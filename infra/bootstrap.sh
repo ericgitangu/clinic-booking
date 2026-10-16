@@ -15,9 +15,19 @@
 #
 # Required env:
 #   PROJECT          GCP project id (sil-clinic-booking)
-#   GCLOUD_ACCOUNT   the account to act as. Passed with --account on every call because the
-#                    machine's active gcloud account is a different one.
-#   BILLING_ACCOUNT  billing account id, used by `project` (dedicated account, Paid, no trial)
+#   GCLOUD_ACCOUNT   the account to act as: the.ace.guru@gmail.com, the project Owner. Use it for
+#                    every mode here (IAM, state bucket, Cloud Run). Passed with --account on
+#                    every call because the machine's active gcloud account is a different one.
+#   BILLING_ACCOUNT  billing account id, used by `project` only: the SHARED account
+#                    01C382-12CD13-DCA6EF ("Firebase Payment"); no dedicated one could be opened.
+#
+# `project` mode is DONE (2026-10-16): sil-clinic-booking (number 291652953712) exists, is linked
+# to the shared billing account and has serviceusage, cloudresourcemanager, storage and run
+# enabled. It was created as the.ace.guru@gmail.com because developer.ericgitangu@gmail.com hit
+# Google's project-creation quota, so the.ace.guru is the Owner and developer holds only
+# roles/editor and roles/billing.projectManager. Do not re-run it; it is kept for the record and
+# is safe to re-run. Billing and budget steps (infra/billing, `make cost-check` C11/C14) run as
+# developer.ericgitangu@gmail.com; nothing in this script needs that account.
 #
 # Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3, no
 # allUsers, custom audience clinic-api. See docs/ for the decision records.
