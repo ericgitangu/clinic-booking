@@ -32,6 +32,12 @@ from app.repositories.errors import is_retryable_conflict, map_integrity_error
 SLOT = timedelta(minutes=30)
 
 
+async def _after_write(session: AsyncSession) -> None:
+    """No-op seam called after a write and before commit. Race tests monkeypatch this to
+    inject a `pg_sleep` that widens the contention window; production keeps the no-op."""
+    return None
+
+
 async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment]]) -> Appointment:
     """Run a write transaction, retrying once on a serialization/deadlock conflict."""
     for attempt in range(2):
@@ -100,6 +106,7 @@ async def book(
             doctor_id=doctor_id,
             fields=booked_event(starts_at, tz),
         )
+        await _after_write(session)
         return appt
 
     return await _run_txn(session, _do)
@@ -132,6 +139,7 @@ async def cancel(
             doctor_id=appt.doctor_id,
             fields=cancelled_event(appt.starts_at, tz),
         )
+        await _after_write(session)
         return appt
 
     return await _run_txn(session, _do)
@@ -176,6 +184,7 @@ async def reschedule(
             doctor_id=appt.doctor_id,
             fields=rescheduled_event(old_starts, new_starts_at, tz),
         )
+        await _after_write(session)
         return appt
 
     return await _run_txn(session, _do)

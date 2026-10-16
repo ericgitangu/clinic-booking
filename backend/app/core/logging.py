@@ -52,6 +52,7 @@ def configure_logging(level: str = "info") -> None:
     # uvicorn's own access log is redundant with ours and unstructured.
     logging.getLogger("uvicorn.access").handlers = []
     logging.getLogger("uvicorn.access").propagate = False
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def access_log(
