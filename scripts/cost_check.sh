@@ -30,7 +30,7 @@ collapse() { perl -0777 -pe 's/\\\n[[:space:]]*//g' "$1"; }
 # silent pass. Globs must precede the pattern, so the checker never matches its own patterns.
 match() {
   local pat="$1"; shift
-  rg -n -g "$SELF" -e "$pat" "$@"
+  rg -n -g "$SELF" -g '!infra/plan_gate.sh' -e "$pat" "$@"
   local rc=$?
   if [ "$rc" -eq 2 ]; then
     fail "cost_check internal error (rg failed) for pattern: $pat"

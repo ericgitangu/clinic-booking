@@ -5,18 +5,33 @@ tag URL, then moves 100% traffic to it. The previous revision keeps its tag (the
 tags and the newest two Artifact Registry versions are retained), so rollback is a traffic
 move, not a rebuild.
 
+Variables (same as `docs/runbooks/bootstrap-gcp.md`); every `gcloud` call passes `--account`
+because the machine's active account is a different one:
+
+```bash
+export PROJECT=sil-clinic-booking
+export GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com
+export WEB=https://<clinic-web production domain>
+export PUBLIC_API="$WEB/api"
+```
+
 ## API
 
 ```bash
 gcloud run services describe clinic-api --region us-east4 --project "$PROJECT" \
+  --account "$GCLOUD_ACCOUNT" \
   --format=json | jq -r '.status.traffic[] | [.tag, .percent, .revisionName] | @tsv'
 
 # send 100% back to the previous tag
 gcloud run services update-traffic clinic-api --region us-east4 --project "$PROJECT" \
-  --to-tags "sha-<previous>=100"
+  --account "$GCLOUD_ACCOUNT" --to-tags "sha-<previous>=100"
 ```
 Never use `--to-latest`. Confirm: `curl -fsS "$PUBLIC_API/readyz"` returns 200 and
-`python scripts/verify_claims.py --base-url "$PUBLIC_API"` is all PASS.
+`python3 scripts/verify_claims.py --base-url "$PUBLIC_API"` is all PASS.
+
+The release keeps exactly two rollback candidates: the revision that is live and the one that
+was live before it. A release that was skipped because a newer commit landed is not a
+candidate and is pruned.
 
 ## Web
 

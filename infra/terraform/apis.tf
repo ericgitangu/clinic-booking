@@ -14,6 +14,8 @@ locals {
     "billingbudgets.googleapis.com",
     "monitoring.googleapis.com",
     "logging.googleapis.com",
+    "cloudresourcemanager.googleapis.com", # project IAM bindings
+    "serviceusage.googleapis.com",         # enabling/reading APIs, user_project_override
   ]
 }
 
