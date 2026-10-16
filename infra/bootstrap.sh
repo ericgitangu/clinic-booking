@@ -1,66 +1,139 @@
 #!/usr/bin/env bash
 #
-# One-time GCP bootstrap, run by the engineer from a laptop with gcloud logged in.
-# It creates ONLY the things Terraform must not own: the state bucket, the Cloud Run
-# service shell, and the run.invoker bindings on that service. Everything else is Terraform.
+# One-time GCP bootstrap, run by the engineer from a laptop. It is split into modes so the
+# run order in docs/runbooks/bootstrap-gcp.md can interleave it with Terraform and CircleCI:
 #
-# NOTHING here runs automatically. Review, set the env vars, then run explicitly.
+#   project   create the project, link billing, enable the APIs Terraform itself needs
+#   state     create the Terraform state bucket (us-east1)
+#   service   create the Cloud Run service shell      (AFTER terraform apply: needs the runtime SA)
+#   invoker   grant run.invoker to the web and smoke  (AFTER terraform apply: needs those SAs)
+#
+# Every mode is safe to re-run. Several modes can be given in one call, e.g.
+#   bash infra/bootstrap.sh project state
+#
+# NOTHING runs on its own. Set DRY_RUN=1 to print each command instead of executing it.
 #
 # Required env:
-#   PROJECT          GCP project id (e.g. sil-clinic-booking)
-#   GCLOUD_ACCOUNT   the account to act as (developer.ericgitangu@gmail.com) -- passed via
-#                    --account on every call, because the active gcloud account differs
-#   BILLING_ACCOUNT  billing account id (dedicated, Paid, no Free Trial)
+#   PROJECT          GCP project id (sil-clinic-booking)
+#   GCLOUD_ACCOUNT   the account to act as. Passed with --account on every call because the
+#                    machine's active gcloud account is a different one.
+#   BILLING_ACCOUNT  billing account id, used by `project` (dedicated account, Paid, no trial)
 #
-# Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3,
-# no allUsers, custom audience clinic-api. See docs/ for the decision records.
+# Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3, no
+# allUsers, custom audience clinic-api. See docs/ for the decision records.
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT}"
 : "${GCLOUD_ACCOUNT:?set GCLOUD_ACCOUNT}"
-: "${BILLING_ACCOUNT:?set BILLING_ACCOUNT}"
 
-G=(gcloud --account "$GCLOUD_ACCOUNT" --project "$PROJECT")
 REGION=us-east4
 BUCKET="gs://clinic-tfstate-${PROJECT}"
+DRY_RUN="${DRY_RUN:-0}"
 
-echo ">>> 1. Terraform state bucket (${BUCKET}, us-east1, versioned, keep 5 noncurrent)"
-"${G[@]}" storage buckets create "$BUCKET" \
-  --location=us-east1 --default-storage-class=STANDARD \
-  --uniform-bucket-level-access --public-access-prevention --soft-delete-duration=0
-"${G[@]}" storage buckets update "$BUCKET" --versioning
-TMP_LIFECYCLE="$(mktemp)"
-cat > "$TMP_LIFECYCLE" <<'JSON'
-{"rule":[{"action":{"type":"Delete"},"condition":{"isLive":false,"numNewerVersions":5}}]}
-JSON
-"${G[@]}" storage buckets update "$BUCKET" --lifecycle-file="$TMP_LIFECYCLE"
-rm -f "$TMP_LIFECYCLE"
+# Run a mutating command, or only print it under DRY_RUN.
+run() {
+  if [ "$DRY_RUN" = 1 ]; then printf '+'; printf ' %q' "$@"; printf '\n'; else "$@"; fi
+}
 
-echo ">>> 2. Cloud Run service shell (hello image; replaced by the first real deploy)"
-# Terraform must NOT manage this service. min=0 max=3, IAM-only, custom audience.
-# Global flags (--account/--project) go after the subcommand so `gcloud run deploy` reads as
-# one token for cost_check.sh --static.
-gcloud run deploy clinic-api \
-  --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
-  --image us-docker.pkg.dev/cloudrun/container/hello \
-  --region "$REGION" \
-  --no-allow-unauthenticated \
-  --min-instances 0 --max-instances 3 \
-  --add-custom-audiences=clinic-api
+# Read-only existence probe. Under DRY_RUN nothing is contacted and nothing "exists", so a dry
+# run prints the full create path.
+exists() {
+  if [ "$DRY_RUN" = 1 ]; then return 1; fi
+  "$@" >/dev/null 2>&1
+}
 
-echo ">>> 3. Invoker bindings (run AFTER 'terraform apply' has created the SAs)"
-echo "    Grant run.invoker to the web proxy and smoke identities only (no allUsers):"
-cat <<CMDS
-  "${G[@]}" run services add-iam-policy-binding clinic-api --region $REGION \\
-    --member=serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com --role=roles/run.invoker
-  "${G[@]}" run services add-iam-policy-binding clinic-api --region $REGION \\
-    --member=serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com --role=roles/run.invoker
-CMDS
-echo "    (printed, not executed: the SAs must exist first)"
+step_project() {
+  : "${BILLING_ACCOUNT:?set BILLING_ACCOUNT for the project mode}"
+  echo ">>> project: create ${PROJECT}, link billing, enable bootstrap APIs"
+  if exists gcloud projects describe "$PROJECT" --account "$GCLOUD_ACCOUNT"; then
+    echo "    project exists"
+  else
+    run gcloud projects create "$PROJECT" --account "$GCLOUD_ACCOUNT" --quiet
+  fi
+  run gcloud billing projects link "$PROJECT" --account "$GCLOUD_ACCOUNT" \
+    --billing-account "$BILLING_ACCOUNT" --quiet
+  # Only what is needed before Terraform can run (and to avoid gcloud's interactive "enable
+  # API?" prompt). Terraform's apis.tf enables and then owns the rest.
+  run gcloud services enable \
+    serviceusage.googleapis.com cloudresourcemanager.googleapis.com \
+    storage.googleapis.com run.googleapis.com \
+    --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --quiet
+}
 
-echo ">>> 4. \$3 gross Cloud Run spend cap (console or Budget API; see docs/runbooks/bootstrap-gcp.md)"
-echo "    Budget API spend-cap support is unverified; set the cap in the console,"
-echo "    scoped to project ${PROJECT} + Cloud Run service (152E-C115-5142), \$3 gross, and"
-echo "    record the budget id in the runbook. This is the only hard spend cap."
+step_state() {
+  echo ">>> state: Terraform state bucket ${BUCKET} (us-east1, versioned, keep 5 noncurrent)"
+  if exists gcloud storage buckets describe "$BUCKET" --account "$GCLOUD_ACCOUNT" --project "$PROJECT"; then
+    echo "    bucket exists"
+  else
+    run gcloud storage buckets create "$BUCKET" \
+      --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
+      --location=us-east1 --default-storage-class=STANDARD \
+      --uniform-bucket-level-access --public-access-prevention --soft-delete-duration=0
+  fi
+  run gcloud storage buckets update "$BUCKET" --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --versioning
+  local lifecycle
+  lifecycle="$(mktemp)"
+  printf '%s\n' '{"rule":[{"action":{"type":"Delete"},"condition":{"isLive":false,"numNewerVersions":5}}]}' > "$lifecycle"
+  run gcloud storage buckets update "$BUCKET" --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
+    --lifecycle-file="$lifecycle"
+  [ "$DRY_RUN" = 1 ] || rm -f "$lifecycle"
+}
 
-echo ">>> bootstrap steps 1-2 done. Run step 3 after terraform apply, then set the budget."
+step_service() {
+  echo ">>> service: Cloud Run service shell (hello image; replaced by the first release)"
+  # Created once and never redeployed from here: re-running must not roll a live service back
+  # to the hello image. Terraform must NOT manage this service.
+  if exists gcloud run services describe clinic-api --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then
+    echo "    clinic-api exists; leaving it untouched"
+    return
+  fi
+  run gcloud run deploy clinic-api \
+    --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
+    --image us-docker.pkg.dev/cloudrun/container/hello \
+    --region "$REGION" \
+    --service-account "clinic-api-runtime@${PROJECT}.iam.gserviceaccount.com" \
+    --no-allow-unauthenticated \
+    --min-instances 0 --max-instances 3 \
+    --add-custom-audiences=clinic-api \
+    --quiet
+}
+
+step_invoker() {
+  echo ">>> invoker: run.invoker for the web proxy and the smoke identity (never allUsers)"
+  local svc sa found=0
+  for svc in clinic-api clinic-realtime; do
+    # clinic-realtime exists only if the optional realtime feature was deployed.
+    if [ "$DRY_RUN" != 1 ] && ! exists gcloud run services describe "$svc" \
+        --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then
+      echo "    $svc does not exist; skipping"
+      continue
+    fi
+    found=1
+    for sa in clinic-web clinic-smoke; do
+      run gcloud run services add-iam-policy-binding "$svc" \
+        --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION" \
+        --member "serviceAccount:${sa}@${PROJECT}.iam.gserviceaccount.com" \
+        --role roles/run.invoker --quiet
+    done
+  done
+  if [ "$found" = 0 ]; then
+    echo "no Cloud Run service found: run the service mode first" >&2
+    return 1
+  fi
+}
+
+if [ "$#" -eq 0 ]; then
+  sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
+  exit 2
+fi
+
+for mode in "$@"; do
+  case "$mode" in
+    project) step_project ;;
+    state) step_state ;;
+    service) step_service ;;
+    invoker) step_invoker ;;
+    *) echo "unknown mode: $mode (use: project state service invoker)" >&2; exit 2 ;;
+  esac
+done
+echo ">>> done: $*"

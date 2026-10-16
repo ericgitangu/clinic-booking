@@ -38,3 +38,14 @@ variable "alert_email" {
   type        = string
   description = "Recipient for the egress alert notification channel."
 }
+
+variable "circleci_gcp_deploy_context_id" {
+  type        = string
+  description = "UUID of the CircleCI gcp-deploy context. Only jobs that use this context can mint a deployer token."
+}
+
+variable "github_repository" {
+  type        = string
+  default     = "ericgitangu/clinic-booking"
+  description = "owner/name of the GitHub repository; matched against the OIDC vcs-origin claim."
+}

@@ -7,3 +7,7 @@ circleci_org_id     = "00000000-0000-0000-0000-000000000000"
 circleci_project_id = "00000000-0000-0000-0000-000000000000"
 vercel_team         = "eric-gitangus-projects"
 alert_email         = "developer.ericgitangu@gmail.com"
+# UUID of the CircleCI "gcp-deploy" context (Organization Settings -> Contexts). Create the
+# context first; Terraform then lets only jobs using it mint the deployer token.
+circleci_gcp_deploy_context_id = "00000000-0000-0000-0000-000000000000"
+github_repository              = "ericgitangu/clinic-booking"
