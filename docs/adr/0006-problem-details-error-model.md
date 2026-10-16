@@ -5,18 +5,23 @@
 - Catalogue: `docs/api-errors.md` (tested against code)
 
 ## Status
+
 Accepted
 
 ## Context
+
 The brief asks for "meaningful errors + correct HTTP status codes". Clients need a stable, machine-readable code, not prose.
 
 ## Considered options
+
 1. Ad hoc `{"detail": "..."}`, which is FastAPI's default.
 2. RFC 9457 `application/problem+json` with a closed catalogue of codes.
 3. A custom error envelope.
 
 ## Decision
+
 Option 2.
+
 - **Shape:** every non-2xx is `{type, title, status, detail, instance, code, request_id, errors}`.
 - **Resolvable types:** `type` is `{PUBLIC_BASE_URL}/problems/<slug>`, and `GET /problems/{slug}` returns that entry.
 - **Domain errors:** a closed hierarchy `DomainError(code, status, title, slug)`, mapped by one exception handler.
@@ -50,11 +55,14 @@ Option 2.
 | INTERNAL_ERROR | 500 | fallback; any `ck_*` violation lands here as a bug |
 
 ## Consequences
+
 - Good: every failure can be told apart by `code`, and every `code` is documented and tested.
 - Bad (a stated deviation from "errors are values"): in FastAPI, a typed exception hierarchy with a single mapping point is the idiomatic equivalent. `tests/unit/test_error_catalogue.py` checks exhaustiveness against `docs/api-errors.md`.
 
 ## Assessment line
+
 "Meaningful errors + correct HTTP status codes".
 
 ## Review trigger
+
 A client that needs localized messages. That means i18n of `title`, keyed by `code`.

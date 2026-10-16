@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.repositories.errors import extract_sqlstate_constraint
+from app.db.errors import extract_sqlstate_constraint
 from tests.conftest import app_sqlalchemy_url, owner_dsn
 
 PHONE = "+254700111222"

@@ -1,0 +1,4 @@
+{
+  "globs": ["README.md", "docs/**/*.md", "backend/**/*.md", "web/**/*.md", ".github/**/*.md"],
+  "ignores": ["**/node_modules/**", "**/.venv/**", "web/.next/**"]
+}

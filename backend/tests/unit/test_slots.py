@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from app.domain.slots import generate_slots, grid_for_date
+from app.domain.slots import Slot, generate_slots, grid_for_date
 
 NAIROBI = ZoneInfo("Africa/Nairobi")
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -11,10 +11,10 @@ OTIENO_MON = [(time(8, 0), time(12, 0)), (time(13, 0), time(17, 0))]
 FAR_PAST = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-def _local_times(slots: list[object], tz: ZoneInfo) -> list[tuple[int, int]]:
+def _local_times(slots: list[Slot], tz: ZoneInfo) -> list[tuple[int, int]]:
     out = []
     for s in slots:
-        local = s.starts_at.astimezone(tz)  # type: ignore[attr-defined]
+        local = s.starts_at.astimezone(tz)
         out.append((local.hour, local.minute))
     return out
 

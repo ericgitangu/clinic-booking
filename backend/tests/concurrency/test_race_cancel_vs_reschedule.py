@@ -35,7 +35,7 @@ async def test_case4_cancel_vs_reschedule_same_appointment(
     reset_appointments: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = make_race_app()
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
         appt_id = await _book(c, AMINA, AT_0900)
 
@@ -68,7 +68,7 @@ async def test_case8_cancel_x_vs_reschedule_y_into_slot(
     reset_appointments: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = make_race_app()
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
         x_id = await _book(c, AMINA, AT_0900)  # X holds 09:00
         y_id = await _book(c, WANJIRU, AT_1300)  # Y at 13:00, will try to move into 09:00

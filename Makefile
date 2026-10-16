@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint cost-static cost-check cost-selftest ci-test shared-headroom
+        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -29,14 +29,24 @@ migrate: ## Run migrations (one-shot)
 seed: ## Run the seed against the running stack
 	docker compose exec -T api python -m app.scripts.seed
 
-lint: ## ruff check + format check
-	$(BE) ruff check . && $(BE) ruff format --check .
+lint: ## markdown, TypeScript, Python (ruff + mypy --strict) and Go, zero warnings (husky and CI call this)
+	pnpm exec markdownlint-cli2
+	pnpm -C web lint
+	pnpm -C web typecheck
+	($(BE) ruff check .) && ($(BE) ruff format --check .)
+	$(BE) mypy --strict app tests migrations
+	@if [ -d services/realtime ]; then \
+	  cd services/realtime && test -z "$$(gofmt -l .)" && go vet ./... && golangci-lint run ./...; \
+	fi
+
+hygiene: ## Repo hygiene: tracked junk, untracked files, AI-code smells
+	bash scripts/repo_hygiene.sh
 
 fmt: ## ruff format + autofix
 	$(BE) ruff format . && $(BE) ruff check --fix .
 
 typecheck: ## mypy --strict
-	$(BE) mypy app
+	$(BE) mypy --strict app tests migrations
 
 test: ## Full test suite
 	$(BE) pytest
@@ -71,8 +81,6 @@ gen-client: ## Regenerate the TS client (web)
 verify: ## Verify live claims (URL=...)
 	uv run --project backend python scripts/verify_claims.py --base-url "$(URL)"
 
-docs-check: ## Check docs links and ADR headings
-	python scripts/docs_check.py
 
 migration-lint: ## Enforce expand-only migrations
 	bash scripts/migration_lint.sh

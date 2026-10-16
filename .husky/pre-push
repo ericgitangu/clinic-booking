@@ -1,1 +1,3 @@
-make typecheck test-unit
+# Scan the commits being pushed, then run the same gates as CI.
+range="@{u}..HEAD"; git rev-parse -q --verify '@{u}' >/dev/null || range="origin/main..HEAD"
+gitleaks git --no-banner --log-opts="$range" && make lint hygiene test-unit

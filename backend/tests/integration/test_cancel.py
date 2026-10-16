@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
 from app.api.deps import get_clock
 from app.core.clock import FakeClock
@@ -64,11 +65,11 @@ async def test_cancel_reason_too_short_422(
 
 
 async def test_cancel_already_started_409(
-    client: httpx.AsyncClient, app_with_clock: object, reset_appointments: None
+    client: httpx.AsyncClient, app_with_clock: FastAPI, reset_appointments: None
 ) -> None:
     appt_id = await _book(client)
     # Advance the clock past the appointment.
-    app_with_clock.dependency_overrides[get_clock] = lambda: FakeClock(  # type: ignore[attr-defined]
+    app_with_clock.dependency_overrides[get_clock] = lambda: FakeClock(
         datetime(2026, 10, 27, 0, 0, tzinfo=UTC)
     )
     resp = await client.patch(f"/appointments/{appt_id}/cancel", json={"reason": "too late now"})

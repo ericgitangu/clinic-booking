@@ -79,7 +79,7 @@ jobs:
           command: cd backend && uv run ruff check . && uv run ruff format --check .
       - run:
           name: mypy --strict
-          command: cd backend && uv run mypy app
+          command: cd backend && uv run mypy --strict app tests migrations
       - run:
           name: migration lint (expand-only) + single head
           command: |
@@ -374,6 +374,7 @@ jobs:
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm audit --prod --audit-level high
+            pnpm exec markdownlint-cli2
             pnpm -C web lint
             pnpm -C web typecheck
             pnpm -C web test
@@ -438,6 +439,12 @@ jobs:
       - run:
           name: Cost guard self-test (every banned flag and bypass, by mutation)
           command: bash scripts/cost_check_selftest.sh
+      - run:
+          name: Repo hygiene
+          command: bash scripts/repo_hygiene.sh
+      - run:
+          name: Repo hygiene self-test
+          command: bash scripts/repo_hygiene_selftest.sh
 
   cost-check:
     machine:

@@ -11,6 +11,7 @@ import asyncpg
 import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.types import ASGIApp
 
 from app.api.deps import get_clock
 from app.core.clock import FakeClock
@@ -20,7 +21,7 @@ from tests.conftest import FIXED_NOW, TEST_PUBLIC_BASE_URL, make_settings, owner
 WAITERS_SQL = "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted"
 
 
-def make_race_app(log_level: str = "warning") -> object:
+def make_race_app(log_level: str = "warning") -> ASGIApp:
     # DB_POOL_SIZE=30 so 25 concurrent requests all get a connection.
     app = create_app(make_settings(DB_POOL_SIZE=30, LOG_LEVEL=log_level))
     app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
@@ -66,12 +67,12 @@ class LockSampler:
 
 
 async def race(
-    app: object,
+    app: ASGIApp,
     task: Callable[[httpx.AsyncClient, int], Awaitable[httpx.Response]],
     n: int,
 ) -> list[httpx.Response]:
     """Release n concurrent requests simultaneously via an asyncio.Barrier."""
-    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     barrier = asyncio.Barrier(n)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as client:
 

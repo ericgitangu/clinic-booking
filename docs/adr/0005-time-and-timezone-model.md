@@ -4,18 +4,23 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted
 
 ## Context
+
 "A patient sees free slots ... on a day." A day only means something in a timezone. "Not in past" needs a single clock that tests can control.
 
 ## Considered options
+
 1. Timezone held in environment config.
 2. Local naive timestamps in storage.
 3. UTC `timestamptz` storage, the clinic's IANA zone stored as data, and an injected clock.
 
 ## Decision
+
 Option 3.
+
 - **Zone as data:** `clinics.timezone`, seeded as `Africa/Nairobi`.
 - **Input:** an RFC 3339 string with an offset.
   - A naive string → 422 `TIMEZONE_REQUIRED`, returned only when every validation error is `timezone_aware`.
@@ -28,13 +33,16 @@ Option 3.
 - **SQL:** business SQL never calls `now`. The current instant is always a bind parameter.
 
 ## Consequences
+
 - Good: a second clinic needs no code change.
 - Good: tests are deterministic and independent of the weekday they run on.
 - Bad: one extra join to read the clinic's zone.
 - Bad: DST tests run in `Europe/Berlin` (spring-forward and fall-back) even though Nairobi has no DST, so the code is proven for zones we don't serve yet.
 
 ## Assessment line
+
 "On a day"; "not in past".
 
 ## Review trigger
+
 A second clinic in a DST zone.

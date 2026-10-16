@@ -12,6 +12,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
@@ -44,13 +45,13 @@ def run_migrations_offline() -> None:
 _ADVISORY_LOCK_KEY = 727001
 
 
-def _do_run_migrations(connection: object) -> None:
+def _do_run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         # Serialize concurrent migrate runs with a transaction-scoped advisory lock: the
         # second runner waits until the first commits, and the lock auto-releases on commit
         # or rollback (no manual unlock, and alembic's commit still covers all the DDL).
-        connection.exec_driver_sql(f"SELECT pg_advisory_xact_lock({_ADVISORY_LOCK_KEY})")  # type: ignore[attr-defined]
+        connection.exec_driver_sql(f"SELECT pg_advisory_xact_lock({_ADVISORY_LOCK_KEY})")
         context.run_migrations()
 
 

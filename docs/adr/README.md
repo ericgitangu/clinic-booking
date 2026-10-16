@@ -28,4 +28,4 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0022](0022-admin-auth-and-bot-protection.md) | Admin-only OAuth and UI bot protection | Accepted (stretch S3 cut 2nd, S4 cut 1st) | "meaningful errors + correct HTTP status codes"; "book online" |
 | [0023](0023-zero-cost-edge-front-door.md) | Zero-cost edge: IAM-gated Cloud Run behind a Vercel front door in North America | Accepted, decided by the engineer 2026-10-16 (; one Vercel project `web`; amends 0010, 0014, 0016, 0022; implementation hardened by the hosting lock review) | "Deploy to any cloud, public URL" under the $0 rule |
 
-**Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make docs-check` enforces the headings and the links.
+**Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make lint` checks the markdown.

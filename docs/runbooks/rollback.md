@@ -26,6 +26,7 @@ gcloud run services describe clinic-api --region us-east4 --project "$PROJECT" \
 gcloud run services update-traffic clinic-api --region us-east4 --project "$PROJECT" \
   --account "$GCLOUD_ACCOUNT" --to-tags "sha-<previous>=100"
 ```
+
 Never use `--to-latest`. Confirm: `curl -fsS "$PUBLIC_API/readyz"` returns 200 and
 `python3 scripts/verify_claims.py --base-url "$PUBLIC_API"` is all PASS.
 
