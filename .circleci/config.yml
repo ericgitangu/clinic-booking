@@ -1,0 +1,154 @@
+version: 2.1
+
+# Cost rules (ADR-0016, §13.3): resource_class small for lint-class jobs, medium otherwise;
+# never large/Gen2; no docker_layer_caching. Docker Official Images are pulled from
+# mirror.gcr.io by digest; cimg/* images authenticate with the free-tier dockerhub-ro token
+# so Docker Hub's shared-IP limits never fail a build.
+
+commands:
+  install_deps:
+    description: Install uv and sync the backend environment from the lockfile.
+    steps:
+      - restore_cache:
+          keys:
+            - uv-v1-{{ checksum "backend/uv.lock" }}
+      - run:
+          name: Install uv
+          command: pip install uv==0.11.28
+      - run:
+          name: uv sync --frozen
+          command: cd backend && uv sync --frozen
+      - save_cache:
+          key: uv-v1-{{ checksum "backend/uv.lock" }}
+          paths:
+            - backend/.venv
+            - ~/.cache/uv
+
+  create_app_role:
+    description: Create the clinic_app role in the CI Postgres (local/CI only).
+    steps:
+      - run:
+          name: Wait for Postgres and create clinic_app
+          command: cd backend && uv run python -m scripts.ci_create_role
+
+executors:
+  backend:
+    docker:
+      - image: cimg/python:3.12
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: small
+    working_directory: ~/repo
+
+  backend_db:
+    docker:
+      - image: cimg/python:3.12
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+      - image: cimg/postgres:17.11
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+        environment:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic
+    resource_class: medium
+    working_directory: ~/repo
+
+jobs:
+  backend-quality:
+    executor: backend
+    steps:
+      - checkout
+      - install_deps
+      - run:
+          name: ruff + format check
+          command: cd backend && uv run ruff check . && uv run ruff format --check .
+      - run:
+          name: mypy --strict
+          command: cd backend && uv run mypy app
+      - run:
+          name: migration lint (expand-only) + single head
+          command: |
+            bash scripts/migration_lint.sh
+            test "$(cd backend && uv run alembic heads | wc -l | tr -d ' ')" -eq 1
+      - run:
+          name: OpenAPI contract is fresh
+          command: |
+            make openapi
+            git diff --exit-code contracts/openapi.json
+
+  backend-test:
+    executor: backend_db
+    steps:
+      - checkout
+      - install_deps
+      - create_app_role
+      - run:
+          name: migrate + seed
+          command: cd backend && DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic uv run alembic upgrade head && DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic uv run python -m app.scripts.seed
+      - run:
+          name: unit + integration + migrations + race + control
+          command: |
+            cd backend
+            uv run pytest tests/unit tests/integration tests/migrations \
+              -m "not race and not control" \
+              --junitxml=test-results/pytest/results.xml \
+              --cov=app --cov-report=xml --cov-fail-under=85
+            uv run pytest -m race -rA
+            uv run pytest -m control -rA
+      - store_test_results:
+          path: backend/test-results
+      - store_artifacts:
+          path: backend/coverage.xml
+
+  backend-contract:
+    executor: backend_db
+    steps:
+      - checkout
+      - install_deps
+      - create_app_role
+      - run:
+          name: migrate + seed
+          command: cd backend && DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic uv run alembic upgrade head && DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic uv run python -m app.scripts.seed
+      - run:
+          name: schemathesis contract tests
+          command: cd backend && uv run pytest tests/contract -q
+
+  secrets:
+    executor: backend
+    steps:
+      - checkout
+      - run:
+          name: gitleaks (full history)
+          command: |
+            VERSION=8.30.1
+            curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+            ./gitleaks git --no-banner
+
+workflows:
+  pr:
+    when:
+      and:
+        - not:
+            equal: [main, << pipeline.git.branch >>]
+        - not: << pipeline.git.tag >>
+    jobs:
+      - backend-quality
+      - backend-test
+      - backend-contract
+      - secrets
+
+  release:
+    when:
+      and:
+        - equal: [main, << pipeline.git.branch >>]
+        - not: << pipeline.git.tag >>
+    jobs:
+      - backend-quality
+      - backend-test
+      - backend-contract
+      - secrets
