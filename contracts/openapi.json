@@ -1084,10 +1084,10 @@
         ]
       }
     },
-    "/healthz": {
+    "/health": {
       "get": {
         "description": "Liveness. Never touches the DB, so it never wakes Neon.",
-        "operationId": "healthz_healthz_get",
+        "operationId": "health_health_get",
         "responses": {
           "200": {
             "content": {
@@ -1100,7 +1100,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Healthz",
+        "summary": "Health",
         "tags": [
           "health"
         ]
@@ -1272,10 +1272,10 @@
         ]
       }
     },
-    "/readyz": {
+    "/ready": {
       "get": {
         "description": "Readiness. A failed SELECT 1 propagates to the DB_UNAVAILABLE handler (503).",
-        "operationId": "readyz_readyz_get",
+        "operationId": "ready_ready_get",
         "responses": {
           "200": {
             "content": {
@@ -1294,7 +1294,7 @@
             "description": "Problem (RFC 9457)"
           }
         },
-        "summary": "Readyz",
+        "summary": "Ready",
         "tags": [
           "health"
         ]

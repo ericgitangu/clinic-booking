@@ -35,7 +35,7 @@ describe("the real route handler", () => {
     for (const segments of [
       ["x", "%2e%2e", "stream"],
       ["x", "%2E%2E", "docs"],
-      ["%2e%2e", "healthz"],
+      ["%2e%2e", "health"],
     ]) {
       const res = await call(segments);
       expect(res.status, segments.join("/")).toBe(404);

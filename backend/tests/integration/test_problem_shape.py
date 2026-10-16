@@ -56,17 +56,17 @@ async def test_unknown_problem_slug_404(client: httpx.AsyncClient) -> None:
 
 async def test_request_id_echoed_when_valid_uuid(client: httpx.AsyncClient) -> None:
     rid = str(uuid.uuid4())
-    resp = await client.get("/healthz", headers={"X-Request-ID": rid})
+    resp = await client.get("/health", headers={"X-Request-ID": rid})
     assert resp.headers["x-request-id"] == rid
 
 
 async def test_request_id_generated_when_invalid(client: httpx.AsyncClient) -> None:
-    resp = await client.get("/healthz", headers={"X-Request-ID": "not-a-uuid"})
+    resp = await client.get("/health", headers={"X-Request-ID": "not-a-uuid"})
     uuid.UUID(resp.headers["x-request-id"])  # a fresh valid one
 
 
 async def test_server_timing_header_present(client: httpx.AsyncClient) -> None:
-    resp = await client.get("/healthz")
+    resp = await client.get("/health")
     st = resp.headers["server-timing"]
     assert "app;dur=" in st and "db;dur=" in st
 

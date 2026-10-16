@@ -27,7 +27,7 @@ export default function Home() {
           <a href="/openapi.json">OpenAPI contract</a>
         </li>
         <li>
-          <a href="/api/healthz">Health</a>
+          <a href="/api/health">Health</a>
         </li>
       </ul>
     </main>

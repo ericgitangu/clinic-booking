@@ -117,8 +117,9 @@ cd ../..
 failure. Do not apply unless it printed `plan_gate: clean`.
 
 This apply also removes `roles/editor` from the default Compute service account
-(`default_sa.tf`, `google_project_default_service_accounts` with `DEPRIVILEGE`); the plan should
-show an update of that resource and no deletion. Our services never use that account (every
+(`default_sa.tf`, `google_project_iam_member_remove`); the plan should show that one binding
+being removed and nothing else. (The provider's `google_project_default_service_accounts` was tried
+first and changed nothing here.) Our services never use that account (every
 deploy passes `--service-account`). Verify afterwards (read-only):
 
 ```bash
@@ -187,7 +188,7 @@ vercel project add clinic-web --scope "$TEAM"
 6. Read the production URL (Project -> Domains, or `vercel project inspect`), then:
 
    ```bash
-   export WEB=https://<clinic-web production domain>
+   export WEB=https://sil-clinic-booking.vercel.app   # clinic-web.vercel.app is taken; claim this alias at the first deploy
    ```
 
    - add `PUBLIC_BASE_URL=$WEB/api` and `WEB_ORIGIN=$WEB` to the `gcp-deploy` context;
@@ -229,6 +230,7 @@ enforce it is UNVERIFIED**.
 
    ```bash
    gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --account "$BILLING_GCLOUD_ACCOUNT" \
+     --billing-project "$PROJECT" \
      --format='value(displayName)'
    ```
 
@@ -253,9 +255,9 @@ release and write the observed result next to each.
 
 | Check | Command | Expected | If not |
 |---|---|---|---|
-| Vercel OIDC -> `generateIdToken` (direct federated, no impersonation hop) | `curl -s -o /dev/null -w '%{http_code}' "$WEB/api/healthz"` | `200` | `502` with `UPSTREAM_AUTH_FAILED`: read `vercel logs`; the proxy logs the STS or IAM status. Switch the role on `clinic-web` in `wif_vercel.tf` to `roles/iam.workloadIdentityUser`, re-apply, retry. |
+| Vercel OIDC -> `generateIdToken` (direct federated, no impersonation hop) | `curl -s -o /dev/null -w '%{http_code}' "$WEB/api/health"` | `200` | `502` with `UPSTREAM_AUTH_FAILED`: read `vercel logs`; the proxy logs the STS or IAM status. Switch the role on `clinic-web` in `wif_vercel.tf` to `roles/iam.workloadIdentityUser`, re-apply, retry. |
 | Vercel functions run in `iad1` only | Vercel dashboard -> the first production deployment -> Functions: the region column | `iad1` (Washington, D.C.) for `/api/[...path]` | The release builds the output offline (`scripts/ci/vercel_offline_build.sh`, so no Vercel token is present during install or build). A local build of that output does **not** carry the `regions: ["iad1"]` pin from `web/vercel.json` (observed: no `iad1` anywhere in `.vercel/output`), and I could not prove here that a prebuilt deploy applies it. `iad1` is also Vercel's default function region. If the dashboard shows anything else, set Settings -> Functions -> Function Region to `iad1` and redeploy. |
-| Cloud Run is IAM-only | `curl -s -o /dev/null -w '%{http_code}' "$RUN_APP_URL/healthz"` | `403` | any `200`: stop, check `run.invoker` bindings for `allUsers`. |
+| Cloud Run is IAM-only | `curl -s -o /dev/null -w '%{http_code}' "$RUN_APP_URL/health"` | `403` | any `200`: stop, check `run.invoker` bindings for `allUsers`. |
 | WIF accepts only the deploy context | `test/wif-deny` branch, a job on context `oidc-probe` that attempts the token exchange | permission denied | the attribute condition in `wif.tf` is not enforcing the context claim. |
 | WIF accepts the deploy job | the first `ship-api` run | green login step | `Permission denied` at `gcp_login.sh`: compare the token's `oidc.circleci.com/*` claims with `local.circleci_attribute_condition`. |
 | Artifact Registry prune permissions | after the third release, `cost-check` job | every package at <= 2 versions | the `clinicImagePruner` role lacks a permission the delete needs. |
