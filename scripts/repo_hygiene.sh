@@ -100,5 +100,24 @@ while IFS= read -r f; do
   done < <(perl -e "$SCAN_PL" "$prod" "$ext" "$f")
 done < <(git ls-files)
 
+# ---- d) dead relative links in the README and docs ----------------------------------------
+# A link must resolve to a tracked file or directory: a file that only exists on this machine
+# would pass an existence test here and 404 on GitHub.
+TRACKED="$(mktemp)"; git ls-files > "$TRACKED"
+while IFS= read -r md; do
+  [ -f "$md" ] || continue
+  while IFS=$'\t' read -r line target; do
+    allowed "$md" "$target" && continue
+    case "$target" in http://*|https://*|mailto:*|\#*|'') continue ;; esac
+    path="${target%%#*}"; path="${path%%\?*}"
+    [ -n "$path" ] || continue
+    resolved="$(perl -MFile::Spec -e 'my ($d,$p)=@ARGV; my $r=$p=~m{^/}?substr($p,1):File::Spec->catfile($d,$p); my @o; for my $s (split m{/}, $r) { next if $s eq "" || $s eq "."; if ($s eq "..") { pop @o } else { push @o,$s } } print join("/",@o)' "$(dirname "$md")" "$path")"
+    if ! grep -qxF -- "$resolved" "$TRACKED" && ! grep -q -- "^${resolved}/" "$TRACKED"; then
+      report "$md:$line: dead-link: $target does not resolve to a tracked file"
+    fi
+  done < <(perl -ne 'while (/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g) { print "$.\t$1\n" }' "$md")
+done < <(git ls-files 'README.md' 'docs/*.md' 'docs/**/*.md')
+rm -f "$TRACKED"
+
 if [ "$FAILS" -eq 0 ]; then echo "repo-hygiene: OK"; else echo "repo-hygiene: $FAILS finding(s)"; fi
 [ "$FAILS" -eq 0 ]

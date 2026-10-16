@@ -68,6 +68,15 @@ printf 'scratch.txt | . |\n' >> "$d/scripts/hygiene_allow.txt"
 N=$((N + 1)); d="$WORK/c$N"; cp -R "$MIN" "$d"; printf '.vscode/\n' >> "$d/.gitignore"; mkdir -p "$d/.vscode"; printf 'x\n' > "$d/.vscode/a.json"
 ( cd "$d" && bash scripts/repo_hygiene.sh >/dev/null 2>&1 ) && ok "ignored untracked file passes" || bad "ignored untracked file passes"
 
+echo "== d) dead links =="
+run_case "dead link in README"        "dead-link" 1 "README.md" 'See [plan](docs/architecture/PLAN.md).'
+run_case "dead link in docs, relative" "dead-link" 1 "docs/a.md" 'See [x](../nope/file.md#top).'
+run_case "link to a path that is not tracked" "dead-link" 1 "docs/b.md" '[s](../scratch.txt)'
+run_case "link to a tracked file"      pass 1 "README.md" '[s](scripts/repo_hygiene.sh)'
+run_case "link to a tracked directory" pass 1 "README.md" '[s](scripts/)'
+run_case "anchor, http and mailto links are skipped" pass 1 "README.md" '[a](#top) [b](https://example.com/x) [c](mailto:a@b.c)'
+run_case "relative link from docs/ resolves" pass 1 "docs/c.md" '[s](../scripts/repo_hygiene.sh)'
+
 echo "== c) smells (backend/app/seed.py, web/src/seed.ts) =="
 PY=backend/app/seed.py; TS=web/src/seed.ts
 smell() { run_case "$1" "$2" 1 "$3" "$4"; }
