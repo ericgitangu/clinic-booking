@@ -135,3 +135,32 @@ Region: **us-east4** (Tier 1, North America free egress SKU). State bucket: **us
 | Neon project region | aws-us-east-1, 0.25 CU fixed (min=max), database `clinic` | §11.1 Q6; confirmed by C13 at bootstrap | 2026-10-16 |
 | Neon `max_prepared_transactions` | deferred: resolved live at the WP-S1a precondition (stretch; not in lean-core WP-00 scope), expected `0` | STRETCH WP-S1a precondition | 2026-10-16 |
 | Vercel plan | Hobby, team `eric-gitangus-projects`, project `clinic-web`, region `iad1`, git deploys off | §11.1 Q4/Q16; confirmed by C15 | 2026-10-16 |
+
+## 10. Web proxy project (WP-11 Part C) — resolved 2026-10-16
+
+Registry (`npm view`/registry latest at pin time) unless noted. CDN assets are pinned exactly
+and loaded from jsDelivr (the CDN FastAPI's default docs use).
+
+| Package | Version | Notes |
+|---|---|---|
+| next | 16.4.2 | App Router, Turbopack |
+| react / react-dom | 19.3.1 | |
+| @vercel/oidc | 4.0.1 | `getVercelOidcToken` for the WIF exchange |
+| typescript | 5.9.3 | stable 5.x (TS 7 / native compiler avoided for Next 16) |
+| eslint | 9.39.5 | flat config |
+| @eslint/js | 9.39.5 | matched to eslint 9 (10.x needs eslint 10) |
+| typescript-eslint | 8.71.2 | flat config preset |
+| @next/eslint-plugin-next | 16.4.2 | recommended + core-web-vitals rules |
+| globals | 17.13.0 | node globals for build scripts |
+| vitest | 5.0.5 | proxy unit tests |
+| prettier | 3.9.10 | |
+| @types/node | 26.6.5 | |
+| @types/react / @types/react-dom | 19.3.0 | |
+| swagger-ui-dist (CDN) | 5.33.3 | `/docs` static page |
+| redoc (CDN) | 3.0.1 | `/redoc` static page |
+
+**eslint note:** `eslint-config-next` via `FlatCompat` hit a circular-ref validation bug on
+eslint 9; replaced with a native flat config (`typescript-eslint` + `@next/eslint-plugin-next`).
+**Build facts:** `next build` route table — `/`, `/docs`, `/redoc`, `/openapi.json` static (○),
+`/api/[...path]` dynamic (ƒ). Local validation (no deploy): eslint, `tsc --noEmit`, vitest
+(17 tests), `next build` all green.
