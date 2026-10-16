@@ -173,7 +173,9 @@ jobs:
             VERSION=0.76.0
             curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" | tar -xz trivy
             ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 clinic-api:ci
-            ./trivy config infra backend/Dockerfile
+            # trivy config takes ONE path per call; scan the Dockerfile, and infra/ once it exists.
+            ./trivy config --exit-code 1 backend/Dockerfile
+            if [ -d infra ]; then ./trivy config --exit-code 1 infra; fi
 
   dast:
     machine:

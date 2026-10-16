@@ -55,8 +55,16 @@ async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment
     raise ConcurrentUpdate()
 
 
-async def _clinic_tz(session: AsyncSession, doctor_id: uuid.UUID) -> ZoneInfo:
-    doctor = await doctor_repo.get_active_doctor(session, doctor_id)
+async def _clinic_tz(
+    session: AsyncSession, doctor_id: uuid.UUID, *, require_active: bool = True
+) -> ZoneInfo:
+    # Reschedule requires the doctor to still be active (§6 row 12 -> UNKNOWN_DOCTOR);
+    # cancel does not (you can always cancel, even if the doctor was since deactivated).
+    doctor = (
+        await doctor_repo.get_active_doctor(session, doctor_id)
+        if require_active
+        else await doctor_repo.get_doctor(session, doctor_id)
+    )
     if doctor is None:
         raise UnknownDoctor()
     clinic = await doctor_repo.get_clinic(session, doctor.clinic_id)
@@ -128,7 +136,7 @@ async def cancel(
         now = clock.now()
         if appt.starts_at <= now:
             raise AppointmentAlreadyStarted()
-        tz = await _clinic_tz(session, appt.doctor_id)
+        tz = await _clinic_tz(session, appt.doctor_id, require_active=False)
         appt.status = "cancelled"
         appt.cancelled_at = now
         appt.cancellation_reason = reason

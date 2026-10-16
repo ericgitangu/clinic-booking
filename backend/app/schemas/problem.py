@@ -64,9 +64,36 @@ class ProblemEntry(BaseModel):
 
 
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, object]]:
-    """Declare problem+json responses for the given statuses, so the OpenAPI spec lists
-    every status a route can return (schemathesis status-code conformance)."""
+    """Declare error responses with the real media type. The ``{"model": ...}`` shortcut is
+    hard-wired to application/json in FastAPI, but the handler emits
+    application/problem+json (ADR-0006), so the content type is set explicitly here."""
     return {
-        status: {"model": Problem, "description": "Problem (application/problem+json)"}
+        status: {
+            "model": Problem,
+            "description": "Problem (RFC 9457)",
+            "content": {"application/problem+json": {}},
+        }
         for status in statuses
     }
+
+
+def strip_json_from_error_responses(spec: dict[str, object]) -> None:
+    """Error responses carry only application/problem+json. FastAPI's {"model": ...} shortcut
+    also adds an application/json entry the server never emits; drop it so the contract is
+    honest (the problem+json entry keeps the Problem schema referenced in components)."""
+    paths = spec.get("paths", {})
+    assert isinstance(paths, dict)  # noqa: S101
+    for operations in paths.values():
+        for operation in operations.values():
+            if not isinstance(operation, dict):
+                continue
+            for status, response in operation.get("responses", {}).items():
+                if status[:1] not in ("4", "5"):
+                    continue
+                # Every error the API emits is application/problem+json; drop FastAPI's
+                # auto-added application/json (incl. the spurious HTTPValidationError on
+                # routes whose only param cannot fail validation).
+                content = response.get("content", {})
+                content.pop("application/json", None)
+                if not content:
+                    response.pop("content", None)

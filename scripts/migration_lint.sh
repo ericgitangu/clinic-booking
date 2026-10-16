@@ -5,7 +5,10 @@
 set -euo pipefail
 
 VERSIONS_DIR="backend/migrations/versions"
-DESTRUCTIVE='DROP TABLE|DROP COLUMN|DROP CONSTRAINT|DROP INDEX|ALTER COLUMN|DROP NOT NULL|DROP DEFAULT|RENAME'
+# Case-insensitive; catches both raw SQL (op.execute) and the Alembic Python API
+# (op.drop_table/op.drop_column/op.drop_constraint/op.drop_index/op.alter_column/op.rename_*),
+# plus TRUNCATE/DELETE. grep -iE is applied below.
+DESTRUCTIVE='drop table|drop column|drop constraint|drop index|alter column|drop not null|drop default|\brename\b|truncate|\bdelete\b|op\.drop_|op\.alter_column|op\.rename_'
 
 status=0
 shopt -s nullglob
@@ -19,7 +22,7 @@ for f in "$VERSIONS_DIR"/*.py; do
 
   while IFS= read -r line; do
     [ -z "$line" ] && continue
-    if printf '%s\n' "$line" | grep -Eq "$DESTRUCTIVE"; then
+    if printf '%s\n' "$line" | grep -iEq "$DESTRUCTIVE"; then
       if printf '%s\n' "$line" | grep -q '# contract-ok'; then
         continue
       fi

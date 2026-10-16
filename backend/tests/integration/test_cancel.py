@@ -74,3 +74,26 @@ async def test_cancel_already_started_409(
     resp = await client.patch(f"/appointments/{appt_id}/cancel", json={"reason": "too late now"})
     assert resp.status_code == 409
     assert resp.json()["code"] == "APPOINTMENT_ALREADY_STARTED"
+
+
+async def test_cancel_after_doctor_deactivated(
+    client: httpx.AsyncClient, reset_appointments: None
+) -> None:
+    import uuid as _uuid
+
+    import asyncpg
+
+    from tests.conftest import owner_dsn
+
+    appt_id = await _book(client)  # booked while the doctor is active
+    conn = await asyncpg.connect(owner_dsn())
+    try:
+        await conn.execute("UPDATE doctors SET is_active = false WHERE id = $1", _uuid.UUID(OTIENO))
+        resp = await client.patch(
+            f"/appointments/{appt_id}/cancel", json={"reason": "doctor since deactivated"}
+        )
+        assert resp.status_code == 200, resp.text  # cancel works regardless of doctor status
+        assert resp.json()["status"] == "cancelled"
+    finally:
+        await conn.execute("UPDATE doctors SET is_active = true WHERE id = $1", _uuid.UUID(OTIENO))
+        await conn.close()

@@ -15,6 +15,7 @@ from app.core.cors import add_cors
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.problems import register_exception_handlers
+from app.schemas.problem import strip_json_from_error_responses
 
 
 def create_app(settings: Settings) -> FastAPI:
@@ -40,6 +41,16 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(doctors.router)
     app.include_router(patients.router)
     app.include_router(appointments.router)
+
+    # Error responses carry only application/problem+json in the served spec, too.
+    _default_openapi = app.openapi
+
+    def _openapi() -> dict[str, object]:
+        schema = _default_openapi()
+        strip_json_from_error_responses(schema)
+        return schema
+
+    app.openapi = _openapi  # type: ignore[method-assign]
     return app
 
 
