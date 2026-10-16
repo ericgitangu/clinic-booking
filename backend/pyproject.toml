@@ -74,6 +74,12 @@ no_implicit_reexport = true
 module = ["tests.*"]
 disallow_untyped_defs = false
 
+[tool.coverage.run]
+source = ["app"]
+# The ASGI app runs under the test's async runner; trace every context so service code
+# invoked through httpx.ASGITransport is measured, not just imported.
+concurrency = ["thread", "greenlet"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

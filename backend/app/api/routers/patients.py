@@ -12,6 +12,7 @@ from app.repositories import appointments as appt_repo
 from app.repositories import patients as patient_repo
 from app.schemas.appointment import AppointmentWithDoctor, DoctorRef, PatientAppointments
 from app.schemas.patient import Patient, PatientCreate
+from app.schemas.problem import problem_responses
 from app.services.patients import create_patient
 
 router = APIRouter(tags=["patients"])
@@ -19,7 +20,9 @@ router = APIRouter(tags=["patients"])
 _NO_STORE = {"Cache-Control": "no-store"}
 
 
-@router.post("/patients", response_model=Patient, status_code=201)
+@router.post(
+    "/patients", response_model=Patient, status_code=201, responses=problem_responses(409, 422)
+)
 async def post_patient(
     body: PatientCreate,
     response: Response,
@@ -31,7 +34,11 @@ async def post_patient(
     return Patient.model_validate(patient)
 
 
-@router.get("/patients/{patient_id}/appointments", response_model=PatientAppointments)
+@router.get(
+    "/patients/{patient_id}/appointments",
+    response_model=PatientAppointments,
+    responses=problem_responses(404, 422),
+)
 async def patient_appointments(
     patient_id: uuid.UUID,
     response: Response,

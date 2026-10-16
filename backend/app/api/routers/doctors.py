@@ -15,6 +15,7 @@ from app.models.working_hours import WorkingHours
 from app.repositories import doctors as doctor_repo
 from app.schemas.availability import Availability
 from app.schemas.doctor import Clinic, Doctor, DoctorList, WorkingWindow
+from app.schemas.problem import problem_responses
 from app.services.availability import get_availability
 
 router = APIRouter(tags=["doctors"])
@@ -59,7 +60,7 @@ async def list_doctors(
     return DoctorList(items=items)
 
 
-@router.get("/doctors/{doctor_id}", response_model=Doctor)
+@router.get("/doctors/{doctor_id}", response_model=Doctor, responses=problem_responses(404, 422))
 async def get_doctor(
     doctor_id: uuid.UUID,
     response: Response,
@@ -73,7 +74,11 @@ async def get_doctor(
     return await _to_schema(session, doctor, windows)
 
 
-@router.get("/doctors/{doctor_id}/availability", response_model=Availability)
+@router.get(
+    "/doctors/{doctor_id}/availability",
+    response_model=Availability,
+    responses=problem_responses(404, 422),
+)
 async def doctor_availability(
     doctor_id: uuid.UUID,
     response: Response,

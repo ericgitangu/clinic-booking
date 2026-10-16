@@ -57,7 +57,7 @@ sec: ## Local security checks (SAST/DAST run in CI)
 	$(BE) pip-audit
 
 openapi: ## Export the OpenAPI contract
-	$(BE) python scripts/export_openapi.py
+	$(BE) python -m scripts.export_openapi
 
 gen-client: ## Regenerate the TS client (web)
 	pnpm -C web gen:api

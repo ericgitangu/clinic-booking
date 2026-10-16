@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.db.session import get_engine
+from app.schemas.problem import problem_responses
 
 router = APIRouter(tags=["health"])
 
@@ -23,7 +24,7 @@ async def healthz() -> Health:
     return Health(status="ok")
 
 
-@router.get("/readyz", response_model=Health)
+@router.get("/readyz", response_model=Health, responses=problem_responses(503))
 async def readyz(request: Request) -> Health:
     """Readiness. A failed SELECT 1 propagates to the DB_UNAVAILABLE handler (503)."""
     engine = get_engine(request.app.state.settings)
