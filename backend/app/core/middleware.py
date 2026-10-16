@@ -50,6 +50,9 @@ class RequestContextMiddleware:
         request_id = inbound if (inbound and _valid_uuid(inbound)) else str(uuid.uuid4())
         trace = _header(scope, b"x-cloud-trace-context")
 
+        # Stash on the scope too: the catch-all 500 handler runs in Starlette's
+        # ServerErrorMiddleware, outside this middleware, after the contextvar is reset.
+        scope["clinic.request_id"] = request_id
         req_token = request_id_ctx.set(request_id)
         db_token = db_time_ms_ctx.set(0.0)
         code_token = problem_code_ctx.set(None)

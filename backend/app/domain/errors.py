@@ -171,3 +171,52 @@ class SlotMisaligned(DomainError):
 
 class OutsideWorkingHours(DomainError):
     code = "OUTSIDE_WORKING_HOURS"
+
+
+# Service / repository-raised errors (WP-07). Additive to the closed hierarchy.
+class UnknownDoctor(DomainError):
+    code = "UNKNOWN_DOCTOR"
+
+
+class UnknownPatient(DomainError):
+    code = "UNKNOWN_PATIENT"
+
+
+class SlotTaken(DomainError):
+    code = "SLOT_TAKEN"
+
+
+class PatientDoubleBooked(DomainError):
+    code = "PATIENT_DOUBLE_BOOKED"
+
+
+class PatientPhoneExists(DomainError):
+    code = "PATIENT_PHONE_EXISTS"
+
+
+class ConcurrentUpdate(DomainError):
+    code = "CONCURRENT_UPDATE"
+
+
+class AppointmentAlreadyCancelled(DomainError):
+    code = "APPOINTMENT_ALREADY_CANCELLED"
+
+
+class AppointmentAlreadyStarted(DomainError):
+    code = "APPOINTMENT_ALREADY_STARTED"
+
+
+class DoctorNotFound(DomainError):
+    code = "DOCTOR_NOT_FOUND"
+
+
+class PatientNotFound(DomainError):
+    code = "PATIENT_NOT_FOUND"
+
+
+class AppointmentNotFound(DomainError):
+    code = "APPOINTMENT_NOT_FOUND"
+
+
+class DbUnavailable(DomainError):
+    code = "DB_UNAVAILABLE"

@@ -35,6 +35,15 @@ def _public_base_url(request: Request) -> str:
     return str(settings.PUBLIC_BASE_URL).rstrip("/")
 
 
+def _request_id(request: Request) -> str:
+    # The scope value survives after the request-context middleware has reset the contextvar
+    # (the catch-all 500 handler runs outside that middleware).
+    scoped = request.scope.get("clinic.request_id")
+    if isinstance(scoped, str) and scoped:
+        return scoped
+    return request_id_ctx.get() or "00000000-0000-0000-0000-000000000000"
+
+
 def build_problem(
     request: Request,
     code: str,
@@ -52,7 +61,7 @@ def build_problem(
         "detail": detail or spec.description,
         "instance": request.url.path,
         "code": code,
-        "request_id": request_id_ctx.get() or "00000000-0000-0000-0000-000000000000",
+        "request_id": _request_id(request),
         "errors": errors,
     }
     return JSONResponse(
@@ -102,7 +111,7 @@ async def _catch_all_handler(request: Request, exc: Exception) -> JSONResponse:
     logging.getLogger(APP_LOGGER).error(
         "unhandled exception",
         exc_info=exc,
-        extra={"request_id": request_id_ctx.get()},
+        extra={"request_id": _request_id(request)},
     )
     return build_problem(request, "INTERNAL_ERROR")
 
