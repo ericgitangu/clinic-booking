@@ -15,7 +15,9 @@
 # wrong must be fixed, never dropped.
 #
 # Optional env for --live:  PROJECT (required), GCLOUD_ACCOUNT (passed as --account when set),
-# BILLING_ACCOUNT (for the budget checks), NEON_PROJECT_ID (for the Neon check).
+# BILLING_ACCOUNT and BILLING_GCLOUD_ACCOUNT (billing reads C11/C14; defaults to GCLOUD_ACCOUNT,
+# which for this project is the Owner, a different user from the one holding billing rights),
+# NEON_PROJECT_ID (for the Neon check).
 #
 set -uo pipefail
 
@@ -71,6 +73,7 @@ my @order = (
   "manual-scaling flag", "managed build or --source", "region outside us-east4/us-east1",
   "resource_class outside small/medium", "docker_layer_caching enabled", "docker build flags",
   "docker pull or cache-from", "terraform banned resource or API",
+  "run deploy missing --service-account",
 );
 my %hits; my $lines = 0; my $deploys = 0;
 sub hit { my ($c, $l) = @_; $hits{$c}{$l} = 1; }
@@ -90,6 +93,10 @@ while (my $row = <STDIN>) {
       $deploys++;
       hit("min-instances missing or not 0", $label) unless $line =~ /--min-instances[= ]+0(?!\d)/;
       hit("max-instances missing", $label)          unless $line =~ /--max-instances[= ]+[1-3](?!\d)/;
+    }
+    # The default Compute service account holds roles/editor; a service must never fall back to it.
+    if ($line =~ /\brun\s+(?:jobs\s+)?deploy\b/) {
+      hit("run deploy missing --service-account", $label) unless $line =~ /--service-account[= ]+\S/;
     }
     if ($line =~ /\brun\s+jobs\s+deploy\b/) {
       hit("job missing --task-timeout or --max-retries 0", $label)
@@ -161,6 +168,14 @@ static_checks() {
   done <<< "$out"
   rm -f "$LINES"
 
+  # The default Compute SA's Editor grant is removed by Terraform (infra/terraform/default_sa.tf).
+  if grep -rhvE '^[[:space:]]*(#|//)' infra/terraform --include='*.tf' 2>/dev/null \
+       | tr '\n' ' ' | grep -qE 'google_project_default_service_accounts"[^{]*\{[^}]*action[[:space:]]*=[[:space:]]*"DEPRIVILEGE"'; then
+    pass "terraform deprivileges the default service accounts"
+  else
+    fail "terraform does not DEPRIVILEGE the default service accounts (google_project_default_service_accounts)"
+  fi
+
   # ---- web: Vercel region and git deploys, Next images, regions, route layout ----
   local vj found_vj=0
   while IFS= read -r vj; do
@@ -227,6 +242,11 @@ REGION=us-east4
 
 gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
   if [ -n "${GCLOUD_ACCOUNT:-}" ]; then gcloud --account "$GCLOUD_ACCOUNT" "$@"; else gcloud "$@"; fi
+}
+
+gcb() { # billing-account reads: BILLING_GCLOUD_ACCOUNT (the billing user), else GCLOUD_ACCOUNT
+  local a="${BILLING_GCLOUD_ACCOUNT:-${GCLOUD_ACCOUNT:-}}"
+  if [ -n "$a" ]; then gcloud --account "$a" "$@"; else gcloud "$@"; fi
 }
 
 live_checks() {
@@ -316,7 +336,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API.
   if [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c11
-    c11="$(gc billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
+    c11="$(gcb billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
     [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap action: confirm in the console)" || fail "C11 budgets '${c11:-unreadable}'"
   else
     fail "C11 skipped: set BILLING_ACCOUNT to check the budgets"
@@ -338,13 +358,26 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     echo "SKIP  C13 Neon region and size: needs neonctl and NEON_PROJECT_ID (check the console instead)"
   fi
 
-  # C14: only this project is linked to the billing account.
+  # C14: the billing account is SHARED (PLAN 11.1 Q14), so the free tiers are shared with the
+  # projects in scripts/shared_billing_projects.txt. A project that joins (or leaves) the account
+  # changes the headroom and must be re-measured with scripts/shared_headroom.py first.
   if [ -n "${BILLING_ACCOUNT:-}" ]; then
-    local c14
-    c14="$(gc billing projects list --billing-account "$BILLING_ACCOUNT" --format='value(projectId)' 2>/dev/null | sort | tr '\n' ' ')"
-    [ "$c14" = "$PROJECT " ] && pass "C14 only $PROJECT is linked to the billing account" || fail "C14 projects on the billing account: ${c14:-unreadable}"
+    local c14 want14
+    c14="$(gcb billing projects list --billing-account "$BILLING_ACCOUNT" --format='value(projectId)' 2>/dev/null | sort | tr '\n' ' ')"
+    want14="$(sort scripts/shared_billing_projects.txt | tr '\n' ' ')"
+    [ "$c14" = "$want14" ] && pass "C14 billing account holds exactly the recorded projects" || fail "C14 projects on the billing account: ${c14:-unreadable} (recorded: $want14)"
   else
     fail "C14 skipped: set BILLING_ACCOUNT"
+  fi
+
+  # C20: the default Compute service account has no roles/editor (Terraform deprivileges it).
+  local num c20
+  num="$(gc projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null)"
+  if [ -n "$num" ]; then
+    c20="$(gc projects get-iam-policy "$PROJECT" --format=json 2>/dev/null | jq -r --arg m "serviceAccount:${num}-compute@developer.gserviceaccount.com" '[.bindings[]? | select(.role == "roles/editor") | .members[]? | select(. == $m)] | length')"
+    [ "$c20" = 0 ] && pass "C20 default Compute SA has no roles/editor" || fail "C20 default Compute SA roles/editor bindings: ${c20:-unreadable}"
+  else
+    fail "C20 could not read the project number"
   fi
 
   # C18: logging stays default plus the one free exclusion.
