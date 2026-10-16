@@ -27,7 +27,7 @@ gcloud run services update-traffic clinic-api --region us-east4 --project "$PROJ
   --account "$GCLOUD_ACCOUNT" --to-tags "sha-<previous>=100"
 ```
 
-Never use `--to-latest`. Confirm: `curl -fsS "$PUBLIC_API/readyz"` returns 200 and
+Never use `--to-latest`. Confirm: `curl -fsS "$PUBLIC_API/ready"` returns 200 and
 `python3 scripts/verify_claims.py --base-url "$PUBLIC_API"` is all PASS.
 
 The release keeps exactly two rollback candidates: the revision that is live and the one that

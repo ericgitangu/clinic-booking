@@ -247,7 +247,7 @@ describe("double-encoded traversal", () => {
   const encoded: [string, string[]][] = [
     ["lowercase %2e%2e", ["x", "%2e%2e", "stream"]],
     ["uppercase %2E%2E", ["x", "%2E%2E", "docs"]],
-    ["leading %2e%2e", ["%2e%2e", "healthz"]],
+    ["leading %2e%2e", ["%2e%2e", "health"]],
     ["single %2e", ["x", "%2e", "y"]],
     ["mixed .%2e", ["x", ".%2e", "y"]],
     ["encoded slash %2f", ["x%2fy"]],
@@ -266,7 +266,7 @@ describe("buildTarget refuses any path the URL parser would rewrite", () => {
   it.each([
     ["/x/%2e%2e/stream"],
     ["/x/%2E%2E/docs"],
-    ["/%2e%2e/healthz"],
+    ["/%2e%2e/health"],
     ["/x/../stream"],
     ["/x/./y"],
   ])("%s -> null", (path) => {

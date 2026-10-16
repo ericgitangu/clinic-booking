@@ -29,7 +29,7 @@ Option 1.
   - The engine uses `hide_parameters=True`, so SQLAlchemy exception strings never carry bound values.
   - A redaction unit test covers the formatter.
   - An integration test forces a CHECK violation and asserts that neither the reason nor the patient id reaches the logs.
-- **Health:** `/healthz` is liveness and never touches the DB, so it never wakes Neon. `/readyz` runs `SELECT 1`.
+- **Health:** `/health` is liveness and never touches the DB, so it never wakes Neon. `/ready` runs `SELECT 1`. The names avoid `/healthz`: Google's frontend answers that path itself on Cloud Run (a 404 before the request reaches the service), so it can never be probed there.
 
 ## Consequences
 

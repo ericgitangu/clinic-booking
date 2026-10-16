@@ -47,7 +47,7 @@ Accepted
 **Database connection:**
 
 - Neon Free project in **aws-us-east-1** (amended from aws-eu-central-1, so the database stays beside Cloud Run us-east4), compute fixed at **0.25 CU** (autoscaling min = max = 0.25). Neon Free gives 100 CU-hours per project a month and suspends rather than bills when they run out (neon.com/docs/introduction/plans, read 2026-10-16); an always-awake 0.25 CU compute would use 186 CU-hours a month (744 h × 0.25, deduced), so scale-to-zero must keep working and nothing may ping the database on a schedule.
-- The direct (non-pooler) Neon endpoint, with `postgresql+asyncpg://...?ssl=require`. There are no `sslmode` or `channel_binding` params, and a config validator rejects them (**unverified**; `/readyz` check confirms it).
+- The direct (non-pooler) Neon endpoint, with `postgresql+asyncpg://...?ssl=require`. There are no `sslmode` or `channel_binding` params, and a config validator rejects them (**unverified**; `/ready` check confirms it).
 - Pool: `pool_size=5, max_overflow=0, pool_pre_ping=True, pool_recycle=240, hide_parameters=True`, so at most 15 connections. Using the direct endpoint avoids asyncpg statement-cache issues behind PgBouncer.
 
 **Other components:**

@@ -274,7 +274,7 @@ live_checks() {
     done <<< "$c1"
   fi
 
-  # C3 probes /readyz: Google's frontend answers /healthz itself with a 404, so it can never show the IAM result.
+  # C3 probes /ready, not /healthz: Google's frontend answers /healthz itself with a 404, so that path can never show the IAM result.
   # C2 + C3: invoker members are EXACTLY the web and smoke identities; direct run.app is an IAM denial.
   local svc want got dis url c403 c401
   want="serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
@@ -289,8 +289,8 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
       fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
     fi
     url="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
-    c403="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/readyz")"
-    c401="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Serverless-Authorization: Bearer junk' "$url/readyz")"
+    c403="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/ready")"
+    c401="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Serverless-Authorization: Bearer junk' "$url/ready")"
     if [ "$c403" = 403 ] && [ "$c401" = 401 ]; then pass "C3 $svc run.app 403 / junk-bearer 401"; else fail "C3 $svc run.app returned $c403 / $c401 (want 403 / 401)"; fi
   done
 

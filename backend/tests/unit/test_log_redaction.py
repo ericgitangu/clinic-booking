@@ -45,7 +45,7 @@ def test_allowlisted_fields_present() -> None:
     record = _record(
         request_id="rid-2",
         method="GET",
-        route="/healthz",
+        route="/health",
         status=200,
         latency_ms=1.23,
         code="NOT_FOUND",
@@ -54,7 +54,7 @@ def test_allowlisted_fields_present() -> None:
     assert out["severity"] == "INFO"
     assert out["message"] == "request"
     assert out["method"] == "GET"
-    assert out["route"] == "/healthz"
+    assert out["route"] == "/health"
     assert out["code"] == "NOT_FOUND"
 
 
