@@ -33,3 +33,6 @@ zap-report.html
 infra/terraform/terraform.tfvars
 *.tfplan
 tfplan
+
+# local AI prompt log, not committed
+docs/ai/
