@@ -28,3 +28,8 @@ zap-report.html
 
 # husky regenerates this on install (prepare)
 .husky/_/
+
+# terraform: real vars and plans are never committed (only the .example)
+infra/terraform/terraform.tfvars
+*.tfplan
+tfplan
