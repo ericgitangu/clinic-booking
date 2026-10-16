@@ -1537,7 +1537,7 @@ Lean-core cut order, unchanged:
 
 | Q | Answer |
 |---|---|
-| 1 | New GCP project `sil-clinic-booking`, owned by developer.ericgitangu@gmail.com, linked to a **dedicated** billing account that the engineer reopens for this project only (one of the closed accounts, e.g. `019163-3D185D-0ACEAD`). It is not linked to "Firebase Payment" (`01C382-12CD13-DCA6EF`). Approval to run `infra/bootstrap.sh` and `terraform apply` is given per run by the engineer. |
+| 1 | New GCP project `sil-clinic-booking`, ~~owned by developer.ericgitangu@gmail.com, linked to a **dedicated** billing account that the engineer reopens for this project only (one of the closed accounts, e.g. `019163-3D185D-0ACEAD`). It is not linked to "Firebase Payment" (`01C382-12CD13-DCA6EF`).~~ **amended 2026-10-16 (engineer's decision; project and link verified live):** project number `291652953712`, ACTIVE, **owned by `the.ace.guru@gmail.com`** (created there because `developer.ericgitangu@gmail.com` hit Google's project-creation quota; developer holds `roles/editor` and `roles/billing.projectManager`). Billing is linked to the **shared** account `01C382-12CD13-DCA6EF` ("Firebase Payment"), `billingEnabled=True`; it has 5 of 5 project slots in use and no dedicated account could be opened. **Accounts per step:** every IAM, Terraform and WIF step runs as `the.ace.guru@gmail.com` (`GCLOUD_ACCOUNT`, the Owner); billing and budget steps (`infra/billing`, `make cost-check` C11/C14) run as `developer.ericgitangu@gmail.com` (`BILLING_GCLOUD_ACCOUNT`). `bootstrap.sh project` is done. APIs enabled so far: serviceusage, cloudresourcemanager, storage, run. Approval to run `infra/bootstrap.sh` and `terraform apply` is given per run by the engineer. |
 | 2 | CircleCI org and project IDs are read after the GitHub repo is connected to CircleCI (the local CLI config could not be parsed). The contexts `gcp-deploy`, `vercel-prod` and `oidc-probe` are approved, restricted to `main`. |
 | 3 | Repository `ericgitangu/clinic-booking`, public before the first CI PR. |
 | 4 | Vercel team `eric-gitangus-projects`, a single project `clinic-web`. |
@@ -1549,10 +1549,10 @@ Lean-core cut order, unchanged:
 | 10 | Accepted: smoke-test and reviewer patients accumulate in prod until after grading (TD15). |
 | 11, 12 | Google OAuth client and Turnstile keys are created by the engineer, and only if S3 or S4 is reached. |
 | 13 | Confirmed as written. |
-| 14 | The dedicated account is a Paid account (no Free Trial), with its own budget and alerts. |
-| 15 | **Resolved by Q1.** "Firebase Payment" carries 10 Cloud Run services in other projects (nanolend-api 5, master-crossing-435409-r1 3, pawacloud-assessment 2, observed 2026-10-16), which would share the per-billing-account free tiers. The dedicated account carries only `sil-clinic-booking`, so §13 stays valid as computed. C14 asserts exactly one project on the account. |
+| 14 | ~~The dedicated account is a Paid account (no Free Trial), with its own budget and alerts.~~ **Amended 2026-10-16:** the account is the shared "Firebase Payment" account, so there is no dedicated account and no account of our own. It is `open=True`; whether it is Paid or a Free Trial is **UNVERIFIED** (the Billing API does not expose it; check the console before the first deploy, K42). The budgets are scoped to this project (`infra/billing`), not to the account, because the account already bills other projects (§13.8). |
+| 15 | ~~**Resolved by Q1.** "Firebase Payment" carries 10 Cloud Run services in other projects (nanolend-api 5, master-crossing-435409-r1 3, pawacloud-assessment 2, observed 2026-10-16), which would share the per-billing-account free tiers. The dedicated account carries only `sil-clinic-booking`, so §13 stays valid as computed. C14 asserts exactly one project on the account.~~ **Reopened by Q1's amendment.** The account carries 5 projects (ours, `nanolend-api`, `master-crossing-435409-r1`, `pawacloud-assessment`, `unicorns-484301`) and 14 Cloud Run services in the other four (observed 2026-10-16), so the free tiers are shared. §13.8 recounts them from 30 days of measured usage. C14 now asserts the account holds exactly the projects in `scripts/shared_billing_projects.txt`, so a sixth project fails the check until it is measured with `make shared-headroom`. |
 | 16 | Accepted: the unpaid interview submission is treated as non-commercial personal use on Vercel Hobby (a judgment call). |
-| 17 | Approved: a $3 gross Cloud Run spend cap, accepting that the API pauses if it trips. Eligibility is checked in WP-00. |
+| 17 | Approved: a $3 gross Cloud Run spend cap, accepting that the API pauses if it trips. Eligibility is checked in WP-00. **Amended 2026-10-16:** the cap is scoped to this project and cannot see the other projects' use of the shared free tier, so it does not protect the discount the other projects spend; creating budgets needs billing rights on the account, which only `developer.ericgitangu@gmail.com` has (whether `roles/billing.projectManager` suffices to create budgets is UNVERIFIED). Whether the account lets the console turn a budget into an enforced cap stays UNVERIFIED. |
 | 18 | Confirmed: Neon, Vercel, CircleCI, Cloudflare and Docker Hub stay on free plans with no payment method. |
 | 19 | Alert recipient: developer.ericgitangu@gmail.com (held in the notification channel, not in the repo). |
 | 20 | Unanswered; decided if the C19 gate ever fails. |
@@ -2134,7 +2134,7 @@ Month (40 pipelines: 30 PR, 10 main, every lane running): 30 × 470 + 10 × 740 
 | IAM, WIF, STS, IAM Credentials | zero | none needed |
 | Cloud Build | zero (never used) | C10, global rule 11 |
 | Budgets and spend cap | zero, with change | $1 alerts-only + $3 gross spend cap (WP-11 step 4) |
-| Billing account | zero, pending Q14 | Paid account recommended; gross-cost proof (C17) |
+| Billing account | ~~zero, pending Q14~~ **not zero, shared account** (§13.8): compute fits (about $4.38 of the $5.22 discount) but Artifact Registry and Secret Manager are already over their shared free tiers, so this project adds about $0.28 a month | Q14 amended; gross-cost proof (C17); the engineer decides between accepting about $0.28 and moving one side off the account (§13.8) |
 | Neon Free | zero, with change | aws-us-east-1; fixed 0.25 CU; no pinger (WP-11) |
 | Vercel Hobby | zero, with change | one project `web` (§12.3), bootstrapped by WP-11 Part C0 (§12.4); `iad1` project-wide; `images.unoptimized`; static doc routes; no card; non-commercial note (ADR-0010, ADR-0023, WP-11 Part C, Q16) |
 | CircleCI Free | zero, with change | resource classes; no DLC; self-skipping lanes; retention (ADR-0016, WP-10) |
@@ -2147,3 +2147,44 @@ Month (40 pipelines: 30 PR, 10 main, every lane running): 30 × 470 + 10 × 740 
 | Semgrep CE | zero | `--metrics=off`; no login (WP-13) |
 | Other OSS CLIs | zero | none needed |
 | Upstash Redis | zero (not provisioned) | re-audit before any provisioning |
+
+## 13.8 Shared billing account: recount from measured usage (2026-10-16)
+
+Q1 was amended: the project sits on the **shared** account `01C382-12CD13-DCA6EF`, not a dedicated one, so §13.2 to §13.7 (which assumed this project was the only user of each per-account free tier) no longer hold as written. Those sections are kept; this one restates the headroom with **observed** numbers. Method: Cloud Monitoring, last 30 days to 2026-10-16, Cloud Run `container/cpu/allocation_time`, `container/memory/allocation_time`, `request_count` and `container/network/sent_bytes_count`, all read-only (`make shared-headroom`, `scripts/shared_headroom.py`; `--account developer` for nanolend-api, master-crossing-435409-r1 and unicorns-484301, `--account the.ace.guru` for pawacloud-assessment). Nothing in the other projects was changed.
+
+| Observed, last 30 days | vCPU-s | GiB-s | Requests | NA egress (MB) | Africa egress (MB) |
+|---|---|---|---|---|---|
+| nanolend-api (9 services, 6 instance-based, max 10 each) | 19,252 | 7,649 | 11,599 | 83.52 | 2.28 |
+| master-crossing-435409-r1 (3 services) | 53,305 | 20,722 | 3,695 | 28.20 | 0 |
+| pawacloud-assessment (2 services) | 3,089 | 486 | 316 | 0 | 7.47 |
+| unicorns-484301 (no Cloud Run use) | 0 | 0 | 0 | 0 | 0 |
+| **Others, observed** | **75,646** | **28,857** | **15,610** | **111.72** | **9.74** |
+| This project, worst month (§13.4, DEDUCED) | 94,400 | 90,400 | 24,400 | 655 | 0 |
+| **Combined** | **170,046** | **119,257** | **40,010** | **766.72** | |
+| Free tier (per billing account) | 180,000 | 360,000 | 2,000,000 | 1,073.74 | |
+| **Headroom** | **9,954 (5.5%)** | 240,743 | 1,959,990 | 307.02 | |
+
+Gross compute, combined, priced conservatively at the request-based rates on allocation time: $4.38 against the $5.22 free-tier discount (the catalog, read 2026-10-16, shows identical CPU and memory unit prices in us-east4, us-central1 and africa-south1, so the regional price tier does not change this; §13's "Tier 2" wording for africa-south1 is **not supported by the catalog read**, reported rather than edited).
+
+**Artifact Registry and Secret Manager, observed with read-only `gcloud` (2026-10-16).** Free tiers are per billing account: 0.5 GiB of storage and 6 active secret versions (catalog: `Artifact Registry Storage` $0 to 0.5 GiB then $0.10 per GiB-month; `Secret version replica storage` $0 to 6 then $0.06 per version-month).
+
+| Project | Artifact Registry (MB) | Active secret versions |
+|---|---|---|
+| nanolend-api | 1,353 | 25 |
+| master-crossing-435409-r1 | 24,764 | 16 |
+| pawacloud-assessment | 2,372 | 9 |
+| unicorns-484301 | API not enabled | not read |
+| **Others** | **about 28,488 (27.8 GiB)** | **50** |
+
+**Verdict: $0 does not hold on this account, and the reason is not compute.**
+
+1. **Cloud Run compute, requests and egress: still $0, on observed use, with thin margin.** 170,046 of 180,000 vCPU-s (headroom 9,954, 5.5%) and $4.38 of $5.22. Africa egress of about 9.7 MB is billed from byte 0 at $0.12 per GiB, about $0.001 a month, charged to the other projects and not covered by any free tier. This is a 30-day observation, not a guarantee: nanolend-api's six instance-based services (CPU always allocated, max 10) can each spend more than the whole 180,000 vCPU-s on their own (one instance busy for a month is 2,592,000 vCPU-s), and our spend cap cannot see their use.
+2. **Artifact Registry: not $0.** The others hold about 27.8 GiB against a 0.5 GiB shared allowance, so the free storage is already spent and every further byte we push bills at $0.10 per GiB-month: at most 0.4 GiB (the C5 bound) is about $0.04 a month.
+3. **Secret Manager: not $0.** The others hold 50 active versions against 6, so all 4 of ours bill at $0.06: about $0.24 a month.
+4. **This project adds about $0.28 a month (DEDUCED from list prices and the 400 MB and 4-version bounds); the account already bills the other projects about $5 a month for the same two lines (50 - 6 versions at $0.06, and 27.3 GiB at $0.10, deduced).** The $1 alerts budget was therefore re-scoped from the account to this project (`infra/billing/budget.tf`); an account-wide $1 alert would be permanently in alarm.
+
+What would restore $0, any one of: (a) the engineer accepts about $0.28 a month on the shared account and the README says so; (b) move this project to a billing account of its own (none can be opened, Q1); (c) move the other four projects, or the heavy ones (master-crossing-435409-r1's 24 GiB of images, nanolend-api's 25 secret versions), off this account or clean them up, which is outside this repository and was not touched; (d) cap the other projects' `--max-instances` and switch nanolend-api's six services to request-based billing, which removes the compute risk in item 1 but not items 2 and 3. Only (b) or (c) gives a provable $0; (a) is the honest default.
+
+`make cost-check` now asserts the account's project list (C14) and that the default Compute service account has no `roles/editor` (C20, below); the Artifact Registry and Secret Manager lines in C5 to C8 still measure only this project and so cannot show the shared state, which `make shared-headroom` and this table do.
+
+**Security: the default Compute service account.** `291652953712-compute@developer.gserviceaccount.com` holds `roles/editor` (a GCP default for new projects, reported by the main session). Terraform now removes that grant (`infra/terraform/default_sa.tf`, `google_project_default_service_accounts` with `action = "DEPRIVILEGE"`; the account is left in place); every Cloud Run service and job here is deployed with an explicit `--service-account` (static rule "run deploy missing --service-account", 6 mutation cases); live check C20 asserts no `roles/editor` binding for that member. Not applied: the engineer runs the Terraform step. **UNVERIFIED live:** that the provider's DEPRIVILEGE removes the binding on this project (validated with `terraform validate` only).
