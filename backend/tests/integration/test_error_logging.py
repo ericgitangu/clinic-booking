@@ -56,3 +56,32 @@ async def test_error_logs_omit_reason_and_patient_id(
     assert SECRET_REASON not in logs  # reason never logged
     assert "confidential" not in logs
     assert AMINA not in logs  # patient id never logged
+
+
+async def test_access_log_records_route_template_not_ids(
+    client: httpx.AsyncClient, reset_appointments: None
+) -> None:
+    created = await client.post(
+        "/appointments", json={"doctor_id": OTIENO, "patient_id": AMINA, "starts_at": BOOK_AT}
+    )
+    assert created.status_code == 201
+    appt_id = created.json()["id"]
+
+    buffer = io.StringIO()
+    handler = logging.StreamHandler(buffer)
+    handler.setFormatter(JsonFormatter())
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        assert (await client.get(f"/patients/{AMINA}/appointments")).status_code == 200
+        assert (await client.get(f"/appointments/{appt_id}")).status_code == 200
+        assert (await client.get(f"/no/such/place/{appt_id}")).status_code == 404
+    finally:
+        root.removeHandler(handler)
+
+    logs = buffer.getvalue()
+    assert '"route": "/patients/{patient_id}/appointments"' in logs
+    assert '"route": "/appointments/{appointment_id}"' in logs
+    assert '"route": "unmatched"' in logs  # a 404 never logs the raw URL
+    assert AMINA not in logs
+    assert appt_id not in logs

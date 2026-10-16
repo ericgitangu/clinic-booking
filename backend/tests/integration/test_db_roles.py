@@ -24,3 +24,17 @@ async def test_app_role_can_insert_patient(app_conn: asyncpg.Connection) -> None
         assert row_id is not None
     finally:
         await tx.rollback()
+
+
+async def test_app_role_cannot_rewrite_migration_head(owner_conn: asyncpg.Connection) -> None:
+    async def can(privilege: str) -> bool:
+        return bool(
+            await owner_conn.fetchval(
+                "SELECT has_table_privilege('clinic_app', 'public.alembic_version', $1)", privilege
+            )
+        )
+
+    assert not await can("UPDATE")
+    assert not await can("INSERT")
+    assert not await can("DELETE")
+    assert await can("SELECT")

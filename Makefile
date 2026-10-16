@@ -2,6 +2,12 @@
 SHELL := /bin/bash
 BE := cd backend && uv run
 
+# Host port for the compose Postgres. The tests connect to the same port, so the pair stays in
+# sync; if 5432 is taken, run e.g. `DB_HOST_PORT=5433 make up test`.
+DB_HOST_PORT ?= 5432
+export DB_HOST_PORT
+export TEST_DB_PORT ?= $(DB_HOST_PORT)
+
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
         contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint cost-static cost-check
 

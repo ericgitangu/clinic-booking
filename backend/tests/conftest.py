@@ -1,17 +1,28 @@
 """Test fixtures.
 
-WP-04 provides DB connection helpers driven by the environment (CI uses localhost:5432; a
-local dev DB on another port is set via TEST_DB_PORT). WP-06 extends this with the ASGI
-client and FakeClock.
+DB connection helpers are driven by the environment (CI uses localhost:5432; a local dev DB
+on another port is set via TEST_DB_PORT). Also provides the ASGI client and FakeClock.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
-from collections.abc import AsyncIterator
+import uuid
+from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime
 
 import asyncpg
+import httpx
+import pytest
 import pytest_asyncio
+
+from app.api.deps import get_clock
+from app.core.clock import FakeClock
+from app.core.config import Settings
+from app.db.session import dispose_engine
+from app.main import create_app
+from app.scripts.seed import DEMO_PATIENTS, NAMESPACE
 
 TEST_DB_HOST = os.environ.get("TEST_DB_HOST", "localhost")
 TEST_DB_PORT = int(os.environ.get("TEST_DB_PORT", "5432"))
@@ -21,6 +32,13 @@ OWNER_USER = os.environ.get("TEST_OWNER_USER", "clinic")
 OWNER_PASSWORD = os.environ.get("TEST_OWNER_PASSWORD", "clinic")
 APP_USER = os.environ.get("TEST_APP_USER", "clinic_app")
 APP_PASSWORD = os.environ.get("TEST_APP_PASSWORD", "clinic_app_local")
+
+TEST_PUBLIC_BASE_URL = "http://testserver"
+FIXED_NOW = datetime(2026, 10, 19, 4, 0, tzinfo=UTC)  # Mon 07:00 EAT
+
+# Set by the fixtures that open the shared database, so the end-of-session cleanup only ever
+# touches a database this run actually used.
+_db_used = False
 
 
 def owner_dsn(dbname: str = TEST_DB_NAME) -> str:
@@ -37,8 +55,38 @@ def owner_sqlalchemy_url(dbname: str = TEST_DB_NAME) -> str:
     )
 
 
+def app_sqlalchemy_url(dbname: str = TEST_DB_NAME) -> str:
+    return f"postgresql+asyncpg://{APP_USER}:{APP_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{dbname}"
+
+
+def _mark_db_used() -> None:
+    global _db_used
+    _db_used = True
+
+
+async def _remove_test_rows() -> None:
+    """Drop everything the suite created, keeping only the seeded reference data."""
+    conn = await asyncpg.connect(owner_dsn())
+    try:
+        await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
+        keep = [uuid.uuid5(NAMESPACE, f"patient:{key}") for key, _ in DEMO_PATIENTS]
+        await conn.execute("DELETE FROM patients WHERE id <> ALL($1::uuid[])", keep)
+    finally:
+        await conn.close()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _clean_database_after_session() -> Iterator[None]:
+    # Race, fuzz and contract tests create patients and appointments in the shared database;
+    # without this they accumulate across runs.
+    yield
+    if _db_used:
+        asyncio.run(_remove_test_rows())
+
+
 @pytest_asyncio.fixture
 async def owner_conn() -> AsyncIterator[asyncpg.Connection]:
+    _mark_db_used()
     conn = await asyncpg.connect(owner_dsn())
     try:
         yield conn
@@ -48,6 +96,7 @@ async def owner_conn() -> AsyncIterator[asyncpg.Connection]:
 
 @pytest_asyncio.fixture
 async def app_conn() -> AsyncIterator[asyncpg.Connection]:
+    _mark_db_used()
     conn = await asyncpg.connect(app_dsn())
     try:
         yield conn
@@ -55,35 +104,12 @@ async def app_conn() -> AsyncIterator[asyncpg.Connection]:
         await conn.close()
 
 
-# --- WP-06: ASGI client + FakeClock -----------------------------------------------------
-from datetime import UTC, datetime  # noqa: E402
-
-import httpx  # noqa: E402
-
-from app.core.clock import FakeClock  # noqa: E402
-from app.core.config import Settings  # noqa: E402
-
-# app.main builds a module-level app from the environment (for the uvicorn CMD); give it a
-# value so importing it under pytest never fails. Tests build their own Settings.
-os.environ.setdefault("DATABASE_URL", owner_sqlalchemy_url())
-
-from app.main import create_app  # noqa: E402
-
-TEST_PUBLIC_BASE_URL = "http://testserver"
-
-
-from app.api.deps import get_clock  # noqa: E402
-from app.db.session import dispose_engine  # noqa: E402
-
-FIXED_NOW = datetime(2026, 10, 19, 4, 0, tzinfo=UTC)  # Mon 07:00 EAT
-
-
-def app_sqlalchemy_url(dbname: str = TEST_DB_NAME) -> str:
-    return f"postgresql+asyncpg://{APP_USER}:{APP_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{dbname}"
+# --- ASGI client + FakeClock ------------------------------------------------------------
 
 
 def make_settings(**overrides: object) -> Settings:
     # The app runs as the clinic_app role, like prod.
+    _mark_db_used()
     base: dict[str, object] = {
         "DATABASE_URL": app_sqlalchemy_url(),
         "PUBLIC_BASE_URL": TEST_PUBLIC_BASE_URL,
@@ -103,6 +129,7 @@ async def _dispose_engine_between_tests() -> AsyncIterator[None]:
 
 @pytest_asyncio.fixture
 async def app_with_clock() -> AsyncIterator[object]:
+    _mark_db_used()
     app = create_app(make_settings())
     app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
     yield app
@@ -121,6 +148,7 @@ async def client(app_with_clock: object) -> AsyncIterator[httpx.AsyncClient]:
 @pytest_asyncio.fixture
 async def reset_appointments() -> None:
     # Clear only the mutable appointment tables (owner); seed rows are untouched.
+    _mark_db_used()
     conn = await asyncpg.connect(owner_dsn())
     try:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
@@ -133,24 +161,19 @@ def clock() -> FakeClock:
     return FakeClock(FIXED_NOW)
 
 
-# --- WP-07 helpers ----------------------------------------------------------------------
-import uuid as _uuid  # noqa: E402
-
-import httpx as _httpx  # noqa: E402
-
-from app.scripts.seed import NAMESPACE  # noqa: E402
+# --- Booking-flow helpers ---------------------------------------------------------------
 
 
-def seeded_doctor_id(key: str) -> _uuid.UUID:
-    return _uuid.uuid5(NAMESPACE, f"doctor:{key}")
+def seeded_doctor_id(key: str) -> uuid.UUID:
+    return uuid.uuid5(NAMESPACE, f"doctor:{key}")
 
 
-def seeded_patient_id(key: str) -> _uuid.UUID:
-    return _uuid.uuid5(NAMESPACE, f"patient:{key}")
+def seeded_patient_id(key: str) -> uuid.UUID:
+    return uuid.uuid5(NAMESPACE, f"patient:{key}")
 
 
 async def first_available(
-    client: _httpx.AsyncClient, doctor_id: _uuid.UUID
+    client: httpx.AsyncClient, doctor_id: uuid.UUID
 ) -> tuple[str, dict[str, str]]:
     """First clinic-local date (from the FakeClock's tomorrow) with >= 1 slot, and slot[0]."""
     day = datetime(2026, 10, 20, tzinfo=UTC).date()

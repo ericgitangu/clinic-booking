@@ -7,6 +7,8 @@ routes stay for local use and the tag-URL smoke.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import FastAPI
 
 from app.api.routers import appointments, doctors, health, patients, problems
@@ -14,7 +16,7 @@ from app.core.config import Settings
 from app.core.cors import add_cors
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
-from app.core.problems import register_exception_handlers
+from app.core.problems import UnhandledErrorMiddleware, register_exception_handlers
 from app.schemas.problem import strip_json_from_error_responses
 
 
@@ -30,8 +32,9 @@ def create_app(settings: Settings) -> FastAPI:
     )
     app.state.settings = settings
 
-    # CORS first, then request-context middleware so the latter is outermost (it sets the
-    # request id and emits the access log for every request).
+    # Added innermost-first: unhandled-error -> CORS -> request-context (outermost, so it sets
+    # the request id and logs every request, including a 500 turned into a response here).
+    app.add_middleware(UnhandledErrorMiddleware)
     add_cors(app, settings)
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
@@ -54,9 +57,23 @@ def create_app(settings: Settings) -> FastAPI:
     return app
 
 
-def _app_from_env() -> FastAPI:
-    # pydantic-settings populates required fields from the environment at runtime.
-    return create_app(Settings())
+_app: FastAPI | None = None
 
 
-app = _app_from_env()
+def __getattr__(name: str) -> FastAPI:
+    """Build the ASGI app on first access to ``app.main:app`` (what uvicorn imports).
+
+    Importing this module for ``create_app`` (tests, the OpenAPI export) must not require the
+    runtime environment, so the settings are read only when the served app is actually asked for.
+    """
+    global _app
+    if name != "app":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if _app is None:
+        # pydantic-settings populates the required fields from the environment.
+        _app = create_app(Settings())
+    return _app
+
+
+if TYPE_CHECKING:
+    app: FastAPI

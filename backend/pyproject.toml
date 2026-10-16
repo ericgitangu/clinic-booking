@@ -10,8 +10,8 @@ dependencies = [
     "asyncpg==0.32.0",
     "alembic==1.20.0",
     "pydantic==2.14.1",
-    "pydantic-settings>=2.6,<3",
-    "email-validator>=2.2,<3",
+    "pydantic-settings==2.16.0",
+    "email-validator==2.3.0",
 ]
 
 [dependency-groups]
@@ -69,10 +69,6 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 no_implicit_reexport = true
-
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
 
 [tool.coverage.run]
 source = ["app"]

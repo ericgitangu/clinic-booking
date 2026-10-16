@@ -129,6 +129,15 @@ def upgrade() -> None:
     op.execute(
         "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO clinic_app;"
     )
+    # The blanket grant above also covered alembic_version; the runtime role must not be able
+    # to rewrite the migration head.
+    op.execute("""
+        DO $$ BEGIN
+          IF to_regclass('public.alembic_version') IS NOT NULL THEN
+            REVOKE INSERT, UPDATE ON public.alembic_version FROM clinic_app;
+          END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:

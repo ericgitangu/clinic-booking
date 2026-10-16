@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import uuid
+
+import asyncpg
 import httpx
 import pytest
 
@@ -32,12 +35,19 @@ async def test_reschedule_ok(client: httpx.AsyncClient, reset_appointments: None
 
 
 async def test_reschedule_same_start_noop(
-    client: httpx.AsyncClient, reset_appointments: None
+    client: httpx.AsyncClient, reset_appointments: None, owner_conn: asyncpg.Connection
 ) -> None:
     appt_id = await _book(client, AMINA, AT_0900)
+    before = (await client.get(f"/appointments/{appt_id}")).json()
+
     resp = await client.patch(f"/appointments/{appt_id}/reschedule", json={"starts_at": AT_0900})
+
     assert resp.status_code == 200
-    assert resp.json()["id"] == appt_id
+    assert resp.json() == before  # nothing changed, updated_at included
+    events = await owner_conn.fetchval(
+        "SELECT count(*) FROM appointment_events WHERE appointment_id = $1", uuid.UUID(appt_id)
+    )
+    assert events == 1  # only the original booking event; the no-op wrote none
 
 
 async def test_reschedule_into_taken_slot_409(
