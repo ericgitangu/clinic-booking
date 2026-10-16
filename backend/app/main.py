@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api.routers import health, problems
+from app.api.routers import appointments, doctors, health, patients, problems
 from app.core.config import Settings
 from app.core.cors import add_cors
 from app.core.logging import configure_logging
@@ -37,6 +37,9 @@ def create_app(settings: Settings) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(problems.router)
+    app.include_router(doctors.router)
+    app.include_router(patients.router)
+    app.include_router(appointments.router)
     return app
 
 
