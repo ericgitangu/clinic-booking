@@ -200,6 +200,230 @@ jobs:
       - store_artifacts:
           path: zap-report.html
 
+  # ---------------------------------------------------------------- release-only jobs
+  # These need the engineer's cloud setup (contexts gcp-deploy / vercel-prod, WIF). They are
+  # inert until WP-11 Part A/B/C0 have been applied; nothing here creates infrastructure.
+  build-scan-push:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: WIF login + Artifact Registry docker auth
+          command: |
+            bash scripts/ci/gcp_login.sh
+            gcloud auth configure-docker "us-east4-docker.pkg.dev" --quiet
+      - run:
+          name: Build (one manifest -> one Artifact Registry version)
+          command: |
+            IMAGE="us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-api:sha-${CIRCLE_SHA1:0:7}"
+            docker buildx build --provenance=false --sbom=false --load -t "$IMAGE" backend
+            echo "export IMAGE=$IMAGE" >> "$BASH_ENV"
+      - run:
+          name: Trivy scan before push (HIGH/CRITICAL, fixed only)
+          command: |
+            VERSION=0.76.0
+            curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" | tar -xz trivy
+            ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+      - run:
+          name: Push and record the digest
+          command: |
+            docker push "$IMAGE"
+            DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")"
+            mkdir -p /tmp/ws
+            printf %s "$DIGEST" > /tmp/ws/image_ref
+      - persist_to_workspace:
+          root: /tmp/ws
+          paths:
+            - image_ref
+
+  ship-api:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: WIF login
+          command: bash scripts/ci/gcp_login.sh
+      - run:
+          name: Migrate (Cloud Run job, bounded timeout, no retries)
+          command: |
+            IMAGE_REF="$(cat /tmp/ws/image_ref)"
+            gcloud run jobs deploy clinic-migrate --image "$IMAGE_REF" --region us-east4 --service-account "clinic-migrate@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-migrate:latest --task-timeout 600s --max-retries 0 --command sh --args="-c,alembic upgrade head && python -m app.scripts.seed" --quiet
+            gcloud run jobs execute clinic-migrate --region us-east4 --wait
+      - run:
+          name: Deploy a tagged revision with no traffic
+          command: |
+            IMAGE_REF="$(cat /tmp/ws/image_ref)"
+            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN}" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
+      - run:
+          name: Tag-URL smoke behind the C19 egress gate
+          command: |
+            set +x
+            TAG_URL="$(gcloud run services describe clinic-api --region us-east4 --format=json | jq -r '.status.traffic[]|select(.tag=="sha-'"${CIRCLE_SHA1:0:7}"'")|.url')"
+            test -n "$TAG_URL" || { echo 'FAIL: tag URL not found'; exit 1; }
+            test "$(curl -s --max-time 5 https://ipinfo.io/country)" = US || { echo 'FAIL C19: CircleCI egress outside North America; tag-URL smoke skipped, nothing promoted'; exit 1; }
+            python3 -m pip install --quiet httpx
+            TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="clinic-smoke@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --audiences=clinic-api)"
+            python3 scripts/verify_claims.py --base-url "$TAG_URL" --header "X-Serverless-Authorization: Bearer ${TOKEN}"
+      - run:
+          name: Promote only if this commit is still main's head
+          command: |
+            mkdir -p /tmp/promoted
+            git fetch origin main
+            if [ "$CIRCLE_SHA1" != "$(git rev-parse origin/main)" ]; then
+              echo "A newer commit exists on main; skipping promotion (it will ship)."
+              echo skipped > /tmp/promoted/state
+              exit 0
+            fi
+            gcloud run services update-traffic clinic-api --region us-east4 --to-tags "sha-${CIRCLE_SHA1:0:7}=100"
+            OLD_TAGS="$(gcloud run services describe clinic-api --region us-east4 --format=json | jq -r '[.status.traffic[]|select(.tag!=null)|.tag]|.[2:]|join(",")')"
+            if [ -n "$OLD_TAGS" ]; then
+              gcloud run services update-traffic clinic-api --region us-east4 --remove-tags "$OLD_TAGS"
+            fi
+            gcloud artifacts docker images list "us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-api" --include-tags --sort-by=~UPDATE_TIME --format=json | jq -r '.[2:][] | .package + "@" + .version' | while read -r REF; do gcloud artifacts docker images delete "$REF" --delete-tags --quiet; done
+            echo promoted > /tmp/promoted/state
+      - persist_to_workspace:
+          root: /tmp/promoted
+          paths:
+            - state
+
+  ship-web:
+    docker:
+      - image: cimg/node:24.14
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Halt unless ship-api promoted this commit
+          command: |
+            if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
+              echo "ship-api did not promote this commit: the web build must not ship a contract newer than the live API."
+              circleci-agent step halt
+            fi
+      - checkout
+      - restore_cache:
+          keys:
+            - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+      - run:
+          name: Install
+          command: |
+            npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile
+      - save_cache:
+          key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.local/share/pnpm/store
+      - run:
+          name: Vercel pull, build, deploy (one production deployment per merge)
+          command: |
+            npx --yes vercel@59.5.0 pull --yes --environment=production --cwd web
+            npx --yes vercel@59.5.0 build --prod --cwd web
+            npx --yes vercel@59.5.0 deploy --prebuilt --prod --cwd web
+
+  web-quality:
+    docker:
+      - image: cimg/node:24.14
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Skip when web/ and contracts/ are untouched
+          command: |
+            git fetch origin main --quiet || true
+            if [ -z "$(git diff --name-only origin/main...HEAD -- web/ contracts/ 2>/dev/null)" ] && [ "$CIRCLE_BRANCH" != "main" ]; then
+              echo "web/ and contracts/ untouched; skipping."
+              circleci-agent step halt
+            fi
+      - restore_cache:
+          keys:
+            - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+      - run:
+          name: Install, lint, typecheck, test, build
+          command: |
+            npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile
+            pnpm -C web lint
+            pnpm -C web typecheck
+            pnpm -C web test
+            pnpm -C web build
+      - save_cache:
+          key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.local/share/pnpm/store
+
+  smoke-public:
+    docker:
+      - image: cimg/python:3.12
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Public smoke (no context, no credentials)
+          command: |
+            . scripts/ci/public-urls.env
+            case "$WEB$RUN_APP_URL" in *REPLACE_AFTER_FIRST_DEPLOY*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1;; esac
+            PUBLIC_API="${WEB}/api"
+            pip install --quiet httpx
+            test "$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_API}/healthz")" = 200
+            curl -fsS "${WEB}/openapi.json" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['servers'][0]['url']=='/api'"
+            curl -fsS -o /dev/null "${WEB}/docs"
+            test "$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_API}/openapi.json")" = 308
+            test "$(curl -s -o /dev/null -w '%{http_code}' "${RUN_APP_URL}/healthz")" = 403
+            python3 scripts/verify_claims.py --base-url "$PUBLIC_API"
+
+  cost-static:
+    docker:
+      - image: cimg/base:current
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Install ripgrep
+          command: sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+      - run:
+          name: Static cost guards
+          command: bash scripts/cost_check.sh --static
+
+  cost-check:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: WIF login (read-only roles)
+          command: bash scripts/ci/gcp_login.sh
+      - run:
+          name: Live cost guards
+          command: |
+            export PROJECT="$GOOGLE_PROJECT_ID"
+            bash scripts/cost_check.sh --live
+
 workflows:
   pr:
     when:
@@ -216,6 +440,8 @@ workflows:
       - sca
       - build-scan
       - dast
+      - web-quality
+      - cost-static
 
   release:
     when:
@@ -230,3 +456,33 @@ workflows:
       - sast
       - sca
       - build-scan
+      - web-quality
+      - cost-static
+      - build-scan-push:
+          context: gcp-deploy
+          requires:
+            - backend-quality
+            - backend-test
+            - backend-contract
+            - secrets
+            - sast
+            - sca
+            - build-scan
+            - cost-static
+      - ship-api:
+          context: gcp-deploy
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - build-scan-push
+      - ship-web:
+          context: vercel-prod
+          requires:
+            - ship-api
+            - web-quality
+      - smoke-public:
+          requires:
+            - ship-web
+      - cost-check:
+          context: gcp-deploy
+          requires:
+            - ship-api

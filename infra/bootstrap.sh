@@ -38,7 +38,10 @@ rm -f "$TMP_LIFECYCLE"
 
 echo ">>> 2. Cloud Run service shell (hello image; replaced by the first real deploy)"
 # Terraform must NOT manage this service. min=0 max=3, IAM-only, custom audience.
-"${G[@]}" run deploy clinic-api \
+# Global flags (--account/--project) go after the subcommand so `gcloud run deploy` reads as
+# one token for cost_check.sh --static.
+gcloud run deploy clinic-api \
+  --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
   --image us-docker.pkg.dev/cloudrun/container/hello \
   --region "$REGION" \
   --no-allow-unauthenticated \

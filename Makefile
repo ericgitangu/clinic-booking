@@ -3,7 +3,7 @@ SHELL := /bin/bash
 BE := cd backend && uv run
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint
+        contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint cost-static cost-check
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -63,10 +63,16 @@ gen-client: ## Regenerate the TS client (web)
 	pnpm -C web gen:api
 
 verify: ## Verify live claims (URL=...)
-	python scripts/verify_claims.py --base-url "$(URL)"
+	uv run --project backend python scripts/verify_claims.py --base-url "$(URL)"
 
 docs-check: ## Check docs links and ADR headings
 	python scripts/docs_check.py
 
 migration-lint: ## Enforce expand-only migrations
 	bash scripts/migration_lint.sh
+
+cost-static: ## $0 static guards (no credentials)
+	bash scripts/cost_check.sh --static
+
+cost-check: ## $0 live guards, read-only (PROJECT=...)
+	bash scripts/cost_check.sh --live
