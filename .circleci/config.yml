@@ -425,7 +425,10 @@ jobs:
       - checkout
       - run:
           name: Install ripgrep
-          command: sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+          command: |
+            # a third-party PPA index can 503; ripgrep is in the main archive
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq ripgrep
       - run:
           name: Static cost guards
           command: bash scripts/cost_check.sh --static
