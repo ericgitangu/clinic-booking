@@ -15,6 +15,14 @@ mkdir -p "$BASE"
 cp "$ROOT/scripts/repo_hygiene.sh" "$BASE/scripts/repo_hygiene.sh"
 ( cd "$BASE" && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm base )
 
+# Seeded cases run against a minimal repo (the script, an empty allowlist, the real .gitignore):
+# the full tree is only needed for the one "unmodified tree passes" control.
+MIN="$WORK/min"
+mkdir -p "$MIN/scripts"
+cp "$ROOT/scripts/repo_hygiene.sh" "$ROOT/scripts/hygiene_allow.txt" "$MIN/scripts/"
+cp "$ROOT/.gitignore" "$MIN/.gitignore"
+( cd "$MIN" && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm base )
+
 PASSES=0; FAILS=0; N=0
 ok()  { PASSES=$((PASSES + 1)); printf 'PASS  %s\n' "$1"; }
 bad() { FAILS=$((FAILS + 1)); printf 'FAIL  %s\n' "$1"; }
@@ -22,7 +30,7 @@ bad() { FAILS=$((FAILS + 1)); printf 'FAIL  %s\n' "$1"; }
 # case <name> <want: pass|<substring>> <tracked: 1|0> <path> <content>
 run_case() {
   local name="$1" want="$2" tracked="$3" path="$4" content="$5" d out rc
-  N=$((N + 1)); d="$WORK/c$N"; cp -R "$BASE" "$d"
+  N=$((N + 1)); d="$WORK/c$N"; cp -R "$MIN" "$d"
   mkdir -p "$d/$(dirname "$path")"; printf '%s\n' "$content" > "$d/$path"
   [ "$tracked" = 1 ] && ( cd "$d" && git add -f "$path" )
   out="$(cd "$d" && bash scripts/repo_hygiene.sh 2>&1)"; rc=$?
@@ -51,13 +59,13 @@ run_case "tracked .vscode/settings.json is allowed" pass 1 ".vscode/settings.jso
 
 echo "== b) untracked files =="
 run_case "untracked scratch file"  "untracked" 0 "scratch.txt" "x"
-N=$((N + 1)); d="$WORK/c$N"; cp -R "$BASE" "$d"; printf 'x\n' > "$d/scratch.txt"
+N=$((N + 1)); d="$WORK/c$N"; cp -R "$MIN" "$d"; printf 'x\n' > "$d/scratch.txt"
 printf 'scratch.txt | . | local scratch kept for review\n' >> "$d/scripts/hygiene_allow.txt"
 ( cd "$d" && bash scripts/repo_hygiene.sh >/dev/null 2>&1 ) && ok "allowlisted untracked file passes" || bad "allowlisted untracked file passes"
-N=$((N + 1)); d="$WORK/c$N"; cp -R "$BASE" "$d"; printf 'x\n' > "$d/scratch.txt"
+N=$((N + 1)); d="$WORK/c$N"; cp -R "$MIN" "$d"; printf 'x\n' > "$d/scratch.txt"
 printf 'scratch.txt | . |\n' >> "$d/scripts/hygiene_allow.txt"
 ( cd "$d" && bash scripts/repo_hygiene.sh >/dev/null 2>&1 ) && bad "allowlist entry without a reason is ignored" || ok "allowlist entry without a reason is ignored"
-N=$((N + 1)); d="$WORK/c$N"; cp -R "$BASE" "$d"; printf '.vscode/\n' >> "$d/.gitignore"; mkdir -p "$d/.vscode"; printf 'x\n' > "$d/.vscode/a.json"
+N=$((N + 1)); d="$WORK/c$N"; cp -R "$MIN" "$d"; printf '.vscode/\n' >> "$d/.gitignore"; mkdir -p "$d/.vscode"; printf 'x\n' > "$d/.vscode/a.json"
 ( cd "$d" && bash scripts/repo_hygiene.sh >/dev/null 2>&1 ) && ok "ignored untracked file passes" || bad "ignored untracked file passes"
 
 echo "== c) smells (backend/app/seed.py, web/src/seed.ts) =="
