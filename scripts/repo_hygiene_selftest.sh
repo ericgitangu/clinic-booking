@@ -49,7 +49,7 @@ echo "== a) tracked junk =="
 for p in .DS_Store .env .env.local app/.env.production x.log coverage/a.xml htmlcov/index.html .coverage \
          pkg/__pycache__/m.pyc m.pyc node_modules/a/b.js web/.next/x.js infra/.terraform/p a.tfstate a.tfstate.backup \
          .vercel/project.json .idea/w.xml .vscode/other.json .claude/settings.json .plan-facts/f docs/ai/PROMPTS.md \
-         certs/server.pem service-account-key.json keys/my-key.json dist/a.js build/a.o \
+         infra/terraform/tfplan infra/terraform/tfplan2 infra/billing/tfplan3 crash.log infra/terraform/crash.123.log certs/server.pem service-account-key.json keys/my-key.json dist/a.js build/a.o \
          docs/architecture/PLAN.md docs/versions.md; do
   run_case "tracked $p" "tracked-junk" 1 "$p" "x"
 done

@@ -31,8 +31,10 @@ zap-report.html
 
 # terraform: real vars and plans are never committed (only the .example)
 infra/terraform/terraform.tfvars
-*.tfplan
-tfplan
+*tfplan*
+*.tfstate*
+crash.log
+crash.*.log
 
 
 infra/billing/terraform.tfvars

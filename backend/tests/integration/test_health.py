@@ -20,13 +20,13 @@ async def test_doc_urls_answer_200(client: httpx.AsyncClient) -> None:
         assert resp.status_code == 200, path
 
 
-async def test_healthz_never_needs_db() -> None:
-    # A bogus DB URL proves /healthz does not connect.
+async def test_health_never_needs_db() -> None:
+    # A bogus DB URL proves /health does not connect.
     settings = make_settings(DATABASE_URL="postgresql+asyncpg://x:x@127.0.0.1:1/x")
     assert isinstance(settings, Settings)
     app = create_app(settings)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
-        resp = await c.get("/healthz")
+        resp = await c.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}

@@ -172,10 +172,10 @@ static_checks() {
 
   # The default Compute SA's Editor grant is removed by Terraform (infra/terraform/default_sa.tf).
   if grep -rhvE '^[[:space:]]*(#|//)' infra/terraform --include='*.tf' 2>/dev/null \
-       | tr '\n' ' ' | qgrep -E 'google_project_default_service_accounts"[^{]*\{[^}]*action[[:space:]]*=[[:space:]]*"DEPRIVILEGE"'; then
-    pass "terraform deprivileges the default service accounts"
+       | tr '\n' ' ' | qgrep -E 'google_project_iam_member_remove"[^{]*\{.{0,200}role[[:space:]]*=[[:space:]]*"roles/editor".{0,200}compute@developer\.gserviceaccount\.com'; then
+    pass "terraform removes roles/editor from the default Compute service account"
   else
-    fail "terraform does not DEPRIVILEGE the default service accounts (google_project_default_service_accounts)"
+    fail "terraform does not remove roles/editor from the default Compute service account (google_project_iam_member_remove)"
   fi
 
   # ---- web: Vercel region and git deploys, Next images, regions, route layout ----
@@ -274,6 +274,7 @@ live_checks() {
     done <<< "$c1"
   fi
 
+  # C3 probes /ready, not /healthz: Google's frontend answers /healthz itself with a 404, so that path can never show the IAM result.
   # C2 + C3: invoker members are EXACTLY the web and smoke identities; direct run.app is an IAM denial.
   local svc want got dis url c403 c401
   want="serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
@@ -288,8 +289,8 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
       fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
     fi
     url="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
-    c403="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/healthz")"
-    c401="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Serverless-Authorization: Bearer junk' "$url/healthz")"
+    c403="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/ready")"
+    c401="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Serverless-Authorization: Bearer junk' "$url/ready")"
     if [ "$c403" = 403 ] && [ "$c401" = 401 ]; then pass "C3 $svc run.app 403 / junk-bearer 401"; else fail "C3 $svc run.app returned $c403 / $c401 (want 403 / 401)"; fi
   done
 
@@ -339,7 +340,8 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     fail "C11 BILLING_GCLOUD_ACCOUNT unset: the billing user (not the project Owner) must read the budgets"
   elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c11
-    c11="$(gcb billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
+    # --billing-project: the budgets API is billed to a project the caller can use; the billing user's gcloud default quota project may not be one.
+    c11="$(gcb --billing-project "$PROJECT" billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName | select(startswith("clinic-"))] | sort | join(",")')"
     [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap action: confirm in the console)" || fail "C11 budgets '${c11:-unreadable}'"
   else
     fail "C11 skipped: set BILLING_ACCOUNT to check the budgets"
@@ -375,7 +377,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     fail "C14 skipped: set BILLING_ACCOUNT"
   fi
 
-  # C20: the default Compute service account has no roles/editor (Terraform deprivileges it).
+  # C20: the default Compute service account has no roles/editor (Terraform removes the binding).
   local num c20
   num="$(gc projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null)"
   if [ -n "$num" ]; then

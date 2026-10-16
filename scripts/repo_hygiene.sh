@@ -28,7 +28,7 @@ allowed() { # <path> <text> -> 0 when an allowlist entry covers it
 }
 
 # ---- a) tracked files that must not be tracked -------------------------------------------
-BAD_PATH='(^|/)(\.DS_Store|__pycache__|node_modules|\.next|coverage|htmlcov|\.idea|\.claude|\.plan-facts|dist|build|\.vercel)(/|$)|(^|/)\.env(\.(?!example$).*)?$|\.(log|pyc|pem)$|(^|/)\.coverage$|\.tfstate|(^|/)\.terraform/|(^|/)[^/]*key[^/]*\.json$|^docs/ai/|(^|/)PLAN\.md$|^docs/versions\.md$'
+BAD_PATH='(^|/)(\.DS_Store|__pycache__|node_modules|\.next|coverage|htmlcov|\.idea|\.claude|\.plan-facts|dist|build|\.vercel)(/|$)|(^|/)\.env(\.(?!example$).*)?$|\.(log|pyc|pem)$|(^|/)\.coverage$|\.tfstate|[^/]*tfplan[^/]*$|(^|/)crash(\.[^/]*)?\.log$|(^|/)\.terraform/|(^|/)[^/]*key[^/]*\.json$|^docs/ai/|(^|/)PLAN\.md$|^docs/versions\.md$'
 while IFS= read -r f; do
   allowed "$f" "$f" || report "$f:1: tracked-junk: tracked file that belongs in .gitignore or local-only"
 done < <(git ls-files | perl -ne "print if m{$BAD_PATH}")
