@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keyless CircleCI -> GCP login via Workload Identity Federation (ADR-0016).
+# Keyless CircleCI -> GCP login via Workload Identity Federation.
 # Needs CIRCLE_OIDC_TOKEN_V2 (set by CircleCI) and, from the gcp-deploy context:
 # GOOGLE_PROJECT_ID, GOOGLE_PROJECT_NUMBER, DEPLOYER_SA. The token is never echoed.
 set -euo pipefail

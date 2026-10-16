@@ -1,4 +1,4 @@
-# ZAP API-scan rule thresholds (generated with -g, then reviewed, WP-13).
+# ZAP API-scan rule thresholds (generated with -g, then reviewed).
 # Columns: ruleId<TAB>threshold(IGNORE|WARN|FAIL)<TAB>comment
 # Defaults are FAIL for active alerts; the entries below tune known-noisy rules for a
 # JSON REST API behind an IAM-gated proxy (no browser, no cookies, no CSP surface locally).

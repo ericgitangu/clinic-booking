@@ -1,4 +1,4 @@
-"""Pin the asyncpg attribute path for sqlstate and constraint_name (§5, WP-07).
+"""Pin the asyncpg attribute path for sqlstate and constraint_name.
 
 Everything in repositories/errors.py depends on this exact path, so it is tested first.
 """

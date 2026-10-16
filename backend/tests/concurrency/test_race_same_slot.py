@@ -1,4 +1,4 @@
-"""Case 1 (§3.4): 25 concurrent POSTs for one slot -> exactly one booking."""
+"""25 concurrent POSTs for one slot produce exactly one booking (one 201, the rest 409)."""
 
 from __future__ import annotations
 

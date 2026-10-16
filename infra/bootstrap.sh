@@ -12,8 +12,8 @@
 #                    --account on every call, because the active gcloud account differs
 #   BILLING_ACCOUNT  billing account id (dedicated, Paid, no Free Trial)
 #
-# Cost rules ($0, §13): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3,
-# no allUsers, custom audience clinic-api. See ADR-0014, ADR-0023.
+# Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3,
+# no allUsers, custom audience clinic-api. See docs/ for the decision records.
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT}"
@@ -59,7 +59,7 @@ CMDS
 echo "    (printed, not executed: the SAs must exist first)"
 
 echo ">>> 4. \$3 gross Cloud Run spend cap (console or Budget API; see docs/runbooks/bootstrap-gcp.md)"
-echo "    Budget API spend-cap support is unverified (WP-00 c); set the cap in the console,"
+echo "    Budget API spend-cap support is unverified; set the cap in the console,"
 echo "    scoped to project ${PROJECT} + Cloud Run service (152E-C115-5142), \$3 gross, and"
 echo "    record the budget id in the runbook. This is the only hard spend cap."
 

@@ -1,6 +1,6 @@
-"""Booking-time validation (ADR-0005, ADR-0006).
+"""Booking-time validation.
 
-``validate_slot`` raises the §6 errors in a fixed order so the API returns the most
+``validate_slot`` raises the validation errors in a fixed order so the API returns the most
 specific, earliest-failing reason.
 """
 

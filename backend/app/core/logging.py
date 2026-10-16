@@ -1,4 +1,4 @@
-"""Structured JSON logging (ADR-0019).
+"""Structured JSON logging.
 
 One JSON object per line on stdout. The formatter emits a fixed allowlist of fields, so
 PII (names, phones, emails, reasons, patient ids, SQL params) can never leak through a

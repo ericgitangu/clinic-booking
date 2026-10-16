@@ -1,4 +1,4 @@
-"""On a server error, logs carry request_id but never PII (ADR-0019, WP-07)."""
+"""On a server error, logs carry request_id but never PII (names, phones, reasons, patient ids)."""
 
 from __future__ import annotations
 

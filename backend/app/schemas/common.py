@@ -1,6 +1,6 @@
 """Shared schema helpers.
 
-``AwareDatetime`` input is a str with an offset (§6). A BeforeValidator rejects any
+``AwareDatetime`` input is a str with an offset. A BeforeValidator rejects any
 non-str value with a VALIDATION_ERROR; a naive string is then caught by pydantic's
 timezone-aware check, which the handler maps to TIMEZONE_REQUIRED.
 """
@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import AwareDatetime, BeforeValidator, PlainSerializer
 
-# v1 is single-clinic; its zone is the output offset (ADR-0005 "output in the clinic offset").
+# v1 is single-clinic; its zone is the output offset (timestamps are rendered in the clinic offset).
 # TD: a multi-clinic API would thread each appointment's clinic tz instead of this constant.
 CLINIC_TZ = ZoneInfo("Africa/Nairobi")
 

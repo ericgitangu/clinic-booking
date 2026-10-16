@@ -1,4 +1,4 @@
-"""Case 2 (§3.4): one patient, two doctors, same instant -> one booking."""
+"""One patient booking two doctors at the same instant ends with exactly one booking."""
 
 from __future__ import annotations
 

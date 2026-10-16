@@ -1,4 +1,4 @@
-"""Closed error hierarchy and catalogue (ADR-0006).
+"""Closed error hierarchy and catalogue.
 
 Every non-2xx maps to one ``DomainError`` subclass or a catalogue entry. ``code`` is
 UPPER_SNAKE; ``slug`` is its kebab-case form and the path segment under ``/problems``.
@@ -27,8 +27,8 @@ class ErrorSpec:
         return _slug(self.code)
 
 
-# The lean-core catalogue. T2 codes (IDEMPOTENCY_KEY_*) are added by WP-14; stretch codes
-# by their owning WP. Order: 422, 409, 404, 405, 503, 500.
+# The core catalogue. Codes for optional features (e.g. IDEMPOTENCY_KEY_*) are added with the
+# feature that raises them. Order: 422, 409, 404, 405, 503, 500.
 CATALOGUE: tuple[ErrorSpec, ...] = (
     ErrorSpec(
         "VALIDATION_ERROR",
@@ -173,7 +173,7 @@ class OutsideWorkingHours(DomainError):
     code = "OUTSIDE_WORKING_HOURS"
 
 
-# Service / repository-raised errors (WP-07). Additive to the closed hierarchy.
+# Service / repository-raised errors. Additive to the closed hierarchy.
 class UnknownDoctor(DomainError):
     code = "UNKNOWN_DOCTOR"
 

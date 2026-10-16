@@ -1,4 +1,4 @@
-"""The JSON formatter emits only an allowlist, so PII can never leak (ADR-0019)."""
+"""The JSON formatter emits only an allowlisted set of fields, so PII cannot leak via ``extra=``."""
 
 from __future__ import annotations
 

@@ -2,8 +2,8 @@
 
 <!-- one-line pitch --> · CircleCI badge (main) · tag v1.0.0 @ &lt;sha&gt;
 
-> Stub. Sections are filled by the work packages that own them (WP-17 finalises). The AI
-> reflection (§11) is written by the engineer; nothing here is auto-generated.
+> Work in progress: sections are filled in as the corresponding work lands. The AI
+> reflection (section 11) is written by the engineer; nothing here is auto-generated.
 
 ## 1. Live URLs
 
@@ -39,7 +39,7 @@
 
 ## 10. Operations, cost & security posture
 
-<!-- cost table · latency · $0 proof (PLAN §13) · no-auth IDOR statement · phone-exists oracle · tech debt ledger · honest hours -->
+<!-- cost table · latency · $0 proof (see docs/) · no-auth IDOR statement · phone-exists oracle · tech debt ledger · honest hours -->
 
 ## 11. AI reflection
 
@@ -57,6 +57,7 @@
 <!-- ENGINEER: decision 2 -- same rule -->
 
 ### Note on commits
+
 AI usage is disclosed here and in docs/ai/PROMPTS.md; commit messages carry no tooling trailers by convention.
 
 ## 12. Run locally

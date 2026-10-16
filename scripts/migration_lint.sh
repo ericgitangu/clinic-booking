@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enforce expand-only migrations (ADR-0015): the upgrade() body must not drop or narrow
+# Enforce expand-only migrations: the upgrade() body must not drop or narrow
 # anything. Destructive ops are allowed only on a line carrying "# contract-ok", and the
 # downgrade() body is not scanned (reversing an expand is expected to drop).
 set -euo pipefail

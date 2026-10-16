@@ -1,4 +1,5 @@
-"""Problem+json shape, headers and the catalogue endpoints (§6, ADR-0006)."""
+"""Error responses are problem+json with the documented fields and headers;
+the catalogue endpoints list every code."""
 
 from __future__ import annotations
 

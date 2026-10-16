@@ -1,4 +1,4 @@
-"""The partial unique indexes and key constraints are part of the contract (§5)."""
+"""The partial unique indexes and key constraints exist; the race guarantees depend on them."""
 
 from __future__ import annotations
 

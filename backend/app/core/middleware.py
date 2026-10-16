@@ -1,4 +1,4 @@
-"""Pure ASGI request-context middleware (ADR-0019). No BaseHTTPMiddleware, no GZip.
+"""Pure ASGI request-context middleware. No BaseHTTPMiddleware, no GZip.
 
 Assigns a request id, measures app and DB time, sets ``Server-Timing`` and ``X-Request-ID``
 on the response, and emits one JSON access line per request.

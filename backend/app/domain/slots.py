@@ -1,4 +1,4 @@
-"""Slot computation (ADR-0004, ADR-0005).
+"""Slot computation.
 
 Slots are computed, never stored. The grid for a clinic-local date is built by stepping in
 UTC so DST is handled correctly: spring-forward gaps are skipped inherently, and fall-back

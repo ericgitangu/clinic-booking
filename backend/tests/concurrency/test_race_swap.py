@@ -1,4 +1,4 @@
-"""Case 7 (§3.4): a two-appointment slot swap stays consistent (original or swapped)."""
+"""A two-appointment slot swap ends consistent: either both original or both swapped."""
 
 from __future__ import annotations
 

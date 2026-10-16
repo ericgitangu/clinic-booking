@@ -1,4 +1,4 @@
-"""Cases 4 and 8 (§3.4): cancel racing reschedule stays consistent, never double-books."""
+"""A cancel racing a reschedule leaves a consistent state and never double-books."""
 
 from __future__ import annotations
 

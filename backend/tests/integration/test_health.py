@@ -1,4 +1,4 @@
-"""Health and the fixed doc URLs (§12.4)."""
+"""Health endpoints respond, and the docs and openapi.json live at their fixed URLs."""
 
 from __future__ import annotations
 

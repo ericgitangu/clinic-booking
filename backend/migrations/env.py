@@ -1,7 +1,7 @@
 """Alembic async environment.
 
 Migrations are hand-written and expand-only; autogenerate is not used, so
-``target_metadata`` stays ``None``. WP-04 wraps ``run_migrations`` in an advisory lock so
+``target_metadata`` stays ``None``. ``run_migrations`` is wrapped in an advisory lock so
 two concurrent migrate runs serialize.
 """
 

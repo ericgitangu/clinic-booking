@@ -1,4 +1,4 @@
-"""Race-test harness (§3.4): a barrier releases N concurrent requests over one ASGI app,
+"""Race-test harness: a barrier releases N concurrent requests over one ASGI app,
 while a sampler on a separate connection watches pg_locks for blocked waiters."""
 
 from __future__ import annotations

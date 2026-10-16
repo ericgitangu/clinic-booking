@@ -1,4 +1,4 @@
-"""Naive control (§3.4): in a DB with the doctor-slot index dropped, a check-then-insert
+"""Naive control: with the doctor-slot unique index dropped, a check-then-insert
 booking service double-books under the same harness. This proves the index is what saves us.
 """
 
