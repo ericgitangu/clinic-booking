@@ -1,0 +1,13 @@
+# ZAP API-scan rule thresholds (generated with -g, then reviewed, WP-13).
+# Columns: ruleId<TAB>threshold(IGNORE|WARN|FAIL)<TAB>comment
+# Defaults are FAIL for active alerts; the entries below tune known-noisy rules for a
+# JSON REST API behind an IAM-gated proxy (no browser, no cookies, no CSP surface locally).
+10015	WARN	(Re-examine Cache-control Directives)
+10021	IGNORE	(X-Content-Type-Options) - set at the edge/proxy, not the API
+10020	IGNORE	(Anti-clickjacking header) - API returns JSON, not framed HTML
+10036	IGNORE	(Server leaks version via Server header) - uvicorn, acceptable locally
+10037	IGNORE	(Server leaks info via X-Powered-By) - not emitted
+10038	IGNORE	(CSP header not set) - JSON API, CSP belongs to the web origin
+10096	WARN	(Timestamp disclosure) - RFC 3339 instants are part of the contract
+10109	IGNORE	(Modern Web Application) - N/A for a JSON API
+90005	WARN	(Sec-Fetch headers) - not applicable to server-to-server calls

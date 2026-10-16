@@ -129,6 +129,75 @@ jobs:
             curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
             ./gitleaks git --no-banner
 
+  sast:
+    executor: backend
+    steps:
+      - checkout
+      - run:
+          name: semgrep (no login, no telemetry)
+          command: |
+            pip install semgrep==1.181.0
+            semgrep --config p/python --config p/typescript --config p/owasp-top-ten --error --metrics=off
+
+  sca:
+    executor: backend
+    steps:
+      - checkout
+      - install_deps
+      - run:
+          name: pip-audit over locked deps
+          command: |
+            cd backend
+            uv export --frozen --no-dev --format requirements-txt > requirements.txt
+            uv run pip-audit -r requirements.txt
+
+  build-scan:
+    docker:
+      - image: cimg/base:current
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build image (no attestations -> one Artifact Registry version)
+          command: |
+            cd backend
+            docker buildx build --provenance=false --sbom=false --load -t clinic-api:ci .
+      - run:
+          name: Trivy image + config scan (HIGH/CRITICAL, fixed only)
+          command: |
+            VERSION=0.76.0
+            curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" | tar -xz trivy
+            ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 clinic-api:ci
+            ./trivy config infra backend/Dockerfile
+
+  dast:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: ZAP API scan against the compose stack
+          command: |
+            docker compose up -d --wait
+            NET=$(docker network ls --filter name=clinic_default --format '{{.Name}}')
+            set +e
+            docker run --rm --network "$NET" -v "$PWD/.zap:/zap/wrk" \
+              ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6 \
+              zap-api-scan.py -t http://api:8080/openapi.json -f openapi -c rules.tsv -r zap-report.html
+            code=$?
+            echo "zap exit=$code"
+            # 0 = no alerts, 2 = warnings only -> pass; 1, 3 -> fail.
+            [ "$code" -eq 0 ] || [ "$code" -eq 2 ]
+      - store_artifacts:
+          path: zap-report.html
+
 workflows:
   pr:
     when:
@@ -141,6 +210,10 @@ workflows:
       - backend-test
       - backend-contract
       - secrets
+      - sast
+      - sca
+      - build-scan
+      - dast
 
   release:
     when:
@@ -152,3 +225,6 @@ workflows:
       - backend-test
       - backend-contract
       - secrets
+      - sast
+      - sca
+      - build-scan
