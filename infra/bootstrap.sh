@@ -99,7 +99,7 @@ step_service() {
 }
 
 step_invoker() {
-  echo ">>> invoker: run.invoker for the web proxy and the smoke identity (never allUsers)"
+  echo ">>> invoker: run.invoker for the web proxy and the smoke identity (no public access)"
   local svc sa found=0
   for svc in clinic-api clinic-realtime; do
     # clinic-realtime exists only if the optional realtime feature was deployed.

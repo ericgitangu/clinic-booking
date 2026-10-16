@@ -180,6 +180,9 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh backend/ infra/ .trivyignore .circleci/
       - setup_remote_docker
       - run:
           name: Build image (no attestations -> one Artifact Registry version)
@@ -204,6 +207,9 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh backend/ docker-compose.yml .zap/ .circleci/
       - run:
           name: ZAP API scan against the compose stack
           command: |
@@ -283,6 +289,9 @@ jobs:
       - run:
           name: Deploy a tagged revision with no traffic
           command: |
+            : "${PUBLIC_BASE_URL:?gcp-deploy context is missing PUBLIC_BASE_URL}"
+            : "${WEB_ORIGIN:?gcp-deploy context is missing WEB_ORIGIN}"
+            : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
             gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN}" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
       - run:
@@ -297,27 +306,16 @@ jobs:
             python3 scripts/verify_claims.py --base-url "$TAG_URL" --header "X-Serverless-Authorization: Bearer ${TOKEN}"
       - run:
           name: Promote only if this commit is still main's head
-          command: |
-            mkdir -p /tmp/promoted
-            git fetch origin main
-            if [ "$CIRCLE_SHA1" != "$(git rev-parse origin/main)" ]; then
-              echo "A newer commit exists on main; skipping promotion (it will ship)."
-              echo skipped > /tmp/promoted/state
-              exit 0
-            fi
-            gcloud run services update-traffic clinic-api --region us-east4 --to-tags "sha-${CIRCLE_SHA1:0:7}=100"
-            OLD_TAGS="$(gcloud run services describe clinic-api --region us-east4 --format=json | jq -r '[.status.traffic[]|select(.tag!=null)|.tag]|.[2:]|join(",")')"
-            if [ -n "$OLD_TAGS" ]; then
-              gcloud run services update-traffic clinic-api --region us-east4 --remove-tags "$OLD_TAGS"
-            fi
-            gcloud artifacts docker images list "us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-api" --include-tags --sort-by=~UPDATE_TIME --format=json | jq -r '.[2:][] | .package + "@" + .version' | while read -r REF; do gcloud artifacts docker images delete "$REF" --delete-tags --quiet; done
-            echo promoted > /tmp/promoted/state
+          command: bash scripts/ci/promote.sh "sha-${CIRCLE_SHA1:0:7}"
       - persist_to_workspace:
           root: /tmp/promoted
           paths:
             - state
+      - run:
+          name: Prune superseded revisions and images (best effort; cost-check C6 flags leftovers)
+          command: bash scripts/ci/prune.sh || echo "WARN prune failed; the next cost-check will report any extra versions"
 
-  ship-web:
+  build-web:
     docker:
       - image: cimg/node:24.14
         auth:
@@ -326,6 +324,35 @@ jobs:
     resource_class: medium
     working_directory: ~/repo
     steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+      - run:
+          name: Install without lifecycle scripts, then build with no Vercel credential
+          command: |
+            npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile --ignore-scripts
+            bash scripts/ci/vercel_offline_build.sh
+      - save_cache:
+          key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.local/share/pnpm/store
+      - persist_to_workspace:
+          root: /home/circleci/repo/web/.vercel
+          paths:
+            - output
+
+  ship-web:
+    docker:
+      - image: cimg/node:24.14
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASS
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
       - attach_workspace:
           at: /tmp/ws
       - run:
@@ -335,25 +362,15 @@ jobs:
               echo "ship-api did not promote this commit: the web build must not ship a contract newer than the live API."
               circleci-agent step halt
             fi
-      - checkout
-      - restore_cache:
-          keys:
-            - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
       - run:
-          name: Install
-          command: |
-            npm install -g pnpm@12.5.1
-            pnpm install --frozen-lockfile
-      - save_cache:
-          key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
-          paths:
-            - ~/.local/share/pnpm/store
+          name: Halt if a newer commit already owns main
+          command: bash scripts/ci/require_head.sh
       - run:
-          name: Vercel pull, build, deploy (one production deployment per merge)
+          name: Deploy the prebuilt output (the only step that needs the Vercel token)
           command: |
-            npx --yes vercel@59.5.0 pull --yes --environment=production --cwd web
-            npx --yes vercel@59.5.0 build --prod --cwd web
-            npx --yes vercel@59.5.0 deploy --prebuilt --prod --cwd web
+            mkdir -p web/.vercel
+            cp -R /tmp/ws/output web/.vercel/output
+            npm_config_ignore_scripts=true npx --yes vercel@59.5.0 deploy --prebuilt --prod --cwd web
 
   web-quality:
     docker:
@@ -366,13 +383,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Skip when web/ and contracts/ are untouched
-          command: |
-            git fetch origin main --quiet || true
-            if [ -z "$(git diff --name-only origin/main...HEAD -- web/ contracts/ 2>/dev/null)" ] && [ "$CIRCLE_BRANCH" != "main" ]; then
-              echo "web/ and contracts/ untouched; skipping."
-              circleci-agent step halt
-            fi
+          name: Skip when web/ and contracts/ are untouched (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh web/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
       - restore_cache:
           keys:
             - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
@@ -380,7 +392,7 @@ jobs:
           name: Install, lint, typecheck, test, build
           command: |
             npm install -g pnpm@12.5.1
-            pnpm install --frozen-lockfile
+            pnpm install --frozen-lockfile --ignore-scripts
             pnpm audit --prod --audit-level high
             pnpm -C web lint
             pnpm -C web typecheck
@@ -401,11 +413,23 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/ws
       - run:
-          name: Public smoke (no context, no credentials)
+          name: Halt unless this commit was promoted (otherwise the smoke tests an older release)
+          command: |
+            if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
+              echo "This commit was not promoted; skipping the public smoke."
+              circleci-agent step halt
+            fi
+      - run:
+          name: Halt if a newer commit already owns main
+          command: bash scripts/ci/require_head.sh
+      - run:
+          name: Public smoke (no Vercel or GCP credentials)
           command: |
             . scripts/ci/public-urls.env
-            case "$WEB$RUN_APP_URL" in *REPLACE_AFTER_FIRST_DEPLOY*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1;; esac
+            case "$WEB$RUN_APP_URL" in *REPLACE_BEFORE_FIRST_PUSH*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1;; esac
             PUBLIC_API="${WEB}/api"
             pip install --quiet httpx
             test "$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_API}/healthz")" = 200
@@ -431,6 +455,12 @@ jobs:
       - run:
           name: Static cost guards
           command: bash scripts/cost_check.sh --static
+      - run:
+          name: CI script tests (promote, prune, head guard, fail-closed skip)
+          command: bash scripts/ci/test_ci_scripts.sh
+      - run:
+          name: Cost guard self-test (every banned flag and bypass, by mutation)
+          command: bash scripts/cost_check_selftest.sh
 
   cost-check:
     machine:
@@ -516,13 +546,19 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - build-scan-push
+      - build-web:
+          context: dockerhub-ro
+          requires:
+            - web-quality
       - ship-web:
           context: [dockerhub-ro, vercel-prod]
+          serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
-            - web-quality
+            - build-web
       - smoke-public:
           context: dockerhub-ro
+          serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-web
       - cost-check:

@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint cost-static cost-check
+        contract lint fmt typecheck audit sec openapi gen-client verify docs-check migration-lint cost-static cost-check cost-selftest ci-test
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -82,3 +82,9 @@ cost-static: ## $0 static guards (no credentials)
 
 cost-check: ## $0 live guards, read-only (PROJECT=...)
 	bash scripts/cost_check.sh --live
+
+cost-selftest: ## Prove the cost guard by mutation (no cloud)
+	bash scripts/cost_check_selftest.sh
+
+ci-test: ## Test the CI helper scripts against fakes (no cloud)
+	bash scripts/ci/test_ci_scripts.sh
