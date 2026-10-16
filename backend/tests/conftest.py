@@ -53,3 +53,43 @@ async def app_conn() -> AsyncIterator[asyncpg.Connection]:
         yield conn
     finally:
         await conn.close()
+
+
+# --- WP-06: ASGI client + FakeClock -----------------------------------------------------
+from datetime import UTC, datetime  # noqa: E402
+
+import httpx  # noqa: E402
+
+from app.core.clock import FakeClock  # noqa: E402
+from app.core.config import Settings  # noqa: E402
+
+# app.main builds a module-level app from the environment (for the uvicorn CMD); give it a
+# value so importing it under pytest never fails. Tests build their own Settings.
+os.environ.setdefault("DATABASE_URL", owner_sqlalchemy_url())
+
+from app.main import create_app  # noqa: E402
+
+TEST_PUBLIC_BASE_URL = "http://testserver"
+
+
+def make_settings(**overrides: object) -> Settings:
+    base: dict[str, object] = {
+        "DATABASE_URL": owner_sqlalchemy_url(),
+        "PUBLIC_BASE_URL": TEST_PUBLIC_BASE_URL,
+        "WEB_ORIGIN": "http://localhost:3000",
+    }
+    base.update(overrides)
+    return Settings(**base)  # type: ignore[arg-type]
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncIterator[httpx.AsyncClient]:
+    app = create_app(make_settings())
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
+        yield c
+
+
+@pytest_asyncio.fixture
+def clock() -> FakeClock:
+    return FakeClock(datetime(2026, 10, 19, 4, 0, tzinfo=UTC))  # Mon 07:00 EAT

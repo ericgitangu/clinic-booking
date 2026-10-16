@@ -9,11 +9,16 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api.routers import health
+from app.api.routers import health, problems
 from app.core.config import Settings
+from app.core.cors import add_cors
+from app.core.logging import configure_logging
+from app.core.middleware import RequestContextMiddleware
+from app.core.problems import register_exception_handlers
 
 
 def create_app(settings: Settings) -> FastAPI:
+    configure_logging(settings.LOG_LEVEL)
     app = FastAPI(
         title="Clinic Booking API",
         version="1.0.0",
@@ -23,7 +28,15 @@ def create_app(settings: Settings) -> FastAPI:
         redoc_url="/redoc",
     )
     app.state.settings = settings
+
+    # CORS first, then request-context middleware so the latter is outermost (it sets the
+    # request id and emits the access log for every request).
+    add_cors(app, settings)
+    app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)
+
     app.include_router(health.router)
+    app.include_router(problems.router)
     return app
 
 
