@@ -1,0 +1,113 @@
+# ADR-0014: Hosting, region and cost
+
+- Date: 2026-10-16
+- Deciders: engineering
+- Amended: 2026-10-16, $0 cost audit: region moved from europe-west3 to us-east4 (Tier 1, North America egress tier), Neon to aws-us-east-1, the edge to an IAM-gated Vercel front door ([ADR-0023](0023-zero-cost-edge-front-door.md)), and every cost line proven against an official free tier in [PLAN.md §13](../architecture/PLAN.md#13-cost-0-proof)
+
+## Status
+Accepted
+
+## Context
+- **Cost rule.** Our infrastructure rule forbids always-on resources: no min-instances > 0, no NAT, no load balancer, no Cloud SQL.
+- **Region preference.** Our default region is africa-south1.
+- **Database location.** Neon has no African region. The nearest is aws-eu-central-1 (Frankfurt).
+- **Round trips.** A booking makes 4-6 sequential DB round trips.
+- **Zero-cost rule (added 2026-10-16).** Total cost must be $0, proven from official free-tier documents, not estimated as low. What the cost audit read on 2026-10-16 (Cloud Billing Catalog API, service `152E-C115-5142`, and cloud.google.com/run/pricing):
+  - `europe-west3` is billed at Tier 2 ($0.0000336/vCPU-s, $0.0000035/GiB-s). The free tier is a spend-based discount priced at Tier 1, so in a Tier 2 region it buys about 29% less compute (about 128,571 vCPU-s instead of 180,000; deduced from the two prices). `us-east1`, `us-east4`, `europe-west1`, `europe-west4` and `africa-south1` are Tier 1. **Verified.**
+  - Cloud Run internet egress is free only North America to North America (first 1 GiB a month). Europe, Africa and intercontinental egress are billed from byte 0. **Verified.**
+  - Cloud Storage Always Free applies only in `us-west1`, `us-central1` and `us-east1`. **Verified (cloud.google.com/storage/pricing, read by the audit).**
+
+## Considered options
+1. Cloud Run in africa-south1 with Neon in Frankfurt.
+2. Cloud Run in europe-west3 (Frankfurt) with Neon in aws-eu-central-1.
+3. Cloud SQL in africa-south1. Rejected outright: it is always-on.
+4. Cloud Run in us-east4 with Neon in aws-us-east-1, reached only through a Vercel front door in iad1 (ADR-0023). Added by the $0 audit.
+
+## Decision
+~~Option 2.~~ **Option 4** (amended 2026-10-16). Option 2 was the decision until the $0 audit showed that europe-west3 cannot be proven $0: its compute is Tier 2 and every byte it sends to Kenya, Vercel or Neon is billed. Option 4 keeps option 2's reasoning (Cloud Run next to the database, so the 4-6 DB round trips stay short) and moves the pair to the one place where Cloud Run's egress has a free tier. The details of the edge are in ADR-0023. Everything below reads `us-east4` where it used to read `europe-west3`.
+
+**`clinic-api` settings:**
+
+| Setting | Value |
+|---|---|
+| Region | `us-east4` (Tier 1; verified in the Cloud Billing catalog, 2026-10-16) |
+| Instances | `--min-instances 0 --max-instances 3` (both asserted by the `cost-check` job) |
+| Concurrency | `--concurrency 80` |
+| Resources | `--cpu 1 --memory 512Mi --cpu-boost` |
+| Timeout | `--timeout 60` |
+| Billing | request-based (default) |
+| Service account | `clinic-api-runtime` |
+| Secrets | `--set-secrets DATABASE_URL=clinic-database-url-app:latest` |
+| URL | ~~public `*.run.app` (public access granted once by bootstrap; ADR-0016)~~ IAM-gated `*.run.app` with no `allUsers` binding; the public URL is the Vercel front door (ADR-0023). Custom audience `clinic-api` (`--add-custom-audiences`) |
+
+**Database connection:**
+- Neon Free project in **aws-us-east-1** (amended from aws-eu-central-1, so the database stays beside Cloud Run us-east4), compute fixed at **0.25 CU** (autoscaling min = max = 0.25). Neon Free gives 100 CU-hours per project a month and suspends rather than bills when they run out (neon.com/docs/introduction/plans, read 2026-10-16); an always-awake 0.25 CU compute would use 186 CU-hours a month (744 h × 0.25, deduced), so scale-to-zero must keep working and nothing may ping the database on a schedule.
+- The direct (non-pooler) Neon endpoint, with `postgresql+asyncpg://...?ssl=require`. There are no `sslmode` or `channel_binding` params, and a config validator rejects them (**unverified**; WP-12's `/readyz` check confirms it).
+- Pool: `pool_size=5, max_overflow=0, pool_pre_ping=True, pool_recycle=240, hide_parameters=True`, so at most 15 connections. Using the direct endpoint avoids asyncpg statement-cache issues behind PgBouncer.
+
+**Other components:**
+- ~~Artifact Registry `clinic` in europe-west3, keeping the last 5 images.~~ Artifact Registry `clinic` in **us-east4** (co-located with Cloud Run, so image pulls cross no region). Target: **at most 2 versions per package** (`clinic-api`, `clinic-realtime`), enforced three ways: a cleanup policy (keep the 2 most recent versions; delete untagged versions and anything older than 7 days that the keep rule does not protect), a CI prune right after promotion (cleanup policies take effect within about a day), and the `cost-check` job asserting the repository's `sizeBytes` is below 400,000,000. Cloud Run traffic tags are pruned to the last 2 to match, so no tagged revision points at a deleted image.
+- Vercel Hobby for the single `web` project (the Next.js app; its route handlers are the front door), pinned to `iad1` with `"regions": ["iad1"]` in `web/vercel.json` (amended by the engineer's decision, PLAN.md §12.3; the separate front-door project `clinic-frontdoor` is superseded).
+- A GCP budget alert at $1. **It only alerts; it does not cap spend** (cloud.google.com/billing/docs/how-to/budgets: an alerts-only budget "doesn't automatically cap ... usage or spending"). What actually caps spend is listed under "Cost" below.
+- Terraform state bucket in **us-east1** (a Cloud Storage Always Free region; us-east4 is not one), Standard class, single region.
+- **Stretch S1:** `clinic-realtime` in **us-east4** beside the API (same Neon latency argument). ~~`--min-instances 0 --max-instances 2 --concurrency 100 --cpu 1 --memory 256Mi --cpu-boost --timeout 300`~~ **`--min-instances 0 --max-instances 2 --concurrency 1 --cpu 0.25 --memory 256Mi --cpu-boost --timeout 300`** (amended for the CPU allowance; see "Realtime cost arithmetic"), SA `clinic-realtime-runtime`, secret `clinic-database-url-realtime`, direct Neon endpoint with at most 2 connections per instance. Total connections become at most 15 + 4.
+
+**Latency for option 2 (superseded by option 4 below; kept for the record; estimate, unmeasured).** Each africa-south1 → Frankfurt round trip is estimated at 150-200 ms. Option 2 pays one long client hop per request instead of 4-6 long DB hops. WP-12 publishes measured cold and warm latency.
+
+**Latency re-weighed for option 4 (estimate, unmeasured).** The DB argument is unchanged: Cloud Run us-east4 (Ashburn) and Neon aws-us-east-1 (N. Virginia) are deduced to be in the same metro, so the 4-6 DB round trips cost a few ms in total, as Frankfurt-Frankfurt did. What gets worse is the client hop: Kenya → US East is longer than Kenya → Frankfurt, and the front door adds a function hop and its own cold start. Our estimate is about 100-150 ms more per warm request than option 2, and a cold first request that can now include three cold starts (Vercel function, Cloud Run, Neon). We accept that for a demo in exchange for a provable $0; it is the first thing to revisit if the system ever had real Kenyan users (and those would also need an African-region database, TD9). WP-12 measures cold and warm latency through the front door.
+
+### Cost
+
+**Summary ($0 rule, amended 2026-10-16; full per-resource proof in [PLAN.md §13](../architecture/PLAN.md#13-cost-0-proof)).** Every resource sits inside a documented free tier, with the headroom computed in §13 against a worst-case month (an admin dashboard live 8 h a day for 7 days, 40 CI pipelines, 200 bookings). Deduced use of the binding limits in that month: Cloud Run CPU about 32% of 180,000 vCPU-s, North America egress about 50% of 1 GiB, Artifact Registry at most about 62% of 0.5 GiB, Secret Manager 4 of 6 active versions, Neon about 35 of 100 CU-hours, CircleCI about 22,200 of 30,000 credits. What enforces it:
+
+| Guard | Kind | What it stops |
+|---|---|---|
+| `--max-instances 3` / `2`, `--min-instances 0`, timeouts 60 s / 300 s, job `--task-timeout 600s --max-retries 0` | hard (platform) | Runaway compute; asserted by `cost-check` |
+| Cloud Run spend-cap budget, $3 gross, project + Cloud Run service | hard (platform; enforcement "isn't instant") | Pauses new Cloud Run usage before gross compute reaches the $4.32 Tier 1 CPU discount, so net compute stays $0 |
+| No `allUsers` invoker, no `--allow-unauthenticated`, no `--no-invoker-iam-check`; the `web` project's proxy only (ADR-0023) | hard (IAM) | Billed egress to non-North-America clients; denied requests are not billed |
+| Neon Free, Vercel Hobby, CircleCI Free with no card | hard (plan) | They pause or block at their limits and cannot bill |
+| Artifact Registry 2 versions per package + `sizeBytes` < 400 MB assert | configuration | Storage past 0.5 GiB |
+| Destroy, never disable, old secret versions; ≤ 6 active asserted | configuration | Secret versions past 6 |
+| State bucket in us-east1, lifecycle, soft delete off | configuration | Storage billed outside the Always Free regions |
+| Daily egress alert policy (~~free until 2027-09-01~~ free until at least 2027-09-01; delete or re-audit before 2027-08-01, PLAN.md §13.6) + kill switch | detection + manual stop | Egress past 1 GiB under a flood |
+| One free `_Default` log exclusion, `drop-iam-denied`, for IAM-denied 401 and 403 request logs (widened from 403 only by the hosting lock review, [PLAN.md §12.4](../architecture/PLAN.md#124-hosting-lock-review); a junk bearer gets 401) | configuration | Log ingestion past 50 GiB under a flood of direct requests |
+| $1 alerts-only budget | detection only | Nothing by itself; it tells us something escaped the guards |
+
+The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Storage, egress) are held at $0 by configuration and checks, not by a platform cap. We say that plainly rather than call the budget a cap.
+
+**Cut for cost.** Anything that could not be proven $0 is out: Europe hosting (Tier 2 compute and egress from byte 0), a public `allUsers` invoker, Artifact Analysis scanning ($0.26 per image, no free tier; trivy in CI instead), Cloud Build and `gcloud run deploy --source`, a state bucket outside the free regions, CircleCI Docker layer caching, Vercel image optimization, uptime pingers. Reasons in PLAN.md §13.
+
+**Cost (estimated at demo traffic; observed numbers replace these in the README).** The original table follows, with each line amended by the audit:
+
+| Item | Plan | Est. $/mo |
+|---|---|---|
+| Cloud Run | ~~Free tier, if it applies in europe-west3 (checked from the pricing page in WP-00)~~ Free tier in us-east4 (Tier 1, verified); spend cap $3 gross | 0 |
+| Neon | Free | 0 |
+| Vercel | Hobby | 0 |
+| CircleCI | Free credits (30,000 a month; budget 22,200 worst case) | 0 |
+| Artifact Registry | ~~about 5 images~~ at most 2 versions per package, < 400 MB (free 0.5 GiB) | ~~< 0.10~~ 0 |
+| Secret Manager | 2 secrets, 1 active version each (free: 6 active versions) | ~~< 0.20~~ 0 |
+| TF state bucket | us-east1, Always Free (5 GB-months) | ~~< 0.05~~ 0 |
+| Cloud Run `clinic-realtime` (stretch S1) | Free tier in us-east4; 0.25 vCPU per stream; an open stream bills instance time while connected | 0 (deduced; WP-S1c measures one dashboard tab for 30 minutes) |
+| Secret Manager, stretch secrets | up to 2 more (realtime DB URL, stream ticket key); total 4 of 6 | ~~< 0.20~~ 0 |
+| Vercel front door (ADR-0023): route handlers in the same `web` project | Hobby; counted in the one project's limits, including 1M CDN requests | 0 |
+| Cloud Run egress | North America only, first 1 GiB free | 0 (deduced use about 50%) |
+| Google OAuth, Cloudflare Turnstile (stretch S3, S4) | Free | 0 |
+
+**Realtime cost arithmetic (stretch S1; superseded by the corrected paragraph below, kept for the record).** With request-based billing an instance is billed for every second it has an open request, so one connected dashboard tab bills about 1 vCPU × 3,600 s = 3,600 vCPU-seconds and 0.25 GiB × 3,600 s = 900 GiB-seconds per connected hour. The monthly free allowance (180,000 vCPU-seconds and 360,000 GiB-seconds per billing account, list figures that WP-00's pricing check confirms; shared with `clinic-api`) therefore covers about 50 connected hours a month at most; a tab held open 8 h a day passes it within about a week. Above the allowance, at the Tier 1 list price of about $0.000024 per vCPU-second (europe-west3's pricing tier is confirmed in the WP-00 pricing check), one connected hour costs roughly $0.09 in CPU plus well under $0.01 in memory. The hidden-tab and 10-minute idle closes are what keep this near zero, which is why they are acceptance items. We keep `--cpu 1`: Cloud Run requires a maximum concurrency of 1 below one vCPU (per its docs; confirmed in WP-S1c before relying on it), which would turn every stream into its own instance. WP-S1c also records the measured cold first-connect time.
+
+**Realtime cost arithmetic, corrected by the $0 audit (2026-10-16; still a deduction until WP-S1c measures it).** The paragraph above used Tier 1 prices for a Tier 2 region. In europe-west3 the same $4.32 CPU discount covers only about 35 connected hours a month at 1 vCPU, not about 50. In us-east4 (Tier 1) it is about 50 hours at 1 vCPU, which a dashboard held 8 h a day for 7 days (56 h) would exceed on its own. We therefore **reverse the `--cpu 1` choice**: `--cpu 0.25 --concurrency 1 --max-instances 2`. One stream per instance is acceptable for an admin feed with one or two viewers, and the 2-instance cap means at most 2 concurrent streams in total (a third connect is queued by Cloud Run and then refused, deduced to be Cloud Run's own 429 rather than our 503 `STREAM_CAPACITY`, which WP-S1c observes; the dashboard shows "Live feed busy" and keeps its metrics view). `MAX_STREAMS_PER_INSTANCE` becomes 1 to match. Per connected hour that is 900 vCPU-s and 900 GiB-s (0.25 GiB), so 56 connected hours use 50,400 vCPU-s, about 28% of the allowance, leaving room for `clinic-api`. **Amended by the hosting lock review ([PLAN.md §12.4](../architecture/PLAN.md#124-hosting-lock-review)):** 56 hours was not an upper bound, because the idle close is client-side; a script could hold 2 streams all month (1,296,000 vCPU-s). Every stream now needs a ticket, and each ticket debits 700 s from a 345,600 s monthly budget enforced by `clinic-api`, so realtime compute is at most 86,400 vCPU-s and the month's worst case is $2.49 gross, under the $3 spend cap (deduced). The "concurrency 1 below 1 vCPU" rule and whether 0.25 vCPU with 256 MiB is an accepted combination are **unverified** and checked in WP-00; if 0.25 vCPU is rejected, the fallback is 0.5 vCPU (100,800 vCPU-s for 56 h, still under the allowance with clinic-api) and the §13 table is recomputed.
+
+## Consequences
+- Good: scale-to-zero end to end, with nothing billing while idle.
+- Bad (option 2, superseded by option 4): EU data residency. That blocks production use with real Kenyan health data under the KDPA (TD9). The demo data is synthetic.
+- Bad: the cold path (Cloud Run start + Neon wake) is estimated at 1-3 s for the first hit, unmeasured.
+- Pending: Neon `max_connections` is recorded in WP-11.
+- Bad (option 4): longer client hop from Kenya and an extra front-door hop; US data residency instead of EU (TD9); Vercel becomes a lean-core dependency (ADR-0023).
+- Good (option 4): the full Tier 1 compute allowance and the only Cloud Run egress tier that is free.
+
+## Assessment line
+"Deploy to any cloud, public URL".
+
+## Review trigger
+More than 10 instances means the Neon pooler with `statement_cache_size=0`, tested first. Real Kenyan data means an African-region database. Any Billing report line above $0.00, a Free Tier savings line approaching its limit, or Google changing a free tier (30 days' notice) means re-running the PLAN.md §13 proof before the next deploy. Cloud Monitoring alerting charges start no sooner than 2027-09-01 at $0.35 per metric reference a month (cloud.google.com/stackdriver/pricing, verified by the cost verifier 2026-10-16): before 2027-08-01, delete the egress alert policy and its notification channel, or re-run the §13 proof with that line (PLAN.md §13.6).
