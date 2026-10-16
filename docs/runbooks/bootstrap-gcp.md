@@ -73,13 +73,12 @@ PROJECT="$PROJECT" GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" bash infra/bootstrap.sh stat
 ## 3. CircleCI contexts
 
 Organization Settings -> Contexts. A job that references a context that does not exist fails
-at start, and every workflow job references one, so create all four before the first push to
+at start, so create all three before the first push to
 `main`.
 
 | Context | Variables | Restriction |
 |---|---|---|
 | `gcp-deploy` | `GOOGLE_PROJECT_ID` = `$PROJECT`; `GOOGLE_PROJECT_NUMBER` = `$PROJECT_NUMBER`; `DEPLOYER_SA` = `circleci-deployer@$PROJECT.iam.gserviceaccount.com`; `PUBLIC_BASE_URL` = `$WEB/api` (step 7); `WEB_ORIGIN` = `$WEB` (step 7) | `pipeline.git.branch == "main"` |
-| `dockerhub-ro` | `DOCKERHUB_USER`, `DOCKERHUB_PASS` (a **read-only** access token from a free Docker Hub account: Account Settings -> Personal access tokens) | none (pull-request builds need it) |
 | `vercel-prod` | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (step 7) | `pipeline.git.branch == "main"` |
 | `oidc-probe` | none | none; used only by the negative test below |
 

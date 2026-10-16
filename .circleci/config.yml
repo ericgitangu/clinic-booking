@@ -53,23 +53,14 @@ commands:
 executors:
   backend:
     docker:
-      - image: cimg/python:3.12
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/python:3.12
     resource_class: small
     working_directory: ~/repo
 
   backend_db:
     docker:
-      - image: cimg/python:3.12
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
-      - image: cimg/postgres:17.11
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/python:3.12
+      - image: mirror.gcr.io/cimg/postgres:17.11
         environment:
           POSTGRES_USER: clinic
           POSTGRES_PASSWORD: clinic
@@ -172,10 +163,7 @@ jobs:
 
   build-scan:
     docker:
-      - image: cimg/base:current
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/base:current
     resource_class: medium
     working_directory: ~/repo
     steps:
@@ -317,10 +305,7 @@ jobs:
 
   build-web:
     docker:
-      - image: cimg/node:24.14
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/node:24.14
     resource_class: medium
     working_directory: ~/repo
     steps:
@@ -345,10 +330,7 @@ jobs:
 
   ship-web:
     docker:
-      - image: cimg/node:24.14
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
     working_directory: ~/repo
     steps:
@@ -374,10 +356,7 @@ jobs:
 
   web-quality:
     docker:
-      - image: cimg/node:24.14
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
     working_directory: ~/repo
     steps:
@@ -405,10 +384,7 @@ jobs:
 
   smoke-public:
     docker:
-      - image: cimg/python:3.12
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/python:3.12
     resource_class: small
     working_directory: ~/repo
     steps:
@@ -441,10 +417,7 @@ jobs:
 
   cost-static:
     docker:
-      - image: cimg/base:current
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASS
+      - image: mirror.gcr.io/cimg/base:current
     resource_class: small
     working_directory: ~/repo
     steps:
@@ -486,25 +459,16 @@ workflows:
             equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
-      - backend-quality:
-          context: dockerhub-ro
-      - backend-test:
-          context: dockerhub-ro
-      - backend-contract:
-          context: dockerhub-ro
-      - secrets:
-          context: dockerhub-ro
-      - sast:
-          context: dockerhub-ro
-      - sca:
-          context: dockerhub-ro
-      - build-scan:
-          context: dockerhub-ro
+      - backend-quality
+      - backend-test
+      - backend-contract
+      - secrets
+      - sast
+      - sca
+      - build-scan
       - dast
-      - web-quality:
-          context: dockerhub-ro
-      - cost-static:
-          context: dockerhub-ro
+      - web-quality
+      - cost-static
 
   release:
     when:
@@ -512,24 +476,15 @@ workflows:
         - equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
-      - backend-quality:
-          context: dockerhub-ro
-      - backend-test:
-          context: dockerhub-ro
-      - backend-contract:
-          context: dockerhub-ro
-      - secrets:
-          context: dockerhub-ro
-      - sast:
-          context: dockerhub-ro
-      - sca:
-          context: dockerhub-ro
-      - build-scan:
-          context: dockerhub-ro
-      - web-quality:
-          context: dockerhub-ro
-      - cost-static:
-          context: dockerhub-ro
+      - backend-quality
+      - backend-test
+      - backend-contract
+      - secrets
+      - sast
+      - sca
+      - build-scan
+      - web-quality
+      - cost-static
       - build-scan-push:
           context: gcp-deploy
           requires:
@@ -547,17 +502,15 @@ workflows:
           requires:
             - build-scan-push
       - build-web:
-          context: dockerhub-ro
           requires:
             - web-quality
       - ship-web:
-          context: [dockerhub-ro, vercel-prod]
+          context: vercel-prod
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
             - build-web
       - smoke-public:
-          context: dockerhub-ro
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-web
