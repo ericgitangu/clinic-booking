@@ -51,7 +51,6 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        origins = [self.WEB_ORIGIN]
-        if "http://localhost:3000" not in origins:
-            origins.append("http://localhost:3000")
-        return origins
+        # Only the configured web origin. WEB_ORIGIN defaults to http://localhost:3000, so local
+        # development works unchanged, while a deployed API never also trusts localhost.
+        return [self.WEB_ORIGIN]

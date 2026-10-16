@@ -1,4 +1,4 @@
-"""Problem+json responses and the exception handlers that produce them (ADR-0006)."""
+"""Problem+json responses and the exception handlers that produce them."""
 
 from __future__ import annotations
 
@@ -11,22 +11,25 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.logging import APP_LOGGER
 from app.core.middleware import problem_code_ctx, request_id_ctx
+from app.db.errors import is_db_unavailable
 from app.domain.errors import CATALOGUE_BY_CODE, DomainError
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 
-# Exceptions that mean "the database is unreachable", mapped to 503 (§5).
+# Exceptions raised before or outside a SQL statement that mean "the database is unreachable",
+# mapped to 503 with Retry-After. Server-side errors that arrive as a DBAPIError are classified
+# by SQLSTATE in ``_dbapi_error_handler`` instead. A bare OSError is deliberately not listed:
+# it would hide unrelated bugs (a missing file, a permission error) behind a 503.
 DB_UNAVAILABLE_EXCEPTIONS: tuple[type[Exception], ...] = (
-    sqlalchemy.exc.TimeoutError,
-    sqlalchemy.exc.OperationalError,
-    sqlalchemy.exc.InterfaceError,
+    sqlalchemy.exc.TimeoutError,  # connection pool exhausted
     sqlalchemy.exc.DisconnectionError,
-    ConnectionError,
-    socket.gaierror,
-    OSError,
+    ConnectionError,  # refused, reset, aborted
+    socket.gaierror,  # DNS failure
+    TimeoutError,  # connect timeout
 )
 
 
@@ -110,20 +113,69 @@ async def _db_unavailable_handler(request: Request, exc: Exception) -> JSONRespo
     return build_problem(request, "DB_UNAVAILABLE", headers={"Retry-After": "2"})
 
 
-async def _catch_all_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Opaque body; the trace is logged under request_id, without bound parameters.
+async def _dbapi_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Database outages (SQLSTATE class 08, 53300, 57P01/02/03) are 503; any other database
+    error is a bug and is re-raised to the catch-all (opaque 500)."""
+    if is_db_unavailable(exc):
+        return build_problem(request, "DB_UNAVAILABLE", headers={"Retry-After": "2"})
+    raise exc
+
+
+def _log_unhandled(request: Request, exc: BaseException) -> None:
+    # Opaque response body; the trace is logged under request_id, without bound parameters.
     logging.getLogger(APP_LOGGER).error(
         "unhandled exception",
         exc_info=exc,
         extra={"request_id": _request_id(request)},
     )
+
+
+async def _catch_all_handler(request: Request, exc: Exception) -> JSONResponse:
+    _log_unhandled(request, exc)
     return build_problem(request, "INTERNAL_ERROR")
+
+
+class UnhandledErrorMiddleware:
+    """Turn an unhandled exception into a 500 problem+json *inside* the request-context and CORS
+    middleware.
+
+    Starlette's own catch-all runs in ServerErrorMiddleware, outside every user middleware, so
+    a response built there carries no ``X-Request-ID``, ``Server-Timing`` or CORS headers and
+    never reaches the access log. Installed innermost, this lets the outer middleware see a
+    normal 500 response.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        started = False
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracking_send)
+        except Exception as exc:
+            if started:
+                raise  # a response is already on the wire; nothing sane to send
+            request = Request(scope, receive)
+            _log_unhandled(request, exc)
+            await build_problem(request, "INTERNAL_ERROR")(scope, receive, send)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, _domain_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
+    app.add_exception_handler(sqlalchemy.exc.DBAPIError, _dbapi_error_handler)
     for exc_type in DB_UNAVAILABLE_EXCEPTIONS:
         app.add_exception_handler(exc_type, _db_unavailable_handler)
     app.add_exception_handler(Exception, _catch_all_handler)

@@ -30,6 +30,17 @@ def _valid_uuid(value: str) -> bool:
     return True
 
 
+def _route_label(scope: Scope) -> str:
+    """The matched route template (``/patients/{patient_id}/appointments``), never the raw path.
+
+    Logging the concrete path would write patient and appointment ids into Cloud Logging. The
+    router stores the matched route on the shared scope; an unmatched request (404) is logged
+    as ``unmatched`` so attacker-controlled URLs never reach the logs either.
+    """
+    path = getattr(scope.get("route"), "path", None)
+    return path if isinstance(path, str) else "unmatched"
+
+
 def _header(scope: Scope, name: bytes) -> str | None:
     for key, value in scope.get("headers", []):
         if key == name:
@@ -82,7 +93,7 @@ class RequestContextMiddleware:
             access_log(
                 request_id=request_id,
                 method=scope.get("method", "-"),
-                route=scope.get("path", "-"),
+                route=_route_label(scope),
                 status=status_holder["status"],
                 latency_ms=latency_ms,
                 code=problem_code_ctx.get(),

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
 from app.schemas.common import ClinicDatetime, StrAwareDatetime
 
@@ -20,18 +20,21 @@ class RescheduleRequest(BaseModel):
     starts_at: StrAwareDatetime
 
 
+def _strip(value: object) -> object:
+    return value.strip() if isinstance(value, str) else value
+
+
 class CancelRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    reason: str = Field(min_length=3, max_length=500)
+    # Trim first, then bound the trimmed text, so surrounding whitespace never counts against
+    # the limit and the stored reason is the trimmed one.
+    reason: Annotated[str, BeforeValidator(_strip), Field(min_length=3, max_length=500)]
 
     @field_validator("reason")
     @classmethod
-    def _trim_nonblank(cls, v: str) -> str:
+    def _no_nul(cls, v: str) -> str:
         if "\x00" in v:
             raise ValueError("reason must not contain NUL characters")
-        trimmed = v.strip()
-        if not (3 <= len(trimmed) <= 500):
-            raise ValueError("reason must be 3..500 non-blank characters")
         return v
 
 

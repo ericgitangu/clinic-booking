@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import io
+import logging
 import uuid
+from typing import Any
 
+import asyncpg.exceptions as pgexc
+import asyncpg.prepared_stmt
 import httpx
 import pytest
+
+from app.core.logging import JsonFormatter
+from app.repositories import doctors as doctor_repo
 
 pytestmark = pytest.mark.asyncio
 
@@ -60,3 +68,51 @@ async def test_server_timing_header_present(client: httpx.AsyncClient) -> None:
     resp = await client.get("/healthz")
     st = resp.headers["server-timing"]
     assert "app;dur=" in st and "db;dur=" in st
+
+
+async def test_unhandled_error_500_headers(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("simulated bug")
+
+    monkeypatch.setattr(doctor_repo, "list_active_doctors", boom)
+
+    buffer = io.StringIO()
+    handler = logging.StreamHandler(buffer)
+    handler.setFormatter(JsonFormatter())
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        resp = await client.get("/doctors", headers={"Origin": "http://localhost:3000"})
+    finally:
+        root.removeHandler(handler)
+
+    assert resp.status_code == 500
+    body = resp.json()
+    assert body["code"] == "INTERNAL_ERROR"
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert resp.headers["x-request-id"] == body["request_id"]
+    assert "server-timing" in resp.headers
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+    # The 500 reaches the access log with the matched route and its request id.
+    access = [line for line in buffer.getvalue().splitlines() if '"message": "request"' in line]
+    assert access, buffer.getvalue()
+    assert '"status": 500' in access[-1]
+    assert f'"request_id": "{body["request_id"]}"' in access[-1]
+    assert "simulated bug" not in resp.text  # the body stays opaque
+
+
+async def test_unclassified_db_error_is_500_not_503(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(self: Any, *args: Any, **kwargs: Any) -> Any:
+        raise pgexc.UndefinedTableError('relation "nope" does not exist')
+
+    monkeypatch.setattr(asyncpg.prepared_stmt.PreparedStatement, "fetch", boom)
+
+    resp = await client.get("/doctors")
+
+    assert resp.status_code == 500
+    assert resp.json()["code"] == "INTERNAL_ERROR"
+    assert "retry-after" not in resp.headers

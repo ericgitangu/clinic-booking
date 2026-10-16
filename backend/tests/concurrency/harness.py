@@ -20,9 +20,9 @@ from tests.conftest import FIXED_NOW, TEST_PUBLIC_BASE_URL, make_settings, owner
 WAITERS_SQL = "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted"
 
 
-def make_race_app() -> object:
-    # DB_POOL_SIZE=30 so 25 concurrent requests all get a connection (§3.4).
-    app = create_app(make_settings(DB_POOL_SIZE=30, LOG_LEVEL="warning"))
+def make_race_app(log_level: str = "warning") -> object:
+    # DB_POOL_SIZE=30 so 25 concurrent requests all get a connection.
+    app = create_app(make_settings(DB_POOL_SIZE=30, LOG_LEVEL=log_level))
     app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
     return app
 

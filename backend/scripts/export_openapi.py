@@ -7,16 +7,10 @@ the database (the engine is lazy). Writes sorted keys so the output is byte-stab
 from __future__ import annotations
 
 import json
-import os
 import pathlib
 
-# app.main builds a module-level app from the environment (for the uvicorn CMD). Give it a
-# value so this env-independent export imports cleanly; the contract is built from
-# FIXED_SETTINGS below, so `make openapi` and `DATABASE_URL=bogus make openapi` are identical.
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://x@localhost/x")
-
-from app.core.config import Settings  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.core.config import Settings
+from app.main import create_app
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT = REPO_ROOT / "contracts" / "openapi.json"

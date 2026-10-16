@@ -7,11 +7,12 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.db.errors import is_retryable_conflict
 from app.domain.booking_rules import validate_slot
 from app.domain.errors import (
     AppointmentAlreadyCancelled,
@@ -27,7 +28,7 @@ from app.repositories import appointments as appt_repo
 from app.repositories import doctors as doctor_repo
 from app.repositories import events as event_repo
 from app.repositories import patients as patient_repo
-from app.repositories.errors import is_retryable_conflict, map_integrity_error
+from app.repositories.errors import map_integrity_error
 
 SLOT = timedelta(minutes=30)
 
@@ -39,7 +40,12 @@ async def _after_write(session: AsyncSession) -> None:
 
 
 async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment]]) -> Appointment:
-    """Run a write transaction, retrying once on a serialization/deadlock conflict."""
+    """Run a write transaction, retrying once on a deadlock or serialization failure.
+
+    The asyncpg dialect raises those as a plain ``DBAPIError``, so the decision is made on the
+    SQLSTATE. A conflict that survives the retry is reported as CONCURRENT_UPDATE; every other
+    database error propagates unchanged (outages become 503, anything else 500).
+    """
     for attempt in range(2):
         try:
             async with session.begin():
@@ -47,8 +53,10 @@ async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment
         except IntegrityError as exc:
             # Unique violations are deterministic: map, never retry.
             raise map_integrity_error(exc) from exc
-        except OperationalError as exc:
-            if is_retryable_conflict(exc) and attempt == 0:
+        except DBAPIError as exc:
+            if not is_retryable_conflict(exc):
+                raise
+            if attempt == 0:
                 await asyncio.sleep(random.uniform(0.02, 0.08))  # noqa: S311  # jitter, not crypto
                 continue
             raise ConcurrentUpdate() from exc

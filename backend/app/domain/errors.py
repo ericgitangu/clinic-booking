@@ -80,13 +80,13 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "SLOT_TAKEN",
         409,
         "Slot taken",
-        "Another booking holds this doctor slot (uq_appt_doctor_slot_booked).",
+        "Another booking already holds this doctor slot.",
     ),
     ErrorSpec(
         "PATIENT_DOUBLE_BOOKED",
         409,
         "Patient double-booked",
-        "The patient already has a booking at this time (uq_appt_patient_slot_booked).",
+        "The patient already has a booking at this time.",
     ),
     ErrorSpec(
         "APPOINTMENT_ALREADY_CANCELLED",
@@ -104,7 +104,7 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "PATIENT_PHONE_EXISTS",
         409,
         "Patient phone exists",
-        "Another patient already uses this phone (uq_patients_phone).",
+        "Another patient already uses this phone.",
     ),
     ErrorSpec(
         "CONCURRENT_UPDATE",
@@ -130,7 +130,7 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "INTERNAL_ERROR",
         500,
         "Internal error",
-        "An unexpected error. Any ck_* violation lands here as a bug.",
+        "An unexpected error occurred; it was logged under the request id.",
     ),
 )
 
