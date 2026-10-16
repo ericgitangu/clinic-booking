@@ -7,6 +7,8 @@
 ## Status
 Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains deferred under ADR-0012.
 
+**Amended 2026-10-16: S3 and S4 are cut by the engineer 2026-10-16, deferred with review trigger.** Review trigger: an admin area that serves more than the unauthenticated aggregates, or observed abuse of the public booking route. The design below is kept unchanged for that day.
+
 ## Context
 - **What S1 exposes.** `/admin`, `GET /admin/metrics` and the gateway's `/stream` carry only non-PII aggregates, so they are public until S3 ships. Once an admin area exists it should have an admin boundary.
 - **What the red-team rejected earlier.** Better Auth made the API depend at runtime on the web app's JWKS, needed a second database, and a Google consent screen in Testing mode admits only listed users (ADR-0012).
