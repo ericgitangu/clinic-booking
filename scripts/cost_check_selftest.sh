@@ -195,7 +195,8 @@ for t in 'google_compute_router_nat' 'google_sql_database_instance' 'scaling_mod
 done
 gate "empty plan"   2 __EMPTY__
 gate "missing plan" 2 __MISSING__
-rc=0; PATH=/usr/bin:/bin bash "$PG" --text "$WORK/pristine/.circleci/config.yml" >/dev/null 2>&1 || rc=$?
+mkdir -p "$WORK/nopath"
+rc=0; PATH="$WORK/nopath" /bin/bash "$PG" --text "$WORK/pristine/.circleci/config.yml" >/dev/null 2>&1 || rc=$?
 if [ "$rc" = 2 ]; then ok "plan_gate: no ripgrep on PATH -> exit 2 (fails closed)"; else bad "plan_gate: no ripgrep (exit $rc, want 2)"; fi
 
 echo
