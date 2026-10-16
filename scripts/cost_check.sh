@@ -15,8 +15,8 @@
 # wrong must be fixed, never dropped.
 #
 # Optional env for --live:  PROJECT (required), GCLOUD_ACCOUNT (passed as --account when set),
-# BILLING_ACCOUNT and BILLING_GCLOUD_ACCOUNT (billing reads C11/C14; defaults to GCLOUD_ACCOUNT,
-# which for this project is the Owner, a different user from the one holding billing rights),
+# BILLING_ACCOUNT and BILLING_GCLOUD_ACCOUNT (billing reads C11/C14; both required, the billing
+# user is not the project Owner in GCLOUD_ACCOUNT, and a missing one is a FAIL naming the variable),
 # NEON_PROJECT_ID (for the Neon check).
 #
 set -uo pipefail
@@ -244,9 +244,8 @@ gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
   if [ -n "${GCLOUD_ACCOUNT:-}" ]; then gcloud --account "$GCLOUD_ACCOUNT" "$@"; else gcloud "$@"; fi
 }
 
-gcb() { # billing-account reads: BILLING_GCLOUD_ACCOUNT (the billing user), else GCLOUD_ACCOUNT
-  local a="${BILLING_GCLOUD_ACCOUNT:-${GCLOUD_ACCOUNT:-}}"
-  if [ -n "$a" ]; then gcloud --account "$a" "$@"; else gcloud "$@"; fi
+gcb() { # billing-account reads, as BILLING_GCLOUD_ACCOUNT (callers check it is set)
+  gcloud --account "$BILLING_GCLOUD_ACCOUNT" "$@"
 }
 
 live_checks() {
@@ -334,7 +333,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   fi
 
   # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API.
-  if [ -n "${BILLING_ACCOUNT:-}" ]; then
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+    fail "C11 BILLING_GCLOUD_ACCOUNT unset: the billing user (not the project Owner) must read the budgets"
+  elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c11
     c11="$(gcb billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
     [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap action: confirm in the console)" || fail "C11 budgets '${c11:-unreadable}'"
@@ -361,7 +362,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   # C14: the billing account is SHARED (PLAN 11.1 Q14), so the free tiers are shared with the
   # projects in scripts/shared_billing_projects.txt. A project that joins (or leaves) the account
   # changes the headroom and must be re-measured with scripts/shared_headroom.py first.
-  if [ -n "${BILLING_ACCOUNT:-}" ]; then
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+    fail "C14 BILLING_GCLOUD_ACCOUNT unset: the billing user must list the projects on the billing account"
+  elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c14 want14
     c14="$(gcb billing projects list --billing-account "$BILLING_ACCOUNT" --format='value(projectId)' 2>/dev/null | sort | tr '\n' ' ')"
     want14="$(sort scripts/shared_billing_projects.txt | tr '\n' ' ')"

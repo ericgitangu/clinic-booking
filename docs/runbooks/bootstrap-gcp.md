@@ -91,14 +91,14 @@ export GCP_DEPLOY_CONTEXT_ID=<uuid of gcp-deploy>
 
 ## 4. Terraform
 
-Terraform and its `gcs` backend use Application Default Credentials, **not** `--account`.
-Point them at the engineer's account and project explicitly:
+Terraform and its `gcs` backend do not read `--account`. `gcloud auth application-default login`
+takes no account flag either, so it would sign in as whoever you pick in the browser. Pin the
+identity instead with an access token minted for the account and verify it:
 
 ```bash
-gcloud auth application-default login --account "$GCLOUD_ACCOUNT"
-gcloud auth application-default set-quota-project "$PROJECT"
-# alternative without touching the ADC file:
-#   export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$GCLOUD_ACCOUNT")
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$GCLOUD_ACCOUNT")
+# the token is short-lived (1 h); re-export when Terraform reports 401. Confirm the identity first:
+curl -s "https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN" | jq -r .email   # must print the.ace.guru@gmail.com
 ```
 
 ```bash
@@ -198,8 +198,10 @@ refused, create them in the console with the same names and amounts). Run it as 
 user, after step 4 has enabled `billingbudgets.googleapis.com`:
 
 ```bash
-gcloud auth application-default login --account "$BILLING_GCLOUD_ACCOUNT"
-gcloud auth application-default set-quota-project "$PROJECT"   # may need serviceusage rights on the project
+# pin the billing identity with a token (ADC login has no account flag), then verify it
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$BILLING_GCLOUD_ACCOUNT")
+# the token is short-lived (1 h); re-export when Terraform reports 401. Confirm the identity first:
+curl -s "https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN" | jq -r .email   # must print developer.ericgitangu@gmail.com
 cd infra/billing
 terraform init -backend-config="bucket=clinic-tfstate-$PROJECT"
 cp terraform.tfvars.example terraform.tfvars   # already holds the shared account id and project number

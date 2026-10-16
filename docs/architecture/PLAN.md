@@ -2136,7 +2136,7 @@ Month (40 pipelines: 30 PR, 10 main, every lane running): 30 × 470 + 10 × 740 
 | IAM, WIF, STS, IAM Credentials | zero | none needed |
 | Cloud Build | zero (never used) | C10, global rule 11 |
 | Budgets and spend cap | zero, with change | $1 alerts-only + $3 gross spend cap (WP-11 step 4) |
-| Billing account | ~~zero, pending Q14~~ **not zero, shared account** (§13.8): compute fits (about $4.38 of the $5.22 discount) but Artifact Registry and Secret Manager are already over their shared free tiers, so this project adds about $0.28 a month | Q14 amended; gross-cost proof (C17); the engineer decides between accepting about $0.28 and moving one side off the account (§13.8) |
+| Billing account | ~~zero, pending Q14~~ **not zero, shared account** (§13.8): compute fits (request-based $4.08 of $5.22, instance-based $0.22 of $5.22) but Artifact Registry and Secret Manager are already over their shared free tiers, so this project adds about $0.28 a month | Q14 amended; gross-cost proof (C17); the engineer decides between accepting about $0.28 and moving one side off the account (§13.8) |
 | Neon Free | zero, with change | aws-us-east-1; fixed 0.25 CU; no pinger (WP-11) |
 | Vercel Hobby | zero, with change | one project `web` (§12.3), bootstrapped by WP-11 Part C0 (§12.4); `iad1` project-wide; `images.unoptimized`; static doc routes; no card; non-commercial note (ADR-0010, ADR-0023, WP-11 Part C, Q16) |
 | CircleCI Free | zero, with change | resource classes; no DLC; self-skipping lanes; retention (ADR-0016, WP-10) |
@@ -2154,19 +2154,21 @@ Month (40 pipelines: 30 PR, 10 main, every lane running): 30 × 470 + 10 × 740 
 
 Q1 was amended: the project sits on the **shared** account `01C382-12CD13-DCA6EF`, not a dedicated one, so §13.2 to §13.7 (which assumed this project was the only user of each per-account free tier) no longer hold as written. Those sections are kept; this one restates the headroom with **observed** numbers. Method: Cloud Monitoring, last 30 days to 2026-10-16, Cloud Run `container/cpu/allocation_time`, `container/memory/allocation_time`, `request_count` and `container/network/sent_bytes_count`, all read-only (`make shared-headroom`, `scripts/shared_headroom.py`; `--account developer` for nanolend-api, master-crossing-435409-r1 and unicorns-484301, `--account the.ace.guru` for pawacloud-assessment). Nothing in the other projects was changed.
 
-| Observed, last 30 days | vCPU-s | GiB-s | Requests | NA egress (MB) | Africa egress (MB) |
-|---|---|---|---|---|---|
-| nanolend-api (9 services, 6 instance-based, max 10 each) | 19,252 | 7,649 | 11,599 | 83.52 | 2.28 |
-| master-crossing-435409-r1 (3 services) | 53,305 | 20,722 | 3,695 | 28.20 | 0 |
-| pawacloud-assessment (2 services) | 3,089 | 486 | 316 | 0 | 7.47 |
-| unicorns-484301 (no Cloud Run use) | 0 | 0 | 0 | 0 | 0 |
-| **Others, observed** | **75,646** | **28,857** | **15,610** | **111.72** | **9.74** |
-| This project, worst month (§13.4, DEDUCED) | 94,400 | 90,400 | 24,400 | 655 | 0 |
-| **Combined** | **170,046** | **119,257** | **40,010** | **766.72** | |
-| Free tier (per billing account) | 180,000 | 360,000 | 2,000,000 | 1,073.74 | |
-| **Headroom** | **9,954 (5.5%)** | 240,743 | 1,959,990 | 307.02 | |
+| Observed, last 30 days (OBSERVED unless marked) | Request-based vCPU-s | GiB-s | Instance-based vCPU-s | GiB-s | Requests | NA egress (MB) | Africa egress (MB) |
+|---|---|---|---|---|---|---|---|
+| nanolend-api (9 services; the 6 `nanolend-*` are instance-based, `deveric-blog` and `bsd-api` request-based) | 7,587 | 1,817 | 11,666 | 5,833 | 11,599 | 83.52 | 2.28 |
+| master-crossing-435409-r1 (3 services, all request-based) | 53,305 | 20,722 | 0 | 0 | 3,695 | 28.20 | 0 |
+| pawacloud-assessment (2 services, request-based) | 3,089 | 486 | 0 | 0 | 316 | 0 | 7.47 |
+| unicorns-484301 (Run API not enabled) | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **Others** | **63,981** | **23,025** | **11,666** | **5,833** | **15,610** | **111.72** | **9.74** |
+| This project, worst month (§13.4, DEDUCED; request-based, `cpu-throttling=true`) | 94,400 | 90,400 | 0 | 0 | 24,400 | 655 | 0 |
+| **Combined** | **158,381** | **113,425** | **11,666** | **5,833** | **40,010** | **766.72** | |
+| Free tier of that mode | 180,000 | 360,000 | 240,000 | 450,000 | 2,000,000 | 1,073.74 | |
+| **Headroom** | **21,619 (12.0%)** | 246,575 | **228,334 (95%)** | 444,167 | 1,959,990 | 307.02 | |
 
-Gross compute, combined, priced conservatively at the request-based rates on allocation time: $4.38 against the $5.22 free-tier discount (the catalog, read 2026-10-16, shows identical CPU and memory unit prices in us-east4, us-central1 and africa-south1, so the regional price tier does not change this; §13's "Tier 2" wording for africa-south1 is **not supported by the catalog read**, reported rather than edited).
+**Billing mode (M1).** Cloud Run has a separate compute free tier per billing mode. Official pricing page, read 2026-10-16 (https://cloud.google.com/run/pricing): request-based services get 180,000 vCPU-s and 360,000 GiB-s free a month (plus 2 million requests), instance-based services get 240,000 vCPU-s and 450,000 GiB-s free, each stated at us-central1 pricing. Each service was assigned to its mode from the Cloud Run Admin API v2 (`resources.cpuIdle` absent = CPU always allocated = instance-based; `true` = request-based), matching the v1 `cpu-throttling=false` annotation read earlier. That the two tiers are independent pools is DEDUCED from the page listing them separately, and the page does not say how a project with both modes is discounted; each mode is therefore checked against its own tier and against its own rates (catalog: request-based $2.4e-5 per vCPU-s and $2.5e-6 per GiB-s, instance-based $1.8e-5 and $2e-6). Usage is Monitoring `allocation_time`, which is at least the billed time for a request-based service, so the request-based figures are an upper bound (conservative).
+
+Gross compute by mode (DEDUCED from observed usage and catalog rates): request-based $4.08 of its $5.22 discount (others $1.59 plus our worst month $2.49, `scripts/shared_headroom.py`), instance-based $0.22 of its $5.22 discount. (An earlier version of this section priced everything at request-based rates against the request-based tier: $4.38 and 5.5% headroom. That over-counted nanolend-api's instance-based usage against the wrong tier; corrected here.) The catalog shows identical CPU and memory unit prices in us-east4, us-central1 and africa-south1, so the regional price tier does not change this; §13's "Tier 2" wording for africa-south1 is **not supported by the catalog read**, reported rather than edited.
 
 **Artifact Registry and Secret Manager, observed with read-only `gcloud` (2026-10-16).** Free tiers are per billing account: 0.5 GiB of storage and 6 active secret versions (catalog: `Artifact Registry Storage` $0 to 0.5 GiB then $0.10 per GiB-month; `Secret version replica storage` $0 to 6 then $0.06 per version-month).
 
@@ -2180,7 +2182,7 @@ Gross compute, combined, priced conservatively at the request-based rates on all
 
 **Verdict: $0 does not hold on this account, and the reason is not compute.**
 
-1. **Cloud Run compute, requests and egress: still $0, on observed use, with thin margin.** 170,046 of 180,000 vCPU-s (headroom 9,954, 5.5%) and $4.38 of $5.22. Africa egress of about 9.7 MB is billed from byte 0 at $0.12 per GiB, about $0.001 a month, charged to the other projects and not covered by any free tier. This is a 30-day observation, not a guarantee: nanolend-api's six instance-based services (CPU always allocated, max 10) can each spend more than the whole 180,000 vCPU-s on their own (one instance busy for a month is 2,592,000 vCPU-s), and our spend cap cannot see their use.
+1. **Cloud Run compute, requests and egress: still $0, on observed use, with a 12% margin on the binding limit.** request-based 158,381 of 180,000 vCPU-s (headroom 21,619, 12.0%) and $4.08 of its $5.22; instance-based 11,666 of 240,000 vCPU-s (headroom 228,334) and $0.22 of its $5.22 (§13.8 table; ~~170,046 of 180,000 and $4.38~~ before the billing-mode split). Africa egress of about 9.7 MB is billed from byte 0 at $0.12 per GiB, about $0.001 a month, charged to the other projects and not covered by any free tier. This is a 30-day observation, not a guarantee: nanolend-api's six instance-based services (CPU always allocated, max 10) can each spend more than the whole 180,000 vCPU-s on their own (one instance busy for a month is 2,592,000 vCPU-s, against a 240,000 instance-based tier), and our spend cap cannot see their use.
 2. **Artifact Registry: not $0.** The others hold about 27.8 GiB against a 0.5 GiB shared allowance, so the free storage is already spent and every further byte we push bills at $0.10 per GiB-month: at most 0.4 GiB (the C5 bound) is about $0.04 a month.
 3. **Secret Manager: not $0.** The others hold 50 active versions against 6, so all 4 of ours bill at $0.06: about $0.24 a month.
 4. **This project adds about $0.28 a month (DEDUCED from list prices and the 400 MB and 4-version bounds); the account already bills the other projects about $5 a month for the same two lines (50 - 6 versions at $0.06, and 27.3 GiB at $0.10, deduced).** The $1 alerts budget was therefore re-scoped from the account to this project (`infra/billing/budget.tf`); an account-wide $1 alert would be permanently in alarm.
