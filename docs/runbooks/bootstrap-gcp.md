@@ -117,8 +117,9 @@ cd ../..
 failure. Do not apply unless it printed `plan_gate: clean`.
 
 This apply also removes `roles/editor` from the default Compute service account
-(`default_sa.tf`, `google_project_default_service_accounts` with `DEPRIVILEGE`); the plan should
-show an update of that resource and no deletion. Our services never use that account (every
+(`default_sa.tf`, `google_project_iam_member_remove`); the plan should show that one binding
+being removed and nothing else. (The provider's `google_project_default_service_accounts` was tried
+first and changed nothing here.) Our services never use that account (every
 deploy passes `--service-account`). Verify afterwards (read-only):
 
 ```bash
@@ -229,6 +230,7 @@ enforce it is UNVERIFIED**.
 
    ```bash
    gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --account "$BILLING_GCLOUD_ACCOUNT" \
+     --billing-project "$PROJECT" \
      --format='value(displayName)'
    ```
 
