@@ -34,5 +34,5 @@ current state; may succeed later or in another state.
 | DB_UNAVAILABLE | 503 | db-unavailable | Database unavailable | Connection failure or pool timeout. Retry after a short delay. |
 | INTERNAL_ERROR | 500 | internal-error | Internal error | An unexpected error. Any ck_* violation lands here as a bug. |
 
-T2 codes (`IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_KEY_CONSUMED`) are added by WP-14.
-Stretch codes are added by their owning WP (§6).
+T2 codes (`IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_KEY_CONSUMED`) are added by.
+Stretch codes are added by their owning feature.

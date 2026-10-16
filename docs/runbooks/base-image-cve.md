@@ -8,10 +8,10 @@ When `trivy image` fails the `build-scan` job on a HIGH/CRITICAL in the base ima
    docker buildx imagetools inspect python:3.12-slim | rg '^Digest:'
    ```
    Update the two `FROM python:3.12-slim@sha256:...` lines in `backend/Dockerfile` and record
-   the new digest and date in `docs/versions.md`. Rebuild and re-scan.
+   the new digest and date in the Dockerfile comment. Rebuild and re-scan.
 2. **If still unfixed upstream.** Add a dated, justified entry to `.trivyignore`:
    ```
-   CVE-XXXX-YYYY  # no fix in debian bookworm yet; not reachable from our code path; expires 2026-11-15
+   CVE-XXXX-YYYY # no fix in debian bookworm yet; not reachable from our code path; expires 2026-11-15
    ```
    The entry must name why it is not exploitable here and an expiry no more than 30 days out.
 3. **Review at expiry.** When the expiry passes, remove the entry and re-scan; the CVE must
@@ -20,4 +20,4 @@ When `trivy image` fails the `build-scan` job on a HIGH/CRITICAL in the base ima
    after that, only a release-blocking CVE justifies a new base image.
 
 Cost note: scanning stays in CI (Trivy). The GCP Artifact Analysis / container-scanning APIs
-stay disabled (ADR-0016, §13).
+stay disabled (ADR-0016, ADR-0014).

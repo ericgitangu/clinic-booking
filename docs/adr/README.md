@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-MADR-style records for the clinic booking system. Every ADR has the same seven sections: Status, Context, Considered options, Decision, Consequences, Assessment line, Review trigger. The master plan is in [`../architecture/PLAN.md`](../architecture/PLAN.md). ADRs marked "stretch" describe the gated tier that starts only after Gate B (PLAN.md §0); if an item does not ship, its ADR stays as the design record and the README says it was not shipped.
+MADR-style records for the clinic booking system. Every ADR has the same seven sections: Status, Context, Considered options, Decision, Consequences, Assessment line, Review trigger. ADRs marked "stretch" describe the gated tier that starts only after Gate B; if an item does not ship, its ADR stays as the design record and the README says it was not shipped.
 
 | ADR | Title | Status | Brief line it serves |
 |---|---|---|---|
@@ -13,7 +13,7 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0007](0007-api-style-rest-openapi.md) | REST + OpenAPI; tRPC/GraphQL/gRPC verdict | Accepted | Section 2 endpoint list |
 | [0008](0008-appointment-lifecycle-and-reschedule.md) | Lifecycle, reschedule atomicity, concurrent updates | Accepted | "old slot freed ... error if cancelled" |
 | [0009](0009-realtime-polling-now-sse-later.md) | Realtime: polling for patients; SSE via a Go gateway for admins as gated stretch | Accepted (supersedes its own SSE deferral; admin SSE is stretch S1) | "must not be available to others" (UX) |
-| [0010](0010-thin-nextjs-booking-ui.md) | Thin Next.js patient booking UI, plus stretch PWA, theme and /admin | Accepted (booking pages T2, cut 1st; the `web` project's proxy and landing page are lean core since PLAN §12.3; stretch S1-S4 on top) | "sees free slots ... books it ... can cancel" |
+| [0010](0010-thin-nextjs-booking-ui.md) | Thin Next.js patient booking UI, plus stretch PWA, theme and /admin | Accepted (booking pages T2, cut 1st; the `web` project's proxy and landing page are lean core since ADR-0023; stretch S1-S4 on top) | "sees free slots ... books it ... can cancel" |
 | [0011](0011-openapi-codegen-contract.md) | pydantic → OpenAPI → TS/zod/TanStack codegen | Accepted (with UI) | "sensible structure" |
 | [0012](0012-identity-and-abuse-controls-deferred.md) | Identity and abuse controls: patient auth deferred; admin OAuth and Turnstile as gated stretch | Accepted (amended) | "Patients can cancel"; "book online" |
 | [0013](0013-idempotency-keys.md) | Idempotency keys on POST /appointments | Accepted (T2, cut 2nd) | "must not be available to others" (retry safety) |
@@ -26,6 +26,6 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0020](0020-git-hygiene-and-ai-disclosure.md) | Git hygiene and AI-usage disclosure | Accepted | Section 4 "Honesty matters" |
 | [0021](0021-go-realtime-gateway.md) | A Go SSE gateway for the admin realtime feed | Accepted (stretch S1, cut last of S1-S4) | Section 1 "components, key decisions, trade-offs" |
 | [0022](0022-admin-auth-and-bot-protection.md) | Admin-only OAuth and UI bot protection | Accepted (stretch S3 cut 2nd, S4 cut 1st) | "meaningful errors + correct HTTP status codes"; "book online" |
-| [0023](0023-zero-cost-edge-front-door.md) | Zero-cost edge: IAM-gated Cloud Run behind a Vercel front door in North America | Accepted, decided by the engineer 2026-10-16 (Q5; one Vercel project `web`; amends 0010, 0014, 0016, 0022; implementation hardened by the hosting lock review, PLAN.md §12.4) | "Deploy to any cloud, public URL" under the $0 rule |
+| [0023](0023-zero-cost-edge-front-door.md) | Zero-cost edge: IAM-gated Cloud Run behind a Vercel front door in North America | Accepted, decided by the engineer 2026-10-16 (; one Vercel project `web`; amends 0010, 0014, 0016, 0022; implementation hardened by the hosting lock review) | "Deploy to any cloud, public URL" under the $0 rule |
 
-**Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table and from the relevant section of `PLAN.md`. `make docs-check` enforces the headings and the links.
+**Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make docs-check` enforces the headings and the links.

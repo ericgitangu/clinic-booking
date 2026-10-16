@@ -2,7 +2,6 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
-- Plan reference: [PLAN.md §3.9, WP-S1a to WP-S1d](../architecture/PLAN.md#39-stretch-s1-realtime-admin-feed)
 
 ## Status
 Accepted (gated stretch S1; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
@@ -23,11 +22,11 @@ Accepted (gated stretch S1; built only after Gate B, cut last of the stretch ite
 ## Decision
 Option 2, as `services/realtime` (`clinic-realtime`).
 - **Why Go for this specific job:**
-  - Each idle stream is a parked goroutine (a few KB of stack) rather than an asyncio task plus a Python-level response object, so one small instance holds many more idle streams for the same memory. This is an engineering expectation, not a measurement; WP-S1c records the Cloud Run memory utilization observed during its 30-minute tab test in README §10.
-  - A static binary in a distroless image (expected well under 30 MB; WP-S1b records `docker image inspect --format '{{.Size}}'` in `docs/versions.md`) starts fast, which matters on a scale-to-zero service whose first request is a browser waiting for a stream.
+  - Each idle stream is a parked goroutine (a few KB of stack) rather than an asyncio task plus a Python-level response object, so one small instance holds many more idle streams for the same memory. This is an engineering expectation, not a measurement; records the Cloud Run memory utilization observed during its 30-minute tab test in README section 10.
+  - A static binary in a distroless image (expected well under 30 MB; measure with `docker image inspect --format '{{.Size}}'`) starts fast, which matters on a scale-to-zero service whose first request is a browser waiting for a stream.
   - The standard library covers HTTP, SSE framing, HMAC (S3) and structured logging; pgx v5 is the only runtime dependency. The supply-chain surface is small and govulncheck covers it.
 - **Why a separate service at all** (this also rules out option 1): streams on their own Cloud Run service cannot consume `clinic-api` concurrency, so a stream flood cannot block booking. The service scales to zero independently and can be cut without touching the API.
-- **Shape:** `GET /stream` and `GET /healthz`; min 0 / max 2 instances, ~~`--concurrency 100`~~ `--concurrency 1 --cpu 0.25` (amended by the $0 audit: at 1 vCPU a dashboard held 8 h a day for a week passes the monthly CPU allowance on its own; at 0.25 vCPU it uses about 28%; the hosting lock review bounds the adversarial case server-side with a monthly stream budget, at most 86,400 vCPU-s, [PLAN.md §12.4](../architecture/PLAN.md#124-hosting-lock-review); [ADR-0014](0014-hosting-region-and-cost.md) has the arithmetic, and `MAX_STREAMS_PER_INSTANCE` becomes 1), 256 MiB, timeout 300 s, region us-east4, reached only through the front door ([ADR-0023](0023-zero-cost-edge-front-door.md)); role `clinic_realtime` with column-level SELECT on `appointment_events` only (ADR-0015); problem+json errors whose `type` URIs point at the API's `/problems` catalogue.
+- **Shape:** `GET /stream` and `GET /healthz`; min 0 / max 2 instances, `--concurrency 1 --cpu 0.25` (amended by the $0 audit: at 1 vCPU a dashboard held 8 h a day for a week passes the monthly CPU allowance on its own; at 0.25 vCPU it uses about 28%; the hosting lock review bounds the adversarial case server-side with a monthly stream budget, at most 86,400 vCPU-s; [ADR-0014](0014-hosting-region-and-cost.md) has the arithmetic, and `MAX_STREAMS_PER_INSTANCE` becomes 1), 256 MiB, timeout 300 s, region us-east4, reached only through the front door ([ADR-0023](0023-zero-cost-edge-front-door.md)); role `clinic_realtime` with column-level SELECT on `appointment_events` only (ADR-0015); problem+json errors whose `type` URIs point at the API's `/problems` catalogue.
 - **Contract with FastAPI:** the `appointment_events` table schema plus a versioned JSON payload (`schema_version: 1`) defined in `contracts/events/appointment-event.v1.schema.json`. Go tests validate every marshalled event against it; the web validates incoming events with a zod schema tested against the same file's examples. Breaking changes mean `schema_version: 2` and a second event name, never an in-place change.
 - **No RPC between the services.** FastAPI and the gateway never call each other; the database row is the interface. ADR-0007's rejection of gRPC/Connect therefore stands unchanged.
 - **Fan-out:** each instance polls independently about once a second, only while it has subscribers. At max 2 instances that is at most 2 small indexed queries per second. The DB pool exists only while there are subscribers, so an idle instance holds no Neon connection.
@@ -36,8 +35,8 @@ Option 2, as `services/realtime` (`clinic-realtime`).
 ## Consequences
 - Good: booking is isolated from streaming; idle cost is zero (no subscribers, no queries, no instance).
 - Good: the cursor logic is small, pure and unit-testable, and the out-of-order-commit case is tested against real Postgres (ADR-0018).
-- Bad: a second language and deploy unit (TD18): a Go CI lane, `govulncheck` and `gosec` (ADR-0017), its own image scan, `ship-realtime` (ADR-0016), and Go conventions in PLAN.md §7.
-- Bad: per-instance polling scales linearly with instances (TD17), and stream caps are per instance (TD23).
+- Bad: a second language and deploy unit: a Go CI lane, `govulncheck` and `gosec` (ADR-0017), its own image scan, `ship-realtime` (ADR-0016), and Go conventions
+- Bad: per-instance polling scales linearly with instances, and stream caps are per instance.
 - Bad ($0 audit): with one stream per instance and max 2 instances, at most 2 admin streams exist at once. The Go memory argument above (many idle streams per instance) is not used at this scale; we keep Go for the small image, fast start and standard-library SSE, and the concurrency can go back up if the CPU allowance stops being the binding limit.
 - **What breaks at 10x and 100x.** At 10x (around 20 instances) the DB sees about 20 cursor queries per second and 20-40 held connections against Neon Free's limits, and Neon never suspends while anyone watches. At 100x the per-instance poll load and connection count dominate. The fix is a single relay: one poller publishing to Upstash Redis pub/sub (or Pub/Sub) and instances subscribing, keeping the same cursor as the event id.
 

@@ -13,7 +13,7 @@ This is step 6 of `docs/runbooks/bootstrap-gcp.md`; its shell variables (`PROJEC
 3. Note the **direct** host (the one without `-pooler` in its name) and `clinic_owner`'s
    password from the console or `neonctl connection-string`:
    ```bash
-   export NEON_HOST=ep-xxxxxxxx.us-east-1.aws.neon.tech      # direct host, NOT -pooler
+   export NEON_HOST=ep-xxxxxxxx.us-east-1.aws.neon.tech # direct host, NOT -pooler
    export OWNER_PW=<clinic_owner password from Neon>
    ```
 
@@ -40,7 +40,7 @@ Create it in SQL as `clinic_owner` (not in the console, so it does not inherit
 syntax error, stdin works).
 
 ```bash
-export APP_PW=$(openssl rand -hex 24)      # never echo it
+export APP_PW=$(openssl rand -hex 24) # never echo it
 psql "postgresql://clinic_owner:${OWNER_PW}@${NEON_HOST}/clinic?sslmode=require" \
   -v ON_ERROR_STOP=1 -v pw="$APP_PW" <<'SQL'
 CREATE ROLE clinic_app LOGIN PASSWORD :'pw' NOSUPERUSER NOCREATEDB NOCREATEROLE;
@@ -69,7 +69,7 @@ printf %s "$MIGRATE_URL" | gcloud secrets versions add clinic-database-url-migra
 
 unset APP_PW OWNER_PW APP_URL MIGRATE_URL
 gcloud secrets versions list clinic-database-url-app --account "$GCLOUD_ACCOUNT" \
-  --project "$PROJECT" --format=json | jq length     # 1
+  --project "$PROJECT" --format=json | jq length # 1
 ```
 
 If `OWNER_PW` contains characters that are special in URLs, percent-encode it in
@@ -101,4 +101,4 @@ SQL
 ```
 
 Apply the two `GRANT`s from the event-cursor migration idempotently, and confirm
-`SHOW max_prepared_transactions` is `0`; record it in `docs/versions.md`.
+`SHOW max_prepared_transactions` is `0`; record it in the PR description.

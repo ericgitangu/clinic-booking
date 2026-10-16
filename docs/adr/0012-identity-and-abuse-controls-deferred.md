@@ -21,7 +21,7 @@ Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot p
 
 ## Decision
 Option 1.
-- **README.** §10 states the IDOR, and the phone-exists oracle (AM-25).
+- **README.** Section 10 of the README states the IDOR, and the phone-exists oracle .
 - **Future auth, as one FastAPI dependency `current_principal`:**
   - The contract doesn't change. `patient_id` stays in the body, a mismatch returns 403, and non-owners get 404 on path resources (anti-enumeration).
   - The ownership check runs before the existence lookup.
@@ -42,7 +42,7 @@ Option 1.
 
 ## Consequences
 - Good: the brief's endpoints work exactly as written for reviewers. No fragile cross-service dependency.
-- Bad: IDOR (TD5) and an open write path (TD6), both stated rather than hidden. Turnstile on the UI route (if S4 ships) does not close TD6 for direct API callers (TD22).
+- Bad: IDOR and an open write path, both stated rather than hidden. Turnstile on the UI route (if S4 ships) does not close for direct API callers.
 
 ## Assessment line
 "Patients can cancel"; "Patients book online". The gap is documented, not half-built.

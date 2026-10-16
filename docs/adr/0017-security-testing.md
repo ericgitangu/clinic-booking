@@ -17,7 +17,7 @@ We want one non-redundant tool per concern. Each one should be a real gate, not 
 ## Decision
 Option 2, alongside the static gates below.
 
-| Concern | Tool (version per `docs/versions.md`) | Where | Gate |
+| Concern | Tool (version pinned in the CI config) | Where | Gate |
 |---|---|---|---|
 | Python SAST | ruff `S` rules (standalone bandit dropped as a duplicate) | pre-commit + CI | any finding |
 | Polyglot SAST | semgrep 1.181.0 `--config p/python --config p/typescript --config p/owasp-top-ten --error --metrics=off` (no `SEMGREP_APP_TOKEN`, never `semgrep ci`; a ruleset that demands login is replaced by a vendored local copy; $0 audit) | CI | error |

@@ -28,7 +28,7 @@ Option 1.
 
 ## Consequences
 - Good: zero cost, and Cloud Logging correlates by trace.
-- Bad: no distributed traces or metrics dashboards (TD11).
+- Bad: no distributed traces or metrics dashboards.
 - Stretch S1 adds a second service, which meets this ADR's review trigger. We still decline OTel for it: the gateway is read-only and never calls the API, so there is no cross-service request to trace. It logs JSON with the same field names via `log/slog`, and each event's `<txid>.<id>` ties a stream frame to its row. If the services ever call each other, the trigger applies in full.
 
 ## Assessment line
