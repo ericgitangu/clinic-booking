@@ -209,7 +209,9 @@ Save the log URLs of the two negative tests (WIF deny, context deny) here:
 `<fill in>`.
 
 ```bash
-GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" PROJECT="$PROJECT" make cost-check     # read-only live guards
+# read-only live guards; GCLOUD_ACCOUNT makes every call use your account, BILLING_ACCOUNT
+# enables the budget checks (C11, C14), NEON_PROJECT_ID enables C13 (otherwise reported as SKIP)
+GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check
 ```
 
 ## Accepted risks

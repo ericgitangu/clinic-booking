@@ -39,6 +39,19 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL")
     @classmethod
+    def _require_asyncpg_url(cls, value: str) -> str:
+        # The engine is built with create_async_engine, so the URL must select the asyncpg
+        # driver. A plain "postgresql://" (what Neon's console hands out) selects psycopg, which
+        # is not installed, and the first migrate would crash on it.
+        if not value.startswith("postgresql+asyncpg://"):
+            raise ValueError(
+                "DATABASE_URL must start with 'postgresql+asyncpg://' "
+                "(for example postgresql+asyncpg://USER:PASSWORD@HOST/DB?ssl=require)."
+            )
+        return value
+
+    @field_validator("DATABASE_URL")
+    @classmethod
     def _reject_libpq_params(cls, value: str) -> str:
         query = parse_qs(urlsplit(value).query)
         offending = [p for p in _BANNED_DSN_PARAMS if p in query]
