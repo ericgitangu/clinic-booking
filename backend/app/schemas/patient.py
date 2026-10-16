@@ -16,6 +16,8 @@ class PatientCreate(BaseModel):
     @field_validator("full_name")
     @classmethod
     def _trim_nonblank(cls, v: str) -> str:
+        if "\x00" in v:
+            raise ValueError("full_name must not contain NUL characters")
         if len(v.strip()) < 2:
             raise ValueError("full_name must be at least 2 non-blank characters")
         return v

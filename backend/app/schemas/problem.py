@@ -61,3 +61,12 @@ class ProblemEntry(BaseModel):
     title: str
     status: int
     description: str
+
+
+def problem_responses(*statuses: int) -> dict[int | str, dict[str, object]]:
+    """Declare problem+json responses for the given statuses, so the OpenAPI spec lists
+    every status a route can return (schemathesis status-code conformance)."""
+    return {
+        status: {"model": Problem, "description": "Problem (application/problem+json)"}
+        for status in statuses
+    }

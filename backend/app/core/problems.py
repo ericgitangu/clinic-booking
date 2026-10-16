@@ -97,7 +97,11 @@ async def _http_exception_handler(request: Request, exc: Exception) -> JSONRespo
         return build_problem(request, "METHOD_NOT_ALLOWED")
     if exc.status_code == 404:
         return build_problem(request, "NOT_FOUND")
-    # Any other Starlette HTTP error: keep the shape, pick a catalogue code by class.
+    # FastAPI raises HTTPException(400) when it cannot parse the body (e.g. invalid UTF-8,
+    # which it does not convert to a RequestValidationError). We never emit 400; a body-parse
+    # failure is a client validation error -> 422. (Found by schemathesis.)
+    if exc.status_code in (400, 422):
+        return build_problem(request, "VALIDATION_ERROR")
     code = "DB_UNAVAILABLE" if exc.status_code == 503 else "INTERNAL_ERROR"
     return build_problem(request, code)
 

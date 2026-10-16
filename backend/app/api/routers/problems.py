@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.domain.errors import CATALOGUE, CATALOGUE_BY_CODE, DomainError
-from app.schemas.problem import ProblemCode, ProblemEntry
+from app.schemas.problem import ProblemCode, ProblemEntry, problem_responses
 
 router = APIRouter(tags=["problems"])
 
@@ -30,7 +30,7 @@ async def list_problems() -> list[ProblemEntry]:
     return [_entry(spec.code) for spec in CATALOGUE]
 
 
-@router.get("/problems/{slug}", response_model=ProblemEntry)
+@router.get("/problems/{slug}", response_model=ProblemEntry, responses=problem_responses(404))
 async def get_problem(slug: str) -> ProblemEntry:
     for spec in CATALOGUE:
         if spec.slug == slug:

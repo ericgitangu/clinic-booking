@@ -17,6 +17,7 @@ from app.schemas.appointment import (
     CancelRequest,
     RescheduleRequest,
 )
+from app.schemas.problem import problem_responses
 from app.services import booking
 
 router = APIRouter(tags=["appointments"])
@@ -28,7 +29,12 @@ def _to_schema(appt: AppointmentModel) -> Appointment:
     return Appointment.model_validate(appt)
 
 
-@router.post("/appointments", response_model=Appointment, status_code=201)
+@router.post(
+    "/appointments",
+    response_model=Appointment,
+    status_code=201,
+    responses=problem_responses(409, 422, 503),
+)
 async def create_appointment(
     body: AppointmentCreate,
     response: Response,
@@ -49,7 +55,11 @@ async def create_appointment(
     return _to_schema(appt)
 
 
-@router.get("/appointments/{appointment_id}", response_model=Appointment)
+@router.get(
+    "/appointments/{appointment_id}",
+    response_model=Appointment,
+    responses=problem_responses(404, 422),
+)
 async def get_appointment(
     appointment_id: uuid.UUID,
     response: Response,
@@ -62,7 +72,11 @@ async def get_appointment(
     return _to_schema(appt)
 
 
-@router.patch("/appointments/{appointment_id}/cancel", response_model=Appointment)
+@router.patch(
+    "/appointments/{appointment_id}/cancel",
+    response_model=Appointment,
+    responses=problem_responses(404, 409, 422),
+)
 async def cancel_appointment(
     appointment_id: uuid.UUID,
     body: CancelRequest,
@@ -75,7 +89,11 @@ async def cancel_appointment(
     return _to_schema(appt)
 
 
-@router.patch("/appointments/{appointment_id}/reschedule", response_model=Appointment)
+@router.patch(
+    "/appointments/{appointment_id}/reschedule",
+    response_model=Appointment,
+    responses=problem_responses(404, 409, 422),
+)
 async def reschedule_appointment(
     appointment_id: uuid.UUID,
     body: RescheduleRequest,

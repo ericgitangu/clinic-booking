@@ -27,6 +27,8 @@ class CancelRequest(BaseModel):
     @field_validator("reason")
     @classmethod
     def _trim_nonblank(cls, v: str) -> str:
+        if "\x00" in v:
+            raise ValueError("reason must not contain NUL characters")
         trimmed = v.strip()
         if not (3 <= len(trimmed) <= 500):
             raise ValueError("reason must be 3..500 non-blank characters")
