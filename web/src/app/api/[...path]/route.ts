@@ -1,7 +1,12 @@
 // The proxy. /api/* -> Cloud Run (IAM-gated); /api/stream -> realtime. The only route
 // under src/app/api/ (route-layout.test enforces this).
 import { forward, problem, resolveUpstream } from "@/lib/proxy/forward";
-import { mintIdToken, minting_enabled } from "@/lib/proxy/gcp-id-token";
+import {
+  TokenMintError,
+  mintIdToken,
+  minting_enabled,
+} from "@/lib/proxy/gcp-id-token";
+import { logError } from "@/lib/proxy/log";
 import { checkRateLimit } from "@/lib/proxy/rate-limit";
 
 export const runtime = "nodejs";
@@ -11,7 +16,7 @@ export const maxDuration = 300;
 // Vercel sets x-vercel-forwarded-for with the real client IP. If a client-supplied list ever
 // reaches us, the right-most entry is the one appended by the nearest trusted proxy; the
 // left-most is attacker-controlled and would let one client dodge the limiter.
-function clientIp(req: Request): string {
+function clientIp(req: Request): string | null {
   for (const name of ["x-vercel-forwarded-for", "x-forwarded-for"]) {
     const value = req.headers.get(name);
     if (value) {
@@ -19,7 +24,7 @@ function clientIp(req: Request): string {
       if (last) return last;
     }
   }
-  return "0.0.0.0";
+  return null; // not behind Vercel's edge: rate-limited as an untrusted client, not a shared one
 }
 
 async function handler(
@@ -49,7 +54,21 @@ async function handler(
   if (minting_enabled()) {
     try {
       token = await mintIdToken(upstream.audience);
-    } catch {
+    } catch (err) {
+      // The first live deploy depends on this exact path (Vercel OIDC -> STS -> generateIdToken).
+      // Log which stage failed and with what status so it is diagnosable from `vercel logs`.
+      if (err instanceof TokenMintError) {
+        logError("upstream auth failed", {
+          stage: err.stage,
+          status: err.status,
+          detail: err.detail,
+        });
+      } else {
+        logError("upstream auth failed", {
+          stage: "unknown",
+          detail: String(err).slice(0, 200),
+        });
+      }
       return problem(
         502,
         "UPSTREAM_AUTH_FAILED",

@@ -3,6 +3,7 @@ import {
   _clearCacheForTests,
   mintIdToken,
   type MintDeps,
+  TokenMintError,
 } from "@/lib/proxy/gcp-id-token";
 
 function jwtWithExp(expSeconds: number): string {
@@ -62,5 +63,113 @@ describe("mintIdToken", () => {
     now += 1000;
     await mintIdToken("clinic-api", d);
     expect(oidc).toHaveBeenCalledTimes(2); // refreshed, not served stale
+  });
+});
+
+function failingDeps(
+  stsStatus: number,
+  idStatus: number,
+  body: string,
+): MintDeps {
+  const fetchImpl = (async (url: string) => {
+    if (url.includes("sts.googleapis.com")) {
+      return stsStatus === 200
+        ? new Response(JSON.stringify({ access_token: "STS" }), { status: 200 })
+        : new Response(body, { status: stsStatus });
+    }
+    return new Response(body, { status: idStatus });
+  }) as unknown as typeof fetch;
+  return {
+    oidcToken: async () => "VERCEL_OIDC_SECRET",
+    fetchImpl,
+    now: () => 1_000_000,
+  };
+}
+
+describe("mint failures are diagnosable and never leak a token", () => {
+  it("an STS rejection reports the stage and status", async () => {
+    const err = await mintIdToken(
+      "clinic-api",
+      failingDeps(403, 200, '{"error":"invalid_grant"}'),
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(TokenMintError);
+    expect(err).toMatchObject({ stage: "sts", status: 403 });
+    expect(err.detail).toContain("invalid_grant");
+  });
+
+  it("a generateIdToken rejection reports its own stage", async () => {
+    const err = await mintIdToken(
+      "clinic-api",
+      failingDeps(200, 403, '{"error":{"status":"PERMISSION_DENIED"}}'),
+    ).catch((e) => e);
+    expect(err).toMatchObject({ stage: "generateIdToken", status: 403 });
+    expect(err.detail).toContain("PERMISSION_DENIED");
+  });
+
+  it("a JWT echoed in an error body is redacted", async () => {
+    const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl";
+    const err = await mintIdToken(
+      "clinic-api",
+      failingDeps(400, 200, `bad subject_token ${jwt}`),
+    ).catch((e) => e);
+    expect(err.detail).not.toContain("eyJ");
+    expect(err.detail).toContain("[redacted-jwt]");
+    expect(String(err.message)).not.toContain("VERCEL_OIDC_SECRET");
+  });
+
+  it("missing configuration fails at the config stage instead of calling Google", async () => {
+    delete process.env.GCP_PROJECT_NUMBER;
+    const fetchImpl = vi.fn();
+    const deps: MintDeps = {
+      oidcToken: async () => "x",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      now: () => 1,
+    };
+    const err = await mintIdToken("clinic-api", deps).catch((e) => e);
+    expect(err).toMatchObject({ stage: "config" });
+    expect(err.detail).toContain("GCP_PROJECT_NUMBER");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("an empty service account email is also a config error", async () => {
+    process.env.GCP_SERVICE_ACCOUNT_EMAIL = "";
+    const err = await mintIdToken(
+      "clinic-api",
+      failingDeps(200, 200, ""),
+    ).catch((e) => e);
+    expect(err).toMatchObject({ stage: "config" });
+    expect(err.detail).toContain("GCP_SERVICE_ACCOUNT_EMAIL");
+  });
+});
+
+describe("concurrent cold requests share one mint", () => {
+  it("runs STS and generateIdToken once for N simultaneous callers", async () => {
+    const now = 1_000_000;
+    const oidc = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      return "VERCEL_OIDC";
+    });
+    const token = jwtWithExp(now / 1000 + 3600);
+    const d = deps(token, oidc, () => now);
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => mintIdToken("clinic-api", d)),
+    );
+    expect(new Set(results)).toEqual(new Set([token]));
+    expect(oidc).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed mint is not cached: the next caller tries again", async () => {
+    await mintIdToken("clinic-api", failingDeps(500, 200, "boom")).catch(
+      () => undefined,
+    );
+    const now = 1_000_000;
+    const oidc = vi.fn(async () => "VERCEL_OIDC");
+    const token = jwtWithExp(now / 1000 + 3600);
+    await expect(
+      mintIdToken(
+        "clinic-api",
+        deps(token, oidc, () => now),
+      ),
+    ).resolves.toBe(token);
   });
 });
