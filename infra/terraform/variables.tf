@@ -1,0 +1,40 @@
+variable "project_id" {
+  type        = string
+  description = "GCP project id (e.g. sil-clinic-booking)."
+}
+
+variable "project_number" {
+  type        = string
+  description = "GCP project number (used in WIF principal strings)."
+}
+
+variable "region" {
+  type        = string
+  default     = "us-east4"
+  description = "Cloud Run / Artifact Registry region (Tier 1, North America free egress)."
+}
+
+variable "billing_account" {
+  type        = string
+  description = "Billing account id for the budget (dedicated account, Paid, no Free Trial)."
+}
+
+variable "circleci_org_id" {
+  type        = string
+  description = "CircleCI organization id (OIDC issuer segment and audience)."
+}
+
+variable "circleci_project_id" {
+  type        = string
+  description = "CircleCI project id (OIDC subject condition)."
+}
+
+variable "vercel_team" {
+  type        = string
+  description = "Vercel team slug (OIDC issuer segment and subject condition)."
+}
+
+variable "alert_email" {
+  type        = string
+  description = "Recipient for the egress alert notification channel."
+}
