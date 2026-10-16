@@ -1,7 +1,9 @@
 packages:
   - web
+# Dependency lifecycle scripts are denied by default. unrs-resolver only downloads an optional
+# native resolver that ESLint does not need.
 allowBuilds:
-  unrs-resolver: set this to true or false
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/env@16.4.2'
   - '@next/eslint-plugin-next@16.4.2'
