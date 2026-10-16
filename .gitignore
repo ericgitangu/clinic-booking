@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Node / Next / Vercel
+node_modules/
+.next/
+.vercel/
+
+# Env: ignore all .env files except the committed example
+.env
+.env.*
+!.env.example
+
+# Terraform
+*.tfstate*
+.terraform/
+
+# Test / scan artifacts
+junit*.xml
+zap-report.html
