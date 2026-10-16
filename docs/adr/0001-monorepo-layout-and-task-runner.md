@@ -2,7 +2,6 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
-- Plan reference: [PLAN.md §7](../architecture/PLAN.md#7-repository-layout--conventions)
 - Amended: 2026-10-16, `services/realtime` Go module and `contracts/events/` for stretch S1
 
 ## Status
@@ -20,7 +19,7 @@ The repository holds a Python API, an optional Next.js app, IaC and CI config. W
 Option 2.
 - **Top-level directories:** `backend/`, `web/`, `infra/`, `docs/`, `scripts/`, `contracts/`, `.circleci/`.
 - **Entry points:** `make help` lists every target. CI calls the same Make targets wherever practical.
-- **Stretch S1:** `services/realtime/` is a single Go module with its own `go.mod`. With one module there is no `go.work`; the Makefile adds `rt-*` targets that `cd` into it. `contracts/events/` holds the versioned JSON Schema shared by FastAPI, the gateway and the web. The Go module imports nothing from the other packages, so there is still no cross-package build graph. If S1 is cut before WP-S1a merges, neither directory exists; if it is cut after, only `contracts/events/` remains (PLAN.md TD24).
+- **Stretch S1:** `services/realtime/` is a single Go module with its own `go.mod`. With one module there is no `go.work`; the Makefile adds `rt-*` targets that `cd` into it. `contracts/events/` holds the versioned JSON Schema shared by FastAPI, the gateway and the web. The Go module imports nothing from the other packages, so there is still no cross-package build graph. If S1 is cut before merges, neither directory exists; if it is cut after, only `contracts/events/` remains.
 
 ## Consequences
 - Good: one entry point that every reviewer already understands.

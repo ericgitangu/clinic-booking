@@ -9,3 +9,15 @@ htmlcov/
 tests/
 docker/
 .python-version
+.git
+.gitignore
+docs/
+web/
+infra/
+node_modules/
+*.egg-info/
+dist/
+build/
+.env*
+!.env.example
+*.md

@@ -11,7 +11,7 @@ account is a different one, so **every `gcloud` call passes `--account`**:
 export PROJECT=sil-clinic-booking
 export GCLOUD_ACCOUNT=the.ace.guru@gmail.com                  # project Owner: every IAM, Terraform and WIF step
 export BILLING_GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com   # billing and budget steps only
-export BILLING_ACCOUNT=01C382-12CD13-DCA6EF                     # SHARED "Firebase Payment" account (PLAN 11.1 Q1, Q14)
+export BILLING_ACCOUNT=01C382-12CD13-DCA6EF                     # SHARED "Firebase Payment" account (see ADR-0014)
 export REGION=us-east4
 ```
 
@@ -19,7 +19,7 @@ The two accounts are not interchangeable. `the.ace.guru` is the project Owner (t
 created there because `developer.ericgitangu` hit Google's project-creation quota). `developer`
 holds only `roles/editor` on the project and `roles/billing.projectManager`, so it runs the
 billing and budget steps and nothing that sets IAM. The billing account is shared with four
-other projects: read PLAN.md §13.8 before relying on "$0".
+other projects: read the cost analysis in ADR-0014.8 before relying on "$0".
 
 Every `bootstrap.sh` mode is re-runnable and honours `DRY_RUN=1` (prints each command, runs
 nothing). Dry-run first, read the output, then run it for real.
@@ -127,7 +127,7 @@ gcloud projects get-iam-policy "$PROJECT" --account "$GCLOUD_ACCOUNT" --format=j
       '[.bindings[] | select(.role == "roles/editor") | .members[] | select(. == $m)] | length'
 ```
 
-Expected: `0` (`make cost-check` C20 asserts the same). UNVERIFIED until applied.
+Expected: `0` (`make cost-check` the default-SA check asserts the same). UNVERIFIED until applied.
 
 ## 5. Cloud Run service and invoker bindings
 
@@ -170,7 +170,7 @@ vercel project add clinic-web --scope "$TEAM"
 5. Production environment variables (identifiers only, no secrets). `vercel env add` prompts
    unless the value arrives on stdin:
    ```bash
-   addenv() { printf %s "$2" | vercel env add "$1" production --cwd web --scope "$TEAM"; }
+   addenv { printf %s "$2" | vercel env add "$1" production --cwd web --scope "$TEAM"; }
    addenv API_URL "$RUN_APP_URL"
    addenv API_AUDIENCE clinic-api
    addenv GCP_PROJECT_NUMBER "$PROJECT_NUMBER"
@@ -211,8 +211,7 @@ cd ../..
 ```
 
 It creates two budgets: `clinic-alerts-1usd` (alerts, on this project's gross spend, **not** the
-whole account: the account already bills about $5 a month for the other projects, PLAN.md
-§13.8) and `clinic-run-spend-cap-3usd`
+whole account: the account already bills about $5 a month for the other projects) and `clinic-run-spend-cap-3usd`
 (a **gross** $3 budget scoped to this project and Cloud Run, credits excluded). Neither the
 Terraform provider nor the CLI has any attribute that pauses or caps usage, so turning the
 second one into an enforced cap is a console action, and **whether this billing account can
@@ -251,7 +250,7 @@ release and write the observed result next to each.
 | Cloud Run is IAM-only | `curl -s -o /dev/null -w '%{http_code}' "$RUN_APP_URL/healthz"` | `403` | any `200`: stop, check `run.invoker` bindings for `allUsers`. |
 | WIF accepts only the deploy context | `test/wif-deny` branch, a job on context `oidc-probe` that attempts the token exchange | permission denied | the attribute condition in `wif.tf` is not enforcing the context claim. |
 | WIF accepts the deploy job | the first `ship-api` run | green login step | `Permission denied` at `gcp_login.sh`: compare the token's `oidc.circleci.com/*` claims with `local.circleci_attribute_condition`. |
-| Artifact Registry prune permissions | after the third release, `cost-check` job (C6) | every package at <= 2 versions | the `clinicImagePruner` role lacks a permission the delete needs. |
+| Artifact Registry prune permissions | after the third release, `cost-check` job | every package at <= 2 versions | the `clinicImagePruner` role lacks a permission the delete needs. |
 | Billing report | Billing -> Reports, group by SKU, 48 h after the first release | every SKU `$0.00` after savings | investigate before further releases. |
 
 Save the log URLs of the two negative tests (WIF deny, context deny) here:
@@ -259,7 +258,7 @@ Save the log URLs of the two negative tests (WIF deny, context deny) here:
 
 ```bash
 # read-only live guards; GCLOUD_ACCOUNT makes every call use your account, BILLING_ACCOUNT
-# and BILLING_GCLOUD_ACCOUNT enable the budget checks (C11, C14), NEON_PROJECT_ID enables C13 (otherwise reported as SKIP)
+# and BILLING_GCLOUD_ACCOUNT enable the budget checks, NEON_PROJECT_ID enables the Neon check (otherwise reported as SKIP)
 GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" BILLING_GCLOUD_ACCOUNT="$BILLING_GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check
 ```
 

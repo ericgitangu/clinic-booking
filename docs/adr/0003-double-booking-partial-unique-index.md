@@ -2,7 +2,6 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
-- Plan reference: [PLAN.md §3.4, §5](../architecture/PLAN.md#34-concurrency-guarantee-and-how-we-prove-it)
 
 ## Status
 Accepted
@@ -34,4 +33,4 @@ Option 1, with these additions:
 "Validate ... not taken"; "Once booked the slot must not be available to others".
 
 ## Review trigger
-Variable slot durations, or a clinic in a non-half-hour offset such as +05:45. Either one means migrating to option 2. Before that, check `SELECT name FROM pg_available_extensions WHERE name='btree_gist'` on Neon. That check is recorded during WP-11 and is unverified until then.
+Variable slot durations, or a clinic in a non-half-hour offset such as +05:45. Either one means migrating to option 2. Before that, check `SELECT name FROM pg_available_extensions WHERE name='btree_gist'` on Neon. That check is recorded during and is unverified until then.

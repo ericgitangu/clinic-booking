@@ -181,7 +181,7 @@ These are deductions from the configuration, not load tests.
 <!-- ENGINEER: factual bullets + a per-WP table of how much code was agent-generated vs hand-written -->
 
 ### An example where AI improved my work
-<!-- ENGINEER: verbatim prompt from the exported session transcript (prompt id from the AI usage summary in README §11), what changed, commit SHA -->
+<!-- ENGINEER: verbatim prompt from the exported session transcript (prompt id from the AI usage summary in README section 11), what changed, commit SHA -->
 
 ### An example where AI was wrong or incomplete, and how I caught it
 <!-- ENGINEER: a real entry with its source; how it was caught (test / doc / observation); fix commit -->
@@ -192,7 +192,7 @@ These are deductions from the configuration, not load tests.
 
 ### Note on commits
 
-AI usage is summarized here in §11; commit messages carry no tooling trailers by convention.
+AI usage is summarized here in section 11; commit messages carry no tooling trailers by convention.
 
 ## 12. Run locally
 
