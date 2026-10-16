@@ -1,0 +1,58 @@
+name: clinic
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    environment:
+      POSTGRES_USER: clinic
+      POSTGRES_PASSWORD: clinic
+      POSTGRES_DB: clinic
+    ports:
+      # Host publish port is overridable to avoid collisions; container port is always 5432.
+      - "${DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinic -d clinic"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: ./backend
+    image: clinic-api:local
+    command: ["sh", "-c", "alembic upgrade head && python -m app.scripts.seed"]
+    environment:
+      # Owner role runs migrations and the seed.
+      DATABASE_URL: postgresql+asyncpg://clinic:clinic@db:5432/clinic
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+    image: clinic-api:local
+    environment:
+      # Runtime role: SELECT/INSERT/UPDATE only.
+      DATABASE_URL: postgresql+asyncpg://clinic_app:clinic_app_local@db:5432/clinic
+      WEB_ORIGIN: http://localhost:3000
+      PUBLIC_BASE_URL: http://localhost:8080
+      LOG_LEVEL: info
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz')
+      interval: 3s
+      timeout: 3s
+      retries: 20
