@@ -4,6 +4,8 @@ packages:
 # native resolver that ESLint does not need.
 # Refuse a dependency version whose publish-time trust evidence is weaker than an earlier one.
 trustPolicy: no-downgrade
+blockExoticSubdeps: true
+minimumReleaseAge: 1440
 # Four locked versions already fail the policy (pnpm reports a trust downgrade against an earlier
 # release: @vercel/* are pulled in by the vercel CLI, semver@6 by tooling). Excluded by exact
 # version so any other downgrade, or a bump of these, is still refused. TECH DEBT: not reviewed

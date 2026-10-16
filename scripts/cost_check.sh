@@ -26,6 +26,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 FAILS=0
+# grep without -q: under pipefail a quiet grep exits early and the writer's SIGPIPE flips the pipeline.
+qgrep() { grep "$@" >/dev/null; }
 pass() { printf 'PASS  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 
@@ -170,7 +172,7 @@ static_checks() {
 
   # The default Compute SA's Editor grant is removed by Terraform (infra/terraform/default_sa.tf).
   if grep -rhvE '^[[:space:]]*(#|//)' infra/terraform --include='*.tf' 2>/dev/null \
-       | tr '\n' ' ' | grep -qE 'google_project_default_service_accounts"[^{]*\{[^}]*action[[:space:]]*=[[:space:]]*"DEPRIVILEGE"'; then
+       | tr '\n' ' ' | qgrep -E 'google_project_default_service_accounts"[^{]*\{[^}]*action[[:space:]]*=[[:space:]]*"DEPRIVILEGE"'; then
     pass "terraform deprivileges the default service accounts"
   else
     fail "terraform does not DEPRIVILEGE the default service accounts (google_project_default_service_accounts)"
@@ -190,8 +192,8 @@ static_checks() {
   [ "$found_vj" = 1 ] || fail "no vercel.json found"
 
   if [ -f web/next.config.ts ]; then
-    if grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | grep -qE 'unoptimized:[[:space:]]*true' \
-       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | grep -qE 'unoptimized:[[:space:]]*false'; then
+    if grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*true' \
+       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*false'; then
       pass "next images unoptimized"
     else
       fail "next images not unoptimized (or only in a comment)"
@@ -204,7 +206,7 @@ static_checks() {
     local pr
     pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
     if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under web/src"; else pass "no non-iad1 preferredRegion"; fi
-    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | grep -qE "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
+    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
       fail "edge runtime under web/src"
     else
       pass "no edge runtime"
@@ -226,8 +228,8 @@ static_checks() {
   for dr in docs redoc openapi.json; do
     src="$(find "web/src/app/$dr" -maxdepth 1 -type f -name 'route.*' 2>/dev/null | head -1)"
     if [ -z "$src" ]; then fail "static doc route missing: web/src/app/$dr"; continue; fi
-    if grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | grep -qE "^[[:space:]]*export[[:space:]]+const[[:space:]]+dynamic[[:space:]]*=[[:space:]]*[\"']force-static[\"']" \
-       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | grep -qE 'lib/proxy|\.\./api|\[\.\.\.path\]|fetch\(|API_URL|process\.env'; then
+    if grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E "^[[:space:]]*export[[:space:]]+const[[:space:]]+dynamic[[:space:]]*=[[:space:]]*[\"']force-static[\"']" \
+       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E 'lib/proxy|\.\./api|\[\.\.\.path\]|fetch\(|API_URL|process\.env'; then
       pass "static doc route, no proxy or network access: $src"
     else
       fail "doc route not force-static, or reaches the proxy/network/env: $src"
@@ -326,7 +328,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   [ "$c9" = "US-EAST1 STANDARD 0" ] && pass "C9 state bucket US-EAST1 STANDARD soft-delete off" || fail "C9 state bucket '${c9:-unreadable}' (want 'US-EAST1 STANDARD 0')"
 
   # C10: paid scanners and managed build disabled.
-  if gc services list --enabled --project "$PROJECT" --format='value(config.name)' | grep -qE 'containerscanning|ondemandscanning|cloudbuild'; then
+  if gc services list --enabled --project "$PROJECT" --format='value(config.name)' | qgrep -E 'containerscanning|ondemandscanning|cloudbuild'; then
     fail "C10 a paid scanner or managed build API is enabled"
   else
     pass "C10 paid scanners and managed build disabled"
@@ -344,7 +346,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   fi
 
   # C12: the egress alert policy exists.
-  if gc monitoring policies list --project "$PROJECT" --format='value(displayName)' 2>/dev/null | grep -qx 'clinic-run-egress-daily'; then
+  if gc monitoring policies list --project "$PROJECT" --format='value(displayName)' 2>/dev/null | qgrep -x 'clinic-run-egress-daily'; then
     pass "C12 egress alert policy exists"
   else
     fail "C12 egress alert policy clinic-run-egress-daily not found"
