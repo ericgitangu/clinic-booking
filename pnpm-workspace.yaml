@@ -2,6 +2,21 @@ packages:
   - web
 # Dependency lifecycle scripts are denied by default. unrs-resolver only downloads an optional
 # native resolver that ESLint does not need.
+# Refuse a dependency version whose publish-time trust evidence is weaker than an earlier one.
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+# TECH DEBT: 1 day, not the 7 days the semgrep rule wants: 40 locked versions are under 7 days old
+# (rolldown/oxc), so 10080 fails the install. Raise it when the lockfile ages past the window.
+minimumReleaseAge: 1440 # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
+# Four locked versions already fail the policy (pnpm reports a trust downgrade against an earlier
+# release: @vercel/* are pulled in by the vercel CLI, semver@6 by tooling). Excluded by exact
+# version so any other downgrade, or a bump of these, is still refused. TECH DEBT: not reviewed
+# for takeover; re-check when the vercel CLI or its semver range moves.
+trustPolicyExclude:
+  - '@vercel/cli-config@0.3.1'
+  - '@vercel/cli-exec@1.0.1'
+  - '@vercel/oidc@4.0.1'
+  - semver@6.3.1
 allowBuilds:
   unrs-resolver: false
 minimumReleaseAgeExclude:

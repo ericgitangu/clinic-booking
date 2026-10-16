@@ -36,3 +36,5 @@ tfplan
 
 # local AI prompt log, not committed
 docs/ai/
+
+infra/billing/terraform.tfvars

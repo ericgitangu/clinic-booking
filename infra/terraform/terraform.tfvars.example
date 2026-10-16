@@ -1,8 +1,7 @@
 # Copy to terraform.tfvars and fill in. Identifiers only; NO secrets here or in state.
 project_id          = "sil-clinic-booking"
-project_number      = "000000000000"
+project_number      = "291652953712"
 region              = "us-east4"
-billing_account     = "019163-3D185D-0ACEAD"
 circleci_org_id     = "00000000-0000-0000-0000-000000000000"
 circleci_project_id = "00000000-0000-0000-0000-000000000000"
 vercel_team         = "eric-gitangus-projects"

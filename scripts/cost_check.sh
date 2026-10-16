@@ -15,7 +15,9 @@
 # wrong must be fixed, never dropped.
 #
 # Optional env for --live:  PROJECT (required), GCLOUD_ACCOUNT (passed as --account when set),
-# BILLING_ACCOUNT (for the budget checks), NEON_PROJECT_ID (for the Neon check).
+# BILLING_ACCOUNT and BILLING_GCLOUD_ACCOUNT (billing reads C11/C14; both required, the billing
+# user is not the project Owner in GCLOUD_ACCOUNT, and a missing one is a FAIL naming the variable),
+# NEON_PROJECT_ID (for the Neon check).
 #
 set -uo pipefail
 
@@ -24,6 +26,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 FAILS=0
+# grep without -q: under pipefail a quiet grep exits early and the writer's SIGPIPE flips the pipeline.
+qgrep() { grep "$@" >/dev/null; }
 pass() { printf 'PASS  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 
@@ -71,6 +75,7 @@ my @order = (
   "manual-scaling flag", "managed build or --source", "region outside us-east4/us-east1",
   "resource_class outside small/medium", "docker_layer_caching enabled", "docker build flags",
   "docker pull or cache-from", "terraform banned resource or API",
+  "run deploy missing --service-account",
 );
 my %hits; my $lines = 0; my $deploys = 0;
 sub hit { my ($c, $l) = @_; $hits{$c}{$l} = 1; }
@@ -90,6 +95,10 @@ while (my $row = <STDIN>) {
       $deploys++;
       hit("min-instances missing or not 0", $label) unless $line =~ /--min-instances[= ]+0(?!\d)/;
       hit("max-instances missing", $label)          unless $line =~ /--max-instances[= ]+[1-3](?!\d)/;
+    }
+    # The default Compute service account holds roles/editor; a service must never fall back to it.
+    if ($line =~ /\brun\s+(?:jobs\s+)?deploy\b/) {
+      hit("run deploy missing --service-account", $label) unless $line =~ /--service-account[= ]+\S/;
     }
     if ($line =~ /\brun\s+jobs\s+deploy\b/) {
       hit("job missing --task-timeout or --max-retries 0", $label)
@@ -161,6 +170,14 @@ static_checks() {
   done <<< "$out"
   rm -f "$LINES"
 
+  # The default Compute SA's Editor grant is removed by Terraform (infra/terraform/default_sa.tf).
+  if grep -rhvE '^[[:space:]]*(#|//)' infra/terraform --include='*.tf' 2>/dev/null \
+       | tr '\n' ' ' | qgrep -E 'google_project_default_service_accounts"[^{]*\{[^}]*action[[:space:]]*=[[:space:]]*"DEPRIVILEGE"'; then
+    pass "terraform deprivileges the default service accounts"
+  else
+    fail "terraform does not DEPRIVILEGE the default service accounts (google_project_default_service_accounts)"
+  fi
+
   # ---- web: Vercel region and git deploys, Next images, regions, route layout ----
   local vj found_vj=0
   while IFS= read -r vj; do
@@ -175,8 +192,8 @@ static_checks() {
   [ "$found_vj" = 1 ] || fail "no vercel.json found"
 
   if [ -f web/next.config.ts ]; then
-    if grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | grep -qE 'unoptimized:[[:space:]]*true' \
-       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | grep -qE 'unoptimized:[[:space:]]*false'; then
+    if grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*true' \
+       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*false'; then
       pass "next images unoptimized"
     else
       fail "next images not unoptimized (or only in a comment)"
@@ -189,7 +206,7 @@ static_checks() {
     local pr
     pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
     if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under web/src"; else pass "no non-iad1 preferredRegion"; fi
-    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | grep -qE "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
+    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
       fail "edge runtime under web/src"
     else
       pass "no edge runtime"
@@ -211,8 +228,8 @@ static_checks() {
   for dr in docs redoc openapi.json; do
     src="$(find "web/src/app/$dr" -maxdepth 1 -type f -name 'route.*' 2>/dev/null | head -1)"
     if [ -z "$src" ]; then fail "static doc route missing: web/src/app/$dr"; continue; fi
-    if grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | grep -qE "^[[:space:]]*export[[:space:]]+const[[:space:]]+dynamic[[:space:]]*=[[:space:]]*[\"']force-static[\"']" \
-       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | grep -qE 'lib/proxy|\.\./api|\[\.\.\.path\]|fetch\(|API_URL|process\.env'; then
+    if grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E "^[[:space:]]*export[[:space:]]+const[[:space:]]+dynamic[[:space:]]*=[[:space:]]*[\"']force-static[\"']" \
+       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E 'lib/proxy|\.\./api|\[\.\.\.path\]|fetch\(|API_URL|process\.env'; then
       pass "static doc route, no proxy or network access: $src"
     else
       fail "doc route not force-static, or reaches the proxy/network/env: $src"
@@ -227,6 +244,10 @@ REGION=us-east4
 
 gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
   if [ -n "${GCLOUD_ACCOUNT:-}" ]; then gcloud --account "$GCLOUD_ACCOUNT" "$@"; else gcloud "$@"; fi
+}
+
+gcb() { # billing-account reads, as BILLING_GCLOUD_ACCOUNT (callers check it is set)
+  gcloud --account "$BILLING_GCLOUD_ACCOUNT" "$@"
 }
 
 live_checks() {
@@ -307,23 +328,25 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   [ "$c9" = "US-EAST1 STANDARD 0" ] && pass "C9 state bucket US-EAST1 STANDARD soft-delete off" || fail "C9 state bucket '${c9:-unreadable}' (want 'US-EAST1 STANDARD 0')"
 
   # C10: paid scanners and managed build disabled.
-  if gc services list --enabled --project "$PROJECT" --format='value(config.name)' | grep -qE 'containerscanning|ondemandscanning|cloudbuild'; then
+  if gc services list --enabled --project "$PROJECT" --format='value(config.name)' | qgrep -E 'containerscanning|ondemandscanning|cloudbuild'; then
     fail "C10 a paid scanner or managed build API is enabled"
   else
     pass "C10 paid scanners and managed build disabled"
   fi
 
   # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API.
-  if [ -n "${BILLING_ACCOUNT:-}" ]; then
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+    fail "C11 BILLING_GCLOUD_ACCOUNT unset: the billing user (not the project Owner) must read the budgets"
+  elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c11
-    c11="$(gc billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
+    c11="$(gcb billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName] | sort | join(",")')"
     [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap action: confirm in the console)" || fail "C11 budgets '${c11:-unreadable}'"
   else
     fail "C11 skipped: set BILLING_ACCOUNT to check the budgets"
   fi
 
   # C12: the egress alert policy exists.
-  if gc monitoring policies list --project "$PROJECT" --format='value(displayName)' 2>/dev/null | grep -qx 'clinic-run-egress-daily'; then
+  if gc monitoring policies list --project "$PROJECT" --format='value(displayName)' 2>/dev/null | qgrep -x 'clinic-run-egress-daily'; then
     pass "C12 egress alert policy exists"
   else
     fail "C12 egress alert policy clinic-run-egress-daily not found"
@@ -338,13 +361,28 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     echo "SKIP  C13 Neon region and size: needs neonctl and NEON_PROJECT_ID (check the console instead)"
   fi
 
-  # C14: only this project is linked to the billing account.
-  if [ -n "${BILLING_ACCOUNT:-}" ]; then
-    local c14
-    c14="$(gc billing projects list --billing-account "$BILLING_ACCOUNT" --format='value(projectId)' 2>/dev/null | sort | tr '\n' ' ')"
-    [ "$c14" = "$PROJECT " ] && pass "C14 only $PROJECT is linked to the billing account" || fail "C14 projects on the billing account: ${c14:-unreadable}"
+  # C14: the billing account is SHARED (PLAN 11.1 Q14), so the free tiers are shared with the
+  # projects in scripts/shared_billing_projects.txt. A project that joins (or leaves) the account
+  # changes the headroom and must be re-measured with scripts/shared_headroom.py first.
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+    fail "C14 BILLING_GCLOUD_ACCOUNT unset: the billing user must list the projects on the billing account"
+  elif [ -n "${BILLING_ACCOUNT:-}" ]; then
+    local c14 want14
+    c14="$(gcb billing projects list --billing-account "$BILLING_ACCOUNT" --format='value(projectId)' 2>/dev/null | sort | tr '\n' ' ')"
+    want14="$(sort scripts/shared_billing_projects.txt | tr '\n' ' ')"
+    [ "$c14" = "$want14" ] && pass "C14 billing account holds exactly the recorded projects" || fail "C14 projects on the billing account: ${c14:-unreadable} (recorded: $want14)"
   else
     fail "C14 skipped: set BILLING_ACCOUNT"
+  fi
+
+  # C20: the default Compute service account has no roles/editor (Terraform deprivileges it).
+  local num c20
+  num="$(gc projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null)"
+  if [ -n "$num" ]; then
+    c20="$(gc projects get-iam-policy "$PROJECT" --format=json 2>/dev/null | jq -r --arg m "serviceAccount:${num}-compute@developer.gserviceaccount.com" '[.bindings[]? | select(.role == "roles/editor") | .members[]? | select(. == $m)] | length')"
+    [ "$c20" = 0 ] && pass "C20 default Compute SA has no roles/editor" || fail "C20 default Compute SA roles/editor bindings: ${c20:-unreadable}"
+  else
+    fail "C20 could not read the project number"
   fi
 
   # C18: logging stays default plus the one free exclusion.
