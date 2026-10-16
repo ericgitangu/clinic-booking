@@ -1,9 +1,9 @@
 version: 2.1
 
-# Cost rules (ADR-0016, §13.3): resource_class small for lint-class jobs, medium otherwise;
-# never large/Gen2; no docker_layer_caching. Docker Official Images are pulled from
-# mirror.gcr.io by digest; cimg/* images authenticate with the free-tier dockerhub-ro token
-# so Docker Hub's shared-IP limits never fail a build.
+# Cost rules: resource_class small for lint-class jobs, medium otherwise;
+# never large/Gen2; no docker_layer_caching. cimg/* images authenticate with the free-tier
+# read-only Docker Hub token (a context attached to every job that pulls one) so Docker Hub's
+# shared-IP limits never fail a build.
 
 commands:
   install_deps:
@@ -23,6 +23,25 @@ commands:
           paths:
             - backend/.venv
             - ~/.cache/uv
+
+  trivy_cache_restore:
+    description: Restore the Trivy vulnerability DB, keyed by day (falls back to the newest).
+    steps:
+      - run:
+          name: Cache key for today
+          command: date -u +%F > /tmp/trivy-date
+      - restore_cache:
+          keys:
+            - trivy-db-v1-{{ checksum "/tmp/trivy-date" }}
+            - trivy-db-v1-
+
+  trivy_cache_save:
+    description: Save the Trivy vulnerability DB under today's key.
+    steps:
+      - save_cache:
+          key: trivy-db-v1-{{ checksum "/tmp/trivy-date" }}
+          paths:
+            - ~/.cache/trivy
 
   create_app_role:
     description: Create the clinic_app role in the CI Postgres (local/CI only).
@@ -167,6 +186,7 @@ jobs:
           command: |
             cd backend
             docker buildx build --provenance=false --sbom=false --load -t clinic-api:ci .
+      - trivy_cache_restore
       - run:
           name: Trivy image + config scan (HIGH/CRITICAL, fixed only)
           command: |
@@ -176,7 +196,7 @@ jobs:
             # trivy config takes ONE path per call; scan the Dockerfile, and infra/ once it exists.
             ./trivy config --exit-code 1 backend/Dockerfile
             if [ -d infra ]; then ./trivy config --exit-code 1 infra; fi
-
+      - trivy_cache_save
   dast:
     machine:
       image: ubuntu-2404:current
@@ -202,7 +222,8 @@ jobs:
 
   # ---------------------------------------------------------------- release-only jobs
   # These need the engineer's cloud setup (contexts gcp-deploy / vercel-prod, WIF). They are
-  # inert until WP-11 Part A/B/C0 have been applied; nothing here creates infrastructure.
+  # inert until the GCP and Vercel setup (WIF pools, service accounts, contexts) has been
+  # applied; nothing here creates infrastructure.
   build-scan-push:
     machine:
       image: ubuntu-2404:current
@@ -221,12 +242,14 @@ jobs:
             IMAGE="us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-api:sha-${CIRCLE_SHA1:0:7}"
             docker buildx build --provenance=false --sbom=false --load -t "$IMAGE" backend
             echo "export IMAGE=$IMAGE" >> "$BASH_ENV"
+      - trivy_cache_restore
       - run:
           name: Trivy scan before push (HIGH/CRITICAL, fixed only)
           command: |
             VERSION=0.76.0
             curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" | tar -xz trivy
             ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+      - trivy_cache_save
       - run:
           name: Push and record the digest
           command: |
@@ -358,6 +381,7 @@ jobs:
           command: |
             npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile
+            pnpm audit --prod --audit-level high
             pnpm -C web lint
             pnpm -C web typecheck
             pnpm -C web test
@@ -432,16 +456,25 @@ workflows:
             equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
-      - backend-quality
-      - backend-test
-      - backend-contract
-      - secrets
-      - sast
-      - sca
-      - build-scan
+      - backend-quality:
+          context: dockerhub-ro
+      - backend-test:
+          context: dockerhub-ro
+      - backend-contract:
+          context: dockerhub-ro
+      - secrets:
+          context: dockerhub-ro
+      - sast:
+          context: dockerhub-ro
+      - sca:
+          context: dockerhub-ro
+      - build-scan:
+          context: dockerhub-ro
       - dast
-      - web-quality
-      - cost-static
+      - web-quality:
+          context: dockerhub-ro
+      - cost-static:
+          context: dockerhub-ro
 
   release:
     when:
@@ -449,15 +482,24 @@ workflows:
         - equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
-      - backend-quality
-      - backend-test
-      - backend-contract
-      - secrets
-      - sast
-      - sca
-      - build-scan
-      - web-quality
-      - cost-static
+      - backend-quality:
+          context: dockerhub-ro
+      - backend-test:
+          context: dockerhub-ro
+      - backend-contract:
+          context: dockerhub-ro
+      - secrets:
+          context: dockerhub-ro
+      - sast:
+          context: dockerhub-ro
+      - sca:
+          context: dockerhub-ro
+      - build-scan:
+          context: dockerhub-ro
+      - web-quality:
+          context: dockerhub-ro
+      - cost-static:
+          context: dockerhub-ro
       - build-scan-push:
           context: gcp-deploy
           requires:
@@ -475,11 +517,12 @@ workflows:
           requires:
             - build-scan-push
       - ship-web:
-          context: vercel-prod
+          context: [dockerhub-ro, vercel-prod]
           requires:
             - ship-api
             - web-quality
       - smoke-public:
+          context: dockerhub-ro
           requires:
             - ship-web
       - cost-check:

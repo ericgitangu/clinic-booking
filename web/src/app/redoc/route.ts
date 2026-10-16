@@ -10,7 +10,7 @@ const HTML = `<!doctype html>
   </head>
   <body>
     <redoc spec-url="/openapi.json"></redoc>
-    <script src="https://cdn.jsdelivr.net/npm/redoc@3.0.1/bundles/redoc.standalone.js" crossorigin></script>
+    <script src="https://cdn.jsdelivr.net/npm/redoc@3.0.1/bundles/redoc.standalone.js" integrity="sha384-j07qRKHNNmcwU1/Y1elJc7pDLHXP/QfbQXTtSkbOJ7uYGJikqAzsFVbY2zR9FqOT" crossorigin="anonymous"></script>
   </body>
 </html>`;
 
