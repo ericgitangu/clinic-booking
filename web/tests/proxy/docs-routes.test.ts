@@ -38,4 +38,19 @@ describe("doc routes are static and never fetch upstream", () => {
       expect(resolveUpstream([p])).toEqual({ kind: "redirect", to: `/${p}` });
     }
   });
+
+  it("every CDN asset on the doc pages carries a SHA-384 integrity hash", async () => {
+    for (const route of [docsRoute, redocRoute]) {
+      const html = await (await route.GET()).text();
+      const tags =
+        html.match(
+          /<(?:script|link)[^>]+https:\/\/cdn\.jsdelivr\.net[^>]*>/g,
+        ) ?? [];
+      expect(tags.length).toBeGreaterThan(0);
+      for (const tag of tags) {
+        expect(tag).toMatch(/integrity="sha384-[A-Za-z0-9+/]{64}"/);
+        expect(tag).toContain('crossorigin="anonymous"');
+      }
+    }
+  });
 });

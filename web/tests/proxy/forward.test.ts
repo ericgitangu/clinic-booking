@@ -35,6 +35,7 @@ describe("resolveUpstream", () => {
       baseUrl: "https://realtime.example.run.app",
       audience: "clinic-realtime",
       upstreamPath: "/stream",
+      timeoutMs: 295_000, // the stream may legitimately stay open for minutes
     });
   });
 
@@ -63,6 +64,9 @@ describe("forward", () => {
         "idempotency-key": "k1",
         "x-request-id": "11111111-1111-1111-1111-111111111111",
         authorization: "Bearer client",
+        cookie: "session=abc",
+        "x-forwarded-for": "6.6.6.6",
+        "accept-language": "sw",
         "x-serverless-authorization": "Bearer SPOOF",
         "x-client-ip": "9.9.9.9",
         "content-type": "application/json",
@@ -81,7 +85,10 @@ describe("forward", () => {
     const h = cap.init!.headers as Headers;
     expect(h.get("idempotency-key")).toBe("k1");
     expect(h.get("x-request-id")).toBe("11111111-1111-1111-1111-111111111111");
-    expect(h.get("authorization")).toBe("Bearer client");
+    expect(h.get("accept-language")).toBe("sw");
+    expect(h.has("authorization")).toBe(false); // allowlist: not forwarded
+    expect(h.has("cookie")).toBe(false);
+    expect(h.has("x-forwarded-for")).toBe(false);
     expect(h.get("x-serverless-authorization")).toBe("Bearer ID_TOKEN"); // minted, not spoofed
     expect(h.get("x-client-ip")).toBe("1.2.3.4"); // overwritten
     expect(h.has("host")).toBe(false);
@@ -140,5 +147,92 @@ describe("forward", () => {
       upstreamPath: "/x",
     });
     expect(res.status).toBe(405);
+  });
+});
+
+describe("resolveUpstream rejects unsafe or empty segments", () => {
+  const bad: [string, string[]][] = [
+    ["empty segment (trailing slash on stream)", ["stream", ""]],
+    ["empty segment (trailing slash on docs)", ["docs", ""]],
+    ["no segments", []],
+    ["dot", ["."]],
+    ["dot-dot", ["doctors", ".."]],
+    ["slash inside a segment", ["doctors/abc"]],
+    ["backslash", ["doctors\\abc"]],
+    ["query character", ["doctors?x=1"]],
+    ["fragment character", ["doctors#x"]],
+    ["control character", ["doctors\u0000"]],
+    ["newline", ["doctors\n"]],
+  ];
+  it.each(bad)("%s -> notfound", (_label, segments) => {
+    expect(resolveUpstream(segments)).toEqual({ kind: "notfound" });
+  });
+
+  it("accepts ordinary segments", () => {
+    expect(resolveUpstream(["doctors", "abc-123"]).kind).toBe("proxy");
+  });
+});
+
+describe("forward failure handling", () => {
+  const base = { baseUrl: "https://api.example.run.app", upstreamPath: "/x" };
+
+  it("502 when the upstream cannot be reached", async () => {
+    const failing = (async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const res = await forward(new Request("https://web.example/api/x"), {
+      ...base,
+      fetchImpl: failing,
+    });
+    expect(res.status).toBe(502);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+  });
+
+  it("504 when the upstream times out", async () => {
+    const timing = (async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    }) as unknown as typeof fetch;
+    const res = await forward(new Request("https://web.example/api/x"), {
+      ...base,
+      fetchImpl: timing,
+    });
+    expect(res.status).toBe(504);
+  });
+
+  it("passes an abort signal so a hung upstream is bounded", async () => {
+    const cap: Captured = {};
+    await forward(new Request("https://web.example/api/x"), {
+      ...base,
+      fetchImpl: mockFetch(cap),
+    });
+    expect(cap.init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("413 when a body with no Content-Length exceeds 64 KB", async () => {
+    const big = new Uint8Array(64 * 1024 + 1);
+    const req = new Request("https://web.example/api/x", {
+      method: "POST",
+      body: big,
+    });
+    req.headers.delete("content-length");
+    const cap: Captured = {};
+    const res = await forward(req, { ...base, fetchImpl: mockFetch(cap) });
+    expect(res.status).toBe(413);
+    expect(cap.url).toBeUndefined(); // nothing was sent upstream
+  });
+
+  it("forwards a small body intact", async () => {
+    const cap: Captured = {};
+    const req = new Request("https://web.example/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ a: 1 }),
+    });
+    await forward(req, { ...base, fetchImpl: mockFetch(cap) });
+    expect(new TextDecoder().decode(cap.init!.body as Uint8Array)).toBe(
+      '{"a":1}',
+    );
   });
 });

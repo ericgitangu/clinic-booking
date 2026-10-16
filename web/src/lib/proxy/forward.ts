@@ -1,16 +1,15 @@
-// Core proxy forwarding (ADR-0023, §12.4). Pure enough to unit-test: fetch is injectable
-// and the token is passed in (null locally). The route handler wires env + token minting.
+// Core proxy forwarding. Pure enough to unit-test: fetch is injectable and the token is passed
+// in (null locally). The route handler wires env + token minting.
 
-const HOP_BY_HOP = new Set([
-  "host",
-  "connection",
-  "content-length",
-  "keep-alive",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
+// Only these client request headers reach Cloud Run. Everything else (cookie, authorization,
+// x-forwarded-*, hop-by-hop headers, a spoofed x-client-ip or x-serverless-authorization) is
+// dropped; the proxy adds its own x-client-ip and invoker token below.
+const FORWARDED_REQUEST_HEADERS = new Set([
+  "content-type",
+  "accept",
+  "accept-language",
+  "x-request-id",
+  "idempotency-key",
 ]);
 
 // Node fetch decompresses the upstream body, so copying these would corrupt it.
@@ -22,13 +21,34 @@ const DROP_RESPONSE = new Set([
 
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PATCH", "OPTIONS"]);
 const MAX_BODY_BYTES = 64 * 1024;
+const API_TIMEOUT_MS = 25_000;
+const STREAM_TIMEOUT_MS = 295_000;
 const REDIRECT_PATHS = new Set(["/docs", "/redoc", "/openapi.json"]);
 
 export type Upstream =
   | { kind: "redirect"; to: string }
-  | { kind: "proxy"; baseUrl: string; audience: string; upstreamPath: string };
+  | { kind: "notfound" }
+  | {
+      kind: "proxy";
+      baseUrl: string;
+      audience: string;
+      upstreamPath: string;
+      timeoutMs: number;
+    };
+
+// A decoded catch-all segment must be a plain path component: it is joined into the upstream
+// URL, so anything that could change its meaning (separators, query, fragment, dot segments,
+// control characters) is rejected rather than forwarded.
+function isSafeSegment(segment: string): boolean {
+  if (segment === "" || segment === "." || segment === "..") return false;
+  // eslint-disable-next-line no-control-regex
+  return !/[/\\?#\u0000-\u001f\u007f]/.test(segment);
+}
 
 export function resolveUpstream(segments: string[]): Upstream {
+  if (segments.length === 0 || !segments.every(isSafeSegment)) {
+    return { kind: "notfound" };
+  }
   const joined = "/" + segments.join("/");
   if (REDIRECT_PATHS.has(joined)) {
     return { kind: "redirect", to: joined };
@@ -39,6 +59,7 @@ export function resolveUpstream(segments: string[]): Upstream {
       baseUrl: process.env.REALTIME_URL ?? "",
       audience: process.env.REALTIME_AUDIENCE ?? "clinic-realtime",
       upstreamPath: "/stream",
+      timeoutMs: STREAM_TIMEOUT_MS,
     };
   }
   return {
@@ -46,10 +67,15 @@ export function resolveUpstream(segments: string[]): Upstream {
     baseUrl: process.env.API_URL ?? "",
     audience: process.env.API_AUDIENCE ?? "clinic-api",
     upstreamPath: joined,
+    timeoutMs: API_TIMEOUT_MS,
   };
 }
 
-function problem(status: number, code: string, detail: string): Response {
+export function problem(
+  status: number,
+  code: string,
+  detail: string,
+): Response {
   return new Response(JSON.stringify({ status, code, detail }), {
     status,
     headers: { "content-type": "application/problem+json" },
@@ -62,6 +88,34 @@ export interface ForwardOptions {
   token?: string | null;
   clientIp?: string | null;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+// Reads at most MAX_BODY_BYTES; the Content-Length header alone is client-controlled.
+async function readCappedBody(
+  req: Request,
+): Promise<Uint8Array | "too-large" | null> {
+  if (!req.body) return null;
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return "too-large";
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 export async function forward(
@@ -71,8 +125,8 @@ export async function forward(
   if (!ALLOWED_METHODS.has(req.method)) {
     return problem(405, "METHOD_NOT_ALLOWED", "Method not allowed");
   }
-  const contentLength = req.headers.get("content-length");
-  if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
+  const declared = req.headers.get("content-length");
+  if (declared && Number(declared) > MAX_BODY_BYTES) {
     return problem(413, "PAYLOAD_TOO_LARGE", "Request body exceeds 64 KB");
   }
 
@@ -82,27 +136,42 @@ export async function forward(
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key)) headers.set(key, value);
+    if (FORWARDED_REQUEST_HEADERS.has(key)) headers.set(key, value);
   });
-  // Client must never spoof the invoker token or the client IP.
-  headers.delete("x-serverless-authorization");
-  headers.delete("x-client-ip");
   if (opts.clientIp) headers.set("x-client-ip", opts.clientIp);
   if (opts.token)
     headers.set("x-serverless-authorization", `Bearer ${opts.token}`);
 
-  const hasBody = req.method !== "GET" && req.method !== "HEAD";
-  const init: RequestInit & { duplex?: "half" } = {
+  const init: RequestInit = {
     method: req.method,
     headers,
     redirect: "manual",
+    signal: AbortSignal.timeout(opts.timeoutMs ?? API_TIMEOUT_MS),
   };
-  if (hasBody) {
-    init.body = req.body;
-    init.duplex = "half";
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    const body = await readCappedBody(req);
+    if (body === "too-large") {
+      return problem(413, "PAYLOAD_TOO_LARGE", "Request body exceeds 64 KB");
+    }
+    if (body) init.body = body as BodyInit;
   }
 
-  const upstream = await doFetch(target, init);
+  let upstream: Response;
+  try {
+    upstream = await doFetch(target, init);
+  } catch (err) {
+    if (
+      err instanceof DOMException &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    ) {
+      return problem(
+        504,
+        "UPSTREAM_TIMEOUT",
+        "The API did not respond in time",
+      );
+    }
+    return problem(502, "UPSTREAM_UNAVAILABLE", "The API could not be reached");
+  }
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {

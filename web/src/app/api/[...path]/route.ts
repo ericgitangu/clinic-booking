@@ -1,6 +1,6 @@
-// The proxy. /api/* -> Cloud Run (IAM-gated); /api/stream -> realtime (S1). The only route
-// under src/app/api/ (route-layout.test enforces this). ADR-0023, §12.4.
-import { forward, resolveUpstream } from "@/lib/proxy/forward";
+// The proxy. /api/* -> Cloud Run (IAM-gated); /api/stream -> realtime. The only route
+// under src/app/api/ (route-layout.test enforces this).
+import { forward, problem, resolveUpstream } from "@/lib/proxy/forward";
 import { mintIdToken, minting_enabled } from "@/lib/proxy/gcp-id-token";
 import { checkRateLimit } from "@/lib/proxy/rate-limit";
 
@@ -8,12 +8,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+// Vercel sets x-vercel-forwarded-for with the real client IP. If a client-supplied list ever
+// reaches us, the right-most entry is the one appended by the nearest trusted proxy; the
+// left-most is attacker-controlled and would let one client dodge the limiter.
 function clientIp(req: Request): string {
-  // WP-00 (f): Vercel sets x-vercel-forwarded-for with the real client IP.
-  const vercel = req.headers.get("x-vercel-forwarded-for");
-  if (vercel) return vercel.split(",")[0].trim();
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
+  for (const name of ["x-vercel-forwarded-for", "x-forwarded-for"]) {
+    const value = req.headers.get(name);
+    if (value) {
+      const last = value.split(",").at(-1)?.trim();
+      if (last) return last;
+    }
+  }
   return "0.0.0.0";
 }
 
@@ -23,6 +28,9 @@ async function handler(
 ): Promise<Response> {
   const { path = [] } = await ctx.params;
   const upstream = resolveUpstream(path);
+  if (upstream.kind === "notfound") {
+    return problem(404, "NOT_FOUND", "Not found");
+  }
   if (upstream.kind === "redirect") {
     return Response.redirect(new URL(upstream.to, req.url), 308);
   }
@@ -37,12 +45,24 @@ async function handler(
       },
     });
   }
-  const token = minting_enabled() ? await mintIdToken(upstream.audience) : null;
+  let token: string | null = null;
+  if (minting_enabled()) {
+    try {
+      token = await mintIdToken(upstream.audience);
+    } catch {
+      return problem(
+        502,
+        "UPSTREAM_AUTH_FAILED",
+        "Could not authenticate to the API",
+      );
+    }
+  }
   return forward(req, {
     baseUrl: upstream.baseUrl,
     upstreamPath: upstream.upstreamPath,
     token,
     clientIp: ip,
+    timeoutMs: upstream.timeoutMs,
   });
 }
 
