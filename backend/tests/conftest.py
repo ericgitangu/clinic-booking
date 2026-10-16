@@ -11,11 +11,13 @@ import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
+from typing import Any
 
 import asyncpg
 import httpx
 import pytest
 import pytest_asyncio
+from fastapi import FastAPI
 
 from app.api.deps import get_clock
 from app.core.clock import FakeClock
@@ -110,13 +112,13 @@ async def app_conn() -> AsyncIterator[asyncpg.Connection]:
 def make_settings(**overrides: object) -> Settings:
     # The app runs as the clinic_app role, like prod.
     _mark_db_used()
-    base: dict[str, object] = {
+    base: dict[str, Any] = {
         "DATABASE_URL": app_sqlalchemy_url(),
         "PUBLIC_BASE_URL": TEST_PUBLIC_BASE_URL,
         "WEB_ORIGIN": "http://localhost:3000",
     }
     base.update(overrides)
-    return Settings(**base)  # type: ignore[arg-type]
+    return Settings(**base)
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -128,7 +130,7 @@ async def _dispose_engine_between_tests() -> AsyncIterator[None]:
 
 
 @pytest_asyncio.fixture
-async def app_with_clock() -> AsyncIterator[object]:
+async def app_with_clock() -> AsyncIterator[FastAPI]:
     _mark_db_used()
     app = create_app(make_settings())
     app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
@@ -137,10 +139,10 @@ async def app_with_clock() -> AsyncIterator[object]:
 
 
 @pytest_asyncio.fixture
-async def client(app_with_clock: object) -> AsyncIterator[httpx.AsyncClient]:
+async def client(app_with_clock: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     # raise_app_exceptions=False so a handled 500 comes back as a response (real-server
     # behaviour) instead of being re-raised into the test by Starlette's error middleware.
-    transport = httpx.ASGITransport(app=app_with_clock, raise_app_exceptions=False)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app_with_clock, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
         yield c
 
@@ -156,7 +158,7 @@ async def reset_appointments() -> None:
         await conn.close()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def clock() -> FakeClock:
     return FakeClock(FIXED_NOW)
 

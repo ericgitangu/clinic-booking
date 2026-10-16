@@ -70,6 +70,11 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 no_implicit_reexport = true
 
+[[tool.mypy.overrides]]
+# asyncpg ships neither stubs nor py.typed; the tests import it directly for raw connections.
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 source = ["app"]
 # The ASGI app runs under the test's async runner; trace every context so service code

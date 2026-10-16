@@ -60,7 +60,7 @@ async def test_deadlock_retry_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = make_race_app()
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as setup:
         patients = await make_patients(setup, 2)
 
@@ -104,7 +104,7 @@ async def test_deadlock_persistent_returns_409_after_one_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = make_race_app(log_level="info")
-    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as client:
         patient = (await make_patients(client, 1))[0]
 

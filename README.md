@@ -15,7 +15,7 @@
 
 ## 3. System design
 
-This section is the shape of the system. Section 4 is why I chose it over the alternatives. Each decision links to its ADR in [`docs/adr/`](docs/adr/README.md); the long form is [`docs/architecture/PLAN.md`](docs/architecture/PLAN.md).
+This section is the shape of the system. Section 4 is why I chose it over the alternatives. Each decision links to its ADR in [`docs/adr/`](docs/adr/README.md).
 
 ### 3.1 Context and containers
 

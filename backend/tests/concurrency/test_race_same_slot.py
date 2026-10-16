@@ -29,7 +29,7 @@ async def test_single_winner_per_slot(
     monkeypatch.setattr(booking, "_after_write", pg_sleep_after_write)
     app = make_race_app()
 
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as setup:
         patients = await make_patients(setup, N)
         avail = await setup.get(f"/doctors/{OTIENO}/availability?date=2026-10-26")

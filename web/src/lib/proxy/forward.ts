@@ -54,7 +54,7 @@ export type Upstream =
 // None of this API's path segments (UUIDs, slugs) contains a '%'.
 function isSafeSegment(segment: string): boolean {
   if (segment === "" || segment === "." || segment === "..") return false;
-  // eslint-disable-next-line no-control-regex
+  // eslint-disable-next-line no-control-regex -- rejecting control characters is the point
   return !/[/\\?#%\u0000-\u001f\u007f]/.test(segment);
 }
 
