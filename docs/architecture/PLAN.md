@@ -97,7 +97,7 @@ Rules that hold for every stretch item:
 | D2 | CI runs tests on every PR | CircleCI workflow `pr` | README links a green PR pipeline (public repo) | §9 |
 | D3 | Auto-deploy on merge to the designated branch | CircleCI workflow `release` on `main` | README links a green main pipeline, plus the WIF-deny and context-deny logs | §9 |
 | D4 | README: URL, which branch, how, what the pipeline does | README | read | §1, §9 |
-| A1-A4 | AI reflection | `docs/ai/PROMPTS.md` + README §11 | written by the engineer only (ADR-0020) | §11 |
+| A1-A4 | AI reflection | README §11 (AI usage summary) | written by the engineer only (ADR-0020) | §11 |
 | G1 | "When ambiguous, decide and note in README" | §2 of this plan | n/a | §8 |
 | S1 | **STRETCH.** Section 1 "components, trade-offs"; "must not be available to others" (staff view) | `services/realtime` (Go), migration `0003_event_cursor`, `app/api/routers/admin.py`, `web/src/app/admin` | `go test ./...`; `go test -tags=integration ./internal/feed/...` (`TestOutOfOrderCommits`, `TestNaiveIdCursorSkips`); `tests/integration/test_admin_metrics.py`; `scripts/verify_stream.py` after deploy | §4.4, §3.8 |
 | S2 | **STRETCH.** "A patient sees free slots ... books it" (UX) | `web/src/app/{sw.ts, manifest.ts}`, next-themes provider | `web/tests/sw-config.test.ts` (data routes network-only); manifest `jq` check; Lighthouse accessibility ≥ 0.9 | §4.4 |
@@ -745,7 +745,7 @@ The owning WP adds its codes, and only its codes, in one PR: `app/domain/errors.
 │   ├── versions.md                            # resolved pins + platform facts (WP-00)
 │   ├── runbooks/{bootstrap-gcp.md, neon.md, rollback.md, base-image-cve.md}
 │   ├── evidence/gate-b.txt                    # STRETCH entry: pasted verify_claims.py output + timestamp (§0)
-│   └── ai/PROMPTS.md                          # engineer-maintained prompt log
+│   └── ai/                                    # local prompt log, gitignored
 ├── scripts/{verify_claims.py, docs_check.py, migration_lint.sh}
 ├── scripts/cost_check.sh                      # $0 audit: --static (config lint) and --live (gcloud reads), WP-12a
 ├── scripts/verify_stream.py                   # STRETCH S1: SSE smoke run after ship-realtime
@@ -896,7 +896,7 @@ The owning WP adds its codes, and only its codes, in one PR: `app/domain/errors.
 4. **Edits.** Edit additively. Never sweep-remove adjacent lines.
 5. **Shell.** In scripts use `docker compose` (never the `dc` alias) and `command ls`. Never type `gl`, which is aliased to a gitleaks scan.
 6. **Git.** No commit trailers. Never use `--no-verify`.
-7. **Reflection.** Never write `docs/ai/PROMPTS.md` entries or README §11 content on the engineer's behalf.
+7. **Reflection.** Never write README §11 content on the engineer's behalf.
 8. **Infra.** Never provision min-instances > 0, a load balancer, a NAT, Redis or Cloud SQL, a static IP, a VPC connector, a VM, a GKE cluster, an Artifact Registry remote repository, or user-managed secret replication. Before any `terraform apply`, run `terraform show -no-color tfplan | rg -n 'min_instance|google_compute_router_nat|google_compute_global_address|google_compute_forwarding_rule|google_redis|google_sql|google_compute_address|google_vpc_access_connector|google_compute_instance|google_container_cluster|google_compute_region_network_endpoint_group|google_compute_backend_service|REMOTE_REPOSITORY|user_managed'` and STOP if anything matches.
 9. **Clock.** Tests that depend on "now" use `FakeClock(datetime(2026, 10, 19, 4, 0, tzinfo=UTC))`, which is Monday 07:00 EAT. Manual checks never hard-code a date. Use "the first date D where availability returns ≥ 1 slot".
 10. **Executor tiers.** Tier **S** is mechanical work from an established pattern. Tier **M** is standard implementation work. Tier **E** is the engineer personally (approvals, cloud accounts, §11).
@@ -1630,14 +1630,14 @@ tech debt ledger · honest hours spent
 ### What I used AI for
 <!-- ENGINEER: factual bullets + a per-WP table of how much code was agent-generated vs hand-written -->
 ### An example where AI improved my work
-<!-- ENGINEER: verbatim prompt from the exported session transcript (docs/ai/PROMPTS.md id), what changed, commit SHA -->
+<!-- ENGINEER: verbatim prompt from the exported session transcript (prompt id from the AI usage summary in README §11), what changed, commit SHA -->
 ### An example where AI was wrong or incomplete, and how I caught it
 <!-- ENGINEER: a real entry with its source; how it was caught (test / doc / observation); fix commit -->
 ### Two decisions I made without AI, and why
 <!-- ENGINEER: decision 1 -- must predate or override AI output; cite the message/commit -->
 <!-- ENGINEER: decision 2 -- same rule -->
 ### Note on commits
-AI usage is disclosed here and in docs/ai/PROMPTS.md; commit messages carry no tooling trailers by convention.
+AI usage is summarized here in §11; commit messages carry no tooling trailers by convention.
 ## 12. Run locally
 `make up` · `make test` · env vars table · prerequisites (Docker, uv, pnpm)
 ```

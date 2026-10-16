@@ -18,7 +18,7 @@ Option 2.
 - **Commits:** Conventional Commits, one PR per work package, squash-merge, PR title = commit subject. No trailers of any kind.
 - **Local files:** local tooling directories and personal instruction files are listed in `.git/info/exclude`, which is local and uncommitted. The committed `.gitignore` carries no tooling-specific entries.
 - **Release:** tag `v1.0.0` at submission, and record the SHA in the README.
-- **Disclosure:** README §11 and `docs/ai/PROMPTS.md`.
+- **Disclosure:** README §11 (AI usage is summarized there; the raw prompt log is kept out of git).
   - Prompts come from **exported session transcripts**, not from memory.
   - Each entry records the date, the prompt verbatim, what was accepted, rejected or corrected, and the commit SHA.
   - §11 includes a per-work-package table of how much code was agent-generated versus hand-written.
