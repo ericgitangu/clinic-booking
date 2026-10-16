@@ -1,4 +1,13 @@
 {
   "globs": ["README.md", "docs/**/*.md", "backend/**/*.md", "web/**/*.md", ".github/**/*.md"],
-  "ignores": ["**/node_modules/**", "**/.venv/**", "web/.next/**"]
+  "ignores": ["**/node_modules/**", "**/.venv/**", "web/.next/**"],
+  "config": {
+    "default": true,
+    // MD013 line length is off: prose is one paragraph per line so a diff reads per paragraph,
+    // and wrapping at a fixed width would reflow every doc for no gain (633 lines would trip it).
+    "MD013": false,
+    // MD041 is off for one file: .github/pull_request_template.md starts at "## What" on
+    // purpose, because GitHub puts the PR title above the template body.
+    "MD041": false
+  }
 }

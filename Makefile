@@ -37,7 +37,7 @@ lint: ## markdown, TypeScript, Python (ruff + mypy --strict) and Go, zero warnin
 	$(BE) mypy --strict app tests migrations
 	@if [ -d services/realtime ]; then \
 	  cd services/realtime && test -z "$$(gofmt -l .)" && go vet ./... && golangci-lint run ./...; \
-	fi
+	else echo "skipped: no Go module"; fi
 
 hygiene: ## Repo hygiene: tracked junk, untracked files, AI-code smells
 	bash scripts/repo_hygiene.sh

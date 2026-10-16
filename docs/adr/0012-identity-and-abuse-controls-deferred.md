@@ -26,7 +26,7 @@ Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot p
 
 Option 1.
 
-- **README.** Section 10 of the README states the IDOR, and the phone-exists oracle .
+- **README.** Section 10 of the README states the IDOR, and the phone-exists oracle.
 - **Future auth, as one FastAPI dependency `current_principal`:**
   - The contract doesn't change. `patient_id` stays in the body, a mismatch returns 403, and non-owners get 404 on path resources (anti-enumeration).
   - The ownership check runs before the existence lookup.

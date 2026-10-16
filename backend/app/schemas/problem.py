@@ -83,7 +83,7 @@ def strip_json_from_error_responses(spec: dict[str, object]) -> None:
     honest (the problem+json entry keeps the Problem schema referenced in components)."""
     paths = spec.get("paths", {})
     if not isinstance(paths, dict):
-        return
+        raise TypeError(f"OpenAPI 'paths' must be a mapping, got {type(paths).__name__}")
     for operations in paths.values():
         for operation in operations.values():
             if not isinstance(operation, dict):

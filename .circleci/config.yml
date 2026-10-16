@@ -57,6 +57,12 @@ executors:
     resource_class: small
     working_directory: ~/repo
 
+  lint:
+    docker:
+      - image: mirror.gcr.io/cimg/python:3.12-node
+    resource_class: small
+    working_directory: ~/repo
+
   backend_db:
     docker:
       - image: mirror.gcr.io/cimg/python:3.12
@@ -69,17 +75,31 @@ executors:
     working_directory: ~/repo
 
 jobs:
+  lint:
+    executor: lint
+    steps:
+      - checkout
+      - install_deps
+      - run:
+          name: Install node dependencies
+          command: |
+            sudo npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile --ignore-scripts
+      - run:
+          name: make lint (the same target the pre-push hook runs)
+          command: make lint
+      - run:
+          name: make hygiene
+          command: make hygiene
+      - run:
+          name: Repo hygiene self-test
+          command: bash scripts/repo_hygiene_selftest.sh
+
   backend-quality:
     executor: backend
     steps:
       - checkout
       - install_deps
-      - run:
-          name: ruff + format check
-          command: cd backend && uv run ruff check . && uv run ruff format --check .
-      - run:
-          name: mypy --strict
-          command: cd backend && uv run mypy --strict app tests migrations
       - run:
           name: migration lint (expand-only) + single head
           command: |
@@ -374,9 +394,6 @@ jobs:
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm audit --prod --audit-level high
-            pnpm exec markdownlint-cli2
-            pnpm -C web lint
-            pnpm -C web typecheck
             pnpm -C web test
             pnpm -C web build
       - save_cache:
@@ -439,12 +456,6 @@ jobs:
       - run:
           name: Cost guard self-test (every banned flag and bypass, by mutation)
           command: bash scripts/cost_check_selftest.sh
-      - run:
-          name: Repo hygiene
-          command: bash scripts/repo_hygiene.sh
-      - run:
-          name: Repo hygiene self-test
-          command: bash scripts/repo_hygiene_selftest.sh
 
   cost-check:
     machine:
@@ -470,6 +481,7 @@ workflows:
             equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
+      - lint
       - backend-quality
       - backend-test
       - backend-contract
@@ -487,6 +499,7 @@ workflows:
         - equal: [main, << pipeline.git.branch >>]
         - not: << pipeline.git.tag >>
     jobs:
+      - lint
       - backend-quality
       - backend-test
       - backend-contract
@@ -499,6 +512,7 @@ workflows:
       - build-scan-push:
           context: gcp-deploy
           requires:
+            - lint
             - backend-quality
             - backend-test
             - backend-contract

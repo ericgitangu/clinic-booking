@@ -37,7 +37,7 @@ Option 1.
 - **Trigger:** the GitHub App preset "PR opened or pushed to, default branch and tag pushes".
 - **`pr`:** runs when the branch is not `main` and the pipeline is not a tag.
 - **`release`:** runs when the branch is `main` and the pipeline is not a tag. It runs the same verify jobs, then `build-scan-push → ship-api → ship-web`. `ship-web` is lean core: it deploys the `web` project, whose route handlers are the front door.
-- **Added by the $0 audit:** `release` also runs `cost-check` (after `ship-api`, context `gcp-deploy`, read-only gcloud calls). (`ship-frontdoor` is superseded by the engineer's one-project decision: the proxy deploys with `ship-web`.) `pr` and `release` both run `cost-static` (no credentials). **Added by the hosting lock review:** `release` runs `smoke-public` after `ship-web`, with no context and no credentials, against the public URL (`verify_claims.py --base-url "$PUBLIC_API"`, the docs and`servers` checks, run.app → 403); it is lean core and never cut. `ship-web` and `smoke-public` halt when `ship-api` skipped promotion.
+- **Added by the zero-cost audit:** `release` also runs `cost-check` (after `ship-api`, context `gcp-deploy`, read-only gcloud calls). (`ship-frontdoor` is superseded by the engineer's one-project decision: the proxy deploys with `ship-web`.) `pr` and `release` both run `cost-static` (no credentials). **Added by the hosting lock review:** `release` runs `smoke-public` after `ship-web`, with no context and no credentials, against the public URL (`verify_claims.py --base-url "$PUBLIC_API"`, the docs check, the `servers` check, run.app → 403); it is lean core and never cut. `ship-web` and `smoke-public` halt when `ship-api` skipped promotion.
 
 **Keyless auth, done by hand rather than with an orb.**
 
@@ -93,7 +93,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 - **Self-skipping lanes, not path-filtered workflows.** The web and realtime jobs first run `git diff --name-only origin/main...HEAD` and call `circleci-agent step halt` when their paths are untouched, so a skipped job still reports green and branch protection keeps requiring it. The backend and security lane always runs on PRs. `release` never skips anything.
 - Images are built with `docker buildx build --provenance=false --sbom=false`, so one push is one Artifact Registry version (attestation manifests would add versions, deduced) and the keep-2 rule and the two-version limit hold (cost verifier issue 6). CI never pulls from `*-docker.pkg.dev`: it scans the local build before the push, because Artifact Registry internet egress is billed from byte 0 (issue 5).
 - Short artifact, cache and workspace retention set in Plan → Usage Controls; artifacts limited to JUnit, coverage XML and `zap-report.html`.
-- Docker Official Images and the `cimg/*` executors are pulled through `mirror.gcr.io` (official images by digest), with no Docker Hub login and no `dockerhub-ro` context (engineer, 2026-10-16; ), so there is no Docker Hub credential to hold. Residual: the mirror is a cache of Docker Hub, so a `cimg` tag it has not cached falls through to Docker Hub's anonymous limit; the four tags in use resolved through it when checked (2026-10-16).
+- Docker Official Images and the `cimg/*` executors are pulled through `mirror.gcr.io` (official images by digest), with no Docker Hub login and no `dockerhub-ro` context (engineer, 2026-10-16), so there is no Docker Hub credential to hold. Residual: the mirror is a cache of Docker Hub, so a `cimg` tag it has not cached falls through to Docker Hub's anonymous limit; the four tags in use resolved through it when checked (2026-10-16).
 
 **Web deploy.** `vercel pull --yes --environment=production && vercel build --prod && vercel deploy --prebuilt --prod`. `web/vercel.json` disables Vercel's own Git deployments. Run with `--cwd web`; one project, which carries the proxy, so this job is lean core.
 
@@ -104,7 +104,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 - Bad: `VERCEL_TOKEN` is long-lived. It is project-scoped and rotated after grading. With the proxy inside the `web` project (ADR-0023) it is lean core.
 - Good: `cost-check` turns cost drift (an unset max-instances, a growing image repository, an extra secret version, an `allUsers` binding) into a red release, not a surprise invoice.
 - Bad: about 10-12 minutes per main pipeline (estimate). The realtime lane runs in parallel with `ship-web`; its added wall time is unmeasured.
-- Unverified: whether branch protection requiring CircleCI checks needs a public repo on the current GitHub plan. The repo is public anyway .
+- Unverified: whether branch protection requiring CircleCI checks needs a public repo on the current GitHub plan. The repo is public anyway.
 
 ## Assessment line
 
