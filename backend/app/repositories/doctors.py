@@ -44,3 +44,10 @@ async def all_working_hours_active(session: AsyncSession) -> list[WorkingHours]:
         .order_by(WorkingHours.weekday, WorkingHours.start_time)
     )
     return list(result.scalars().all())
+
+
+async def get_doctor(session: AsyncSession, doctor_id: uuid.UUID) -> Doctor | None:
+    """Fetch a doctor regardless of is_active (e.g. to resolve the clinic tz when
+    cancelling an appointment whose doctor has since been deactivated)."""
+    result = await session.execute(select(Doctor).where(Doctor.id == doctor_id))
+    return result.scalar_one_or_none()

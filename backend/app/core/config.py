@@ -23,6 +23,9 @@ class Settings(BaseSettings):
         env_file=None,
         extra="ignore",
         frozen=True,
+        # Never render the input (which includes the DSN password) into a ValidationError
+        # that could reach startup logs/stderr.
+        hide_input_in_errors=True,
     )
 
     DATABASE_URL: str = Field(..., description="postgresql+asyncpg://…?ssl=require")

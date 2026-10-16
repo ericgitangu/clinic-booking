@@ -773,33 +773,21 @@
           },
           "409": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "503": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Create Appointment",
@@ -836,23 +824,15 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Get Appointment",
@@ -899,33 +879,21 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "409": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Cancel Appointment",
@@ -972,33 +940,21 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "409": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Reschedule Appointment",
@@ -1056,23 +1012,15 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Get Doctor",
@@ -1119,23 +1067,15 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Doctor Availability",
@@ -1192,23 +1132,15 @@
           },
           "409": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Post Patient",
@@ -1257,23 +1189,15 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Patient Appointments",
@@ -1334,22 +1258,11 @@
           },
           "404": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
             "description": "Validation Error"
           }
         },
@@ -1376,13 +1289,9 @@
           },
           "503": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
+              "application/problem+json": {}
             },
-            "description": "Problem (application/problem+json)"
+            "description": "Problem (RFC 9457)"
           }
         },
         "summary": "Readyz",
