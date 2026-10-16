@@ -34,7 +34,12 @@ infra/terraform/terraform.tfvars
 *.tfplan
 tfplan
 
-# local AI prompt log, not committed
-docs/ai/
 
 infra/billing/terraform.tfvars
+
+# build outputs
+dist/
+build/
+out/
+*.egg-info/
+bin/

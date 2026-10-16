@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Base pinned by digest (docs/versions.md, resolved 2026-10-16). Re-resolved at feature freeze.
+# Base pinned by digest (resolved 2026-10-16). Re-resolved at feature freeze.
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
