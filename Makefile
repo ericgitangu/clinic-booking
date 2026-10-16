@@ -9,7 +9,7 @@ help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 up: ## Build and start the stack, wait for health
-	docker compose up -d --wait
+	docker compose up -d --build --wait
 
 down: ## Stop the stack and remove volumes
 	docker compose down -v
