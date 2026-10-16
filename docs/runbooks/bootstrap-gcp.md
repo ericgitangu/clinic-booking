@@ -162,13 +162,16 @@ vercel project add clinic-web --scope "$TEAM"
    mode is **Team** (dashboard-only toggle).
 2. Settings -> General -> Root Directory: leave **empty** (CI passes `--cwd web`). Also confirm Settings -> Functions -> Function Region is **US East (iad1)**; see the first-deploy check below.
 3. Link and read the identifiers:
+
    ```bash
    (cd web && vercel link --yes --project clinic-web --scope "$TEAM")
    cat web/.vercel/project.json            # orgId and projectId; gitignored identifiers
    ```
+
 4. Put `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` in the `vercel-prod` context.
 5. Production environment variables (identifiers only, no secrets). `vercel env add` prompts
    unless the value arrives on stdin:
+
    ```bash
    addenv { printf %s "$2" | vercel env add "$1" production --cwd web --scope "$TEAM"; }
    addenv API_URL "$RUN_APP_URL"
@@ -180,10 +183,13 @@ vercel project add clinic-web --scope "$TEAM"
    addenv RATE_LIMIT_PER_MINUTE 120
    vercel env ls production --cwd web --scope "$TEAM"     # all seven names listed
    ```
+
 6. Read the production URL (Project -> Domains, or `vercel project inspect`), then:
+
    ```bash
    export WEB=https://<clinic-web production domain>
    ```
+
    - add `PUBLIC_BASE_URL=$WEB/api` and `WEB_ORIGIN=$WEB` to the `gcp-deploy` context;
    - write both URLs into `scripts/ci/public-urls.env` (`WEB=` and `RUN_APP_URL=`) and commit
      it **before the first push to `main`**. `smoke-public` fails fast while the placeholders
@@ -220,10 +226,12 @@ enforce it is UNVERIFIED**.
 1. Console -> Billing -> Budgets & alerts -> `clinic-run-spend-cap-3usd`: enable the
    usage-pausing / cap action if the console offers it for this account. Screenshot it.
 2. Confirm both budgets exist:
+
    ```bash
    gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --account "$BILLING_GCLOUD_ACCOUNT" \
      --format='value(displayName)'
    ```
+
    Expected: `clinic-alerts-1usd` and `clinic-run-spend-cap-3usd`.
 3. Record the budget id and the outcome here: `BUDGET_ID=<fill in>`; cap action: `<enabled | not offered>`.
 

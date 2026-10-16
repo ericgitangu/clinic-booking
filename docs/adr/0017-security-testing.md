@@ -4,17 +4,21 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted (the ZAP job is third in the cut order). Amended 2026-10-16: Go gates for stretch S1.
 
 ## Context
+
 We want one non-redundant tool per concern. Each one should be a real gate, not theatre. Nothing may fuzz the production database.
 
 ## Considered options
+
 1. A ZAP baseline after promote, against prod `/docs`.
 2. ZAP API scan against an ephemeral compose stack, before deploy.
 3. No DAST.
 
 ## Decision
+
 Option 2, alongside the static gates below.
 
 | Concern | Tool (version pinned in the CI config) | Where | Gate |
@@ -34,13 +38,16 @@ Option 2, alongside the static gates below.
 **Base-image CVE runbook.** Rebuild on the newest `python:3.12-slim` digest. If the CVE is still unfixed, add a dated `.trivyignore` entry with a justification. The base digest is frozen at feature freeze.
 
 ## Consequences
+
 - Good: the active scan runs against throwaway data and can actually block a deploy.
 - Bad: the machine executor costs more credits. It is the only job that uses one.
 - Rejected: any scan of prod. gosec and govulncheck were rejected while there was no Go; they are adopted with stretch S1 and exist only if S1 ships.
 - The ZAP scan targets the API's OpenAPI document only; the SSE gateway is covered by its unit and integration tests and the post-deploy stream smoke, not by DAST.
 
 ## Assessment line
+
 Section 3: "what the pipeline does".
 
 ## Review trigger
+
 Handling real PII. That means an authenticated API scan against a preview environment.

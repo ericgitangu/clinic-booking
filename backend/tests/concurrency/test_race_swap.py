@@ -35,7 +35,7 @@ async def test_swap_no_5xx_no_double_book(
     reset_appointments: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = make_race_app()
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
         a_id = await _book(c, AMINA, AT_0900)  # A at 09:00 -> wants 10:00
         b_id = await _book(c, WANJIRU, AT_1000)  # B at 10:00 -> wants 09:00

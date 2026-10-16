@@ -5,6 +5,8 @@ Any 5xx is a bug to fix, never a relaxed check.
 
 from __future__ import annotations
 
+from typing import Any
+
 import schemathesis
 from hypothesis import settings
 from schemathesis.checks import (
@@ -23,10 +25,10 @@ _app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", _app)
 
-CHECKS = (not_a_server_error, status_code_conformance, response_schema_conformance)
+CHECKS = [not_a_server_error, status_code_conformance, response_schema_conformance]
 
 
 @schema.parametrize()
 @settings(max_examples=25, deadline=None)
-def test_api(case: schemathesis.Case) -> None:
+def test_api(case: schemathesis.Case[Any]) -> None:
     case.call_and_validate(checks=CHECKS)

@@ -31,7 +31,7 @@ async def test_two_reschedules_one_slot(
     reset_appointments: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = make_race_app()
-    transport = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url=TEST_PUBLIC_BASE_URL) as c:
         a_id = await _book(c, AMINA, AT_0900)
         b_id = await _book(c, WANJIRU, AT_1030)
@@ -52,7 +52,7 @@ async def test_two_reschedules_one_slot(
     assert conflicts[0].json()["code"] in ("SLOT_TAKEN", "CONCURRENT_UPDATE")
 
     # The loser keeps its original slot.
-    transport2 = httpx.ASGITransport(app=app)  # type: ignore[arg-type]
+    transport2 = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport2, base_url=TEST_PUBLIC_BASE_URL) as c:
         a = (await c.get(f"/appointments/{a_id}")).json()
         b = (await c.get(f"/appointments/{b_id}")).json()

@@ -9,7 +9,10 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _indexdef(conn: asyncpg.Connection, name: str) -> str | None:
-    return await conn.fetchval("SELECT indexdef FROM pg_indexes WHERE indexname = $1", name)
+    indexdef: str | None = await conn.fetchval(
+        "SELECT indexdef FROM pg_indexes WHERE indexname = $1", name
+    )
+    return indexdef
 
 
 async def test_doctor_slot_partial_unique_index(owner_conn: asyncpg.Connection) -> None:

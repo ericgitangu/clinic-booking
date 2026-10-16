@@ -4,11 +4,13 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains deferred under ADR-0012.
 
 **Amended 2026-10-16: S3 and S4 are cut by the engineer 2026-10-16, deferred with review trigger.** Review trigger: an admin area that serves more than the unauthenticated aggregates, or observed abuse of the public booking route. The design below is kept unchanged for that day.
 
 ## Context
+
 - **What S1 exposes.** `/admin`, `GET /admin/metrics` and the gateway's `/stream` carry only non-PII aggregates, so they are public until S3 ships. Once an admin area exists it should have an admin boundary.
 - **What the red-team rejected earlier.** Better Auth made the API depend at runtime on the web app's JWKS, needed a second database, and a Google consent screen in Testing mode admits only listed users (ADR-0012).
 - **EventSource cannot set headers.** A browser stream cannot carry `Authorization: Bearer`.
@@ -16,6 +18,7 @@ Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains
 - **Bot protection options.** reCAPTCHA v3 returns a score that needs a threshold tuned on traffic we don't have, and it brings Google tracking and a consent burden for patients. Cloudflare Turnstile is free, does not use the same tracking model, and needs no score threshold. Both providers issue single-use tokens: Google's docs say a reCAPTCHA token is valid for two minutes and can be verified only once (`siteverify` returns `timeout-or-duplicate`), and Turnstile's `siteverify` rejects a reused token the same way. Replay protection is therefore a property of our design, not a point of difference between the two.
 
 ## Considered options
+
 1. **Admin auth:** Auth.js v5 (Google provider) in Next for the session; FastAPI verifies the Google ID token against Google's JWKS with an email allowlist and is the single verifier. How the gateway authenticates is options 4 and 5.
 2. **Admin auth:** Better Auth with its own JWKS (rejected earlier, kept here for the record).
 3. **Admin auth:** Cloud Run IAM (Google-signed identity tokens checked by the platform).
@@ -26,7 +29,9 @@ Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains
 8. **Bot protection:** Turnstile enforced inside FastAPI on `POST /appointments`.
 
 ## Decision
+
 **S3: options 1 and 5.**
+
 - **Session:** Auth.js v5 Google provider, used for `/admin` only. v5 is still published only as a beta (`5.0.0-beta.32`, `npm view next-auth dist-tags` on 2026-10-16), and the library is reported to be in security-patch-only maintenance; we pin the exact beta and accept it as debt because the API's verification does not depend on the web library. The `jwt` callback keeps the Google `id_token` in the encrypted session cookie; client JS never sees it. Next server routes under `/admin/api/*` forward it as `Authorization: Bearer` to FastAPI through the proxy's in-process helper `call-api.ts`. Auth.js runs with `basePath: "/auth"`, because `/api/*` belongs to the proxy.
 - **Verification lives in FastAPI** (`require_admin`): PyJWT with `PyJWKClient` on Google's JWKS, cached with single-flight refetch and a cooldown; RS256 only; `iss` in {`https://accounts.google.com`, `accounts.google.com`}; `aud` equal to our OAuth client id; `exp`; `email_verified`; lowercased email in `ADMIN_EMAILS`. Role, `hd` and other claims are ignored. `aud` alone is not a trust boundary: anyone can mint a Google service-account ID token with any audience, so the `aud` check only rejects tokens meant for other clients, and the real gate is `email_verified` plus the allowlist. This removes the Vercel-JWKS runtime coupling: the API depends only on Google's published keys, and there is no second database.
 - **Stream ticket, not a proxy:** `POST /admin/stream-ticket` returns an HMAC-SHA256 ticket (`v`, `aud: clinic-realtime`, `exp` 60 s; no email, no `jti`). The ticket is reusable until it expires; we state that rather than carry a `jti` that nothing checks. The browser opens `/stream?cursor=...&ticket=...`; the Go gateway checks it with `hmac.Equal`, `aud` and `exp` at connect time only, and the client fetches a fresh ticket before every reconnect. A Next proxy (option 4) would hold a Vercel function open for each stream (billed, duration-capped on Hobby) and add a hop to the long-lived path. The ticket keeps the stream direct to Cloud Run and keeps Go on the standard library with no JWT/JWKS code, so there is one Google-token verifier in the codebase.
@@ -39,11 +44,13 @@ Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains
   - **Amended (ADR-0023):** Cloud Run IAM is now on, but as a cost control with a single service identity (`clinic-web`, the web project's proxy), not as the admin boundary. Browsers and reviewers never hold an IAM token; the front door adds it server-side. The admin boundary is unchanged: Google ID token checks in FastAPI and the ticket in Go.
 
 **S4: option 7.**
+
 - The booking dialog renders the Turnstile widget (`action: "book"`) and posts to the same-origin route `POST /ui/appointments` (moved off `/api/*`, which is the proxy's) (Vercel region `iad1`, near the API in us-east4; amended by the $0 audit, because Hobby allows a single function region and the API moved to North America). The route forwards through the proxy's in-process helper `call-api.ts` (it used to read `API_BASE_URL` = the front-door URL), never to `*.run.app` without an ID token. The route verifies the token with `siteverify` (3 s timeout, fail closed) and checks the returned `hostname` and `action`, then forwards the original body and `Idempotency-Key` to the API and returns the API's response unchanged.
 - **Direct API calls are not bot-protected.** Swagger, curl and scripts bypass the check by design, so reviewers keep working. Option 8 is the real fix and needs API auth first; until then a bot can call the API directly.
 - **Option 6 rejected** for the reasons in Context: v3 is score-only and needs a threshold tuned on traffic we do not have, and it carries Google's tracking and a consent burden for patients. Single-use tokens are not a difference: both providers have them.
 
 ## Consequences
+
 - Good: the admin surface gets a real boundary without a user table, a second DB or a cross-service JWKS dependency.
 - Good: patients and reviewers see no change to the required endpoints.
 - Bad: the ticket travels in a URL and therefore appears in Cloud Run request logs. Mitigated by a 60 s TTL, no email in it, and a stream that carries no PII.
@@ -52,7 +59,9 @@ Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains
 - Bad: the bot check covers only the UI booking route.
 
 ## Assessment line
+
 "Meaningful errors + correct HTTP status codes" (401/403/503 problem types); "Patients book online" (abuse on the UI write path). Both are stretch strengthenings, not brief requirements.
 
 ## Review trigger
+
 Any real patient data or any authenticated patient flow: build patient auth per ADR-0012, then move bot enforcement into the API (option 8). More than a handful of admins, or a need for roles: a clinic IdP with a proper session and refresh tokens.

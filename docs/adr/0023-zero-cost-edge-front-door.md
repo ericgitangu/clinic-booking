@@ -5,9 +5,11 @@
 - Amends: [ADR-0010](0010-thin-nextjs-booking-ui.md) (the web project carries the front door), [ADR-0014](0014-hosting-region-and-cost.md) (region), [ADR-0016](0016-cicd-circleci-keyless-deploy.md) (bootstrap IAM, smoke auth), [ADR-0022](0022-admin-auth-and-bot-protection.md) (the stream path)
 
 ## Status
+
 Accepted, decided by the engineer 2026-10-16: Vercel hosts the frontend and GCP hosts the backend (option 1), with one simplification adopted now: a single Vercel project, the Next.js app in `web/`, carries the front door as route handlers (Decision). (Superseded by the decision. Option 2 remains the documented fallback only if cannot mint an ID token; see Review trigger.) The hosting lock review hardened the implementation inside this decision without re-opening it: static doc routes, exact token-exchange calls, a Vercel bootstrap step, `Location` rewriting, header rules and a credential-free public smoke.
 
 ## Context
+
 - **The rule.** Total cost must be $0, proven from official pricing, not estimated as "low".
 - **Cloud Run egress has one free tier, and it is North America only.** Read from the Cloud Billing Catalog API on 2026-10-16 (service `152E-C115-5142`): "Cloud Run Network Internet Data Transfer Out North America to North America" (SKU `DDFD-AE42-E219`) is $0 for the first 1 GiB, then $0.105/GiB. Its region list includes `us-east1` and `us-east4`. "Internet Data Transfer Out Europe to Europe" is $0.105/GiB, "Intercontinental from/to Africa" is $0.12/GiB and "Africa to Africa" is $0.12/GiB, all from byte 0. **Verified (catalog read, 2026-10-16).**
 - **Our users are in Kenya.** Any response Cloud Run sends straight to a browser or a curl in Kenya is billed from the first byte, whichever region Cloud Run runs in. There is no Cloud Run region where that traffic is free.
@@ -21,17 +23,20 @@ Accepted, decided by the engineer 2026-10-16: Vercel hosts the frontend and GCP 
 - **Cloud Run compute tiers.** The catalog lists `us-east1` and `us-east4` under the Tier 1 SKUs "Services CPU (Request-based billing)" at $0.000024/vCPU-s and memory at $0.0000025/GiB-s, and `europe-west3` under "Services CPU Tier 2" at $0.0000336/vCPU-s. **Verified (catalog read, 2026-10-16).**
 
 ## Considered options
+
 1. **North America, IAM-gated.** Cloud Run (`clinic-api`, `clinic-realtime`) and Artifact Registry in `us-east4`; Neon in `aws-us-east-1`; a Vercel front door in `iad1` is the only public entry point (first drafted as a separate small project, superseded by the single `web` project in the Decision). It forwards every request to Cloud Run with a Google ID token minted through Vercel OIDC → WIF. Cloud Run has no `allUsers` invoker, so every direct request to `*.run.app` is an IAM denial and is not billed. Cloud Run's only egress goes to Vercel, Neon and CircleCI, all inside North America.
 2. **North America, public Cloud Run.** Same regions, `allUsers` invoker kept. Direct hits from Kenya (reviewers, Swagger, scanners) bill Africa egress from byte 0. Sub-cent at demo volume (deduced), but not $0.
 3. **Europe (the earlier plan): europe-west3 + Neon Frankfurt, public.** Tier 2 compute (about 29% less free CPU) and Europe-to-Europe egress from byte 0. Not $0.
 4. **africa-south1 Cloud Run (Tier 1 compute, verified in the catalog today) + Neon Frankfurt.** Africa egress from byte 0, and every one of the 4-6 DB round trips per booking crosses continents. Not $0, and slower.
 
 ## Decision
+
 Option 1.
 
 **Topology.** Browser or curl in Kenya → Vercel edge → the `web` project's proxy function in `iad1` (Washington DC; deduced to sit in AWS us-east-1) → Cloud Run `us-east4` (Ashburn) → Neon `aws-us-east-1` (N. Virginia). The co-location of these three in the Ashburn area is a deduction from their published locations; measures it.
 
 **The front door: route handlers inside the single Vercel project `web/` (decided by the engineer 2026-10-16; not a rewrite).** One Vercel project, one deploy, one OIDC trust, fewer moving parts.
+
 - `web/src/app/api/[...path]/route.ts` with `runtime = "nodejs"`, `dynamic = "force-dynamic"`, `maxDuration = 300`. It strips the `/api` prefix and passes the rest through unchanged, so the brief's REST paths sit under `https://<clinic-web>.vercel.app/api`. `/api/stream` goes to `clinic-realtime` (S1 only); everything else to `clinic-api`. No other route file may live under `web/src/app/api/` (a test and `cost-static` enforce it): S3's Auth.js uses `basePath: "/auth"` and S4's route is `/ui/appointments`.
 - `web/src/app/{docs,redoc,openapi.json}/route.ts` serve Swagger UI, ReDoc and the spec at the web origin root, so reviewers open Swagger at the Vercel URL. `/openapi.json` replaces `servers` with `[{"url": "/api"}]`, so "Try it out" calls the proxy. **Amended by the hosting lock review:** the three routes are `force-static`, built at `next build` from the committed `contracts/openapi.json` (a lean-core CI check keeps it equal to the code), and never fetch from Cloud Run, so no query string or cache miss turns them into Cloud Run egress. `/api/docs`, `/api/redoc` and `/api/openapi.json` answer 308 to them. FastAPI keeps its own fixed `/docs`, `/redoc` and `/openapi.json` for local use and the tag-URL smoke.
 - A minimal static landing page, `web/src/app/page.tsx`, links to `/docs`, `/redoc`, `/openapi.json` and `/api/healthz`. With the proxy it is lean core and it is the public URL; the booking pages (ADR-0010) stay T2 and can be cut without touching either.
@@ -60,6 +65,7 @@ done
 **Superseded design (first $0 draft, kept for the record).** A separate route-handler-only Vercel project `clinic-frontdoor` in `frontdoor/`, with the catch-all `frontdoor/src/app/[[...path]]/route.ts`, its own `vercel.json`, service account `clinic-frontdoor@`, WIF condition `project:clinic-frontdoor` and CI jobs `frontdoor-quality` / `ship-frontdoor`. Merged into `web/` by the engineer's decision (rename map).
 
 ## Consequences
+
 - Good: Cloud Run's internet egress stays inside the only free egress tier, and every request that bypasses the front door costs nothing. Removing `allUsers` is also a security gain: the run.app URLs are no longer an unauthenticated surface.
 - Good: Tier 1 compute (the full 180,000 vCPU-s allowance), and Cloud Run sits next to Neon, so the 4-6 DB round trips per booking stay short.
 - Bad: one extra hop and one extra runtime on every request, plus the front door's own cold start. Kenya to US East is a longer client hop than Kenya to Frankfurt; we estimate about 100-150 ms more per request (unmeasured; publishes cold and warm latency through the front door).
@@ -67,14 +73,16 @@ done
 - Bad: the public REST base gains an `/api` prefix, and S3/S4's server routes move off `/api/*`.
 - Bad: Vercel becomes a T0 dependency. The booking UI pages can still be cut, but the `web` project, its proxy and its landing page cannot. `VERCEL_TOKEN` is therefore lean-core debt.
 - Bad: data residency moves from the EU to the US. The demo data stays synthetic.
-- Bad: a determined flood through the front door of more than about 165,000 requests of the ordinary mix in a month (deduced from about 6.5 KB of Cloud Run egress per request), or about 12,000 of the largest response a client can trigger uncached (recomputed by the hosting lock review; deduced), passes the 1 GiB free egress tier before Vercel's 1M invocation or 1M CDN-request limit pauses the project. That residual is closed by the kill switch; the Cloud Run spend cap bounds it only if it counts network SKUs, which its page does not say. It is recorded and risk .
+- Bad: a determined flood through the front door of more than about 165,000 requests of the ordinary mix in a month (deduced from about 6.5 KB of Cloud Run egress per request), or about 12,000 of the largest response a client can trigger uncached (recomputed by the hosting lock review; deduced), passes the 1 GiB free egress tier before Vercel's 1M invocation or 1M CDN-request limit pauses the project. That residual is closed by the kill switch; the Cloud Run spend cap bounds it only if it counts network SKUs, which its page does not say. It is recorded as a known risk.
 - Good (hosting lock review): the doc routes cost no Cloud Run egress at all, and Swagger always shows the contract of the deployed release.
 - Bad (hosting lock review): every S1 stream needs a ticket that debits a monthly budget, so an abuser can switch the live feed off until the next month (a denial of a stretch feature, not a cost).
 - Bad: S1's stream now holds a Vercel function open for up to 290 s per connection. That uses provisioned memory (counted in the ADR-0014 cost analysis), and reverses ADR-0022's reason for avoiding a proxy.
 - Unverified: OIDC → `generateIdToken` from a federated principal; the Vercel client-IP header name; SSE flushing through the front door; that IAM-denied responses (403, and the 401 a junk bearer gets) add no egress line.
 
 ## Assessment line
+
 "Deploy to any cloud, public URL" (the `web` project's URL is the public URL: REST under `/api`, Swagger at `/docs`), under the engineer's $0 cost rule.
 
 ## Review trigger
+
 Real users outside North America, a custom domain, or traffic near 1 GiB of Cloud Run egress a month: put the API behind a regional external load balancer (always-on, so it needs a budget decision first) or move to a provider with free egress to Africa. If cannot make Vercel OIDC mint an ID token by Gate A, fall back to option 2 and record the egress line in ADR-0014 as a known breach. A second Vercel project is never added for the proxy; if the web project ever has to split, this ADR is re-opened.

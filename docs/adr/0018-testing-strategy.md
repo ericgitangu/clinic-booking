@@ -4,20 +4,25 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted
 
 ## Context
+
 The brief asks for "at least basic test coverage of booking logic". The headline claim, that a slot can never be double-booked, needs evidence that the test really exercises concurrency. A test that would pass even with sequential requests isn't evidence.
 
 ## Considered options
+
 1. Mocked repositories plus SQLite.
 2. A pyramid on real PostgreSQL 17, with a naive control as the only control.
 3. Option 2 plus a lock-waiter overlap proof and a naive check-then-insert control.
 
 ## Decision
+
 Option 3. Everything runs on real Postgres 17: no mocked repositories, no SQLite.
 
 **Layers.**
+
 - **Unit** (`tests/unit`, no DB, `FakeClock`):
   - Slot generation: split shifts, non-working days, edges, the 59/60-minute lead boundary, the horizon, misalignment, and Berlin DST spring-forward and fall-back.
   - The `validate_slot` check order.
@@ -53,11 +58,14 @@ Option 3. Everything runs on real Postgres 17: no mocked repositories, no SQLite
 - **Stretch S2, S4:** vitest for the service-worker caching rules (data routes network-only) and the Turnstile route (forward once on success; no forward on failure or timeout; upstream problems passed through).
 
 ## Consequences
+
 - Good: the README's race claim is backed by two assertions that would each fail if the harness didn't race or the index didn't hold.
 - Bad: slower tests. The test-only sleep hook and `NaiveBookingService` must never ship; they live only under `tests/`.
 
 ## Assessment line
+
 "At least basic test coverage of booking logic".
 
 ## Review trigger
+
 UI regressions. That means a Playwright smoke run against the Vercel production URL.

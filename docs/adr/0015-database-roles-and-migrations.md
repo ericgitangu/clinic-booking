@@ -5,20 +5,25 @@
 - Amended: 2026-10-16, third role `clinic_realtime` for stretch S1
 
 ## Status
+
 Accepted
 
 ## Context
+
 - **Ordering.** Migrations run against the shared production database before the new revision is smoke-tested. A destructive migration would break the live revision even when the smoke test fails.
 - **Privileges.** A runtime that holds DDL rights turns any SQL injection or bug into a schema change.
 
 ## Considered options
+
 1. One role for everything.
 2. Two roles: `clinic_owner` for migrations and `clinic_app` for runtime, each with its own secret and service account.
 3. Option 2 plus an automated N-1 compatibility test.
 4. (Stretch S1) Option 2 plus a read-only `clinic_realtime` role for the Go gateway, with its own secret and service account.
 
 ## Decision
+
 Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 ships.
+
 - **Roles:**
   - `clinic_app` is created in SQL by the owner: `NOSUPERUSER NOCREATEDB NOCREATEROLE`. On Neon this avoids `neon_superuser` inheritance (**unverified**; acceptance checks it).
   - Migration 0001 asserts that the role exists, then grants `SELECT, INSERT, UPDATE` on tables and `USAGE, SELECT` on sequences. It adds matching default privileges. No DELETE is granted.
@@ -36,6 +41,7 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 - **Seed:** `INSERT ... ON CONFLICT (id) DO UPDATE` only. It never deletes.
 
 ## Consequences
+
 - Good: the runtime cannot change the schema (tested: `CREATE TABLE` fails as `clinic_app`).
 - Good: destructive changes need an explicit, reviewed annotation.
 - Bad: two secrets to rotate (three with S1).
@@ -43,7 +49,9 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 - Bad: no automated N-1 test. No previous release tag exists before v1.0.0.
 
 ## Assessment line
+
 Section 3, "which branch deploys and how": migrations-first deploys are safe by construction, not by hope.
 
 ## Review trigger
+
 The first contract (destructive) migration. Adopt the expand/migrate/contract release sequence and the N-1 test before merging it.

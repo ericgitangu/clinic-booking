@@ -12,6 +12,7 @@ This is step 6 of `docs/runbooks/bootstrap-gcp.md`; its shell variables (`PROJEC
    scale-to-zero on (it cannot be disabled on Free). No card.
 3. Note the **direct** host (the one without `-pooler` in its name) and `clinic_owner`'s
    password from the console or `neonctl connection-string`:
+
    ```bash
    export NEON_HOST=ep-xxxxxxxx.us-east-1.aws.neon.tech # direct host, NOT -pooler
    export OWNER_PW=<clinic_owner password from Neon>

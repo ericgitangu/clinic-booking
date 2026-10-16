@@ -53,7 +53,7 @@ def create_app(settings: Settings) -> FastAPI:
         strip_json_from_error_responses(schema)
         return schema
 
-    app.openapi = _openapi  # type: ignore[method-assign]
+    app.openapi = _openapi  # type: ignore[method-assign]  # FastAPI documents replacing openapi() this way
     return app
 
 

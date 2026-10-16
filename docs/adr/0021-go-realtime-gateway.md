@@ -4,9 +4,11 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted (gated stretch S1; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
 ## Context
+
 - **The job.** Hold many long-lived, mostly idle HTTP connections and push a few small events to them. Read one table. Never write, never decide availability.
 - **The platform.** Cloud Run, scale-to-zero, request-based billing (an open stream bills its instance for as long as it is open; ADR-0014 has the arithmetic), a 300 s request timeout we choose to set, Neon Free. LISTEN/NOTIFY is rejected on its merits in ADR-0009 (lossy, needs a change in the booking transaction, a global commit lock, a session held even with no clients), not only because Neon's pooled endpoint lacks it.
 - **What the stream must guarantee.** No skipped and no duplicated events across reconnects, even when transactions commit out of order (ADR-0009's xid8 snapshot-horizon cursor).
@@ -14,13 +16,16 @@ Accepted (gated stretch S1; built only after Gate B, cut last of the stretch ite
 - **The cost of a second language.** A second toolchain, image, CI lane (tests, govulncheck, gosec, trivy), deploy job and set of conventions. ADR-0002 rejected Go for exactly that reason when nothing required it.
 
 ## Considered options
+
 1. SSE inside FastAPI with async generators (same service, same image).
 2. A separate Go service on stdlib `net/http` + pgx v5, its own Cloud Run service.
 3. A managed realtime provider (Pusher or Ably) fed by FastAPI.
 4. A separate Python (FastAPI/Starlette) streaming service.
 
 ## Decision
+
 Option 2, as `services/realtime` (`clinic-realtime`).
+
 - **Why Go for this specific job:**
   - Each idle stream is a parked goroutine (a few KB of stack) rather than an asyncio task plus a Python-level response object, so one small instance holds many more idle streams for the same memory. This is an engineering expectation, not a measurement; records the Cloud Run memory utilization observed during its 30-minute tab test in README section 10.
   - A static binary in a distroless image (expected well under 30 MB; measure with `docker image inspect --format '{{.Size}}'`) starts fast, which matters on a scale-to-zero service whose first request is a browser waiting for a stream.
@@ -33,6 +38,7 @@ Option 2, as `services/realtime` (`clinic-realtime`).
 - **Rejected:** option 1 for the concurrency-sharing reason above; option 3 because it adds a third-party account, keys and a data processor, costs money past its free tier, and still needs our own commit-safe cursor to publish from; option 4 because it pays the cost of a second deploy unit without the runtime advantage that justifies one.
 
 ## Consequences
+
 - Good: booking is isolated from streaming; idle cost is zero (no subscribers, no queries, no instance).
 - Good: the cursor logic is small, pure and unit-testable, and the out-of-order-commit case is tested against real Postgres (ADR-0018).
 - Bad: a second language and deploy unit: a Go CI lane, `govulncheck` and `gosec` (ADR-0017), its own image scan, `ship-realtime` (ADR-0016), and Go conventions
@@ -41,7 +47,9 @@ Option 2, as `services/realtime` (`clinic-realtime`).
 - **What breaks at 10x and 100x.** At 10x (around 20 instances) the DB sees about 20 cursor queries per second and 20-40 held connections against Neon Free's limits, and Neon never suspends while anyone watches. At 100x the per-instance poll load and connection count dominate. The fix is a single relay: one poller publishing to Upstash Redis pub/sub (or Pub/Sub) and instances subscribing, keeping the same cursor as the event id.
 
 ## Assessment line
+
 Section 1 "components, key decisions, trade-offs"; "REST API in FastAPI, DRF or Go" (Go used where its runtime model fits, FastAPI kept as the system of record).
 
 ## Review trigger
+
 More than 5 gateway instances, more than 500 concurrent streams, a cursor query p95 above 50 ms, or Neon connection errors from the gateway: move fan-out to a single relay (Upstash Redis pub/sub or Pub/Sub). If S1 is dropped, or the admin feed is removed later, delete the service rather than keep a second runtime for nothing.

@@ -17,7 +17,9 @@ BRIAN = str(seeded_patient_id("brian"))
 BOOK_AT = "2026-10-26T09:00:00+03:00"
 
 
-def _body(doctor: str = OTIENO, patient: str = AMINA, starts_at: object = BOOK_AT) -> dict:
+def _body(
+    doctor: str = OTIENO, patient: str = AMINA, starts_at: object = BOOK_AT
+) -> dict[str, object]:
     return {"doctor_id": doctor, "patient_id": patient, "starts_at": starts_at}
 
 

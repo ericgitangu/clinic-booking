@@ -4,22 +4,30 @@
   "private": true,
   "description": "Clinic booking monorepo root: git hygiene tooling only.",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint:md": "markdownlint-cli2"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.0",
     "@commitlint/config-conventional": "^19.6.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.2.10"
+    "lint-staged": "^15.2.10",
+    "markdownlint-cli2": "^0.18.1"
   },
   "lint-staged": {
     "backend/**/*.py": [
-      "uv run --project backend ruff check --fix",
+      "uv run --project backend ruff check --fix --exit-non-zero-on-fix",
       "uv run --project backend ruff format"
     ],
     "web/**/*.{ts,tsx}": [
-      "pnpm -C web exec eslint --fix",
+      "pnpm -C web exec eslint --fix --max-warnings=0",
       "pnpm -C web exec prettier --write"
+    ],
+    "**/*.md": [
+      "markdownlint-cli2"
+    ],
+    "**/*.go": [
+      "gofmt -l -w"
     ]
   },
   "pnpm": {

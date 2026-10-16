@@ -4,12 +4,15 @@
 - Deciders: engineering
 
 ## Status
+
 Accepted
 
 ## Context
+
 We looked at tRPC, gRPC, GraphQL, ConnectRPC and REST over HTTP/2, and whether TanStack Query can be combined with tRPC and gRPC. The brief lists REST verbs and paths and asks for HTTP status codes.
 
 ## Considered options
+
 1. tRPC.
 2. GraphQL.
 3. Native gRPC.
@@ -18,6 +21,7 @@ We looked at tRPC, gRPC, GraphQL, ConnectRPC and REST over HTTP/2, and whether T
 6. REST + OpenAPI 3.1 from FastAPI, served over HTTP/2 at the edge.
 
 ## Decision
+
 Option 6. `/docs`, `/redoc` and `/openapi.json` are public in production.
 
 | Option | Verdict | Reason |
@@ -34,11 +38,14 @@ Option 6. `/docs`, `/redoc` and `/openapi.json` are public in production.
 **The stretch Go gateway (ADR-0021) does not change this verdict.** FastAPI and the gateway never call each other; their interface is the `appointment_events` table plus a versioned JSON event schema. With no network hop between the services, gRPC/Connect would add an IDL and a toolchain for nothing. The browser-facing stream is plain SSE over HTTP.
 
 ## Consequences
+
 - Good: the contract is the standard reviewers expect, and Swagger works out of the box.
 - Bad: type safety comes from codegen and a drift gate, not from inference.
 
 ## Assessment line
+
 The Section 2 endpoint list; "correct HTTP status codes".
 
 ## Review trigger
+
 Three or more heterogeneous clients needing different projections means GraphQL. Service-to-service streaming means Connect.
