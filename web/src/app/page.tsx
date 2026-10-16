@@ -1,4 +1,4 @@
-// Static landing page: no client JS. Links to the API docs and health (§12.3).
+// Static landing page: no client JS. Links to the API docs and health.
 export const dynamic = "force-static";
 
 export default function Home() {

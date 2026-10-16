@@ -1,7 +1,7 @@
 """The single source of 'now'.
 
 This is the only module permitted to read the wall clock; ruff bans the time APIs
-everywhere else (ADR-0005). A ``Clock`` is injected so tests are deterministic.
+everywhere else. A ``Clock`` is injected so tests are deterministic.
 """
 
 from __future__ import annotations

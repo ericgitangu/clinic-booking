@@ -1,7 +1,7 @@
 import spec from "@/generated/openapi.public.json";
 
 // Static: prerendered at build from the committed contract (servers: [{"url":"/api"}]).
-// No upstream fetch, so no query string can turn it into Cloud Run egress (§12.4).
+// No upstream fetch, so no query string can turn it into Cloud Run egress.
 export const dynamic = "force-static";
 
 export async function GET(): Promise<Response> {

@@ -2,7 +2,7 @@
 
 Writes are ``INSERT ... ON CONFLICT (id) DO UPDATE`` only. No DELETE, ever: the seed runs
 against live prod on every deploy. Ids are deterministic ``uuid5`` values so reruns update
-in place. The expected working_hours count is 27 (§5); if the DB shows anything else, the
+in place. The expected working_hours count is 27; if the DB shows anything else, the
 seed is wrong, not the number.
 """
 

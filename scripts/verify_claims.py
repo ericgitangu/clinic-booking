@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the live API's claims end to end (WP-12).
+"""Verify the live API's claims end to end.
 
 Creates its own patients, drives the real booking flow against --base-url, prints a PASS/FAIL
 table and exits non-zero on any FAIL. The same script runs in CI (with a CI-only invoker

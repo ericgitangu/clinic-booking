@@ -1,5 +1,5 @@
 // prebuild: snapshot the committed contract with servers rewritten to the proxy path, so the
-// static /openapi.json never fetches from Cloud Run (§12.4). Kept fresh by WP-09's check.
+// static /openapi.json never fetches from Cloud Run. The contract-drift check keeps it fresh.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

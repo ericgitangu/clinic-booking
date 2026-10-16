@@ -1,5 +1,5 @@
 # Vercel -> GCP via WIF. The web project's proxy mints a Google ID token for Cloud Run
-# directly (generateIdToken), so clinic-web gets the OpenID-token-creator role (ADR-0023).
+# directly (generateIdToken), so clinic-web gets the OpenID-token-creator role.
 resource "google_iam_workload_identity_pool" "vercel" {
   workload_identity_pool_id = "vercel"
   display_name              = "Vercel"
@@ -25,7 +25,7 @@ locals {
   vercel_principal = "principal://iam.googleapis.com/projects/${var.project_number}/locations/global/workloadIdentityPools/vercel/subject/owner:${var.vercel_team}:project:clinic-web:environment:production"
 }
 
-# Direct federated generateIdToken (unverified until Part C acceptance; K38). Fallback if the
+# Direct federated generateIdToken (unverified until the first live Vercel deploy). Fallback if the
 # direct call is denied: swap this role for roles/iam.workloadIdentityUser (a superset that
 # includes iam.serviceAccounts.getOpenIdToken) on the same principal, same single call.
 resource "google_service_account_iam_member" "vercel_mint_id_token" {

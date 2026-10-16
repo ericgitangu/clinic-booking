@@ -1,7 +1,7 @@
 # One email channel + one alert on Cloud Run sent bytes summed per day across the project.
 # Threshold 30 MB/day (~1 GiB/month is ~34.6 MB/day). Alerting is free until >= 2027-09-01
-# (then $0.35/metric-reference/month); delete this policy + channel or re-run the §13 proof
-# before 2027-08-01 (§13.6). No uptime checks.
+# (then $0.35/metric-reference/month); delete this policy + channel or re-verify the cost
+# before 2027-08-01. No uptime checks.
 resource "google_monitoring_notification_channel" "email" {
   display_name = "clinic-alert-email"
   type         = "email"

@@ -1,7 +1,6 @@
-"""Property-based contract tests (WP-09).
-
-Schemathesis drives every operation in the committed spec and asserts the three checks the
-plan names. Any 5xx is a bug to fix, never a relaxed check.
+"""Property-based contract tests: Schemathesis drives every operation in the committed spec
+and asserts status-code conformance, response-schema conformance and no server errors.
+Any 5xx is a bug to fix, never a relaxed check.
 """
 
 from __future__ import annotations

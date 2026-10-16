@@ -1,4 +1,4 @@
-"""RFC 9457 problem+json schema and the exhaustive ProblemCode enum (ADR-0006, §6).
+"""RFC 9457 problem+json schema and the exhaustive ProblemCode enum.
 
 ProblemCode is explicit (type-safe, gives the generated client an exhaustive union) and a
 test asserts it matches the catalogue so the two never drift.
@@ -66,7 +66,7 @@ class ProblemEntry(BaseModel):
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, object]]:
     """Declare error responses with the real media type. The ``{"model": ...}`` shortcut is
     hard-wired to application/json in FastAPI, but the handler emits
-    application/problem+json (ADR-0006), so the content type is set explicitly here."""
+    application/problem+json, so the content type is set explicitly here."""
     return {
         status: {
             "model": Problem,

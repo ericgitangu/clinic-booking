@@ -1,4 +1,4 @@
-"""Audit-event field construction (ADR-0009). Pure: no I/O, no clock reads.
+"""Audit-event field construction. Pure: no I/O, no clock reads.
 
 local_date is the clinic-local date of to_starts_at (from_starts_at for a cancel);
 from_local_date is set only when a reschedule crosses clinic-local days.

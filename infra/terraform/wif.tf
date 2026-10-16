@@ -1,4 +1,4 @@
-# CircleCI -> GCP via Workload Identity Federation (keyless deploy, ADR-0016).
+# CircleCI -> GCP via Workload Identity Federation (keyless deploy).
 resource "google_iam_workload_identity_pool" "circleci" {
   workload_identity_pool_id = "circleci"
   display_name              = "CircleCI"

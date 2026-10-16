@@ -1,4 +1,4 @@
-"""CORS configuration (§6). Starlette's CORSMiddleware is pure ASGI (not BaseHTTPMiddleware)."""
+"""CORS configuration. Starlette's CORSMiddleware is pure ASGI (not BaseHTTPMiddleware)."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """Application factory.
 
-Doc URLs are fixed (§12.4): root_path is empty and the spec/docs live at the documented
+Doc URLs are fixed: root_path is empty and the spec/docs live at the documented
 paths. The public web origin serves static copies of the committed contract; FastAPI's own
 routes stay for local use and the tag-URL smoke.
 """

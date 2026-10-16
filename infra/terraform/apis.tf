@@ -1,7 +1,7 @@
 # Enabled APIs only. Paid image scanners and the managed build service are intentionally
 # excluded: Artifact Analysis bills per image with no free tier, and the build service makes
-# extra buckets/repos outside the free regions ($0 audit, ADR-0016). Image scanning stays in
-# CI (Trivy). Adding any API here is recounted against §13.
+# extra buckets/repos outside the free regions. Image scanning stays in
+# CI (Trivy). Re-check the free-tier cost before enabling any API here.
 
 locals {
   services = [

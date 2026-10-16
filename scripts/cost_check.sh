@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# $0 cost guards (WP-12a, section 13).
+# $0 cost guards.
 #   --static  source/config lint, no credentials. Exit 1 on any FAIL.
 #   --live    read-only gcloud plus one unauthenticated curl against prod
 #             (the engineer's `make cost-check`). Exit 1 on any FAIL.
 #
-# --live is DRAFTED AND NOT YET EXECUTED against a real project: the gcloud JSON field
-# paths below come from the plan (cost-control table C1..C18) and are marked unverified until
-# WP-00 (j) / first live run confirms them. A path that is wrong must be fixed, never dropped.
+# --live is NOT YET EXECUTED against a real project: the gcloud JSON field paths below
+# (checks C1..C18) are unverified until the first live run confirms them. A path that is
+# wrong must be fixed, never dropped.
 #
 set -uo pipefail
 

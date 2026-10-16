@@ -1,4 +1,4 @@
-"""The problem catalogue endpoints (§6 rows 3-4)."""
+"""The problem catalogue endpoints (list of codes and per-code lookup)."""
 
 from __future__ import annotations
 

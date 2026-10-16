@@ -4,7 +4,7 @@ Revision ID: 0001
 Revises:
 Create Date: 2026-10-16
 
-DDL is hand-written and expand-only (ADR-0015). Partial indexes, CHECKs and grants go
+DDL is hand-written and expand-only. Partial indexes, CHECKs and grants go
 through raw SQL; autogenerate is not used.
 """
 

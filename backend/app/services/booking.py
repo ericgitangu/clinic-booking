@@ -66,7 +66,7 @@ async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment
 async def _clinic_tz(
     session: AsyncSession, doctor_id: uuid.UUID, *, require_active: bool = True
 ) -> ZoneInfo:
-    # Reschedule requires the doctor to still be active (§6 row 12 -> UNKNOWN_DOCTOR);
+    # Reschedule requires the doctor to still be active (else UNKNOWN_DOCTOR);
     # cancel does not (you can always cancel, even if the doctor was since deactivated).
     doctor = (
         await doctor_repo.get_active_doctor(session, doctor_id)

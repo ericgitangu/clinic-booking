@@ -1,4 +1,4 @@
-"""Case 3 (§3.4): two reschedules into one free slot -> one wins, loser keeps its slot."""
+"""Two reschedules into one free slot: exactly one wins and the loser keeps its original slot."""
 
 from __future__ import annotations
 
