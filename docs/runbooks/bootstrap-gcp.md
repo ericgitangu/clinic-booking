@@ -9,21 +9,34 @@ account is a different one, so **every `gcloud` call passes `--account`**:
 
 ```bash
 export PROJECT=sil-clinic-booking
-export GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com
-export BILLING_ACCOUNT=<dedicated billing account id>   # Paid, not a Free Trial
+export GCLOUD_ACCOUNT=the.ace.guru@gmail.com                  # project Owner: every IAM, Terraform and WIF step
+export BILLING_GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com   # billing and budget steps only
+export BILLING_ACCOUNT=01C382-12CD13-DCA6EF                     # SHARED "Firebase Payment" account (PLAN 11.1 Q1, Q14)
 export REGION=us-east4
 ```
+
+The two accounts are not interchangeable. `the.ace.guru` is the project Owner (the project was
+created there because `developer.ericgitangu` hit Google's project-creation quota). `developer`
+holds only `roles/editor` on the project and `roles/billing.projectManager`, so it runs the
+billing and budget steps and nothing that sets IAM. The billing account is shared with four
+other projects: read PLAN.md §13.8 before relying on "$0".
 
 Every `bootstrap.sh` mode is re-runnable and honours `DRY_RUN=1` (prints each command, runs
 nothing). Dry-run first, read the output, then run it for real.
 
-## 0. Project and billing
+## 0. Project and billing: DONE (2026-10-16)
+
+`bootstrap.sh project` has been run. Do not run it again. Recorded facts, read live by the
+main session (not re-created here): project `sil-clinic-booking`, number `291652953712`,
+ACTIVE; Owner `the.ace.guru@gmail.com`; linked to the shared billing account
+`01C382-12CD13-DCA6EF`, `billingEnabled=True`; APIs enabled: serviceusage,
+cloudresourcemanager, storage, run. The project was created as `the.ace.guru` because
+`developer.ericgitangu` hit Google's project-creation quota; no dedicated billing account could
+be opened (5 of 5 slots in use), which is the engineer's decision.
 
 ```bash
-DRY_RUN=1 bash infra/bootstrap.sh project
-bash infra/bootstrap.sh project          # creates the project, links billing, enables the bootstrap APIs
-export PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --account "$GCLOUD_ACCOUNT" --format='value(projectNumber)')
-echo "$PROJECT_NUMBER"
+export PROJECT_NUMBER=291652953712
+gcloud projects describe "$PROJECT" --account "$GCLOUD_ACCOUNT" --format='value(projectNumber,lifecycleState)'   # read-only check
 ```
 
 Why the APIs here: `gcloud run deploy` would otherwise stop at an interactive "enable API?"
@@ -32,8 +45,11 @@ anything else. Terraform owns every other API after step 4.
 
 ## 1. Terraform state bucket
 
+Dry-run first (prints each command, runs nothing), then run it as the Owner:
+
 ```bash
-bash infra/bootstrap.sh state
+DRY_RUN=1 PROJECT="$PROJECT" GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" bash infra/bootstrap.sh state
+PROJECT="$PROJECT" GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" bash infra/bootstrap.sh state
 ```
 
 ## 2. GitHub repository and CircleCI
@@ -57,13 +73,12 @@ bash infra/bootstrap.sh state
 ## 3. CircleCI contexts
 
 Organization Settings -> Contexts. A job that references a context that does not exist fails
-at start, and every workflow job references one, so create all four before the first push to
+at start, so create all three before the first push to
 `main`.
 
 | Context | Variables | Restriction |
 |---|---|---|
 | `gcp-deploy` | `GOOGLE_PROJECT_ID` = `$PROJECT`; `GOOGLE_PROJECT_NUMBER` = `$PROJECT_NUMBER`; `DEPLOYER_SA` = `circleci-deployer@$PROJECT.iam.gserviceaccount.com`; `PUBLIC_BASE_URL` = `$WEB/api` (step 7); `WEB_ORIGIN` = `$WEB` (step 7) | `pipeline.git.branch == "main"` |
-| `dockerhub-ro` | `DOCKERHUB_USER`, `DOCKERHUB_PASS` (a **read-only** access token from a free Docker Hub account: Account Settings -> Personal access tokens) | none (pull-request builds need it) |
 | `vercel-prod` | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (step 7) | `pipeline.git.branch == "main"` |
 | `oidc-probe` | none | none; used only by the negative test below |
 
@@ -76,21 +91,21 @@ export GCP_DEPLOY_CONTEXT_ID=<uuid of gcp-deploy>
 
 ## 4. Terraform
 
-Terraform and its `gcs` backend use Application Default Credentials, **not** `--account`.
-Point them at the engineer's account and project explicitly:
+Terraform and its `gcs` backend do not read `--account`. `gcloud auth application-default login`
+takes no account flag either, so it would sign in as whoever you pick in the browser. Pin the
+identity instead with an access token minted for the account and verify it:
 
 ```bash
-gcloud auth application-default login --account "$GCLOUD_ACCOUNT"
-gcloud auth application-default set-quota-project "$PROJECT"
-# alternative without touching the ADC file:
-#   export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$GCLOUD_ACCOUNT")
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$GCLOUD_ACCOUNT")
+# the token is short-lived (1 h); re-export when Terraform reports 401. Confirm the identity first:
+curl -s "https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN" | jq -r .email   # must print the.ace.guru@gmail.com
 ```
 
 ```bash
 cd infra/terraform
 terraform init -backend-config="bucket=clinic-tfstate-$PROJECT"
 cp terraform.tfvars.example terraform.tfvars    # gitignored; identifiers only, no secrets
-$EDITOR terraform.tfvars   # project_number, billing_account, circleci_org_id,
+$EDITOR terraform.tfvars   # project_number (291652953712), circleci_org_id,
                            # circleci_project_id, circleci_gcp_deploy_context_id
 terraform plan -out tfplan
 bash ../plan_gate.sh tfplan      # cost gate: exits non-zero on any banned resource, or if it cannot run
@@ -100,6 +115,19 @@ cd ../..
 
 `plan_gate.sh` fails closed: a missing `rg`, a failing `terraform show` or an empty plan is a
 failure. Do not apply unless it printed `plan_gate: clean`.
+
+This apply also removes `roles/editor` from the default Compute service account
+(`default_sa.tf`, `google_project_default_service_accounts` with `DEPRIVILEGE`); the plan should
+show an update of that resource and no deletion. Our services never use that account (every
+deploy passes `--service-account`). Verify afterwards (read-only):
+
+```bash
+gcloud projects get-iam-policy "$PROJECT" --account "$GCLOUD_ACCOUNT" --format=json \
+  | jq -r --arg m "serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+      '[.bindings[] | select(.role == "roles/editor") | .members[] | select(. == $m)] | length'
+```
+
+Expected: `0` (`make cost-check` C20 asserts the same). UNVERIFIED until applied.
 
 ## 5. Cloud Run service and invoker bindings
 
@@ -163,7 +191,28 @@ vercel project add clinic-web --scope "$TEAM"
 
 ## 8. Spend cap (before the first push to main)
 
-Terraform creates two budgets: `clinic-alerts-1usd` (alerts) and `clinic-run-spend-cap-3usd`
+The budgets live in their own Terraform root, `infra/billing`, because creating them needs
+billing rights on the shared account, which only `developer.ericgitangu` has (whether
+`roles/billing.projectManager` is enough to create budgets is UNVERIFIED; if the apply is
+refused, create them in the console with the same names and amounts). Run it as the billing
+user, after step 4 has enabled `billingbudgets.googleapis.com`:
+
+```bash
+# pin the billing identity with a token (ADC login has no account flag), then verify it
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token --account "$BILLING_GCLOUD_ACCOUNT")
+# the token is short-lived (1 h); re-export when Terraform reports 401. Confirm the identity first:
+curl -s "https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN" | jq -r .email   # must print developer.ericgitangu@gmail.com
+cd infra/billing
+terraform init -backend-config="bucket=clinic-tfstate-$PROJECT"
+cp terraform.tfvars.example terraform.tfvars   # already holds the shared account id and project number
+terraform plan -out tfplan && bash ../plan_gate.sh tfplan
+terraform apply tfplan
+cd ../..
+```
+
+It creates two budgets: `clinic-alerts-1usd` (alerts, on this project's gross spend, **not** the
+whole account: the account already bills about $5 a month for the other projects, PLAN.md
+§13.8) and `clinic-run-spend-cap-3usd`
 (a **gross** $3 budget scoped to this project and Cloud Run, credits excluded). Neither the
 Terraform provider nor the CLI has any attribute that pauses or caps usage, so turning the
 second one into an enforced cap is a console action, and **whether this billing account can
@@ -173,7 +222,7 @@ enforce it is UNVERIFIED**.
    usage-pausing / cap action if the console offers it for this account. Screenshot it.
 2. Confirm both budgets exist:
    ```bash
-   gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --account "$GCLOUD_ACCOUNT" \
+   gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --account "$BILLING_GCLOUD_ACCOUNT" \
      --format='value(displayName)'
    ```
    Expected: `clinic-alerts-1usd` and `clinic-run-spend-cap-3usd`.
@@ -210,8 +259,8 @@ Save the log URLs of the two negative tests (WIF deny, context deny) here:
 
 ```bash
 # read-only live guards; GCLOUD_ACCOUNT makes every call use your account, BILLING_ACCOUNT
-# enables the budget checks (C11, C14), NEON_PROJECT_ID enables C13 (otherwise reported as SKIP)
-GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check
+# and BILLING_GCLOUD_ACCOUNT enable the budget checks (C11, C14), NEON_PROJECT_ID enables C13 (otherwise reported as SKIP)
+GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" BILLING_GCLOUD_ACCOUNT="$BILLING_GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check
 ```
 
 ## Accepted risks

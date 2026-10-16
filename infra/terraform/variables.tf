@@ -14,11 +14,6 @@ variable "region" {
   description = "Cloud Run / Artifact Registry region (Tier 1, North America free egress)."
 }
 
-variable "billing_account" {
-  type        = string
-  description = "Billing account id for the budget (dedicated account, Paid, no Free Trial)."
-}
-
 variable "circleci_org_id" {
   type        = string
   description = "CircleCI organization id (OIDC issuer segment and audience)."

@@ -85,7 +85,7 @@ these are the current digests, re-resolved at freeze.
 |---|---|---|---|
 | cimg/python (backend-test primary) | `cimg/python:3.12` (tracks 3.12.x; `3.12.13` available, matches local) | Docker Hub tags API | 2026-10-16 |
 | cimg/postgres (backend-test secondary) | `cimg/postgres:17.11` (latest 17.x) | Docker Hub tags API | 2026-10-16 |
-| Docker Official Images in CI | pulled from `mirror.gcr.io/library/...` by digest; `dockerhub-ro` context as login fallback | ADR-0016, §8 rule 11 | 2026-10-16 |
+| Docker Official Images in CI | pulled from `mirror.gcr.io/library/...` by digest; `cimg/*` also through `mirror.gcr.io`; no Docker Hub login | ADR-0016, §8 rule 11 | 2026-10-16 |
 
 ## 6. Security tool versions
 

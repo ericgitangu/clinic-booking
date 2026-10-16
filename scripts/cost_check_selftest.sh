@@ -148,6 +148,14 @@ for t in 'invoker_iam_disabled = true' 'scaling_mode = "MANUAL"' 'manual_instanc
   expect_fail "terraform: $t" "terraform banned resource or API" tf "$t"
 done
 
+echo "== default service account =="
+expect_fail "ship-api deploy without --service-account" "run deploy missing --service-account: ship-api" mutate_sub "$CI" 's/ --service-account "clinic-api-runtime@[^"]*"//'
+expect_fail "migrate job without --service-account" "run deploy missing --service-account" mutate_sub "$CI" 's/ --service-account "clinic-migrate@[^"]*"//'
+expect_fail "bootstrap service shell without --service-account" "run deploy missing --service-account: infra/bootstrap.sh" mutate_sub infra/bootstrap.sh 's/--service-account "clinic-api-runtime/--svc-acct "clinic-api-runtime/'
+expect_fail "deprivilege resource deleted" "does not DEPRIVILEGE" mutate_write infra/terraform/default_sa.tf '# removed'
+expect_fail "deprivilege action changed" "does not DEPRIVILEGE" mutate_sub infra/terraform/default_sa.tf 's/"DEPRIVILEGE"/"NONE"/'
+expect_fail "deprivilege only in a comment" "does not DEPRIVILEGE" mutate_write infra/terraform/default_sa.tf '# resource "google_project_default_service_accounts" "d" { action = "DEPRIVILEGE" }'
+
 echo "== web =="
 VJ=web/vercel.json
 expect_fail "vercel.json second region"  "vercel.json not pinned" mutate_sub "$VJ" 's/"iad1"/"iad1", "sfo1"/'
@@ -187,7 +195,8 @@ for t in 'google_compute_router_nat' 'google_sql_database_instance' 'scaling_mod
 done
 gate "empty plan"   2 __EMPTY__
 gate "missing plan" 2 __MISSING__
-rc=0; PATH=/usr/bin:/bin bash "$PG" --text "$WORK/pristine/.circleci/config.yml" >/dev/null 2>&1 || rc=$?
+mkdir -p "$WORK/nopath"
+rc=0; PATH="$WORK/nopath" /bin/bash "$PG" --text "$WORK/pristine/.circleci/config.yml" >/dev/null 2>&1 || rc=$?
 if [ "$rc" = 2 ]; then ok "plan_gate: no ripgrep on PATH -> exit 2 (fails closed)"; else bad "plan_gate: no ripgrep (exit $rc, want 2)"; fi
 
 echo

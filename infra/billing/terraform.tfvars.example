@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars. Identifiers only; no secrets.
+project_id      = "sil-clinic-booking"
+project_number  = "291652953712"
+billing_account = "01C382-12CD13-DCA6EF"
