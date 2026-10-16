@@ -1,0 +1,12 @@
+title = "clinic-booking gitleaks config"
+
+# Use the full default ruleset (covers AWS keys, generic high-entropy secrets, etc.).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe paths and placeholders"
+paths = [
+  '''\.env\.example$''',
+  '''docs/.*''',
+]
