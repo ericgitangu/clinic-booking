@@ -12,11 +12,18 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "idempotency-key",
 ]);
 
-// Node fetch decompresses the upstream body, so copying these would corrupt it.
-const DROP_RESPONSE = new Set([
-  "content-encoding",
-  "content-length",
-  "transfer-encoding",
+// Only these upstream response headers reach the browser. Copying the rest would leak the
+// *.run.app origin and platform headers (set-cookie, server, x-cloud-trace-context,
+// www-authenticate, the API's CORS headers) through the public domain. content-encoding and
+// content-length are excluded on purpose: Node fetch has already decompressed the body.
+const FORWARDED_RESPONSE_HEADERS = new Set([
+  "content-type",
+  "cache-control",
+  "location",
+  "retry-after",
+  "x-request-id",
+  "server-timing",
+  "idempotent-replayed",
 ]);
 
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PATCH", "OPTIONS"]);
@@ -39,10 +46,16 @@ export type Upstream =
 // A decoded catch-all segment must be a plain path component: it is joined into the upstream
 // URL, so anything that could change its meaning (separators, query, fragment, dot segments,
 // control characters) is rejected rather than forwarded.
+//
+// Next decodes the catch-all parameter once. A '%' that is still present therefore means the
+// client double-encoded something ("%252e%252e" arrives as "%2e%2e"), and the URL parser used
+// by fetch would decode it again into a real ".." and collapse it, so the path we classified
+// (and rate-limited, and picked an audience for) would not be the path Cloud Run receives.
+// None of this API's path segments (UUIDs, slugs) contains a '%'.
 function isSafeSegment(segment: string): boolean {
   if (segment === "" || segment === "." || segment === "..") return false;
   // eslint-disable-next-line no-control-regex
-  return !/[/\\?#\u0000-\u001f\u007f]/.test(segment);
+  return !/[/\\?#%\u0000-\u001f\u007f]/.test(segment);
 }
 
 export function resolveUpstream(segments: string[]): Upstream {
@@ -118,6 +131,48 @@ async function readCappedBody(
   return body;
 }
 
+// The URL actually requested must keep the host and the exact path that was classified. Any
+// difference (a dot segment the parser collapsed, an authority change) is refused.
+export function buildTarget(
+  baseUrl: string,
+  upstreamPath: string,
+  search: string,
+): URL | null {
+  try {
+    const base = new URL(baseUrl);
+    const basePath = base.pathname.replace(/\/$/, "");
+    const target = new URL(base.origin + basePath + upstreamPath + search);
+    if (
+      target.origin !== base.origin ||
+      target.pathname !== basePath + upstreamPath
+    )
+      return null;
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+// A Location from the API is root-relative ("/appointments/x") or, if some layer made it
+// absolute, points at the upstream origin. Either way the browser must stay on /api.
+export function rewriteLocation(location: string, baseUrl: string): string {
+  if (location.startsWith("/")) return "/api" + location;
+  try {
+    const base = new URL(baseUrl);
+    const abs = new URL(location);
+    if (abs.origin === base.origin) {
+      const basePath = base.pathname.replace(/\/$/, "");
+      const rest = abs.pathname.startsWith(basePath)
+        ? abs.pathname.slice(basePath.length)
+        : abs.pathname;
+      return "/api" + rest + abs.search + abs.hash;
+    }
+  } catch {
+    // not an absolute URL: leave it as it was
+  }
+  return location;
+}
+
 export async function forward(
   req: Request,
   opts: ForwardOptions,
@@ -131,8 +186,14 @@ export async function forward(
   }
 
   const doFetch = opts.fetchImpl ?? fetch;
-  const search = new URL(req.url).search;
-  const target = opts.baseUrl.replace(/\/$/, "") + opts.upstreamPath + search;
+  const target = buildTarget(
+    opts.baseUrl,
+    opts.upstreamPath,
+    new URL(req.url).search,
+  );
+  if (!target) {
+    return problem(404, "NOT_FOUND", "Not found");
+  }
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {
@@ -158,7 +219,7 @@ export async function forward(
 
   let upstream: Response;
   try {
-    upstream = await doFetch(target, init);
+    upstream = await doFetch(target.toString(), init);
   } catch (err) {
     if (
       err instanceof DOMException &&
@@ -175,11 +236,11 @@ export async function forward(
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
-    if (!DROP_RESPONSE.has(key)) responseHeaders.set(key, value);
+    if (FORWARDED_RESPONSE_HEADERS.has(key)) responseHeaders.set(key, value);
   });
   const location = upstream.headers.get("location");
-  if (location && location.startsWith("/")) {
-    responseHeaders.set("location", "/api" + location);
+  if (location) {
+    responseHeaders.set("location", rewriteLocation(location, opts.baseUrl));
   }
 
   return new Response(upstream.body, {

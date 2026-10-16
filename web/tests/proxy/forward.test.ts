@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { forward, resolveUpstream } from "@/lib/proxy/forward";
+import {
+  buildTarget,
+  forward,
+  resolveUpstream,
+  rewriteLocation,
+} from "@/lib/proxy/forward";
 
 interface Captured {
   url?: string;
@@ -234,5 +239,140 @@ describe("forward failure handling", () => {
     expect(new TextDecoder().decode(cap.init!.body as Uint8Array)).toBe(
       '{"a":1}',
     );
+  });
+});
+
+describe("double-encoded traversal", () => {
+  // Next decodes the catch-all once, so "%252e%252e" reaches resolveUpstream as "%2e%2e".
+  const encoded: [string, string[]][] = [
+    ["lowercase %2e%2e", ["x", "%2e%2e", "stream"]],
+    ["uppercase %2E%2E", ["x", "%2E%2E", "docs"]],
+    ["leading %2e%2e", ["%2e%2e", "healthz"]],
+    ["single %2e", ["x", "%2e", "y"]],
+    ["mixed .%2e", ["x", ".%2e", "y"]],
+    ["encoded slash %2f", ["x%2fy"]],
+    ["encoded backslash %5c", ["x%5cy"]],
+    ["encoded NUL %00", ["x%00"]],
+    ["encoded question mark %3f", ["x%3fy"]],
+    ["a bare percent", ["100%"]],
+  ];
+  it.each(encoded)("%s -> notfound", (_label, segments) => {
+    expect(resolveUpstream(segments)).toEqual({ kind: "notfound" });
+  });
+});
+
+describe("buildTarget refuses any path the URL parser would rewrite", () => {
+  const base = "https://api.example.run.app";
+  it.each([
+    ["/x/%2e%2e/stream"],
+    ["/x/%2E%2E/docs"],
+    ["/%2e%2e/healthz"],
+    ["/x/../stream"],
+    ["/x/./y"],
+  ])("%s -> null", (path) => {
+    expect(buildTarget(base, path, "")).toBeNull();
+  });
+
+  it("accepts ordinary API paths and keeps the query", () => {
+    expect(
+      buildTarget(
+        base,
+        "/doctors/abc/availability",
+        "?date=2026-10-26",
+      )?.toString(),
+    ).toBe(
+      "https://api.example.run.app/doctors/abc/availability?date=2026-10-26",
+    );
+  });
+
+  it("forward() answers 404 and sends nothing upstream for a crafted path", async () => {
+    let called = false;
+    const spy = (async () => {
+      called = true;
+      return new Response("x");
+    }) as unknown as typeof fetch;
+    const res = await forward(new Request("https://web.example/api/x"), {
+      baseUrl: base,
+      upstreamPath: "/x/%2e%2e/stream",
+      fetchImpl: spy,
+    });
+    expect(res.status).toBe(404);
+    expect(called).toBe(false);
+  });
+});
+
+describe("response headers are allowlisted", () => {
+  it("drops platform and cookie headers, keeps the documented ones", async () => {
+    const upstream = new Response("ok", {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "retry-after": "2",
+        "x-request-id": "rid",
+        "server-timing": "app;dur=1",
+        "idempotent-replayed": "true",
+        "set-cookie": "a=b",
+        server: "Google Frontend",
+        "x-cloud-trace-context": "abc/1",
+        "www-authenticate": "Bearer",
+        "access-control-allow-origin": "https://run.app",
+      },
+    });
+    const res = await forward(new Request("https://web.example/api/x"), {
+      baseUrl: "https://api.example.run.app",
+      upstreamPath: "/x",
+      fetchImpl: (async () => upstream) as unknown as typeof fetch,
+    });
+    for (const kept of [
+      "content-type",
+      "cache-control",
+      "retry-after",
+      "x-request-id",
+      "server-timing",
+      "idempotent-replayed",
+    ]) {
+      expect(res.headers.has(kept), kept).toBe(true);
+    }
+    for (const dropped of [
+      "set-cookie",
+      "server",
+      "x-cloud-trace-context",
+      "www-authenticate",
+      "access-control-allow-origin",
+    ]) {
+      expect(res.headers.has(dropped), dropped).toBe(false);
+    }
+  });
+});
+
+describe("rewriteLocation", () => {
+  const base = "https://api.example.run.app";
+  it.each([
+    ["/appointments/x", "/api/appointments/x"],
+    ["https://api.example.run.app/appointments/x", "/api/appointments/x"],
+    [
+      "https://api.example.run.app/appointments/x?a=1#f",
+      "/api/appointments/x?a=1#f",
+    ],
+    ["https://elsewhere.example/x", "https://elsewhere.example/x"],
+  ])("%s -> %s", (input, expected) => {
+    expect(rewriteLocation(input, base)).toBe(expected);
+  });
+
+  it("an absolute Location on the run.app origin never reaches the browser", async () => {
+    const res = await forward(
+      new Request("https://web.example/api/appointments", { method: "POST" }),
+      {
+        baseUrl: base,
+        upstreamPath: "/appointments",
+        fetchImpl: (async () =>
+          new Response(null, {
+            status: 201,
+            headers: { location: `${base}/appointments/abc` },
+          })) as unknown as typeof fetch,
+      },
+    );
+    expect(res.headers.get("location")).toBe("/api/appointments/abc");
   });
 });
