@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { firstDoctor, hhmm, patientOf, pick } from "./api";
 
 // Each scenario takes its own day from pick(n), so scenarios can run in parallel. Run against the
-// stand-in API by default and against the real one in CI (E2E_API_URL), see playwright.config.ts.
+// real API and database (docker compose), see playwright.config.ts.
 
 // Next adds its own role=alert route announcer; ours are the ones inside the page.
 const alertOf = (page: Page) =>
@@ -95,8 +95,20 @@ test("a double booking says the time was just taken and offers the next free tim
   await expect(alert).toContainText("That time was just taken.");
   await expect(alert).toContainText("Here are the next free times");
   // A suggested time leads straight to a details page for that time, and it books.
-  await alert.getByRole("link").first().click();
-  await expect(b.page).toHaveURL(/\/details\?starts_at=/);
+  // Slow the browser's navigation to the details page, as a busy runner or a bad connection would:
+  // the confirm click must wait for the suggested time's page, never land on the old one.
+  await b.page.route(/\/book\/[^/]+\/details/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  const suggestion = alert.getByRole("link").first();
+  const suggestedHref = await suggestion.getAttribute("href");
+  await suggestion.click();
+  // The page is already on a details URL (for the taken time), so wait for the suggested one,
+  // otherwise the next click can land on the old page.
+  await expect(b.page).toHaveURL(
+    (u) => u.pathname + u.search === suggestedHref,
+  );
   await b.page.getByRole("button", { name: "Confirm booking" }).click();
   await expect(
     b.page.getByRole("heading", { name: "You are booked" }),

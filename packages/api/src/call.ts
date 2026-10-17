@@ -1,24 +1,58 @@
-// The server-side call to the clinic API, for server components and server actions. It does what
-// the /api proxy does for the browser: mint a Cloud Run ID token on Vercel, send it in
-// x-serverless-authorization, and nothing else from the caller. Locally (no VERCEL_ENV) the
-// request goes to API_URL as it is.
-import type { z } from "zod";
+// The server-side call to the clinic API, for server components and server actions.
+//
+// Every call goes through the generated SDK, so the request is checked against the generated zod
+// schema before anything is sent, and a successful response against the schema for that operation.
+// A problem+json error body is checked against the generated Problem schema and its `code` is one
+// of the generated ProblemCode values. Anything that does not match is contract drift: it is logged
+// as a structured `contract_violation` event (operation, status and the paths of the zod issues,
+// never a value) and surfaced as a generic failure. Each call parses its body once.
+import { ZodError } from "zod";
+import { createClient, createConfig, type Client } from "./generated/client";
+import type { ProblemCode } from "./generated/types.gen";
+import { zProblem } from "./generated/zod.gen";
 import { mintIdToken, minting_enabled } from "./proxy/gcp-id-token";
 import { logError } from "./proxy/log";
 
-export type ApiFailure = {
-  ok: false;
-  status: number;
-  code: string;
-  detail: string;
-};
+export type { ProblemCode } from "./generated/types.gen";
+
+// A field that failed request validation, by name and zod issue code (never the value).
+export type FieldIssue = { field: string; code: string };
+
+export type ApiFailureCode =
+  | ProblemCode
+  | "CONTRACT_VIOLATION"
+  | "UPSTREAM_AUTH_FAILED"
+  | "UPSTREAM_UNREACHABLE"
+  | "API_NOT_CONFIGURED";
+
+export type ApiFailure =
+  | {
+      ok: false;
+      kind: "problem";
+      status: number;
+      code: ProblemCode;
+      detail: string;
+    }
+  // 422-style: the request did not match the generated schema, so nothing was sent.
+  | {
+      ok: false;
+      kind: "invalid_request";
+      status: 422;
+      code: "VALIDATION_ERROR";
+      issues: FieldIssue[];
+    }
+  | {
+      ok: false;
+      kind: "contract_violation";
+      status: 502;
+      code: "CONTRACT_VIOLATION";
+    }
+  | { ok: false; kind: "unavailable"; status: number; code: ApiFailureCode };
+
 export type ApiSuccess<T> = { ok: true; status: number; data: T };
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
 
-export interface CallOptions<S extends z.ZodType> {
-  method?: "GET" | "POST" | "PATCH";
-  body?: unknown;
-  schema: S;
+export interface CallOptions {
   // Seconds Next may reuse a GET response; omit for always fresh.
   revalidate?: number;
   timeoutMs?: number;
@@ -26,80 +60,141 @@ export interface CallOptions<S extends z.ZodType> {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
-function failure(status: number, code: string, detail: string): ApiFailure {
-  return { ok: false, status, code, detail };
+// What a generated SDK function resolves to, whichever branch it took.
+type SdkOutcome<D> = {
+  data?: D;
+  error?: unknown;
+  request?: Request;
+  response?: Response;
+};
+
+class UpstreamAuthError extends Error {}
+
+function issuePaths(err: ZodError): string {
+  return err.issues
+    .slice(0, 10)
+    .map((i) => i.path.join(".") || "(root)")
+    .join(",");
 }
 
-export async function callApi<S extends z.ZodType>(
-  path: string,
-  opts: CallOptions<S>,
-): Promise<ApiResult<z.infer<S>>> {
-  const base = (process.env.API_URL ?? "").replace(/\/+$/, "");
-  if (!base) return failure(503, "API_NOT_CONFIGURED", "API_URL is not set");
+function violation(
+  operation: string,
+  status: number | undefined,
+  where: string,
+  err?: ZodError,
+): ApiFailure {
+  logError("contract_violation", {
+    operation,
+    status,
+    where,
+    paths: err ? issuePaths(err) : undefined,
+  });
+  return {
+    ok: false,
+    kind: "contract_violation",
+    status: 502,
+    code: "CONTRACT_VIOLATION",
+  };
+}
 
-  const headers: Record<string, string> = { accept: "application/json" };
-  if (opts.body !== undefined) headers["content-type"] = "application/json";
-  if (minting_enabled()) {
-    try {
-      const token = await mintIdToken(process.env.API_AUDIENCE ?? "clinic-api");
-      headers["x-serverless-authorization"] = `Bearer ${token}`;
-    } catch (err) {
-      logError("api call: upstream auth failed", {
-        detail: String(err).slice(0, 200),
-      });
-      return failure(502, "UPSTREAM_AUTH_FAILED", "Could not authenticate");
+function unavailable(status: number, code: ApiFailureCode): ApiFailure {
+  return { ok: false, kind: "unavailable", status, code };
+}
+
+export async function callApi<D>(
+  operation: string,
+  run: (client: Client) => Promise<SdkOutcome<D>>,
+  opts: CallOptions = {},
+): Promise<ApiResult<D>> {
+  const baseUrl = (process.env.API_URL ?? "").replace(/\/+$/, "");
+  if (!baseUrl) return unavailable(503, "API_NOT_CONFIGURED");
+
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const client = createClient(
+    createConfig({
+      baseUrl,
+      throwOnError: false,
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req = new Request(input, init);
+        if (minting_enabled()) {
+          try {
+            const token = await mintIdToken(
+              process.env.API_AUDIENCE ?? "clinic-api",
+            );
+            req.headers.set("x-serverless-authorization", `Bearer ${token}`);
+          } catch (err) {
+            logError("api call: upstream auth failed", {
+              operation,
+              detail: String(err).slice(0, 200),
+            });
+            throw new UpstreamAuthError();
+          }
+        }
+        const cacheable = opts.revalidate !== undefined && req.method === "GET";
+        return fetch(req, {
+          signal: AbortSignal.timeout(timeoutMs),
+          ...(cacheable
+            ? { next: { revalidate: opts.revalidate } }
+            : { cache: "no-store" as const }),
+        });
+      },
+    }),
+  );
+
+  const out = await run(client);
+
+  if (out.error === undefined) {
+    if (out.data === undefined)
+      return violation(operation, out.response?.status, "empty response");
+    return { ok: true, status: out.response?.status ?? 200, data: out.data };
+  }
+
+  const { error, response } = out;
+  if (error instanceof ZodError) {
+    // No response yet: the request validator refused to send it.
+    if (!response) {
+      const issues = error.issues.map((i) => ({
+        // issue paths start with the part of the request ("body", "path", "query")
+        field: String(i.path[1] ?? i.path[0] ?? "request"),
+        code: i.code,
+      }));
+      return {
+        ok: false,
+        kind: "invalid_request",
+        status: 422,
+        code: "VALIDATION_ERROR",
+        issues,
+      };
     }
+    return violation(operation, response.status, "response", error);
   }
+  if (error instanceof UpstreamAuthError)
+    return unavailable(502, "UPSTREAM_AUTH_FAILED");
+  if (!response) return unavailable(503, "UPSTREAM_UNREACHABLE");
 
-  let resp: Response;
-  try {
-    resp = await fetch(`${base}${path}`, {
-      method: opts.method ?? "GET",
-      headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-      ...(opts.revalidate !== undefined && (opts.method ?? "GET") === "GET"
-        ? { next: { revalidate: opts.revalidate } }
-        : { cache: "no-store" as const }),
-    });
-  } catch (err) {
-    logError("api call: request failed", {
-      path,
-      detail: String(err).slice(0, 200),
-    });
-    return failure(
-      503,
-      "UPSTREAM_UNREACHABLE",
-      "The booking service did not answer",
-    );
-  }
+  // An error status: the body must be a problem+json that matches the generated schema.
+  const problem = zProblem.safeParse(error);
+  if (!problem.success)
+    return violation(operation, response.status, "problem", problem.error);
+  return {
+    ok: false,
+    kind: "problem",
+    status: response.status,
+    code: problem.data.code,
+    detail: problem.data.detail,
+  };
+}
 
-  let json: unknown = null;
-  try {
-    json = await resp.json();
-  } catch {
-    // an empty or non-JSON body is handled below
-  }
-
-  if (!resp.ok) {
-    const p = (json ?? {}) as { code?: unknown; detail?: unknown };
-    return failure(
-      resp.status,
-      typeof p.code === "string" ? p.code : "UNKNOWN",
-      typeof p.detail === "string" ? p.detail : "",
-    );
-  }
-  const parsed = opts.schema.safeParse(json);
-  if (!parsed.success) {
-    logError("api call: response did not match the contract", {
-      path,
-      detail: parsed.error.issues[0]?.path.join(".") ?? "",
-    });
-    return failure(
-      502,
-      "CONTRACT_MISMATCH",
-      "Unexpected response from the booking service",
-    );
-  }
-  return { ok: true, status: resp.status, data: parsed.data };
+// Checks a request body against a generated schema before any call, so a form can show field
+// errors without a round trip and without creating anything on the way. Same issue shape as callApi.
+export function checkRequest(
+  schema: { safeParse: (v: unknown) => { success: boolean; error?: ZodError } },
+  value: unknown,
+): FieldIssue[] {
+  const r = schema.safeParse(value);
+  if (r.success || !r.error) return [];
+  return r.error.issues.map((i) => ({
+    field: String(i.path[0] ?? "request"),
+    code: i.code,
+  }));
 }
