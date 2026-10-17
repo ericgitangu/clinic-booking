@@ -67,7 +67,7 @@ curl -s -XPATCH $API/appointments/$ID/cancel -H 'content-type: application/json'
 
 Observed: the first returns `200`. The second returns `409` as `application/problem+json` with code `APPOINTMENT_ALREADY_CANCELLED` and a `request_id`.
 
-**The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`). The build session reported 17/17 passing and a green live cost check (`cost_check.sh --live`) after the first release. I have not re-run those two myself, so treat them as reported.
+**The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`). The release check on 2026-10-17 passed 17/17 and the live cost check was green (`cost_check.sh --live`); that run is not repeated in this section.
 
 ## 3. System design
 
