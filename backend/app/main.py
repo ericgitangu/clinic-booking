@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
+from app.api.deps import bind_clinic_zone
 from app.api.routers import admin, appointments, doctors, health, me, patients, problems
 from app.core.config import Settings
 from app.core.cors import add_cors
@@ -41,14 +42,17 @@ def create_app(settings: Settings) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(problems.router)
-    app.include_router(doctors.router)
-    app.include_router(patients.router)
-    app.include_router(appointments.router)
-    app.include_router(admin.router)
-    app.include_router(admin.identity_router)
-    app.include_router(admin.manage_router)
-    app.include_router(admin.access_router)
-    app.include_router(me.router)
+    # Routers whose responses carry timestamps bind the clinic's zone first; health and
+    # problems do not touch the database.
+    zoned = [Depends(bind_clinic_zone)]
+    app.include_router(doctors.router, dependencies=zoned)
+    app.include_router(patients.router, dependencies=zoned)
+    app.include_router(appointments.router, dependencies=zoned)
+    app.include_router(admin.router, dependencies=zoned)
+    app.include_router(admin.identity_router, dependencies=zoned)
+    app.include_router(admin.manage_router, dependencies=zoned)
+    app.include_router(admin.access_router, dependencies=zoned)
+    app.include_router(me.router, dependencies=zoned)
 
     # Error responses carry only application/problem+json in the served spec, too.
     _default_openapi = app.openapi

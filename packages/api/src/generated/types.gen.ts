@@ -256,7 +256,7 @@ export type Availability = {
     /**
      * Slot Minutes
      */
-    slot_minutes?: 30;
+    slot_minutes?: number;
     /**
      * Slots
      */
@@ -626,7 +626,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -781,6 +781,14 @@ export type WorkingWindow = {
 
 export type CreateAppointmentAppointmentsPostData = {
     body: AppointmentCreate;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.
+         */
+        'Idempotency-Key'?: string | null;
+    };
     path?: never;
     query?: never;
     url: '/appointments';
@@ -803,7 +811,7 @@ export type CreateAppointmentAppointmentsPostErrors = {
 
 export type CreateAppointmentAppointmentsPostResponses = {
     /**
-     * Successful Response
+     * Created, or the earlier booking replayed for the same Idempotency-Key
      */
     201: Appointment;
 };
@@ -975,6 +983,12 @@ export type DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData = {
          * Date
          */
         date: string;
+        /**
+         * Slot Minutes
+         *
+         * Slot length in minutes: 5 to 1440 and a divisor of 1440. Defaults to 30.
+         */
+        slot_minutes?: number;
     };
     url: '/doctors/{doctor_id}/availability';
 };
@@ -1493,6 +1507,14 @@ export type MyAppointmentsInternalMeAppointmentsGetResponse = MyAppointmentsInte
 
 export type BookMineInternalMeAppointmentsPostData = {
     body: MeAppointmentCreate;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.
+         */
+        'Idempotency-Key'?: string | null;
+    };
     path?: never;
     query?: never;
     url: '/internal/me/appointments';
@@ -1527,7 +1549,7 @@ export type BookMineInternalMeAppointmentsPostErrors = {
 
 export type BookMineInternalMeAppointmentsPostResponses = {
     /**
-     * Successful Response
+     * Created, or the earlier booking replayed for the same Idempotency-Key
      */
     201: Appointment;
 };

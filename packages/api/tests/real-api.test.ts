@@ -118,6 +118,90 @@ describe.skipIf(!REAL)("against the real API", () => {
     });
   });
 
+  it("sends the Idempotency-Key to the API: a retry returns the same appointment, a different time is refused", async () => {
+    expect(
+      process.env.INTERNAL_SIGNING_KEY,
+      "INTERNAL_SIGNING_KEY",
+    ).toBeTruthy();
+    const suffix = Math.random().toString(36).slice(2, 10);
+    const caller = {
+      sub: `idem-${suffix}`,
+      email: `idem-${suffix}@example.test`,
+      role: "patient",
+      emailVerified: true,
+    };
+    const linked = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Idempotent Person" },
+        }),
+      { caller },
+    );
+    expect(linked.ok).toBe(true);
+
+    const key = `real-${suffix}`;
+    const book = (startsAt: string, idempotencyKey: string) =>
+      callApi(
+        "bookMine",
+        (client) =>
+          sdk.bookMineInternalMeAppointmentsPost({
+            client,
+            body: { doctor_id: doctorId, starts_at: startsAt },
+            headers: { "Idempotency-Key": idempotencyKey },
+          }),
+        { caller },
+      );
+
+    const first = await book(slots[1], key);
+    expect(first).toMatchObject({ ok: true, status: 201 });
+    if (!first.ok) return;
+
+    // The response was "lost": the same attempt is sent again with the same key.
+    const replay = await book(slots[1], key);
+    expect(replay).toMatchObject({ ok: true, status: 201 });
+    expect(replay.ok && replay.data.id).toBe(first.data.id);
+
+    // Without the key the same request is a conflict with the patient's own booking, which is
+    // what the key prevents.
+    const keyless = await callApi(
+      "bookMine",
+      (client) =>
+        sdk.bookMineInternalMeAppointmentsPost({
+          client,
+          body: { doctor_id: doctorId, starts_at: slots[1] },
+        }),
+      { caller },
+    );
+    expect(keyless).toMatchObject({ ok: false, kind: "problem", status: 409 });
+
+    // The same key for a different time is a different request.
+    const reused = await book(slots[3], key);
+    expect(reused).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 422,
+      code: "IDEMPOTENCY_KEY_REUSED",
+    });
+
+    // A malformed key is refused as a validation error, by the client schema or the API.
+    const malformed = await book(slots[1], "has a space");
+    expect(malformed).toMatchObject({ ok: false, status: 422 });
+
+    const cleanup = await callApi(
+      "cancelMine",
+      (client) =>
+        sdk.cancelMineInternalMeAppointmentsAppointmentIdCancelPatch({
+          client,
+          path: { appointment_id: first.data.id },
+          body: { reason: "idempotency test cleanup" },
+        }),
+      { caller },
+    );
+    expect(cleanup.ok && cleanup.data.status).toBe("cancelled");
+  });
+
   it("books, refuses a double booking, cancels, refuses a second cancel and a reschedule of a cancelled one", async () => {
     const phone = `+2547${Math.floor(Math.random() * 1e8)
       .toString()

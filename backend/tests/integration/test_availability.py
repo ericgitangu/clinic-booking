@@ -74,3 +74,27 @@ async def test_availability_uses_local_day_bounds(
     tue = await client.get(f"/doctors/{did}/availability?date=2026-10-27")
     tue_starts = {s["starts_at"] for s in tue.json()["slots"]}
     assert any("T09:00:00+03:00" in s for s in tue_starts)  # next day unaffected
+
+
+async def test_availability_slot_minutes_parameter(client: httpx.AsyncClient) -> None:
+    did = seeded_doctor_id("otieno")
+    base = (await client.get(f"/doctors/{did}/availability?date=2026-10-26")).json()
+    hourly = await client.get(f"/doctors/{did}/availability?date=2026-10-26&slot_minutes=60")
+    assert hourly.status_code == 200
+    body = hourly.json()
+    assert body["slot_minutes"] == 60
+    assert len(body["slots"]) == len(base["slots"]) // 2
+    first = body["slots"][0]
+    start = datetime.fromisoformat(first["starts_at"])
+    assert datetime.fromisoformat(first["ends_at"]) - start == timedelta(minutes=60)
+
+
+@pytest.mark.parametrize("value", ["0", "-30", "1", "7", "25", "1441", "99999", "abc", ""])
+async def test_availability_rejects_unusable_slot_minutes(
+    client: httpx.AsyncClient, value: str
+) -> None:
+    did = seeded_doctor_id("otieno")
+    resp = await client.get(f"/doctors/{did}/availability?date=2026-10-26&slot_minutes={value}")
+    assert resp.status_code == 422, resp.text
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert resp.json()["code"] == "VALIDATION_ERROR"

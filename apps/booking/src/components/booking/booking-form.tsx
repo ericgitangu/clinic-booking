@@ -7,6 +7,7 @@ import { bookAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
 import { NextSlots } from "@/components/booking/next-slots";
 import { StickyCta } from "@/components/booking/sticky-cta";
+import { useAttemptKey } from "@/components/booking/use-attempt-key";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
 
@@ -26,6 +27,9 @@ export function BookingForm({
     initialState,
   );
   const getToken = useRecaptcha("book");
+  // One key for this booking attempt (this doctor and time): sent again if the same attempt is
+  // retried, replaced when the person picks a different time.
+  const attemptKey = useAttemptKey(`${doctorId}|${startsAt}`);
   // Until the page has hydrated a submit would be a plain browser form post. The button stays off
   // until the handler is attached.
   const [ready, setReady] = useState(false);
@@ -44,6 +48,7 @@ export function BookingForm({
     >
       <input type="hidden" name="doctor_id" value={doctorId} />
       <input type="hidden" name="starts_at" value={startsAt} />
+      <input type="hidden" name="idempotency_key" value={attemptKey} />
 
       {state.status === "error" ? (
         <div

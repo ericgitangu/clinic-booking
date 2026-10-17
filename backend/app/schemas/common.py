@@ -9,13 +9,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from pydantic import AwareDatetime, BeforeValidator, PlainSerializer
 
-# v1 is single-clinic; its zone is the output offset (timestamps are rendered in the clinic offset).
-# TD: a multi-clinic API would thread each appointment's clinic tz instead of this constant.
-CLINIC_TZ = ZoneInfo("Africa/Nairobi")
+from app.core.clinic_zone import current_clinic_zone
 
 
 def _require_str(value: object) -> object:
@@ -28,9 +25,12 @@ def _require_str(value: object) -> object:
 # AwareDatetime must sit next to datetime; the str guard wraps it (runs first on input).
 StrAwareDatetime = Annotated[datetime, AwareDatetime, BeforeValidator(_require_str)]
 
-# Output instants rendered in the clinic offset (+03:00), consistently for fresh writes and
-# DB reads alike. Stays a date-time in the schema (return_type=datetime).
+# Output instants rendered in the clinic's offset, consistently for fresh writes and DB reads
+# alike. The zone is the one bound for the request from clinics.timezone (see bind_clinic_zone).
+# Stays a date-time in the schema (return_type=datetime).
 ClinicDatetime = Annotated[
     datetime,
-    PlainSerializer(lambda d: d.astimezone(CLINIC_TZ), return_type=datetime, when_used="json"),
+    PlainSerializer(
+        lambda d: d.astimezone(current_clinic_zone()), return_type=datetime, when_used="json"
+    ),
 ]

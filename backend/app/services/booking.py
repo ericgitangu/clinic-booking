@@ -4,6 +4,7 @@ import asyncio
 import random
 import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -19,18 +20,27 @@ from app.domain.errors import (
     AppointmentAlreadyStarted,
     AppointmentNotFound,
     ConcurrentUpdate,
+    PatientDoubleBooked,
+    SlotTaken,
     UnknownDoctor,
     UnknownPatient,
 )
 from app.domain.events import booked_event, cancelled_event, rescheduled_event
+from app.domain.idempotency import check_replay, request_fingerprint
+from app.domain.slots import SLOT
 from app.models.appointment import Appointment
 from app.repositories import appointments as appt_repo
 from app.repositories import doctors as doctor_repo
 from app.repositories import events as event_repo
 from app.repositories import patients as patient_repo
-from app.repositories.errors import map_integrity_error
+from app.repositories.errors import IdempotencyKeyRaced, map_integrity_error
 
-SLOT = timedelta(minutes=30)
+
+@dataclass(frozen=True)
+class Booked:
+    appointment: Appointment
+    # True when an Idempotency-Key matched an earlier booking and that booking is returned as is.
+    replayed: bool = False
 
 
 async def _after_write(session: AsyncSession) -> None:
@@ -39,7 +49,7 @@ async def _after_write(session: AsyncSession) -> None:
     return None
 
 
-async def _run_txn(session: AsyncSession, fn: Callable[[], Awaitable[Appointment]]) -> Appointment:
+async def _run_txn[T](session: AsyncSession, fn: Callable[[], Awaitable[T]]) -> T:
     """Run a write transaction, retrying once on a deadlock or serialization failure.
 
     The asyncpg dialect raises those as a plain ``DBAPIError``, so the decision is made on the
@@ -81,6 +91,27 @@ async def _clinic_tz(
     return ZoneInfo(clinic.timezone)
 
 
+async def _replay(
+    session: AsyncSession, patient_id: uuid.UUID, key: str, fingerprint: str
+) -> Appointment | None:
+    """The appointment this key already created for this patient, if any.
+
+    Raises IDEMPOTENCY_KEY_REUSED for a different payload and IDEMPOTENCY_KEY_CONSUMED once the
+    appointment has left ``booked``; the stored row is otherwise the replay.
+    """
+    stored = await appt_repo.get_by_idempotency_key(session, patient_id, key)
+    if stored is None:
+        return None
+    # Both columns are set together (ck_appt_idempotency_pair), so a row found by key has a
+    # fingerprint.
+    check_replay(
+        stored_fingerprint=stored.request_fingerprint or "",
+        stored_status=stored.status,
+        fingerprint=fingerprint,
+    )
+    return stored
+
+
 async def book(
     session: AsyncSession,
     clock: Clock,
@@ -89,10 +120,18 @@ async def book(
     doctor_id: uuid.UUID,
     patient_id: uuid.UUID,
     starts_at: datetime,
-) -> Appointment:
+    idempotency_key: str | None = None,
+) -> Booked:
     lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    fingerprint = request_fingerprint(doctor_id, starts_at) if idempotency_key is not None else None
 
-    async def _do() -> Appointment:
+    async def _do() -> Booked:
+        # Replays are answered before any validation: a retry after the slot has since passed
+        # or been rescheduled still gets the booking it made.
+        if idempotency_key is not None and fingerprint is not None:
+            prior = await _replay(session, patient_id, idempotency_key, fingerprint)
+            if prior is not None:
+                return Booked(prior, replayed=True)
         doctor = await doctor_repo.get_active_doctor(session, doctor_id)
         if doctor is None:
             raise UnknownDoctor()
@@ -115,6 +154,8 @@ async def book(
             patient_id=patient_id,
             starts_at=starts_at,
             ends_at=starts_at + SLOT,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint,
         )
         await event_repo.insert_event(
             session,
@@ -123,9 +164,26 @@ async def book(
             fields=booked_event(starts_at, tz),
         )
         await _after_write(session)
-        return appt
+        return Booked(appt)
 
-    return await _run_txn(session, _do)
+    try:
+        return await _run_txn(session, _do)
+    except (SlotTaken, PatientDoubleBooked, IdempotencyKeyRaced) as conflict:
+        if idempotency_key is None or fingerprint is None:
+            if isinstance(conflict, IdempotencyKeyRaced):  # pragma: no cover - needs a key
+                raise ConcurrentUpdate() from conflict
+            raise
+        # Step 2: on any unique violation re-check the key before reporting a conflict.
+        # Postgres may name the doctor-slot index first even when the real cause is a duplicate
+        # of this very request, and a lost response must never read as "your slot was taken".
+        async with session.begin():
+            winner = await _replay(session, patient_id, idempotency_key, fingerprint)
+        if winner is not None:
+            return Booked(winner, replayed=True)
+        if isinstance(conflict, IdempotencyKeyRaced):
+            # The key row existed a moment ago and cannot have been removed (no DELETE grant).
+            raise ConcurrentUpdate() from conflict  # pragma: no cover
+        raise
 
 
 async def cancel(

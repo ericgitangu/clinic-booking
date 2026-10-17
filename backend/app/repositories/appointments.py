@@ -22,6 +22,17 @@ async def get_for_update(session: AsyncSession, appointment_id: uuid.UUID) -> Ap
     return result.scalar_one_or_none()
 
 
+async def get_by_idempotency_key(
+    session: AsyncSession, patient_id: uuid.UUID, key: str
+) -> Appointment | None:
+    result = await session.execute(
+        select(Appointment).where(
+            Appointment.patient_id == patient_id, Appointment.idempotency_key == key
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def booked_starts_for_doctor(
     session: AsyncSession,
     doctor_id: uuid.UUID,
@@ -46,6 +57,8 @@ async def insert_appointment(
     patient_id: uuid.UUID,
     starts_at: datetime,
     ends_at: datetime,
+    idempotency_key: str | None = None,
+    request_fingerprint: str | None = None,
 ) -> Appointment:
     appt = Appointment(
         id=uuid.uuid4(),
@@ -54,6 +67,8 @@ async def insert_appointment(
         starts_at=starts_at,
         ends_at=ends_at,
         status="booked",
+        idempotency_key=idempotency_key,
+        request_fingerprint=request_fingerprint,
     )
     session.add(appt)
     await session.flush()

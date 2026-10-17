@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
 
 from pydantic import BaseModel
 
@@ -17,5 +16,5 @@ class Availability(BaseModel):
     doctor_id: uuid.UUID
     date: str  # "YYYY-MM-DD"
     timezone: str
-    slot_minutes: Literal[30] = 30
+    slot_minutes: int = 30
     slots: list[Slot]

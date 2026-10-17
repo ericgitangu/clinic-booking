@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import DateOutOfRange, DoctorNotFound
-from app.domain.slots import generate_slots
+from app.domain.slots import SLOT, generate_slots
 from app.repositories.appointments import booked_starts_for_doctor
 from app.repositories.doctors import get_active_doctor, get_clinic, working_hours_for
 from app.schemas.availability import Availability, Slot
@@ -21,6 +21,7 @@ async def get_availability(
     settings: Settings,
     doctor_id: uuid.UUID,
     on_date: date,
+    slot: timedelta = SLOT,
 ) -> Availability:
     doctor = await get_active_doctor(session, doctor_id)
     if doctor is None:
@@ -49,10 +50,11 @@ async def get_availability(
     booked = await booked_starts_for_doctor(session, doctor_id, day_start, next_day_start)
 
     lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
-    slots = generate_slots(windows, booked, tz, on_date, now, lead)
+    slots = generate_slots(windows, booked, tz, on_date, now, lead, slot)
     return Availability(
         doctor_id=doctor_id,
         date=on_date.isoformat(),
         timezone=clinic.timezone,
+        slot_minutes=int(slot.total_seconds() // 60),
         slots=[Slot(starts_at=s.starts_at, ends_at=s.ends_at) for s in slots],
     )

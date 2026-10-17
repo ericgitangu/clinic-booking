@@ -27,6 +27,10 @@ class Appointment(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'booked'"))
     cancellation_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # the client's Idempotency-Key for the POST that created this row, and the sha256
+    # of its canonical request. Both are NULL for a booking made without a key.
+    idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
