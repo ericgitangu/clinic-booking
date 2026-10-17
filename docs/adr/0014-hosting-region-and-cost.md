@@ -96,7 +96,7 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 | Vercel | Hobby | 0 |
 | CircleCI | Free credits (30,000 a month; budget 22,200 worst case) | 0 |
 | Artifact Registry | at most 2 versions per package, < 400 MB (free 0.5 GiB) | 0 |
-| Secret Manager | 3 secrets, 1 active version each (the two database URLs and the internal signing key; 4 during a rotation). The shared account's free versions are already used by other projects, so these bill at $0.06 each, inside the accepted total | about 0.18 (0.24 during a rotation) |
+| Secret Manager | 3 secrets, 1 active version each (the two database URLs and `clinic-internal-signing-key`, now wired to `clinic-api` with `--set-secrets` and managed in Terraform; 4 versions during a rotation). The shared account's free versions are already used by other projects, so these bill at $0.06 each, inside the accepted total | about 0.18 (0.24 during a rotation) |
 | TF state bucket | us-east1, Always Free (5 GB-months) | 0 |
 | Cloud Run `clinic-realtime` (stretch S1) | Free tier in us-east4; 0.25 vCPU per stream; an open stream bills instance time while connected | 0 (deduced; measures one dashboard tab for 30 minutes) |
 | Secret Manager, stretch secrets | up to 2 more (realtime DB URL, stream ticket key); total 4 of 6 | 0 |
@@ -125,3 +125,5 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 ## Review trigger
 
 More than 10 instances means the Neon pooler with `statement_cache_size=0`, tested first. Real Kenyan data means an African-region database. Any Billing report line above $0.00, a Free Tier savings line approaching its limit, or Google changing a free tier (30 days' notice) means re-running the the cost analysis in ADR-0014 proof before the next deploy. Cloud Monitoring alerting charges start no sooner than 2027-09-01 at $0.35 per metric reference a month (cloud.google.com/stackdriver/pricing, verified by the cost verifier 2026-10-16): before 2027-08-01, delete the egress alert policy and its notification channel, or re-run the cost proof in ADR-0014 with that line.
+
+**Amendment, 2026-10-17: the internal signing key reaches the API.** `clinic-internal-signing-key` already existed in Secret Manager with one version; Terraform now adopts it (an `import` block, removed after the first apply) and grants `clinic-api-runtime` `roles/secretmanager.secretAccessor` on that one secret. `ship-api` passes it as `INTERNAL_SIGNING_KEY` and sets `ADMIN_EMAILS`. The secret count stays at 3 (the table above already counted it), so Secret Manager remains about $0.18 a month, $0.24 during a rotation (3 versions at $0.06; 4 while the old one is destroyed), and the accepted total with Artifact Registry stays about $0.28 to $0.34 a month. Nothing new is always-on and no value is in state.

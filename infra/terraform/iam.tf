@@ -118,6 +118,13 @@ resource "google_secret_manager_secret_iam_member" "runtime_app_secret" {
   member    = "serviceAccount:${google_service_account.api_runtime.email}"
 }
 
+# The API verifies the signed assertion with this key; read access to this one secret only.
+resource "google_secret_manager_secret_iam_member" "runtime_signing_key" {
+  secret_id = google_secret_manager_secret.internal_signing_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api_runtime.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "migrate_secret" {
   secret_id = google_secret_manager_secret.database_url_migrate.secret_id
   role      = "roles/secretmanager.secretAccessor"
