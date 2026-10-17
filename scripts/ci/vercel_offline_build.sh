@@ -13,6 +13,10 @@
 # keeps dependencies in the root node_modules, so the function file map is relative to the root
 # and building or deploying with --cwd web fails on missing files.
 #
+# VERCEL_BUILD_TARGET=preview builds a preview-target output, for rehearsing the deploy layout
+# without touching production (a prebuilt output can only be deployed to the target it was
+# built for).
+#
 # Output: .vercel/output at the repo root (the Build Output API tree, no secrets).
 set -euo pipefail
 
@@ -28,5 +32,5 @@ cat > .vercel/project.json <<'JSON'
 JSON
 
 VERCEL_TELEMETRY_DISABLED=1 npm_config_ignore_scripts=true \
-  npx --yes vercel@59.5.0 build --prod
+  npx --yes vercel@59.5.0 build --target="${VERCEL_BUILD_TARGET:-production}"
 test -d .vercel/output

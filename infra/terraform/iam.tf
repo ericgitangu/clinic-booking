@@ -117,3 +117,43 @@ resource "google_secret_manager_secret_iam_member" "migrate_secret" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.migrate.email}"
 }
+
+# ---- read access for the CI cost check (scripts/cost_check.sh --live) ------------------------
+# Each permission below is read-only metadata and exists for exactly one check. The billing
+# checks (budgets, projects on the shared billing account) are NOT covered: they need a billing
+# role on a shared account, which the deployer must never hold, so they run locally.
+
+# C12 reads the egress alert policy; C20 reads the project IAM policy to confirm the default
+# Compute service account has no roles/editor. getIamPolicy shows who holds which role (the
+# bindings are already documented in this public repo); it cannot change anything.
+resource "google_project_iam_custom_role" "cost_check_reader" {
+  role_id     = "clinicCostCheckReader"
+  title       = "Clinic cost check reader"
+  description = "Read the alert policies and the project IAM policy for the CI cost check."
+  permissions = [
+    "monitoring.alertPolicies.get",
+    "monitoring.alertPolicies.list",
+    "resourcemanager.projects.getIamPolicy",
+  ]
+}
+
+resource "google_project_iam_member" "deployer_cost_check_reader" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.cost_check_reader.id
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+# C9 reads the state bucket's location, class and soft-delete setting. Granted on that one
+# bucket, with storage.buckets.get only: no object listing and no object reads.
+resource "google_project_iam_custom_role" "bucket_meta_reader" {
+  role_id     = "clinicBucketMetaReader"
+  title       = "Clinic bucket metadata reader"
+  description = "Read a bucket's configuration (not its objects)."
+  permissions = ["storage.buckets.get"]
+}
+
+resource "google_storage_bucket_iam_member" "deployer_state_bucket_meta" {
+  bucket = "clinic-tfstate-${var.project_id}"
+  role   = google_project_iam_custom_role.bucket_meta_reader.id
+  member = "serviceAccount:${google_service_account.deployer.email}"
+}
