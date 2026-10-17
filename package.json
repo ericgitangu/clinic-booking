@@ -19,9 +19,9 @@
       "uv run --project backend ruff check --fix --exit-non-zero-on-fix",
       "uv run --project backend ruff format"
     ],
-    "web/**/*.{ts,tsx}": [
-      "pnpm -C web exec eslint --fix --max-warnings=0",
-      "pnpm -C web exec prettier --write"
+    "apps/booking/**/*.{ts,tsx}": [
+      "pnpm -C apps/booking exec eslint --fix --max-warnings=0",
+      "pnpm -C apps/booking exec prettier --write"
     ],
     "**/*.md": [
       "markdownlint-cli2"

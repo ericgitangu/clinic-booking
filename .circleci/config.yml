@@ -341,7 +341,11 @@ jobs:
           command: circleci run release update ship-api --status=FAILED --failure-reason="ship-api failed" || echo "WARNING - the deploy marker was not updated"
           when: on_fail
 
-  build-web:
+  build-app:
+    parameters:
+      app:
+        description: The app directory under apps/ (booking or admin)
+        type: string
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: medium
@@ -356,20 +360,28 @@ jobs:
           command: |
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
-            bash scripts/ci/vercel_offline_build.sh
+            VERCEL_APP_DIR="apps/<< parameters.app >>" bash scripts/ci/vercel_offline_build.sh
+            mv .vercel/output ".vercel/output-<< parameters.app >>"
       - save_cache:
           key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
           paths:
             - ~/.local/share/pnpm/store
       - persist_to_workspace:
-          # The prebuilt output points at files in the repo tree (web/.next, about 27 MB), not only
-          # at .vercel/output, so both travel to the deploy job.
+          # The prebuilt output points at files in the repo tree (apps/<app>/.next, about 27 MB), not
+          # only at .vercel/output, so both travel to the deploy job.
           root: /home/circleci/repo
           paths:
-            - .vercel/output
-            - web/.next
+            - .vercel/output-<< parameters.app >>
+            - apps/<< parameters.app >>/.next
 
-  ship-web:
+  ship-app:
+    parameters:
+      app:
+        description: The app directory under apps/ (booking or admin)
+        type: string
+      component:
+        description: The component name on the CircleCI deploy marker
+        type: string
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
@@ -382,7 +394,7 @@ jobs:
           name: Halt unless ship-api promoted this commit
           command: |
             if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
-              echo "ship-api did not promote this commit: the web build must not ship a contract newer than the live API."
+              echo "ship-api did not promote this commit: the web builds must not ship a contract newer than the live API."
               circleci-agent step halt
             fi
       - run:
@@ -391,9 +403,9 @@ jobs:
       - run:
           name: Deploy marker, planned and running (CircleCI Deploys)
           command: |
-            circleci run release plan ship-web --environment-name=production \
-              --component-name=clinic-web --namespace=clinic --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARNING - the deploy marker was not recorded"
-            circleci run release update ship-web --status=running || echo "WARNING - the deploy marker was not updated"
+            circleci run release plan ship-<< parameters.app >> --environment-name=production \
+              --component-name=<< parameters.component >> --namespace=clinic --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARNING - the deploy marker was not recorded"
+            circleci run release update ship-<< parameters.app >> --status=running || echo "WARNING - the deploy marker was not updated"
       - run:
           name: Install dependencies and the Vercel CLI without lifecycle scripts
           command: |
@@ -406,31 +418,33 @@ jobs:
           name: Record the production deployment that is live now (the rollback target)
           command: |
             mkdir -p /tmp/webstate
-            bash scripts/ci/vercel_prod.sh current | tee /tmp/webstate/prev
+            export VERCEL_APP="<< parameters.app >>"
+            bash scripts/ci/vercel_prod.sh current | tee "/tmp/webstate/prev-<< parameters.app >>"
       - run:
           name: Deploy the prebuilt output (the only step that needs the Vercel token)
           command: |
             mkdir -p .vercel
-            cp -R /tmp/ws/.vercel/output .vercel/output
-            cp -R /tmp/ws/web/.next web/.next
+            cp -R "/tmp/ws/.vercel/output-<< parameters.app >>" .vercel/output
+            cp -R "/tmp/ws/apps/<< parameters.app >>/.next" "apps/<< parameters.app >>/.next"
+            export VERCEL_APP="<< parameters.app >>"
             URL="$(npm_config_ignore_scripts=true vercel deploy --prebuilt --prod | tail -1)"
             echo "deployed $URL"
             NEW="$(bash scripts/ci/vercel_prod.sh id-of "$URL")"
             # A rollback switches off automatic alias assignment, so make sure the public alias
             # really serves this deployment, promoting it if it does not.
-            bash scripts/ci/vercel_prod.sh ensure "$NEW" | tee /tmp/webstate/new
+            bash scripts/ci/vercel_prod.sh ensure "$NEW" | tee "/tmp/webstate/new-<< parameters.app >>"
       - persist_to_workspace:
           root: /tmp/webstate
           paths:
-            - prev
-            - new
+            - prev-<< parameters.app >>
+            - new-<< parameters.app >>
       - run:
           name: Deploy marker, success
-          command: circleci run release update ship-web --status=SUCCESS || echo "WARNING - the deploy marker was not updated"
+          command: circleci run release update ship-<< parameters.app >> --status=SUCCESS || echo "WARNING - the deploy marker was not updated"
           when: on_success
       - run:
           name: Deploy marker, failed
-          command: circleci run release update ship-web --status=FAILED --failure-reason="ship-web failed" || echo "WARNING - the deploy marker was not updated"
+          command: circleci run release update ship-<< parameters.app >> --status=FAILED --failure-reason="ship-<< parameters.app >> failed" || echo "WARNING - the deploy marker was not updated"
           when: on_fail
 
   web-quality:
@@ -441,8 +455,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Skip when web/ and contracts/ are untouched (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh web/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
+          name: Skip when apps/, packages/ and contracts/ are untouched (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
       - restore_cache:
           keys:
             - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
@@ -452,8 +466,8 @@ jobs:
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm audit --prod --audit-level high
-            pnpm -C web test
-            pnpm -C web build
+            pnpm -r --if-present test
+            pnpm -r --if-present build
       - save_cache:
           key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
           paths:
@@ -467,16 +481,16 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Skip when web/ and contracts/ are untouched (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh web/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
+          name: Skip when apps/, packages/ and contracts/ are untouched (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
       - run:
           name: Build the web app and run the mobile layout checks (Playwright's Chromium)
           command: |
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
-            pnpm -C web build
-            pnpm -C web exec playwright install chromium
-            PW_BUNDLED=1 pnpm -C web test:e2e
+            pnpm -C apps/booking build
+            pnpm -C apps/booking exec playwright install chromium
+            PW_BUNDLED=1 pnpm -C apps/booking test:e2e
 
   verify-release:
     docker:
@@ -508,7 +522,7 @@ jobs:
               echo "attempt $i failed"; sleep 15
             done
             echo "$result" > /tmp/verify/result
-            echo "verify-release result: $result (a failure is handled by rollback-api, rollback-web and smoke-public)"
+            echo "verify-release result: $result (a failure is handled by rollback-api, the app rollbacks and smoke-public)"
       - persist_to_workspace:
           root: /tmp/verify
           paths:
@@ -540,7 +554,11 @@ jobs:
           paths:
             - rollback_state
 
-  rollback-web:
+  rollback-app:
+    parameters:
+      app:
+        description: The app directory under apps/ (booking or admin)
+        type: string
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
@@ -565,10 +583,10 @@ jobs:
           name: Point production at the previous deployment, by id
           command: |
             sudo npm install -g vercel@59.5.0 --ignore-scripts
-            bash scripts/ci/vercel_prod.sh rollback "$(cat /tmp/ws/prev)"
+            VERCEL_APP="<< parameters.app >>" bash scripts/ci/vercel_prod.sh rollback "$(cat "/tmp/ws/prev-<< parameters.app >>")"
       - run:
-          name: Mark the web deploy as failed
-          command: circleci run release update ship-web --status=FAILED --failure-reason="rolled back by the public check" || echo "WARNING - ship-web was already marked finished, so its marker could not be changed"
+          name: Mark the << parameters.app >> deploy as failed
+          command: circleci run release update ship-<< parameters.app >> --status=FAILED --failure-reason="rolled back by the public check" || echo "WARNING - ship-web was already marked finished, so its marker could not be changed"
 
   smoke-public:
     docker:
@@ -593,7 +611,7 @@ jobs:
           name: A release that was rolled back stays red
           command: |
             if grep -qx failed /tmp/ws/result 2>/dev/null; then
-              echo "FAIL: the public check failed and this release was rolled back (see rollback-api and rollback-web)."; exit 1
+              echo "FAIL: the public check failed and this release was rolled back (see rollback-api and the app rollbacks)."; exit 1
             fi
       - run:
           name: Public smoke (no Vercel or GCP credentials)
@@ -695,33 +713,63 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - build-scan-push
-      - build-web:
+      - build-app:
+          name: build-booking
+          app: booking
           requires:
             - web-quality
-      - ship-web:
+      - build-app:
+          name: build-admin
+          app: admin
+          requires:
+            - web-quality
+      - ship-app:
+          name: ship-booking
+          app: booking
+          component: clinic-web
           context: vercel-prod
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
-            - build-web
+            - build-booking
+      - ship-app:
+          name: ship-admin
+          app: admin
+          component: clinic-admin
+          context: vercel-admin
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - ship-api
+            - build-admin
       - verify-release:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
-            - ship-web
+            - ship-booking
+            - ship-admin
       - rollback-api:
           context: gcp-deploy
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - verify-release
-      - rollback-web:
+      - rollback-app:
+          name: rollback-booking
+          app: booking
           context: vercel-prod
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - rollback-api
+      - rollback-app:
+          name: rollback-admin
+          app: admin
+          context: vercel-admin
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - rollback-api
       - smoke-public:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
-            - rollback-web
+            - rollback-booking
+            - rollback-admin
       - cost-check:
           context: gcp-deploy
           requires:

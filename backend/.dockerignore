@@ -12,7 +12,8 @@ docker/
 .git
 .gitignore
 docs/
-web/
+apps/
+packages/
 infra/
 node_modules/
 *.egg-info/

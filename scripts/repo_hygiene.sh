@@ -86,14 +86,14 @@ PL
 is_code() { case "$1" in
   *.py|*.ts|*.tsx|*.js|*.mjs|*.sh|*.go|*.tf|*.sql|*.yml|*.yaml|Makefile|*/Makefile|*/Dockerfile|Dockerfile) return 0 ;; esac; return 1; }
 skip_smell() { case "$1" in
-  docs/*|web/src/components/ui/*|*.lock|pnpm-lock.yaml|*/generated/*|contracts/openapi.json|.husky/_/*|scripts/repo_hygiene.sh|scripts/repo_hygiene_selftest.sh|.terraform.lock.hcl) return 0 ;; esac; return 1; }
+  docs/*|packages/ui/src/components/ui/*|*.lock|pnpm-lock.yaml|*/generated/*|contracts/openapi.json|.husky/_/*|scripts/repo_hygiene.sh|scripts/repo_hygiene_selftest.sh|.terraform.lock.hcl) return 0 ;; esac; return 1; }
 
 while IFS= read -r f; do
   is_code "$f" || continue
   skip_smell "$f" && continue
   [ -f "$f" ] || continue
   prod=0
-  case "$f" in backend/app/*|web/src/*) case "$f" in */tests/*|*.test.*|web/src/api/*) ;; *) prod=1 ;; esac ;; esac
+  case "$f" in backend/app/*|apps/*/src/*|packages/*/src/*) case "$f" in */tests/*|*.test.*|apps/*/src/api/*) ;; *) prod=1 ;; esac ;; esac
   ext="${f##*.}"
   while IFS= read -r hit; do
     [ -z "$hit" ] && continue

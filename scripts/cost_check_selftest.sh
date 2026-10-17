@@ -18,8 +18,8 @@ mkdir -p "$PRISTINE"
 # The parts of the repo the checker reads.
 ( cd "$ROOT" && tar -cf - \
     --exclude=node_modules --exclude=.terraform --exclude=.venv --exclude=__pycache__ \
-    --exclude=web/src/generated \
-    .circleci infra scripts Makefile web/vercel.json web/next.config.ts web/src ) | ( cd "$PRISTINE" && tar -xf - )
+    --exclude=apps/booking/src/generated \
+    .circleci infra scripts Makefile apps/booking/vercel.json apps/booking/next.config.ts apps/booking/src ) | ( cd "$PRISTINE" && tar -xf - )
 
 PASSES=0; FAILS=0; N=0
 ok()  { PASSES=$((PASSES + 1)); printf 'PASS  %s\n' "$1"; }
@@ -158,24 +158,24 @@ expect_fail "editor removal for another member" "does not remove roles/editor" m
 expect_fail "editor removal only in a comment" "does not remove roles/editor" mutate_write infra/terraform/default_sa.tf '# resource "google_project_iam_member_remove" "d" { role = "roles/editor" member = "x-compute@developer.gserviceaccount.com" }'
 
 echo "== web =="
-VJ=web/vercel.json
+VJ=apps/booking/vercel.json
 expect_fail "vercel.json second region"  "vercel.json not pinned" mutate_sub "$VJ" 's/"iad1"/"iad1", "sfo1"/'
 expect_fail "vercel.json git deploys on" "vercel.json not pinned" mutate_sub "$VJ" 's/false/true/'
 expect_fail "vercel.json git missing"    "vercel.json not pinned" mutate_write "$VJ" '{"regions":["iad1"]}'
 expect_fail "vercel.json invalid"        "vercel.json not pinned" mutate_write "$VJ" '{not json'
-expect_fail "next unoptimized false"     "next images not unoptimized" mutate_sub web/next.config.ts 's/unoptimized: true/unoptimized: false/'
-expect_fail "next unoptimized removed"   "next images not unoptimized" mutate_sub web/next.config.ts 's/.*unoptimized.*//'
-expect_fail "next unoptimized only in a comment next to false" "next images not unoptimized" mutate_sub web/next.config.ts 's/unoptimized: true/unoptimized: false \/\/ unoptimized: true/'
-expect_fail "preferredRegion sfo1"       "preferredRegion other than iad1" mutate_add web/src/app/page.tsx 'export const preferredRegion = "sfo1";'
-expect_fail "preferredRegion all"        "preferredRegion other than iad1" mutate_add web/src/app/page.tsx 'export const preferredRegion = "all";'
-expect_fail "edge runtime"               "edge runtime under web/src" mutate_add web/src/app/page.tsx 'export const runtime = "edge";'
-expect_fail "second route.js under api"  "web/src/app/api route files" mutate_write web/src/app/api/extra/route.js 'export const GET = () => 1;'
-expect_fail "second route.tsx under api" "web/src/app/api route files" mutate_write web/src/app/api/extra2/route.tsx 'export const GET = () => 1;'
-expect_fail "docs route imports the proxy (alias)"    "doc route not force-static" mutate_add web/src/app/docs/route.ts 'import { forward } from "@/lib/proxy/forward";'
-expect_fail "docs route imports the proxy (relative)" "doc route not force-static" mutate_add web/src/app/docs/route.ts 'import { x } from "../../lib/proxy/x";'
-expect_fail "docs route fetches Cloud Run"            "doc route not force-static" mutate_add web/src/app/docs/route.ts 'const r = await fetch("https://x.run.app");'
-expect_fail "docs route re-exports the proxy handler" "doc route not force-static" mutate_add web/src/app/redoc/route.ts 'export { GET } from "../api/[...path]/route";'
-expect_fail "force-static only in a comment"          "doc route not force-static" mutate_sub web/src/app/docs/route.ts 's/^export const dynamic = "force-static";/export const dynamic = "force-dynamic"; \/\/ force-static/'
+expect_fail "next unoptimized false"     "next images not unoptimized" mutate_sub apps/booking/next.config.ts 's/unoptimized: true/unoptimized: false/'
+expect_fail "next unoptimized removed"   "next images not unoptimized" mutate_sub apps/booking/next.config.ts 's/.*unoptimized.*//'
+expect_fail "next unoptimized only in a comment next to false" "next images not unoptimized" mutate_sub apps/booking/next.config.ts 's/unoptimized: true/unoptimized: false \/\/ unoptimized: true/'
+expect_fail "preferredRegion sfo1"       "preferredRegion other than iad1" mutate_add apps/booking/src/app/page.tsx 'export const preferredRegion = "sfo1";'
+expect_fail "preferredRegion all"        "preferredRegion other than iad1" mutate_add apps/booking/src/app/page.tsx 'export const preferredRegion = "all";'
+expect_fail "edge runtime"               "edge runtime under apps/booking/src" mutate_add apps/booking/src/app/page.tsx 'export const runtime = "edge";'
+expect_fail "second route.js under api"  "apps/booking/src/app/api route files" mutate_write apps/booking/src/app/api/extra/route.js 'export const GET = () => 1;'
+expect_fail "second route.tsx under api" "apps/booking/src/app/api route files" mutate_write apps/booking/src/app/api/extra2/route.tsx 'export const GET = () => 1;'
+expect_fail "docs route imports the proxy (alias)"    "doc route not force-static" mutate_add apps/booking/src/app/docs/route.ts 'import { forward } from "@/lib/proxy/forward";'
+expect_fail "docs route imports the proxy (relative)" "doc route not force-static" mutate_add apps/booking/src/app/docs/route.ts 'import { x } from "../../lib/proxy/x";'
+expect_fail "docs route fetches Cloud Run"            "doc route not force-static" mutate_add apps/booking/src/app/docs/route.ts 'const r = await fetch("https://x.run.app");'
+expect_fail "docs route re-exports the proxy handler" "doc route not force-static" mutate_add apps/booking/src/app/redoc/route.ts 'export { GET } from "../api/[...path]/route";'
+expect_fail "force-static only in a comment"          "doc route not force-static" mutate_sub apps/booking/src/app/docs/route.ts 's/^export const dynamic = "force-static";/export const dynamic = "force-dynamic"; \/\/ force-static/'
 
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }

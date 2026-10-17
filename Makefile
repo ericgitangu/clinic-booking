@@ -31,8 +31,8 @@ seed: ## Run the seed against the running stack
 
 lint: ## markdown, TypeScript, Python (ruff + mypy --strict) and Go, zero warnings (husky and CI call this)
 	pnpm exec markdownlint-cli2
-	pnpm -C web lint
-	pnpm -C web typecheck
+	pnpm -C apps/booking lint
+	pnpm -C apps/booking typecheck
 	($(BE) ruff check .) && ($(BE) ruff format --check .)
 	$(BE) mypy --strict app tests migrations
 	@if [ -d services/realtime ]; then \
@@ -76,7 +76,7 @@ openapi: ## Export the OpenAPI contract
 	$(BE) python -m scripts.export_openapi
 
 gen-client: ## Regenerate the TS client (web)
-	pnpm -C web gen:api
+	pnpm -C apps/booking gen:api
 
 verify: ## Verify live claims (URL=...)
 	uv run --project backend python scripts/verify_claims.py --base-url "$(URL)"
@@ -100,13 +100,13 @@ cost-selftest: ## Prove the cost guard by mutation (no cloud)
 ci-test: ## Test the CI helper scripts against fakes (no cloud)
 	bash scripts/ci/test_ci_scripts.sh
 
-env-pull: ## Fill web/.env.local (gitignored) from Vercel's Development environment; sensitive values are not returned
-	cd web && vercel env pull .env.local --environment=development
+env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development environment; sensitive values are not returned
+	cd apps/booking && vercel env pull .env.local --environment=development
 	@printf '%s\n' \
 	  'NOTE: Vercel never returns variables marked Sensitive through env pull.' \
-	  'Copy those into web/.env.local by hand: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET,' \
+	  'Copy those into apps/booking/.env.local by hand: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET,' \
 	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
-e2e: ## Playwright checks against a production build (web/): sideways scroll and touch targets at 360, 768, 1280
-	cd web && pnpm build && pnpm test:e2e
+e2e: ## Playwright checks against a production build (apps/booking): sideways scroll and touch targets at 360, 768, 1280
+	cd apps/booking && pnpm build && pnpm test:e2e
