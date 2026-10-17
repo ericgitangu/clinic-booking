@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clinic.invalid/contracts/events/appointment-event.v1.schema.json",
+  "title": "AppointmentEventV1",
+  "description": "Payload of the SSE events appointment.booked, appointment.cancelled and appointment.rescheduled. Aggregate and non-PII: no appointment id, no patient data, no reason. A breaking change is schema_version 2 under a new event name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "type",
+    "doctor_id",
+    "from_starts_at",
+    "to_starts_at",
+    "local_date",
+    "from_local_date",
+    "occurred_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "type": { "enum": ["appointment.booked", "appointment.cancelled", "appointment.rescheduled"] },
+    "doctor_id": { "type": "string", "format": "uuid" },
+    "from_starts_at": { "type": ["string", "null"], "format": "date-time" },
+    "to_starts_at": { "type": ["string", "null"], "format": "date-time" },
+    "local_date": { "type": "string", "format": "date" },
+    "from_local_date": { "type": ["string", "null"], "format": "date" },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  },
+  "examples": [
+    {
+      "schema_version": 1,
+      "type": "appointment.booked",
+      "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+      "from_starts_at": null,
+      "to_starts_at": "2026-10-20T06:00:00Z",
+      "local_date": "2026-10-20",
+      "from_local_date": null,
+      "occurred_at": "2026-10-18T09:15:00.123456Z"
+    },
+    {
+      "schema_version": 1,
+      "type": "appointment.cancelled",
+      "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+      "from_starts_at": "2026-10-20T06:00:00Z",
+      "to_starts_at": null,
+      "local_date": "2026-10-20",
+      "from_local_date": null,
+      "occurred_at": "2026-10-18T09:16:00Z"
+    },
+    {
+      "schema_version": 1,
+      "type": "appointment.rescheduled",
+      "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+      "from_starts_at": "2026-10-20T06:00:00Z",
+      "to_starts_at": "2026-10-21T07:00:00Z",
+      "local_date": "2026-10-21",
+      "from_local_date": "2026-10-20",
+      "occurred_at": "2026-10-18T09:17:00Z"
+    }
+  ]
+}

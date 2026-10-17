@@ -1,0 +1,4 @@
+Makefile
+testdata
+**/*_test.go
+internal/testenv
