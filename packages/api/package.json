@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./proxy/*": "./src/proxy/*.ts"
+    "./proxy/*": "./src/proxy/*.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings=0",
@@ -12,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@vercel/oidc": "4.0.1"
+    "@vercel/oidc": "4.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

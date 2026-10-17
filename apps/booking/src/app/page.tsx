@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SITE } from "@/lib/site";
 import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
 import { Button } from "@clinic/ui/components/ui/button";
@@ -54,12 +55,12 @@ export default function Home() {
           </h1>
           <p className="mt-5 max-w-[60ch] text-lg leading-8 text-muted-foreground">
             Book your visit. See a doctor&rsquo;s free slots, pick a time, and
-            cancel or reschedule when plans change. Online booking pages are
-            coming next; the API behind them is live and open to try now.
+            cancel or reschedule when plans change. The API behind the booking
+            pages is live and open to try too.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="h-11 px-5 text-base">
-              <a href="/docs">Open the API docs</a>
+              <Link href="/book">Book a visit</Link>
             </Button>
             <Button
               asChild
@@ -67,7 +68,7 @@ export default function Home() {
               variant="outline"
               className="h-11 px-5 text-base"
             >
-              <a href="/openapi.json">Read the contract</a>
+              <a href="/docs">Open the API docs</a>
             </Button>
           </div>
         </div>

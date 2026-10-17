@@ -9,4 +9,6 @@ export const SITE = {
 export const FOOTER_NOTICE =
   "© 2026 Eric Gitangu. A take-home assessment for Savannah Informatics, not a live medical service.";
 
-export const NAV_LINKS = [{ href: "/dashboard", label: "Dashboard" }] as const;
+export const NAV_LINKS = [
+  { href: "/dashboard", label: "Dashboard", inline: true },
+] as const;
