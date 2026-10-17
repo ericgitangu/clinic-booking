@@ -82,3 +82,7 @@ ignores `TARGET_VERSION`, because Vercel deployments are not tagged with the rel
 under Project Settings -> Deploys -> Rollback Pipeline (UI only). CircleCI's own *automatic*
 rollback also needs the continuous-validation level and a monitor sending webhooks (Datadog,
 Prometheus-compatible or a custom HTTP POST); it is not turned on here.
+
+### When the Vercel token is refused (403)
+
+`scripts/ci/vercel_prod.sh` stops with "the Vercel token was refused (403)" when `VERCEL_TOKEN` cannot read the deployment behind a host. Both apps use the `vercel-prod` context, so the token must be a team-scoped token that can see **both** projects (`clinic-web` and `clinic-admin`). The ship and rollback jobs print `Vercel target: app=… project=… team=…` first, so the logs show which project id the job used. To fix a refused token, create a new team-scoped token and update `VERCEL_TOKEN` in the context.

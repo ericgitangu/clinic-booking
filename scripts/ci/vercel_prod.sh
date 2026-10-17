@@ -22,10 +22,32 @@ case "${VERCEL_APP:-booking}" in
   *) echo "vercel_prod: VERCEL_APP must be booking or admin" >&2; exit 2 ;;
 esac
 
+# Run a Vercel API call and print its JSON body. The CLI prints a telemetry notice before the body
+# and an error as plain text, so the JSON is cut out by position; when there is none, say what the
+# CLI said instead of failing inside the parser.
+vercel_json() {
+  local out
+  out="$("$VERCEL" api "$1" --raw 2>&1)" || true
+  case "$out" in
+    *"Not authorized"*)
+      echo "vercel_prod: the Vercel token was refused (403) for $1. It needs access to this team and to the project behind the host; see docs/runbooks/rollback.md." >&2
+      return 1 ;;
+    *"{"*) printf '{%s' "${out#*\{}" ;;
+    *)
+      echo "vercel_prod: no JSON from the Vercel API for $1: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-240)" >&2
+      return 1 ;;
+  esac
+}
+
 id_of() {
-  local host="${1#https://}"; host="${host%%/*}"
-  "$VERCEL" api "/v13/deployments/${host}?teamId=${VERCEL_ORG_ID:?set VERCEL_ORG_ID}" --raw |
-    python3 -c 'import sys,json; t=sys.stdin.read(); print(json.loads(t[t.index("{"):])["id"])'
+  local host body
+  host="${1#https://}"; host="${host%%/*}"
+  body="$(vercel_json "/v13/deployments/${host}?teamId=${VERCEL_ORG_ID:?set VERCEL_ORG_ID}")" || return 1
+  printf '%s' "$body" | python3 -c 'import sys,json
+try:
+    print(json.load(sys.stdin)["id"])
+except Exception as e:
+    sys.exit("vercel_prod: no deployment id in the response for this host (%s)" % type(e).__name__)'
 }
 
 case "${1:-}" in
@@ -33,8 +55,14 @@ case "${1:-}" in
   current)  id_of "$HOST" ;;
   previous)
     now="$(id_of "$HOST")"
-    "$VERCEL" api "/v6/deployments?projectId=${VERCEL_PROJECT_ID:?set VERCEL_PROJECT_ID}&teamId=${VERCEL_ORG_ID:?}&target=production&state=READY&limit=10" --raw |
-      NOW="$now" python3 -c 'import os,sys,json; t=sys.stdin.read(); d=json.loads(t[t.index("{"):]); ids=[x["uid"] for x in d.get("deployments",[]) if x["uid"]!=os.environ["NOW"]]; print(ids[0] if ids else "")' ;;
+    body="$(vercel_json "/v6/deployments?projectId=${VERCEL_PROJECT_ID:?set VERCEL_PROJECT_ID}&teamId=${VERCEL_ORG_ID:?}&target=production&state=READY&limit=10")" || exit 1
+    printf '%s' "$body" | NOW="$now" python3 -c 'import os,sys,json
+try:
+    d=json.load(sys.stdin)
+except Exception as e:
+    sys.exit("vercel_prod: the deployments list was not JSON (%s)" % type(e).__name__)
+ids=[x["uid"] for x in d.get("deployments",[]) if x["uid"]!=os.environ["NOW"]]
+print(ids[0] if ids else "")' ;;
   ensure)
     want="${2:?usage: ensure <deployment-id>}"
     have="$(id_of "$HOST")"

@@ -399,6 +399,9 @@ jobs:
             if [ -n "<< parameters.project_id >>" ]; then
               echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
             fi
+            # Identifiers only (never the token), so a 403 can be told from a wrong project.
+            PROJECT="<< parameters.project_id >>"; PROJECT="${PROJECT:-$VERCEL_PROJECT_ID}"
+            echo "Vercel target: app=<< parameters.app >> project=${PROJECT} team=${VERCEL_ORG_ID:0:9}..."
       - attach_workspace:
           at: /tmp/ws
       - run:
@@ -587,6 +590,9 @@ jobs:
             if [ -n "<< parameters.project_id >>" ]; then
               echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
             fi
+            # Identifiers only (never the token), so a 403 can be told from a wrong project.
+            PROJECT="<< parameters.project_id >>"; PROJECT="${PROJECT:-$VERCEL_PROJECT_ID}"
+            echo "Vercel target: app=<< parameters.app >> project=${PROJECT} team=${VERCEL_ORG_ID:0:9}..."
       - attach_workspace:
           at: /tmp/ws
       - run:
