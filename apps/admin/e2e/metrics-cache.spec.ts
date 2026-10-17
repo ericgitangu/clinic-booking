@@ -8,7 +8,7 @@
 import { lastDays } from "../src/lib/clinic-time";
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { EMAIL, internal, OWNER } from "./support/stack";
-import { expect, seeded, test } from "./support/fixtures";
+import { expect, test } from "./support/fixtures";
 import type { Page } from "@playwright/test";
 
 interface Metrics {
@@ -60,13 +60,14 @@ test("a booking the admin app did not see stays hidden until Refresh", async ({
 test("an admin's cancel shows on the dashboard at once, with no refresh and no wait", async ({
   as,
 }) => {
-  const id = seeded().free[3];
+  // An appointment made for this test, so nothing the other specs use is touched.
+  const id = await bookOneStraightThroughTheApi();
   const page = await as("admin");
   await page.goto("/dashboard?days=7");
   await refreshUntil(page, (await truth()).upcoming_active);
-  const cancelledBefore = (await truth()).cancelled;
+  const before = await truth();
   await expect(page.getByTestId("kpi-cancellations")).toHaveText(
-    String(cancelledBefore),
+    String(before.cancelled),
   );
 
   await page.goto(`/dashboard/appointments/${id}`);
@@ -77,7 +78,8 @@ test("an admin's cancel shows on the dashboard at once, with no refresh and no w
   await expect(page.getByText("Appointment cancelled.")).toBeVisible();
 
   const after = await truth();
-  expect(after.cancelled).toBe(cancelledBefore + 1);
+  expect(after.cancelled).toBe(before.cancelled + 1);
+  expect(after.upcoming_active).toBe(before.upcoming_active - 1);
   await page.goto("/dashboard?days=7");
   await expect(page.getByTestId("kpi-cancellations")).toHaveText(
     String(after.cancelled),
@@ -94,28 +96,31 @@ test("an access change expires the cache too", async ({ as }) => {
   await page.reload();
   await expect(upcoming(page)).toHaveText(String(before));
 
-  // Change a role through the Access page (the real server action), then look again.
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/access");
-  await page
-    .getByRole("button", { name: `Change role of ${EMAIL.viewer}` })
-    .click();
-  await page.locator("#change-role").click();
-  await page.getByRole("option", { name: /^Admin/ }).click();
-  await page.getByRole("button", { name: "Save role" }).click();
-  await expect(page.getByText(`${EMAIL.viewer} is now admin.`)).toBeVisible();
+  try {
+    // Change a role through the Access page (the real server action), then look again.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/access");
+    await page
+      .getByRole("button", { name: `Change role of ${EMAIL.viewer}` })
+      .click();
+    await page.locator("#change-role").click();
+    await page.getByRole("option", { name: /^Admin/ }).click();
+    await page.getByRole("button", { name: "Save role" }).click();
+    await expect(page.getByText(`${EMAIL.viewer} is now admin.`)).toBeVisible();
 
-  await page.goto("/dashboard?days=7");
-  await expect(upcoming(page)).toHaveText(String(before + 1));
-  // Put the viewer back, so the other specs find the person they expect.
-  await page.goto("/access");
-  await page
-    .getByRole("button", { name: `Change role of ${EMAIL.viewer}` })
-    .click();
-  await page.locator("#change-role").click();
-  await page.getByRole("option", { name: /^Viewer/ }).click();
-  await page.getByRole("button", { name: "Save role" }).click();
-  await expect(page.getByText(`${EMAIL.viewer} is now viewer.`)).toBeVisible();
+    await page.goto("/dashboard?days=7");
+    await expect(upcoming(page)).toHaveText(String(before + 1));
+  } finally {
+    // Whatever happened above, the viewer is a viewer again for every other spec and every rerun,
+    // put back through the real API as the owner.
+    const back = await internal(
+      "PATCH",
+      `/internal/admin/access/${encodeURIComponent(EMAIL.viewer)}`,
+      owner,
+      { role: "viewer" },
+    );
+    expect(back.status).toBe(200);
+  }
 });
 
 test.describe("a cached value is never handed to someone who may not see it", () => {

@@ -153,3 +153,54 @@ describe("the matcher puts the proxy in front of what the redirect needs", () =>
     "/api/x",
   ])("runs for %s", (p) => expect(runs(p)).toBe(true));
 });
+
+describe("static assets: matched on the alias hosts only", () => {
+  const runsOn = (host: string, url: string) =>
+    unstable_doesMiddlewareMatch({ config, url, headers: { host } });
+  const ASSETS = [
+    "/robots.txt",
+    "/favicon.ico",
+    "/_next/static/chunks/app.js",
+    "/_next/image?url=%2Fx.png&w=64&q=75",
+  ];
+
+  it.each(ALIASES)("%s: the proxy runs for every asset path", (host) => {
+    for (const p of ASSETS) expect(runsOn(host, p), `${host}${p}`).toBe(true);
+  });
+
+  it.each([
+    "clinic-admin.ericgitangu.com",
+    "clinic-admin-k3j9x2abc-eric-gitangus-projects.vercel.app",
+    "localhost:3101",
+  ])("%s: assets are still left to Next, not the proxy", (host) => {
+    for (const p of ASSETS) expect(runsOn(host, p), `${host}${p}`).toBe(false);
+  });
+
+  it("a lookalike host does not get the asset matcher (the dots are literal)", () => {
+    for (const host of [
+      "clinic-adminXazure.vercel.app",
+      "clinic-admin-azureXvercel.app",
+      "clinic-admin-azure.vercelXapp",
+      "clinic-admin-eric-gitangus-projectsXvercel.app",
+    ])
+      expect(runsOn(host, "/robots.txt"), host).toBe(false);
+  });
+
+  it("the redirect then answers 308 for an asset on an alias", () => {
+    for (const host of ALIASES) {
+      const res = proxy(req(host, "/robots.txt"));
+      expect(res.status).toBe(308);
+      expect(res.headers.get("location")).toBe(`${CANONICAL}/robots.txt`);
+    }
+  });
+});
+
+describe("the matcher entries and the allowlist agree", () => {
+  it("has one host entry per allowlisted alias, and no others", () => {
+    const hosts = config.matcher
+      .filter((m): m is Exclude<typeof m, string> => typeof m !== "string")
+      .flatMap((m) => m.has ?? [])
+      .map((h) => (h as { value: string }).value.replaceAll("\\.", "."));
+    expect(hosts.sort()).toEqual([...REDIRECTED_HOSTS].sort());
+  });
+});

@@ -27,6 +27,26 @@ export function proxy(request: NextRequest) {
   return notConfiguredResponse(SITE.name);
 }
 
+// Everything but static assets gets the 503 guard. The two alias hosts are also matched on every
+// path, assets included, so robots.txt, favicon.ico and _next/* redirect to the custom domain too
+// (a `has: host` entry per alias, written out because Next reads this object statically; the value
+// is a regular expression, so the dots are escaped). A test keeps these in step with
+// REDIRECTED_HOSTS.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt).*)",
+    {
+      source: "/:path*",
+      has: [{ type: "host", value: "clinic-admin-azure\\.vercel\\.app" }],
+    },
+    {
+      source: "/:path*",
+      has: [
+        {
+          type: "host",
+          value: "clinic-admin-eric-gitangus-projects\\.vercel\\.app",
+        },
+      ],
+    },
+  ],
 };
