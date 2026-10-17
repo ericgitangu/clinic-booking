@@ -314,6 +314,73 @@ bash "$HERE/skip_unless_changed.sh" backend/ >/dev/null 2>&1
 expect "skip: fails CLOSED (runs the job) when main cannot be fetched" "$([ -f "$FX/agent" ] && echo halted || echo ran)" ran
 git remote set-url origin "$WORK/origin.git"
 
+# =========================================================================================
+# vercel_env_check.sh: names only, per app and environment; a gap refuses the ship.
+# =========================================================================================
+cat > "$WORK/bin/vercel" <<'FAKE'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "env ls" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
+[ -f "$FX/denied" ] && { echo "Error: Not authorized" >&2; exit 1; }
+cat "$FX/env_ls"
+FAKE
+chmod +x "$WORK/bin/vercel"
+env_row() { printf ' %-40s %-26s %-19s %s\n' "$1" "SECRET-VALUE-MUST-NOT-LEAK" Sensitive "$2"; }
+env_table() { # <environments> <name...>
+  local envs="$1"; shift
+  printf '\n name  value  type  environments\n'
+  for n in "$@"; do env_row "$n" "$envs"; done
+  printf '\nCommon next commands:\n- `vercel env add`\n'
+}
+ALL="BETTER_AUTH_URL BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL API_AUDIENCE GCP_PROJECT_NUMBER GCP_SERVICE_ACCOUNT_EMAIL GCP_WORKLOAD_IDENTITY_POOL_ID GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID ADMIN_EMAILS"
+
+new_fx env_ok
+env_table Production $ALL OTHER > "$FX/env_ls"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: passes when every name is set for production" "$rc" 0
+expect "env check: never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_missing
+env_table Production BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL > "$FX/env_ls"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: refuses when a name is missing" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names the missing variable" "$(grep -c 'BETTER_AUTH_URL' <<<"$out")" 1
+expect "env check: a failure never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_none
+printf '> No Environment Variables found for team/clinic-admin\n' > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
+expect "env check: refuses an empty project (the 2026-10 admin outage)" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_wrong_target
+env_table Preview $ALL > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: a Preview-only value does not satisfy production" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_all_envs
+env_table "All Environments" $ALL > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: All Environments counts" "$rc" 0
+
+new_fx env_denied
+touch "$FX/denied"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: fails closed when the listing is refused" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+# =========================================================================================
+# not_configured_smoke.sh: refuses to run an app whose directory holds an .env file, because
+# `next start` would load it and the test would report a false FAIL. Never moves the file.
+# =========================================================================================
+new_fx smoke_env
+mkdir -p "$WORK/smoke/admin" "$WORK/smoke/booking"
+: > "$WORK/smoke/admin/.env.local"        # a fixture in a temp dir, not a real env file
+: > "$WORK/smoke/booking/.env.production"
+out="$(APPS_DIR="$WORK/smoke" bash "$HERE/not_configured_smoke.sh" 2>&1)"; rc=$?
+expect "smoke: refuses (non-zero) when apps hold .env files" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "smoke: names the admin file to move aside" "$(grep -c 'admin/.env.local exists' <<<"$out")" 1
+expect "smoke: names the booking file to move aside" "$(grep -c 'booking/.env.production exists' <<<"$out")" 1
+expect "smoke: leaves the developer's files in place" "$([ -e "$WORK/smoke/admin/.env.local" ] && [ -e "$WORK/smoke/booking/.env.production" ] && echo kept)" kept
+expect "smoke: does not start a server for a refused app" "$(grep -c 'did not start' <<<"$out")" 0
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
