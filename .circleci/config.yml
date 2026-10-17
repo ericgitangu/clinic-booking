@@ -502,9 +502,13 @@ jobs:
       - run:
           name: Build the booking app and run the booking scenarios against the real API
           command: |
-            export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"
-            nvm install 24.14.0 >/dev/null && nvm use 24.14.0 >/dev/null
-            npm install -g pnpm@12.5.1
+            # The machine image has no Node 24: fetch the official build and check it against its
+            # published SHA-256 before using it.
+            curl -fsSLO https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.xz
+            echo "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df  node-v24.14.0-linux-x64.tar.xz" | sha256sum -c -
+            sudo tar -xJf node-v24.14.0-linux-x64.tar.xz -C /usr/local --strip-components=1
+            node --version
+            sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
