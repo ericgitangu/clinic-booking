@@ -3,6 +3,7 @@ import { LotusMark } from "@/components/brand/lotus-mark";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { SITE } from "@/lib/site";
 
 export function SiteHeader() {
   return (
@@ -13,8 +14,8 @@ export function SiteHeader() {
           className="flex min-h-11 items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
           <LotusMark size={36} />
-          <span className="font-heading text-lg font-semibold tracking-tight">
-            Idyllic
+          <span className="font-heading text-base font-semibold leading-tight tracking-tight sm:text-lg">
+            {SITE.name}
           </span>
         </Link>
         <div className="flex items-center">

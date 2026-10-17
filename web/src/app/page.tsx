@@ -1,3 +1,4 @@
+import { SITE } from "@/lib/site";
 import { LotusMark } from "@/components/brand/lotus-mark";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -49,12 +50,12 @@ export default function Home() {
       <section className="grid items-center gap-10 py-14 md:grid-cols-[1.15fr_0.85fr] md:py-20">
         <div className="max-w-xl">
           <h1 className="font-heading text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
-            Book your visit at Idyllic
+            {SITE.name}
           </h1>
           <p className="mt-5 max-w-[60ch] text-lg leading-8 text-muted-foreground">
-            See a doctor&rsquo;s free slots, pick a time, and cancel or
-            reschedule when plans change. Online booking pages are coming next;
-            the API behind them is live and open to try now.
+            Book your visit. See a doctor&rsquo;s free slots, pick a time, and
+            cancel or reschedule when plans change. Online booking pages are
+            coming next; the API behind them is live and open to try now.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="h-11 px-5 text-base">

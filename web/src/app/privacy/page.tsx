@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/layout/legal-page";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { CONTACT_EMAIL, SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -33,18 +33,70 @@ export default function PrivacyPage() {
         </li>
       </ul>
 
-      <h2>Signing in with Google</h2>
+      <h2>Google user data</h2>
       <p>
-        You can sign in with your Google account. We receive your name, email
-        address and whether Google has verified the address. Your session is
-        kept in a cookie on this site only. We never see your Google password.
+        You can sign in with your Google account. We ask Google only for the
+        OpenID Connect scopes <code>openid</code>, <code>email</code> and{" "}
+        <code>profile</code>, and from them we receive your name, email address,
+        whether Google has verified that address, and your profile picture. We
+        never see your Google password, and we do not ask for access to Gmail,
+        Drive, Calendar, contacts or any other Google service.
+      </p>
+      <h3>How we use it</h3>
+      <p>
+        Only to sign you in, to show you your own appointments, and to send
+        appointment emails to your address. We do not use it for advertising,
+        profiling or analytics, and no person reads it except to support you.
+      </p>
+      <h3>How it is stored and shared</h3>
+      <p>
+        Your name, email address and picture are stored in our database on Neon,
+        and your sign-in session lives in a cookie on this site only. We never
+        sell Google user data or share it with anyone for their own purposes.
+        The only service that receives your email address is Resend, which
+        delivers the appointment emails for us.
+      </p>
+      <h3>Retention and deletion</h3>
+      <p>
+        We keep your account data until you ask us to delete it, or until the
+        demonstration data is reset. To delete your account and everything tied
+        to it, write to{" "}
+        <a
+          className="text-primary underline underline-offset-4"
+          href={`mailto:${CONTACT_EMAIL}?subject=Delete%20my%20data`}
+        >
+          {CONTACT_EMAIL}
+        </a>{" "}
+        from the address on the account, and we will remove it within 30 days.
+        You can also revoke access at any time in your{" "}
+        <a
+          className="text-primary underline underline-offset-4"
+          href="https://myaccount.google.com/permissions"
+        >
+          Google account permissions
+        </a>
+        .
+      </p>
+      <h3>Google API Services User Data Policy</h3>
+      <p>
+        {SITE.name}&rsquo;s use and transfer to any other app of information
+        received from Google APIs will adhere to the{" "}
+        <a
+          className="text-primary underline underline-offset-4"
+          href="https://developers.google.com/terms/api-services-user-data-policy"
+        >
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements.
       </p>
 
       <h2>Protection against automated abuse</h2>
       <p>
         Forms that change a booking use Google reCAPTCHA. It looks at signals
         from your browser to score whether a request comes from a person, and
-        Google handles that data under its own privacy policy.
+        Google handles that data under its own privacy policy. This site is
+        protected by reCAPTCHA and the Google Privacy Policy and Terms of
+        Service apply.
       </p>
 
       <h2>Email</h2>

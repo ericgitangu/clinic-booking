@@ -23,6 +23,19 @@ for (const vp of VIEWPORTS) {
       expect(scroll).toBeLessThanOrEqual(inner);
     });
 
+    test("the home page shows the exact name the OAuth consent screen uses", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await expect(page).toHaveTitle("Idyllic Clinic Booking");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        "Idyllic Clinic Booking",
+      );
+      await expect(page.getByRole("banner")).toContainText(
+        "Idyllic Clinic Booking",
+      );
+    });
+
     test("every button and link can be hit with a thumb (at least 44px tall)", async ({
       page,
     }) => {

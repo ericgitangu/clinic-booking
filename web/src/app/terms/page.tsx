@@ -29,6 +29,21 @@ export default function TermsPage() {
         or emergency service.
       </p>
 
+      <h2>Your account</h2>
+      <p>
+        You can sign in with Google. You are responsible for what happens under
+        your account, and you can stop using it at any time. We may suspend an
+        account that misuses the service. How we handle your data is described
+        in the{" "}
+        <a
+          className="text-primary underline underline-offset-4"
+          href="/privacy"
+        >
+          privacy page
+        </a>
+        .
+      </p>
+
       <h2>Using it fairly</h2>
       <ul>
         <li>
@@ -48,6 +63,12 @@ export default function TermsPage() {
       <p>
         The service is provided as it is. It may change, be reset or go away at
         any time, and bookings are not guaranteed to persist.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        We may update these terms. The date at the top shows the latest version,
+        and continuing to use the site means you accept it.
       </p>
 
       <h2>Contact</h2>
