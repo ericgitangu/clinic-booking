@@ -470,12 +470,13 @@ jobs:
           name: Skip when web/ and contracts/ are untouched (fails closed)
           command: bash scripts/ci/skip_unless_changed.sh web/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
       - run:
-          name: Build the web app and run the mobile layout checks (Chrome in the image)
+          name: Build the web app and run the mobile layout checks (Playwright's Chromium)
           command: |
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm -C web build
-            PW_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable)" pnpm -C web test:e2e
+            pnpm -C web exec playwright install chromium
+            PW_BUNDLED=1 pnpm -C web test:e2e
 
   verify-release:
     docker:
