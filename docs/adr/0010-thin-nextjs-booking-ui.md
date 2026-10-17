@@ -6,6 +6,8 @@
 
 ## Status
 
+**Amended 2026-10-17: the admin dashboard is its own app, `apps/admin`, and the patient app moves to `apps/booking` ([ADR-0027](0027-two-apps-in-a-workspace.md)); hostnames are in [ADR-0028](0028-public-hostnames.md). Where this ADR says `/admin` inside the web app, read the admin app.**
+
 Accepted. The web project is lean core because its proxy route handlers and landing page are the public URL ([ADR-0023](0023-zero-cost-edge-front-door.md)). The pages and features below are built as droppable slices in the order of the cut line at the end; dropping a slice never removes the proxy or the landing page.
 
 ## Context

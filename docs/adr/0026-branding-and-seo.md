@@ -5,6 +5,8 @@
 
 ## Status
 
+**Amended 2026-10-17: each app has its own `SITE.url`, icons and metadata, built on the shared `packages/ui` ([ADR-0027](0027-two-apps-in-a-workspace.md)); the public URLs are in [ADR-0028](0028-public-hostnames.md).**
+
 Accepted. The site carries the Idyllic brand and is set up so a link to it previews properly and a crawler can read it.
 
 ## Context
