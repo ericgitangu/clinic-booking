@@ -31,8 +31,8 @@ seed: ## Run the seed against the running stack
 
 lint: ## markdown, TypeScript, Python (ruff + mypy --strict) and Go, zero warnings (husky and CI call this)
 	pnpm exec markdownlint-cli2
-	pnpm -C apps/booking lint
-	pnpm -C apps/booking typecheck
+	pnpm -r --if-present lint
+	pnpm -r --if-present typecheck
 	($(BE) ruff check .) && ($(BE) ruff format --check .)
 	$(BE) mypy --strict app tests migrations
 	@if [ -d services/realtime ]; then \

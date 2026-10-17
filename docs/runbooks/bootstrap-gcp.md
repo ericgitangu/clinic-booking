@@ -308,3 +308,16 @@ The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE
   CircleCI month-to-date credits with no card; Billing -> Reports 48 h after the first
   release (gross and free-tier savings per SKU); CircleCI Plan -> Usage Controls at the
   minimum retention.
+
+## Admin app identity and project
+
+The admin app is a second Vercel project, `clinic-admin`, with its own service account. `infra/terraform` creates `clinic-admin@<project>` and lets only the `clinic-admin` production Vercel subject mint ID tokens for it; the OIDC provider admits exactly the `clinic-web` and `clinic-admin` production subjects. Then:
+
+```bash
+bash infra/bootstrap.sh invoker    # run.invoker for clinic-web, clinic-admin and clinic-smoke
+vercel project add clinic-admin --scope "$TEAM"
+vercel api -X PATCH "/v9/projects/clinic-admin?teamId=$VERCEL_ORG_ID" -f rootDirectory=apps/admin -f framework=nextjs
+vercel domains add clinic-admin.ericgitangu.com clinic-admin --scope "$TEAM"
+```
+
+CircleCI needs a `vercel-admin` context holding that project's `VERCEL_PROJECT_ID`, plus `VERCEL_ORG_ID` and a team token, beside `vercel-prod` for the booking app.

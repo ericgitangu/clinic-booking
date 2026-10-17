@@ -19,7 +19,7 @@ mkdir -p "$PRISTINE"
 ( cd "$ROOT" && tar -cf - \
     --exclude=node_modules --exclude=.terraform --exclude=.venv --exclude=__pycache__ \
     --exclude=apps/booking/src/generated \
-    .circleci infra scripts Makefile apps/booking/vercel.json apps/booking/next.config.ts apps/booking/src ) | ( cd "$PRISTINE" && tar -xf - )
+    .circleci infra scripts Makefile apps/booking/vercel.json apps/booking/next.config.ts apps/booking/src packages/ui/src packages/api/src ) | ( cd "$PRISTINE" && tar -xf - )
 
 PASSES=0; FAILS=0; N=0
 ok()  { PASSES=$((PASSES + 1)); printf 'PASS  %s\n' "$1"; }
@@ -168,7 +168,7 @@ expect_fail "next unoptimized removed"   "next images not unoptimized" mutate_su
 expect_fail "next unoptimized only in a comment next to false" "next images not unoptimized" mutate_sub apps/booking/next.config.ts 's/unoptimized: true/unoptimized: false \/\/ unoptimized: true/'
 expect_fail "preferredRegion sfo1"       "preferredRegion other than iad1" mutate_add apps/booking/src/app/page.tsx 'export const preferredRegion = "sfo1";'
 expect_fail "preferredRegion all"        "preferredRegion other than iad1" mutate_add apps/booking/src/app/page.tsx 'export const preferredRegion = "all";'
-expect_fail "edge runtime"               "edge runtime under apps/booking/src" mutate_add apps/booking/src/app/page.tsx 'export const runtime = "edge";'
+expect_fail "edge runtime"               "edge runtime under apps/" mutate_add apps/booking/src/app/page.tsx 'export const runtime = "edge";'
 expect_fail "second route.js under api"  "apps/booking/src/app/api route files" mutate_write apps/booking/src/app/api/extra/route.js 'export const GET = () => 1;'
 expect_fail "second route.tsx under api" "apps/booking/src/app/api route files" mutate_write apps/booking/src/app/api/extra2/route.tsx 'export const GET = () => 1;'
 expect_fail "docs route imports the proxy (alias)"    "doc route not force-static" mutate_add apps/booking/src/app/docs/route.ts 'import { forward } from "@/lib/proxy/forward";'

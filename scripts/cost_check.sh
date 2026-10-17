@@ -204,10 +204,10 @@ static_checks() {
 
   if [ -d apps/booking/src ]; then
     local pr
-    pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/booking/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
-    if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under apps/booking/src"; else pass "no non-iad1 preferredRegion"; fi
-    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/booking/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
-      fail "edge runtime under apps/booking/src"
+    pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/*/src packages/*/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
+    if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under apps/*/src or packages/*/src"; else pass "no non-iad1 preferredRegion"; fi
+    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/*/src packages/*/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
+      fail "edge runtime under apps/*/src or packages/*/src"
     else
       pass "no edge runtime"
     fi
@@ -280,16 +280,17 @@ live_checks() {
   fi
 
   # C3 probes /ready, not /healthz: Google's frontend answers /healthz itself with a 404, so that path can never show the IAM result.
-  # C2 + C3: invoker members are EXACTLY the web and smoke identities; direct run.app is an IAM denial.
+  # C2 + C3: invoker members are EXACTLY the web, admin and smoke identities; direct run.app is an IAM denial.
   local svc want got dis url c403 c401
-  want="serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
+  want="serviceAccount:clinic-admin@${PROJECT}.iam.gserviceaccount.com
+serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
 serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   for svc in clinic-api clinic-realtime; do
     gc run services describe "$svc" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1 || continue
     got="$(gc run services get-iam-policy "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '[.bindings[]? | select(.role == "roles/run.invoker") | .members[]] | sort | .[]')"
     dis="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '.metadata.annotations["run.googleapis.com/invoker-iam-disabled"] // "false"')"
     if [ "$got" = "$want" ] && [ "$dis" = false ]; then
-      pass "C2 $svc invoker members are exactly clinic-web and clinic-smoke"
+      pass "C2 $svc invoker members are exactly clinic-web, clinic-admin and clinic-smoke"
     else
       fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
     fi

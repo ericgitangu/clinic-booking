@@ -78,6 +78,10 @@ pnpm-workspace.yaml   packages: apps/*, packages/*
 
 Section 1 "components, key decisions, trade-offs": two audiences, two apps.
 
+## Implementation note
+
+Landed as written, with two differences. `@clinic/api` holds only the proxy core so far: the generated zod schemas and `callApi` arrive with the first slice that needs them. The patient app's Vercel Root Directory moves from `web` to `apps/booking` when this change merges, because the project setting is not in the repository.
+
 ## Review trigger
 
 A third audience (staff, doctors) or a Hobby plan limit. Either may argue for one admin app with roles, or for a paid plan.

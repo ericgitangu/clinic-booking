@@ -1,8 +1,8 @@
 import type { FooterColumn } from "@clinic/ui/lib/footer";
 
 // Every link the footer shows, in one place so the sitemap and the link-check test read the same list.
-// Off until the admin app is deployed and its domain is attached; the link would fail TLS before then.
-export const ADMIN_APP_LIVE = false;
+// The admin app is deployed at this host (checked 200). Turn it off to hide the link if the host is down.
+export const ADMIN_APP_LIVE = true;
 
 const GITHUB = "https://github.com/ericgitangu/clinic-booking";
 

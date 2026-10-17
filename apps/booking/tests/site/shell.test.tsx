@@ -51,12 +51,12 @@ describe("page shell", () => {
     expect(html).toContain('href="/data"');
   });
 
-  it("hides the admin link until the admin app is live", () => {
+  it("links the admin app while it is live", () => {
     const html = renderToStaticMarkup(
       <SiteFooter columns={FOOTER_COLUMNS} notice={FOOTER_NOTICE} />,
     );
-    expect(ADMIN_APP_LIVE).toBe(false);
-    expect(html).not.toContain("clinic-admin.ericgitangu.com");
+    expect(ADMIN_APP_LIVE).toBe(true);
+    expect(html).toContain('href="https://clinic-admin.ericgitangu.com"');
   });
 
   it("opens other sites safely and names every column", () => {
