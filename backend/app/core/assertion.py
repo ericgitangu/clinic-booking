@@ -2,7 +2,8 @@
 
 Wire format, header ``X-Internal-Assertion``: ``v1.<payload>.<mac>`` where ``payload`` is the
 base64url (no padding) of the canonical JSON (sorted keys, no whitespace) of
-``{aud, sub, email, role, iat, exp, m, p, bh}`` and ``mac`` is the base64url HMAC-SHA256 of the
+``{aud, sub, email, role, iat, exp, m, p, bh}`` (plus ``ev``, whether the sign-in provider
+verified the email, when the web app sends it) and ``mac`` is the base64url HMAC-SHA256 of the
 payload string with ``INTERNAL_SIGNING_KEY``.
 
 ``m`` is the HTTP method, ``p`` the path with query string exactly as sent, and ``bh`` the
@@ -45,6 +46,8 @@ class Principal:
     sub: str
     email: str
     role: str
+    # True only when the signed claim ``ev`` is the boolean true. Absent or anything else is False.
+    email_verified: bool = False
 
 
 def _b64(raw: bytes) -> str:
@@ -128,4 +131,4 @@ def verify(
     sub, email, role = claims.get("sub"), claims.get("email"), claims.get("role")
     if not (isinstance(sub, str) and isinstance(email, str) and isinstance(role, str)):
         raise InvalidAssertion("missing identity")
-    return Principal(sub=sub, email=email, role=role)
+    return Principal(sub=sub, email=email, role=role, email_verified=claims.get("ev") is True)

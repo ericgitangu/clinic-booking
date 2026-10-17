@@ -61,6 +61,8 @@ export interface Caller {
   email: string;
   /** The role the API should see; "none" only when asking what role an email holds. */
   role: string;
+  /** Whether the sign-in provider verified the email; the patient routes refuse it when not true. */
+  emailVerified?: boolean;
 }
 
 export interface CallOptions {

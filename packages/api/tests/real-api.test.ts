@@ -285,11 +285,13 @@ describe.skipIf(!REAL)("against the real API", () => {
       sub: `sub-${tag}-a`,
       email: `a-${tag}@clinic.example`,
       role: "patient",
+      emailVerified: true,
     };
     const bob = {
       sub: `sub-${tag}-b`,
       email: `b-${tag}@clinic.example`,
       role: "patient",
+      emailVerified: true,
     };
 
     // Without an assertion the API refuses, and says so with a typed problem.
@@ -301,6 +303,28 @@ describe.skipIf(!REAL)("against the real API", () => {
       kind: "problem",
       status: 401,
       code: "UNAUTHENTICATED",
+    });
+
+    // An email Google has not verified is refused on every patient route, with a typed problem.
+    const unverified = {
+      ...alice,
+      sub: `${alice.sub}-u`,
+      emailVerified: false,
+    };
+    const refused = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Nope Person" },
+        }),
+      { caller: unverified },
+    );
+    expect(refused).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 403,
+      code: "FORBIDDEN",
     });
 
     const before = await callApi(
@@ -324,6 +348,7 @@ describe.skipIf(!REAL)("against the real API", () => {
         }),
       { caller: alice },
     );
+    expect(first).toMatchObject({ ok: true, status: 201 });
     expect(first.ok && first.data.created).toBe(true);
     const again = await callApi(
       "linkAccount",
@@ -334,6 +359,7 @@ describe.skipIf(!REAL)("against the real API", () => {
         }),
       { caller: alice },
     );
+    expect(again).toMatchObject({ ok: true, status: 200 });
     expect(again.ok && again.data.created).toBe(false);
     expect(again.ok && first.ok && again.data.patient_id).toBe(
       first.ok && first.data.patient_id,

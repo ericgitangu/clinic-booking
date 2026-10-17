@@ -1,8 +1,9 @@
 """What a signed-in patient may do, through the web app's server side only.
 
-Every route needs a valid, request-bound assertion (``require_identity``). The patient is the one
-the assertion's subject is linked to; a patient id is never taken from the request. An appointment
-that is not the caller's answers 404, the same as one that does not exist, so ids cannot be probed.
+Every route needs a valid, request-bound assertion for a verified email
+(``require_verified_identity``). The patient is the one the assertion's subject is linked to; a
+patient id is never taken from the request. An appointment that is not the caller's answers 404,
+the same as one that does not exist, so ids cannot be probed.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, get_session, get_settings, require_identity
+from app.api.deps import get_clock, get_session, get_settings, require_verified_identity
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -38,7 +39,7 @@ from app.services import booking
 router = APIRouter(
     prefix="/internal",
     tags=["patient account"],
-    responses=problem_responses(401),
+    responses=problem_responses(401, 403),
 )
 
 _NO_STORE = {"Cache-Control": "no-store"}
@@ -69,17 +70,20 @@ def _to_schema(appt: AppointmentModel) -> Appointment:
 @router.post(
     "/accounts/link",
     response_model=AccountLinked,
-    responses=problem_responses(422),
+    responses={
+        **problem_responses(403, 422),
+        201: {"model": AccountLinked, "description": "The patient was created by this call"},
+    },
 )
 async def link_account(
     body: AccountLinkRequest,
     response: Response,
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
 ) -> AccountLinked:
     """Idempotent: the first call for a sign-in creates a patient from the display name and the
-    verified email and records the link; every later call returns the same patient. It never
-    adopts an existing patient that happens to share a phone number or an email."""
+    verified email and records the link (201); every later call returns the same patient (200).
+    It never adopts an existing patient that happens to share a phone number or an email."""
     response.headers.update(_NO_STORE)
     existing = await account_repo.patient_id_for(session, who.sub)
     await session.rollback()
@@ -104,6 +108,7 @@ async def link_account(
         if winner is None:  # pragma: no cover - the row exists once the conflict was reported
             raise PatientNotFound()
         return AccountLinked(patient_id=winner, created=False)
+    response.status_code = 201
     return AccountLinked(patient_id=created, created=True)
 
 
@@ -115,7 +120,7 @@ async def link_account(
 async def my_appointments(
     response: Response,
     limit: int = Query(default=50, ge=1, le=100),
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
 ) -> PatientAppointments:
@@ -154,7 +159,7 @@ async def my_appointments(
 async def my_appointment(
     appointment_id: uuid.UUID,
     response: Response,
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
@@ -177,7 +182,7 @@ async def my_appointment(
 async def book_mine(
     body: MeAppointmentCreate,
     response: Response,
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
@@ -204,7 +209,7 @@ async def cancel_mine(
     appointment_id: uuid.UUID,
     body: CancelRequest,
     response: Response,
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
 ) -> Appointment:
@@ -224,7 +229,7 @@ async def reschedule_mine(
     appointment_id: uuid.UUID,
     body: RescheduleRequest,
     response: Response,
-    who: Principal = Depends(require_identity),
+    who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),

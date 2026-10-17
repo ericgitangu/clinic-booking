@@ -151,8 +151,8 @@ export const healthHealthGet = <ThrowOnError extends boolean = false>(options?: 
  * Link Account
  *
  * Idempotent: the first call for a sign-in creates a patient from the display name and the
- * verified email and records the link; every later call returns the same patient. It never
- * adopts an existing patient that happens to share a phone number or an email.
+ * verified email and records the link (201); every later call returns the same patient (200).
+ * It never adopts an existing patient that happens to share a phone number or an email.
  */
 export const linkAccountInternalAccountsLinkPost = <ThrowOnError extends boolean = false>(options: Options<LinkAccountInternalAccountsLinkPostData, ThrowOnError>): RequestResult<LinkAccountInternalAccountsLinkPostResponses, LinkAccountInternalAccountsLinkPostErrors, ThrowOnError> => (options.client ?? client).post<LinkAccountInternalAccountsLinkPostResponses, LinkAccountInternalAccountsLinkPostErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({

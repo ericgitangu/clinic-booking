@@ -17,6 +17,7 @@ import * as api from "@/lib/api";
 import { addDays, clinicDay } from "@/lib/clinic-time";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
+import { patientName } from "@/lib/identity";
 import { callerFor, getIdentity, type Identity } from "@/lib/session";
 
 // Request bodies are checked with the schemas generated from the contract, never with rules
@@ -106,7 +107,7 @@ export async function bookAppointment(
 
   const caller = callerFor(who);
   // Idempotent: makes the patient the first time this person books, finds it every time after.
-  const linked = await api.linkAccount(caller, who.name);
+  const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
   const booked = await api.bookMine(caller, {

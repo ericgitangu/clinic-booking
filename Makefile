@@ -116,6 +116,8 @@ e2e: ## Playwright checks against the real API and database (docker compose, mig
 	# the app signs its sessions with BETTER_AUTH_SECRET.
 	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32); \
 	docker compose down -v && docker compose up -d --wait && \
+	REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
+	REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts && \
 	cd apps/booking && pnpm build && pnpm test:e2e
 
 e2e-admin: ## Playwright for apps/admin against the real build, API and Postgres (compose); only Google sign-in is replaced

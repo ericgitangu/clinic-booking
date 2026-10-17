@@ -44,7 +44,12 @@ async def api() -> AsyncIterator[httpx.AsyncClient]:
 
 
 def _headers(
-    method: str, path: str, who: tuple[str, str], body: bytes = b"", at: datetime = FIXED_NOW
+    method: str,
+    path: str,
+    who: tuple[str, str],
+    body: bytes = b"",
+    at: datetime = FIXED_NOW,
+    verified: bool | None = True,
 ) -> dict[str, str]:
     sub, email = who
     claims: dict[str, object] = {
@@ -58,6 +63,8 @@ def _headers(
         "p": path,
         "bh": body_hash(body),
     }
+    if verified is not None:
+        claims["ev"] = verified
     return {"X-Internal-Assertion": sign(claims, KEY.encode()), "content-type": "application/json"}
 
 
@@ -107,9 +114,10 @@ async def test_link_creates_a_patient_once_and_returns_the_same_one_after(
     api: httpx.AsyncClient, accounts: None, owner_conn: asyncpg.Connection
 ) -> None:
     first = await link(api, ALICE, "Alice Wanjiru")
-    assert first.status_code == 200, first.text
+    assert first.status_code == 201, first.text
     assert first.json()["created"] is True
     again = await link(api, ALICE, "A Different Name")
+    assert again.status_code == 200
     assert again.json() == {"patient_id": first.json()["patient_id"], "created": False}
     row = await owner_conn.fetchrow(
         "SELECT full_name, email FROM patients WHERE id = $1", uuid.UUID(first.json()["patient_id"])
@@ -128,7 +136,7 @@ async def test_link_never_adopts_an_existing_patient_with_the_same_email(
         ALICE[1],
     )
     resp = await link(api, ALICE)
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.json()["patient_id"] != str(existing)
 
 
@@ -136,7 +144,8 @@ async def test_two_first_sign_ins_racing_make_one_patient(
     api: httpx.AsyncClient, accounts: None, owner_conn: asyncpg.Connection
 ) -> None:
     results = await asyncio.gather(*(link(api, BOB) for _ in range(8)))
-    assert {r.status_code for r in results} == {200}
+    assert {r.status_code for r in results} <= {200, 201}
+    assert sum(1 for r in results if r.status_code == 201) == 1
     assert len({r.json()["patient_id"] for r in results}) == 1
     assert sum(1 for r in results if r.json()["created"]) == 1
     assert await owner_conn.fetchval("SELECT count(*) FROM patient_accounts") == 1
@@ -176,8 +185,8 @@ async def test_me_routes_say_not_found_before_the_account_is_linked(
 async def test_a_patient_books_lists_and_reads_only_their_own(
     api: httpx.AsyncClient, accounts: None
 ) -> None:
-    assert (await link(api, ALICE)).status_code == 200
-    assert (await link(api, BOB)).status_code == 200
+    assert (await link(api, ALICE)).status_code == 201
+    assert (await link(api, BOB)).status_code == 201
     appt = await book_as(api, ALICE)
 
     mine = await call(api, "GET", "/internal/me/appointments", ALICE)
@@ -283,3 +292,37 @@ async def test_the_runtime_role_cannot_change_or_remove_a_link(
         await app_conn.execute("UPDATE patient_accounts SET email = 'x@example.test'")
     with pytest.raises(asyncpg.InsufficientPrivilegeError):
         await app_conn.execute("DELETE FROM patient_accounts")
+
+
+@pytest.mark.parametrize("verified", [False, None])
+async def test_an_unverified_email_cannot_link_book_or_list(
+    api: httpx.AsyncClient, accounts: None, owner_conn: asyncpg.Connection, verified: bool | None
+) -> None:
+    """``ev`` false, or absent altogether, is refused on every patient route and creates nothing."""
+    body = b'{"full_name":"Not Verified"}'
+    refused = await api.post(
+        "/internal/accounts/link",
+        headers=_headers("POST", "/internal/accounts/link", ALICE, body, verified=verified),
+        content=body,
+    )
+    assert refused.status_code == 403 and refused.json()["code"] == "FORBIDDEN"
+    listed = await api.get(
+        "/internal/me/appointments",
+        headers=_headers("GET", "/internal/me/appointments", ALICE, verified=verified),
+    )
+    assert listed.status_code == 403
+    assert await owner_conn.fetchval("SELECT count(*) FROM patient_accounts") == 0
+
+
+async def test_a_verified_link_is_not_undone_by_a_later_unverified_assertion(
+    api: httpx.AsyncClient, accounts: None
+) -> None:
+    assert (await link(api, ALICE)).status_code == 201
+    body = b'{"full_name":"Whoever"}'
+    refused = await api.post(
+        "/internal/accounts/link",
+        headers=_headers("POST", "/internal/accounts/link", ALICE, body, verified=False),
+        content=body,
+    )
+    assert refused.status_code == 403
+    assert (await link(api, ALICE)).status_code == 200

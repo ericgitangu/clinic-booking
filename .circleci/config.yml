@@ -526,6 +526,8 @@ jobs:
             pnpm install --frozen-lockfile --ignore-scripts
             # the generated client against the real API (reads, real problems, the whole booking path)
             REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts
+            # the same Google person on two app instances gets the same patient (real OAuth callback, real API)
+            REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts
             pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e

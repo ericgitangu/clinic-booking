@@ -1030,6 +1030,10 @@ export type LinkAccountInternalAccountsLinkPostErrors = {
     /**
      * Problem (RFC 9457)
      */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
     422: unknown;
 };
 
@@ -1038,6 +1042,10 @@ export type LinkAccountInternalAccountsLinkPostResponses = {
      * Successful Response
      */
     200: AccountLinked;
+    /**
+     * The patient was created by this call
+     */
+    201: AccountLinked;
 };
 
 export type LinkAccountInternalAccountsLinkPostResponse = LinkAccountInternalAccountsLinkPostResponses[keyof LinkAccountInternalAccountsLinkPostResponses];
@@ -1463,6 +1471,10 @@ export type MyAppointmentsInternalMeAppointmentsGetErrors = {
     /**
      * Problem (RFC 9457)
      */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
     404: unknown;
     /**
      * Validation Error
@@ -1491,6 +1503,10 @@ export type BookMineInternalMeAppointmentsPostErrors = {
      * Problem (RFC 9457)
      */
     401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
     /**
      * Problem (RFC 9457)
      */
@@ -1538,6 +1554,10 @@ export type MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors = {
     /**
      * Problem (RFC 9457)
      */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
     404: unknown;
     /**
      * Problem (RFC 9457)
@@ -1571,6 +1591,10 @@ export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors = {
      * Problem (RFC 9457)
      */
     401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
     /**
      * Problem (RFC 9457)
      */
@@ -1611,6 +1635,10 @@ export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErro
      * Problem (RFC 9457)
      */
     401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
     /**
      * Problem (RFC 9457)
      */
