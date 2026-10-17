@@ -1,6 +1,11 @@
 variable "project_id" {
   type        = string
   description = "GCP project id (e.g. sil-clinic-booking)."
+
+  validation {
+    condition     = var.project_id == "sil-clinic-booking"
+    error_message = "Every Google resource for this app lives only in the dedicated project sil-clinic-booking."
+  }
 }
 
 variable "project_number" {

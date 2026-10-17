@@ -157,3 +157,26 @@ resource "google_storage_bucket_iam_member" "deployer_state_bucket_meta" {
   role   = google_project_iam_custom_role.bucket_meta_reader.id
   member = "serviceAccount:${google_service_account.deployer.email}"
 }
+
+# ---- reCAPTCHA assessments from the web app's server side (ADR-0022) ---------------------------
+# The BFF verifies score-based reCAPTCHA tokens with projects.assessments.create. It has no API
+# key and no secret: Vercel's OIDC identity (the same federated principal that mints the Cloud Run
+# ID token) may mint short-lived tokens for this one account, and the account holds only the
+# reCAPTCHA Enterprise Agent role.
+resource "google_service_account" "recaptcha" {
+  account_id   = "clinic-recaptcha"
+  display_name = "reCAPTCHA assessments for the web app"
+  depends_on   = [google_project_service.enabled]
+}
+
+resource "google_project_iam_member" "recaptcha_agent" {
+  project = var.project_id
+  role    = "roles/recaptchaenterprise.agent"
+  member  = "serviceAccount:${google_service_account.recaptcha.email}"
+}
+
+resource "google_service_account_iam_member" "vercel_impersonate_recaptcha" {
+  service_account_id = google_service_account.recaptcha.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = local.vercel_principal
+}
