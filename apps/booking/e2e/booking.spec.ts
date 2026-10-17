@@ -95,6 +95,12 @@ test("a double booking says the time was just taken and offers the next free tim
   await expect(alert).toContainText("That time was just taken.");
   await expect(alert).toContainText("Here are the next free times");
   // A suggested time leads straight to a details page for that time, and it books.
+  // Slow the browser's navigation to the details page, as a busy runner or a bad connection would:
+  // the confirm click must wait for the suggested time's page, never land on the old one.
+  await b.page.route(/\/book\/[^/]+\/details/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
   const suggestion = alert.getByRole("link").first();
   const suggestedHref = await suggestion.getAttribute("href");
   await suggestion.click();

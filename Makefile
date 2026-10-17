@@ -110,5 +110,8 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
 e2e: ## Playwright checks against the real API and database (docker compose, migrations and seed) and a production build
+	# A fresh database every time (this removes the compose volume), as in CI: the scenarios book real
+	# slots, and a database that keeps every earlier run eventually has no free times in the week a scenario uses.
+	docker compose down -v
 	docker compose up -d --wait
 	cd apps/booking && pnpm build && pnpm test:e2e
