@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Production-alias helpers for the web app. Needs VERCEL_TOKEN, VERCEL_ORG_ID (the team id) and
+# Production-alias helpers for one web app: VERCEL_APP=booking (default) or admin picks the host. Needs VERCEL_TOKEN, VERCEL_ORG_ID (the team id) and
 # scripts/ci/public-urls.env; the Vercel CLI comes from PATH ($VERCEL overrides it in tests).
 #
 #   vercel_prod.sh id-of <host-or-url>   print the deployment id behind a host
-#   vercel_prod.sh current               print the id of the deployment serving $WEB right now
+#   vercel_prod.sh current               print the id of the deployment serving the app host right now
 #   vercel_prod.sh previous              print the newest READY production deployment that is not the
 #                                        current one (empty when there is none)
-#   vercel_prod.sh ensure <id>           make $WEB serve <id>: promote it if it does not, then fail
+#   vercel_prod.sh ensure <id>           make the app host serve <id>: promote it if it does not, then fail
 #                                        unless it does (a rollback switches off auto-assignment,
 #                                        so a later deploy can land without taking the alias)
 #   vercel_prod.sh rollback <id>         point production at <id> explicitly, then check it took
@@ -16,7 +16,11 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 VERCEL="${VERCEL:-vercel}"
 . scripts/ci/public-urls.env
-HOST="${WEB#https://}"
+case "${VERCEL_APP:-booking}" in
+  booking) HOST="${WEB#https://}" ;;
+  admin)   HOST="${ADMIN#https://}" ;;
+  *) echo "vercel_prod: VERCEL_APP must be booking or admin" >&2; exit 2 ;;
+esac
 
 id_of() {
   local host="${1#https://}"; host="${host%%/*}"

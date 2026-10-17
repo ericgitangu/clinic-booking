@@ -29,7 +29,15 @@ jobs:
           name: Deploy marker, success
           command: circleci run release update rollback-api --status=SUCCESS
 
-  rollback-web:
+  rollback-app:
+    parameters:
+      app:
+        description: The app directory under apps/ (booking or admin)
+        type: string
+      project_id:
+        description: Vercel project id for this app when it differs from the context's (not a secret)
+        type: string
+        default: ""
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
@@ -39,18 +47,26 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Select the Vercel project for this app (the context holds the booking project's id)
+          command: |
+            echo 'export VERCEL_APP="<< parameters.app >>"' >> "$BASH_ENV"
+            if [ -n "<< parameters.project_id >>" ]; then
+              echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
+            fi
+      - run:
           name: Deploy marker, planned rollback
           command: |
-            circleci run release plan rollback-web --environment-name=<< pipeline.deploy.environment_name >> \
+            circleci run release plan rollback-<< parameters.app >> --environment-name=<< pipeline.deploy.environment_name >> \
               --component-name=<< pipeline.deploy.component_name >> --target-version="${TARGET_VERSION}" --rollback
       - run:
           name: Point production at the previous Vercel deployment (TARGET_VERSION is not used here)
           command: |
             sudo npm install -g vercel@59.5.0 --ignore-scripts
+            export VERCEL_APP="<< parameters.app >>"
             bash scripts/ci/vercel_prod.sh rollback "$(bash scripts/ci/vercel_prod.sh previous)"
       - run:
           name: Deploy marker, success
-          command: circleci run release update rollback-web --status=SUCCESS
+          command: circleci run release update rollback-<< parameters.app >> --status=SUCCESS
 
 workflows:
   rollback-api:
@@ -59,9 +75,18 @@ workflows:
     jobs:
       - rollback-api:
           context: gcp-deploy
-  rollback-web:
+  rollback-booking:
     when:
       equal: [clinic-web, << pipeline.deploy.component_name >>]
     jobs:
-      - rollback-web:
+      - rollback-app:
+          app: booking
           context: vercel-prod
+  rollback-admin:
+    when:
+      equal: [clinic-admin, << pipeline.deploy.component_name >>]
+    jobs:
+      - rollback-app:
+          app: admin
+          context: vercel-prod
+          project_id: prj_Y5T4nteV26yu6A9pVSMy2YLZgE4w
