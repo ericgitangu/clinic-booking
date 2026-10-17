@@ -255,7 +255,12 @@ live_checks() {
   command -v gcloud >/dev/null || { fail "gcloud not installed"; return; }
   command -v jq >/dev/null || { fail "jq not installed"; return; }
   if [ -z "${GCLOUD_ACCOUNT:-}" ]; then
-    echo "note: GCLOUD_ACCOUNT unset; using the active gcloud account: $(gcloud config get-value account 2>/dev/null)"
+    # CI masks the account in logs, so print it only when running by hand.
+    if [ -n "${CIRCLECI:-}" ]; then
+      echo "note: GCLOUD_ACCOUNT unset; using the active gcloud account (the CI deployer)"
+    else
+      echo "note: GCLOUD_ACCOUNT unset; using the active gcloud account: $(gcloud config get-value account 2>/dev/null)"
+    fi
   fi
 
   # C1: max/min instances, service-level min, CPU throttling, scaling mode.
@@ -342,7 +347,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   fi
 
   # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API.
-  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ] && [ -n "${CIRCLECI:-}" ]; then
+    echo "SKIP  C11 budgets: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
+  elif [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
     fail "C11 BILLING_GCLOUD_ACCOUNT unset: the billing user (not the project Owner) must read the budgets"
   elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c11
@@ -372,7 +379,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   # C14: the billing account is SHARED (PLAN 11.1 Q14), so the free tiers are shared with the
   # projects in scripts/shared_billing_projects.txt. A project that joins (or leaves) the account
   # changes the headroom and must be re-measured with scripts/shared_headroom.py first.
-  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
+  if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ] && [ -n "${CIRCLECI:-}" ]; then
+    echo "SKIP  C14 project list: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
+  elif [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
     fail "C14 BILLING_GCLOUD_ACCOUNT unset: the billing user must list the projects on the billing account"
   elif [ -n "${BILLING_ACCOUNT:-}" ]; then
     local c14 want14
@@ -385,7 +394,8 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
 
   # C20: the default Compute service account has no roles/editor (Terraform removes the binding).
   local num c20
-  num="$(gc projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null)"
+  # CI has the number in GOOGLE_PROJECT_NUMBER (no resourcemanager.projects.get needed).
+  num="${GOOGLE_PROJECT_NUMBER:-$(gc projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null)}"
   if [ -n "$num" ]; then
     c20="$(gc projects get-iam-policy "$PROJECT" --format=json 2>/dev/null | jq -r --arg m "serviceAccount:${num}-compute@developer.gserviceaccount.com" '[.bindings[]? | select(.role == "roles/editor") | .members[]? | select(. == $m)] | length')"
     [ "$c20" = 0 ] && pass "C20 default Compute SA has no roles/editor" || fail "C20 default Compute SA roles/editor bindings: ${c20:-unreadable}"
