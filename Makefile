@@ -100,8 +100,13 @@ cost-selftest: ## Prove the cost guard by mutation (no cloud)
 ci-test: ## Test the CI helper scripts against fakes (no cloud)
 	bash scripts/ci/test_ci_scripts.sh
 
-env-pull: ## Fill web/.env.local (gitignored) from the Vercel project's Development environment
+env-pull: ## Fill web/.env.local (gitignored) from Vercel's Development environment; sensitive values are not returned
 	cd web && vercel env pull .env.local --environment=development
+	@printf '%s\n' \
+	  'NOTE: Vercel never returns variables marked Sensitive through env pull.' \
+	  'Copy those into web/.env.local by hand: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET,' \
+	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
+	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
 e2e: ## Playwright checks against a production build (web/): sideways scroll and touch targets at 360, 768, 1280
 	cd web && pnpm build && pnpm test:e2e
