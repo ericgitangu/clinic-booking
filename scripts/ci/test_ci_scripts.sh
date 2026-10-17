@@ -319,51 +319,66 @@ git remote set-url origin "$WORK/origin.git"
 # =========================================================================================
 cat > "$WORK/bin/vercel" <<'FAKE'
 #!/usr/bin/env bash
-[ "${1:-} ${2:-}" = "env ls" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
+[ "${1:-}" = "api" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
 [ -f "$FX/denied" ] && { echo "Error: Not authorized" >&2; exit 1; }
-cat "$FX/env_ls"
+cat "$FX/env_json"
 FAKE
 chmod +x "$WORK/bin/vercel"
-env_row() { printf ' %-40s %-26s %-19s %s\n' "$1" "SECRET-VALUE-MUST-NOT-LEAK" Sensitive "$2"; }
-env_table() { # <environments> <name...>
-  local envs="$1"; shift
-  printf '\n name  value  type  environments\n'
-  for n in "$@"; do env_row "$n" "$envs"; done
-  printf '\nCommon next commands:\n- `vercel env add`\n'
+# env_table <target> [hidden] <name...>: a Vercel env API body with a value that must never leak.
+env_table() {
+  local target="$1" hidden="$2"; shift 2
+  python3 - "$target" "$hidden" "$@" <<'PY' > "$FX/env_json"
+import json, sys
+target, hidden, names = sys.argv[1], int(sys.argv[2]), sys.argv[3:]
+t = ["production", "preview", "development"] if target == "all" else [target]
+print("Vercel CLI 59.5.0\n" + json.dumps({"envs": [{"key": n, "target": t, "type": "plain", "value": "SECRET-VALUE-MUST-NOT-LEAK"} for n in names], "hiddenProductionEnvCount": hidden}))
+PY
 }
 ALL="BETTER_AUTH_URL BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL API_AUDIENCE GCP_PROJECT_NUMBER GCP_SERVICE_ACCOUNT_EMAIL GCP_WORKLOAD_IDENTITY_POOL_ID GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID ADMIN_EMAILS"
 
 new_fx env_ok
-env_table Production $ALL OTHER > "$FX/env_ls"
+env_table production 0 $ALL OTHER
 out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
 expect "env check: passes when every name is set for production" "$rc" 0
 expect "env check: never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
 
 new_fx env_missing
-env_table Production BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL > "$FX/env_ls"
+env_table production 0 BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL
 out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
 expect "env check: refuses when a name is missing" "$([ "$rc" -ne 0 ] && echo refused)" refused
 expect "env check: names the missing variable" "$(grep -c 'BETTER_AUTH_URL' <<<"$out")" 1
 expect "env check: a failure never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
 
 new_fx env_none
-printf '> No Environment Variables found for team/clinic-admin\n' > "$FX/env_ls"
+env_table production 0
 bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
 expect "env check: refuses an empty project (the 2026-10 admin outage)" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
 new_fx env_wrong_target
-env_table Preview $ALL > "$FX/env_ls"
+env_table preview 0 $ALL
 bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
 expect "env check: a Preview-only value does not satisfy production" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
 new_fx env_all_envs
-env_table "All Environments" $ALL > "$FX/env_ls"
+env_table all 0 $ALL
 bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
 expect "env check: All Environments counts" "$rc" 0
 
+new_fx env_hidden
+env_table production 2 $ALL
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: fails closed when variables are hidden from the token" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: says how many are hidden" "$(grep -c '2 production variables are hidden' <<<"$out")" 1
+
+new_fx env_garbage
+printf 'Error: something odd\n' > "$FX/env_json"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: unreadable response fails closed" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: unreadable response says what the CLI said" "$(grep -c 'something odd' <<<"$out")" 1
+
 new_fx env_denied
 touch "$FX/denied"
-bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+out="$(bash "$HERE/vercel_env_check.sh" booking production 2>&1)"; rc=$?
 expect "env check: fails closed when the listing is refused" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
 # =========================================================================================

@@ -5,8 +5,8 @@
 #   vercel_env_check.sh <booking|admin> [production]
 #
 # Needs VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID like the rest of the ship job. Reads only
-# the variable NAMES and the environment column from `vercel env ls`; the value column is never
-# kept, printed or compared. The Vercel CLI comes from PATH ($VERCEL overrides it in tests).
+# the variable NAMES and their target environments from the project's env API (the same
+# authenticated `vercel api` path vercel_prod.sh uses); values are never kept, printed or compared. The Vercel CLI comes from PATH ($VERCEL overrides it in tests).
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -17,18 +17,31 @@ TARGET="${2:-production}"
 required="$(awk -v app="$APP" '$1 == app { print $2 }' scripts/ci/required_env.txt)"
 [ -n "$required" ] || { echo "vercel_env_check: no required variables listed for '$APP'" >&2; exit 2; }
 
-listing="$("$VERCEL" env ls "$TARGET" 2>&1)" || {
-  echo "vercel_env_check: could not list the $TARGET variables for $APP (the Vercel token may lack access to this project)" >&2
-  exit 1
-}
+raw="$("$VERCEL" api "/v10/projects/${VERCEL_PROJECT_ID:?set VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID:?set VERCEL_ORG_ID}" --raw 2>&1)" || true
 
-# Table rows only: " NAME  value  type  environments  created". Keep the name and, as a flag, whether
-# the row covers the target; throw the rest away before anything is stored.
-present="$(printf '%s\n' "$listing" | awk -v t="$TARGET" '
-  $1 ~ /^[A-Za-z_][A-Za-z0-9_]*$/ && $1 != "name" {
-    line = tolower($0)
-    if (index(line, tolower(t)) || index(line, "all environments")) print $1
-  }')"
+# Keep only key + target from the JSON; on anything else say what the CLI said (error text, so no
+# values) and fail closed, because an unreadable list must not read as "all present".
+present="$(printf '%s' "$raw" | TARGET="$TARGET" python3 -c '
+import json, os, sys
+text = sys.stdin.read()
+try:
+    data = json.loads("{" + text.split("{", 1)[1].rsplit("}", 1)[0] + "}")
+    envs = data["envs"]
+except Exception:
+    reason = " ".join(text.split())[:240] or "empty response"
+    sys.stderr.write("vercel_env_check: could not read the project variables: " + reason + "\n")
+    sys.exit(3)
+hidden = int(data.get("hiddenProductionEnvCount") or 0)
+if os.environ["TARGET"] == "production" and hidden:
+    sys.stderr.write("vercel_env_check: %d production variables are hidden from this token, so the list cannot be verified\n" % hidden)
+    sys.exit(4)
+target = os.environ["TARGET"]
+for e in envs:
+    t = e.get("target") or []
+    t = [t] if isinstance(t, str) else t
+    if target in t:
+        print(e["key"])
+')" || { echo "vercel_env_check: FAIL, cannot verify the $TARGET variables for $APP; nothing was promoted." >&2; exit 1; }
 
 missing=""
 for name in $required; do
