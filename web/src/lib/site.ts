@@ -4,7 +4,7 @@ export const SITE = {
   shortName: "Idyllic",
   description:
     "Find a doctor, see free slots in Nairobi time, book a visit, and cancel or reschedule when plans change.",
-  url: "https://sil-clinic-booking.vercel.app",
+  url: "https://clinic.ericgitangu.com",
   locale: "en_KE",
 } as const;
 

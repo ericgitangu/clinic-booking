@@ -284,7 +284,7 @@ Everything stays in the `sil-clinic-booking` project; pass `--project` on every 
 
 ```bash
 gcloud recaptcha keys create --web --integration-type=score \
-  --domains=sil-clinic-booking.vercel.app,localhost --display-name=clinic-web \
+  --domains=sil-clinic-booking.vercel.app,localhost,clinic.ericgitangu.com --display-name=clinic-web \
   --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
 gcloud recaptcha keys list --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
 ```

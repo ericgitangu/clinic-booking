@@ -9,12 +9,14 @@
 
 | What | Where |
 |---|---|
-| Landing page | <https://sil-clinic-booking.vercel.app> |
-| API base | <https://sil-clinic-booking.vercel.app/api> |
-| Swagger UI | <https://sil-clinic-booking.vercel.app/docs> |
-| ReDoc | <https://sil-clinic-booking.vercel.app/redoc> |
-| OpenAPI spec | <https://sil-clinic-booking.vercel.app/openapi.json> |
+| Landing page | <https://clinic.ericgitangu.com> |
+| API base | <https://clinic.ericgitangu.com/api> |
+| Swagger UI | <https://clinic.ericgitangu.com/docs> |
+| ReDoc | <https://clinic.ericgitangu.com/redoc> |
+| OpenAPI spec | <https://clinic.ericgitangu.com/openapi.json> |
 | Pipelines | <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
+
+The earlier address, <https://sil-clinic-booking.vercel.app>, still serves the same deployment.
 
 There is no booking UI; the API is the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
@@ -23,7 +25,7 @@ There is no booking UI; the API is the product. Cloud Run itself is IAM-only and
 Everything below was run against production on 2026-10-17 (UTC). The commands are copy-paste; the output is what I saw.
 
 ```bash
-W=https://sil-clinic-booking.vercel.app
+W=https://clinic.ericgitangu.com
 for p in / /docs /openapi.json /api/doctors /api/ready; do
   printf '%-14s ' $p; curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $W$p
 done
