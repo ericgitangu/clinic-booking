@@ -103,6 +103,10 @@ test.describe("footer", () => {
         expect((await request.get(href)).status(), href).toBe(200);
       } else {
         const url = new URL(href);
+        if (process.env.E2E_CHECK_EXTERNAL === "1") {
+          const res = await request.get(href);
+          expect(res.status(), href).toBeLessThan(400);
+        }
         expect(url.protocol, href).toBe("https:");
         expect(rel, href).toContain("noopener");
         expect(rel, href).toContain("noreferrer");

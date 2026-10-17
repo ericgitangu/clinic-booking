@@ -43,7 +43,12 @@ export default function AboutPage() {
           Conflict-free booking: the database itself refuses a second booking
           for the same doctor and time.
         </li>
-        <li>Reminders by email the day before a visit.</li>
+      </ul>
+
+      <h2>Planned next</h2>
+      <p>These are being built and are not live yet.</p>
+      <ul>
+        <li>Email reminders the day before a visit.</li>
         <li>An admin view of the day for the front desk.</li>
       </ul>
 

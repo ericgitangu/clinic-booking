@@ -22,9 +22,12 @@ export type FooterLink = {
 
 export type FooterColumn = { title: string; links: readonly FooterLink[] };
 
+// Off until the admin app is deployed and its domain is attached; the link would fail TLS before then.
+export const ADMIN_APP_LIVE = false;
+
 const GITHUB = "https://github.com/ericgitangu/clinic-booking";
 
-export const FOOTER_COLUMNS: readonly FooterColumn[] = [
+const ALL_COLUMNS: readonly FooterColumn[] = [
   {
     title: "Clinic",
     links: [
@@ -79,7 +82,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
         icon: "briefcase",
       },
       {
-        label: "Data & privacy",
+        label: "Data handling",
         href: "/data",
         external: false,
         icon: "database",
@@ -135,3 +138,10 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
     ],
   },
 ];
+
+export const FOOTER_COLUMNS: readonly FooterColumn[] = ALL_COLUMNS.map(
+  (col) => ({
+    ...col,
+    links: col.links.filter((l) => ADMIN_APP_LIVE || l.label !== "Admin"),
+  }),
+);
