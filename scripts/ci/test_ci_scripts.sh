@@ -24,9 +24,12 @@ cat > "$WORK/bin/gcloud" <<'FAKE'
 echo "$*" >> "$FX/calls.all"
 case "$*" in
   "run services describe"*)
-    if [ -f "$FX/promoted" ]; then cat "$FX/service_after.json"; else cat "$FX/service_before.json"; fi ;;
+    if [ -f "$FX/rolled" ]; then cat "$FX/service_rolled.json"
+    elif [ -f "$FX/promoted" ]; then cat "$FX/service_after.json"; else cat "$FX/service_before.json"; fi ;;
   "run services update-traffic"*--to-tags*)
     echo "$*" >> "$FX/calls"; touch "$FX/promoted" ;;
+  "run services update-traffic"*--to-revisions*)
+    echo "$*" >> "$FX/calls"; touch "$FX/rolled" ;;
   "run services update-traffic"*--remove-tags*)
     echo "$*" >> "$FX/calls" ;;
   "run revisions describe"*)
@@ -66,6 +69,99 @@ mut() { cnt "$1"; }
 # promote.sh + prune.sh: the skipped-release scenario from the review.
 #   Live before: P (tag sha-p, 100%). A was skipped earlier (tag sha-a, 0%). O is older.
 #   Promoting B must keep B and P, and remove A and O (tags and images).
+# =========================================================================================
+# rollback.sh: only ever back to a real previous revision, only if this release is still live.
+# =========================================================================================
+rb_setup() { # <name> <live revision> <previous image>
+  new_fx "$1"; export GOOGLE_PROJECT_ID=p
+  cat > "$FX/service_after.json" <<J
+{"status":{"traffic":[{"revisionName":"$2","percent":100,"tag":"t"},{"revisionName":"rev-p","percent":0,"tag":"sha-p"}]}}
+J
+  cp "$FX/service_after.json" "$FX/service_before.json"; touch "$FX/promoted"
+  cat > "$FX/service_rolled.json" <<'J'
+{"status":{"traffic":[{"revisionName":"rev-p","percent":100,"tag":"sha-p"},{"revisionName":"rev-b","percent":0,"tag":"sha-b"}]}}
+J
+  jq -n --arg i "$3" '{"rev-p":$i,"rev-b":"us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:bbb"}' > "$FX/revision_images.json"
+  export PROMOTE_DIR="$WORK/rb.$1"; mkdir -p "$PROMOTE_DIR"
+  echo '{"revisions":["rev-b","rev-p"],"current":"rev-b","previous":"rev-p"}' > "$PROMOTE_DIR/keep.json"
+}
+rb_setup ok rev-b "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: exit 0 when the promoted release is live" "$rc" 0
+expect "rollback: traffic goes back to the previous revision" "$(cnt 'to-revisions rev-p=100')" 1
+expect "rollback: state recorded" "$(cat "$PROMOTE_DIR/rollback_state")" rolled-back
+
+rb_setup hello rev-b "us-docker.pkg.dev/cloudrun/container/hello"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: refuses the placeholder image (exit 2)" "$rc" 2
+expect "rollback: no traffic change for the placeholder" "$(cnt 'update-traffic')" 0
+
+rb_setup moved rev-x "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: refuses when production is on a different revision (exit 2)" "$rc" 2
+expect "rollback: no traffic change when it is not this release" "$(cnt 'update-traffic')" 0
+
+rb_setup already rev-p "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: already on the previous revision is a no-op (exit 0)" "$rc" 0
+expect "rollback: no-op makes no traffic change" "$(cnt 'update-traffic')" 0
+expect "rollback: no-op still records a state for the workspace" "$(cat "$PROMOTE_DIR/rollback_state")" already-previous
+
+rb_setup first rev-b ""
+echo '{"revisions":["rev-b"],"current":"rev-b","previous":""}' > "$PROMOTE_DIR/keep.json"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: first release has nothing to go back to (exit 2)" "$rc" 2
+
+new_fx nokeep; export PROMOTE_DIR="$WORK/rb.nokeep"; mkdir -p "$PROMOTE_DIR"
+bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
+expect "rollback: nothing promoted means nothing to do (exit 0)" "$rc" 0
+
+
+# manual mode: --to-tag
+rb_setup tag rev-b "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" --to-tag sha-p >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: exit 0 for an existing tag" "$rc" 0
+expect "rollback --to-tag: moves traffic to that tag's revision" "$(cnt 'to-revisions rev-p=100')" 1
+rb_setup notag rev-b "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" --to-tag sha-gone >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: a tag that does not exist is refused (exit 2)" "$rc" 2
+expect "rollback --to-tag: no traffic change for a missing tag" "$(cnt 'update-traffic')" 0
+rb_setup tag_hello rev-b "us-docker.pkg.dev/cloudrun/container/hello"
+bash "$HERE/rollback.sh" --to-tag sha-p >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: the placeholder image is refused (exit 2)" "$rc" 2
+
+# vercel_prod.sh with a fake vercel
+cat > "$WORK/bin/fakevercel" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$FX/vcalls"
+case "$1" in
+  api) case "$2" in
+         */v6/deployments*) echo "{\"deployments\":[{\"uid\":\"$(cat "$FX/serving")\"},{\"uid\":\"dpl_prior\"}]}" ;;
+         *) echo "{\"id\":\"$(cat "$FX/serving")\"}" ;;
+       esac ;;
+  promote) echo "$2" > "$FX/serving" ;;
+  rollback) [ -f "$FX/rollback_broken" ] || echo "$2" > "$FX/serving" ;;
+esac
+FAKE
+chmod +x "$WORK/bin/fakevercel"
+export VERCEL="$WORK/bin/fakevercel" VERCEL_ORG_ID=team_x
+new_fx vp; echo dpl_old > "$FX/serving"
+out="$(bash "$HERE/vercel_prod.sh" current 2>/dev/null)"; expect "vercel_prod: current reads the serving deployment" "$out" dpl_old
+export VERCEL_PROJECT_ID=prj_x
+out="$(bash "$HERE/vercel_prod.sh" previous 2>/dev/null)"; expect "vercel_prod: previous skips the live deployment" "$out" dpl_prior
+bash "$HERE/vercel_prod.sh" ensure dpl_new >/dev/null 2>&1; rc=$?
+expect "vercel_prod: ensure promotes a deployment the alias is not serving" "$rc:$(cat "$FX/serving")" "0:dpl_new"
+bash "$HERE/vercel_prod.sh" ensure dpl_new >/dev/null 2>&1
+expect "vercel_prod: ensure does not promote twice" "$(grep -c '^promote' "$FX/vcalls")" 1
+bash "$HERE/vercel_prod.sh" rollback dpl_old >/dev/null 2>&1
+expect "vercel_prod: rollback points production at the named deployment" "$(cat "$FX/serving")" dpl_old
+touch "$FX/rollback_broken"; bash "$HERE/vercel_prod.sh" rollback dpl_new >/dev/null 2>&1; rc=$?
+expect "vercel_prod: a rollback that does not take fails (exit 1)" "$rc" 1
+bash "$HERE/vercel_prod.sh" rollback "" >/dev/null 2>&1; rc=$?
+expect "vercel_prod: no recorded previous deployment is refused (exit 2)" "$rc" 2
+unset VERCEL
+
+
 # =========================================================================================
 new_fx skipped_in_between
 cat > "$FX/service_before.json" <<'J'
