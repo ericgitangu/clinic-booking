@@ -1,3 +1,4 @@
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 
 // Cost: no image optimization (it bills), no rewrites (the proxy is an explicit route).
@@ -6,4 +7,4 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@clinic/ui", "@clinic/api"],
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

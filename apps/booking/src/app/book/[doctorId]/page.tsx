@@ -74,9 +74,10 @@ export default async function PickTime({
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="details"
             doctorId={doctorId}
-            slots={avail.data.slots}
+            availability={avail.data}
           />
         ) : (
           <p

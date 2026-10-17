@@ -93,9 +93,10 @@ export default async function Reschedule({
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="reschedule"
             appointmentId={id}
-            slots={avail.data.slots}
+            availability={avail.data}
           />
         ) : (
           <p
