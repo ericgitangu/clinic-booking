@@ -1,4 +1,4 @@
-import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
@@ -13,8 +13,11 @@ import { cn } from "@clinic/ui/lib/utils";
 
 // Atkinson Hyperlegible was drawn for legibility, which suits a booking form. One family keeps the
 // first load small: a second font file cost about 0.3 s of simulated slow-4G largest contentful paint.
-const sans = Atkinson_Hyperlegible_Next({
-  subsets: ["latin"],
+const sans = localFont({
+  // Variable weight, latin subset, committed under src/fonts (SIL OFL 1.1, licence beside it): the build needs no network.
+  src: "../fonts/AtkinsonHyperlegibleNext-latin-wght.woff2",
+  weight: "200 800",
+  style: "normal",
   variable: "--font-sans",
   display: "optional",
   // No metrics are published for this font, so Next cannot size a fallback; ask for plain system fonts instead of warning.

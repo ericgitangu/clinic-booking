@@ -1,4 +1,4 @@
-import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
@@ -9,8 +9,11 @@ import { metadata, viewport } from "@/lib/metadata";
 import { getStaff } from "@/lib/session";
 import { ACCESS_LINK, FOOTER_NOTICE, NAV_LINKS, SITE } from "@/lib/site";
 
-const sans = Atkinson_Hyperlegible_Next({
-  subsets: ["latin"],
+const sans = localFont({
+  // Variable weight, latin subset, committed under src/fonts (SIL OFL 1.1, licence beside it): the build needs no network.
+  src: "../fonts/AtkinsonHyperlegibleNext-latin-wght.woff2",
+  weight: "200 800",
+  style: "normal",
   variable: "--font-sans",
   display: "optional",
   adjustFontFallback: false,
