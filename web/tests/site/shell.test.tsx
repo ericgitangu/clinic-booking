@@ -1,3 +1,4 @@
+import { ADMIN_APP_LIVE } from "@/lib/footer-links";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import Home from "@/app/page";
@@ -33,6 +34,28 @@ describe("page shell", () => {
     const html = renderToStaticMarkup(<SiteFooter />);
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="/terms"');
+    expect(html).toContain('href="/data"');
+  });
+
+  it("hides the admin link until the admin app is live", () => {
+    const html = renderToStaticMarkup(<SiteFooter />);
+    expect(ADMIN_APP_LIVE).toBe(false);
+    expect(html).not.toContain("clinic-admin.ericgitangu.com");
+  });
+
+  it("opens other sites safely and names every column", () => {
+    const html = renderToStaticMarkup(<SiteFooter />);
+    for (const title of [
+      "Clinic",
+      "Assessment",
+      "Legal",
+      "Built by Eric Gitangu",
+    ]) {
+      expect(html).toContain(`aria-label="${title}"`);
+    }
+    const external = html.match(/<a [^>]*target="_blank"[^>]*>/g) ?? [];
+    expect(external.length).toBeGreaterThan(10);
+    for (const a of external) expect(a).toContain('rel="noopener noreferrer"');
   });
 });
 

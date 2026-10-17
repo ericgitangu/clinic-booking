@@ -18,6 +18,8 @@ export const PUBLIC_PATHS = [
   "/",
   "/privacy",
   "/terms",
+  "/about",
+  "/data",
   "/docs",
   "/redoc",
   "/openapi.json",
