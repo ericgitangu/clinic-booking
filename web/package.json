@@ -11,7 +11,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "snapshot": "node scripts/snapshot-openapi.mjs"
+    "snapshot": "node scripts/snapshot-openapi.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@next/eslint-plugin-next": "16.4.2",
+    "@playwright/test": "^1.64.1",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

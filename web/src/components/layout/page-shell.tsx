@@ -13,7 +13,7 @@ export function PageShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <SiteHeader />
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-5">
+      <main id="main" className="pad-safe-x mx-auto w-full max-w-5xl flex-1">
         {children}
       </main>
       <SiteFooter />

@@ -259,4 +259,12 @@ AI usage is summarized here in section 11; commit messages carry no tooling trai
 
 ## 12. Run locally
 
+Prerequisites: Docker, uv and pnpm, plus the Vercel CLI for the web app's environment.
+
+The web app reads its settings from `web/.env.local`, which is gitignored. `web/.env.example` lists every variable name with a comment and no values. Run this once, signed in to Vercel, to fill the file from the project's Development environment:
+
+```bash
+make env-pull
+```
+
 <!-- `make up` · `make test` · env vars table · prerequisites (Docker, uv, pnpm) -->

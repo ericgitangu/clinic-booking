@@ -45,3 +45,7 @@ build/
 out/
 *.egg-info/
 bin/
+
+# Playwright output
+test-results/
+playwright-report/

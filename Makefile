@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom
+        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -99,3 +99,9 @@ cost-selftest: ## Prove the cost guard by mutation (no cloud)
 
 ci-test: ## Test the CI helper scripts against fakes (no cloud)
 	bash scripts/ci/test_ci_scripts.sh
+
+env-pull: ## Fill web/.env.local (gitignored) from the Vercel project's Development environment
+	cd web && vercel env pull .env.local --environment=development
+
+e2e: ## Playwright checks against a production build (web/): sideways scroll and touch targets at 360, 768, 1280
+	cd web && pnpm build && pnpm test:e2e

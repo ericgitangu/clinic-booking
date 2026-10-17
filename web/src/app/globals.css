@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-display);
+  --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -139,7 +139,20 @@
   }
 }
 
+/* Side padding that clears the notch and the home bar in landscape on phones. */
+.pad-safe-x {
+  padding-inline: max(1.25rem, env(safe-area-inset-left))
+    max(1.25rem, env(safe-area-inset-right));
+}
+
 @layer base {
+  /* 16px form controls: iOS zooms the page when a smaller field takes focus. */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -149,4 +162,9 @@
   html {
     @apply font-sans;
   }
+}
+
+/* The reCAPTCHA badge is hidden; the footer carries Google's attribution instead. */
+.grecaptcha-badge {
+  visibility: hidden;
 }

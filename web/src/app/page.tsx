@@ -57,10 +57,15 @@ export default function Home() {
             the API behind them is live and open to try now.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="h-11 px-5 text-base">
               <a href="/docs">Open the API docs</a>
             </Button>
-            <Button asChild size="lg" variant="outline">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-11 px-5 text-base"
+            >
               <a href="/openapi.json">Read the contract</a>
             </Button>
           </div>
@@ -117,7 +122,7 @@ export default function Home() {
             <li key={link.href} className="py-4 first:pt-0 last:pb-0">
               <a
                 href={link.href}
-                className="font-medium text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 {link.label}
               </a>
