@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import type { ApiResult } from "@clinic/api/call";
 import type { LineageEvent, Metrics } from "@clinic/api/generated";
 import {
@@ -8,6 +9,7 @@ import {
   type AppointmentQuery,
 } from "@/lib/api";
 import { addDays, lastDays, localDate } from "@/lib/clinic-time";
+import { assertMayReadMetrics, metricsCachePlan } from "@/lib/metrics-cache";
 import { callerFor, type Authorised } from "@/lib/session";
 
 function unwrap<T>(res: ApiResult<T>, what: string): T {
@@ -16,6 +18,26 @@ function unwrap<T>(res: ApiResult<T>, what: string): T {
     throw new Error(`${what} failed (${res.status} ${res.code})`);
   }
   return res.data;
+}
+
+// The clinic-wide metrics, cached for 60 seconds under one tag. The caller has already
+// been checked (requireStaff on the page, and the check below), outside the cache: a cached value
+// is only ever returned to someone who holds a role that may view. The cached function throws on a
+// failure, so an error is never stored; the signed caller is a closure, not part of the key,
+// because the figures are the same for every role.
+async function cachedMetrics(
+  staff: Authorised,
+  from: string,
+  to: string,
+): Promise<Metrics> {
+  assertMayReadMetrics(staff.role);
+  const { keyParts, options } = metricsCachePlan(from, to, "day");
+  return unstable_cache(
+    async () =>
+      unwrap(await metrics(callerFor(staff, staff.role), from, to), "metrics"),
+    keyParts,
+    options,
+  )();
 }
 
 export interface Dashboard {
@@ -37,8 +59,8 @@ export async function loadDashboard(
   const today = localDate(now);
 
   const [rangeRes, weekRes, todayRes] = await Promise.all([
-    metrics(caller, range.from, range.to),
-    days === 7 ? null : metrics(caller, week.from, week.to),
+    cachedMetrics(staff, range.from, range.to),
+    days === 7 ? null : cachedMetrics(staff, week.from, week.to),
     appointmentsPage(caller, {
       status: "booked",
       from: today,
@@ -46,10 +68,8 @@ export async function loadDashboard(
       limit: 100,
     }),
   ]);
-  const rangeMetrics = unwrap(rangeRes, "metrics");
-  const weekMetrics = weekRes
-    ? unwrap(weekRes, "weekly metrics")
-    : rangeMetrics;
+  const rangeMetrics = rangeRes;
+  const weekMetrics = weekRes ?? rangeMetrics;
   const todayPage = unwrap(todayRes, "today's appointments");
 
   const visits = rangeMetrics.per_doctor.reduce(
