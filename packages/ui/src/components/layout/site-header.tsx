@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
 import { MobileNav } from "@clinic/ui/components/layout/mobile-nav";
@@ -7,9 +8,12 @@ import type { NavLink } from "@clinic/ui/lib/nav";
 export function SiteHeader({
   name,
   links,
+  trailing,
 }: {
   name: string;
   links: readonly NavLink[];
+  // Whatever the app wants beside the theme control, e.g. who is signed in.
+  trailing?: ReactNode;
 }) {
   return (
     <header className="border-b border-border pt-[env(safe-area-inset-top)]">
@@ -38,6 +42,7 @@ export function SiteHeader({
                 </a>
               ))}
           </nav>
+          {trailing}
           <ThemeToggle />
           <MobileNav links={links} />
         </div>

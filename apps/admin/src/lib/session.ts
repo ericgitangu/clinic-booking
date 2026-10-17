@@ -30,10 +30,12 @@ export function ownerEmails(): ReadonlySet<string> {
 async function identity(): Promise<Identity | null> {
   const session = await getAuth().api.getSession({ headers: await headers() });
   const user = session?.user;
-  // An address Google has not verified is not an identity we act on.
-  if (!user?.email || !user.emailVerified) return null;
+  // Google's own subject (see auth-plugins.ts), never Better Auth's per-instance user id; and an
+  // address Google has not verified is not an identity we act on.
+  const sub = session?.googleSub;
+  if (!sub || !user?.email || !user.emailVerified) return null;
   return {
-    sub: user.id,
+    sub,
     email: user.email.toLowerCase(),
     name: user.name || user.email,
   };

@@ -72,6 +72,7 @@ async def _remove_test_rows() -> None:
     try:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
         await conn.execute("TRUNCATE staff_access, staff_access_audit RESTART IDENTITY")
+        await conn.execute("TRUNCATE patient_accounts")
         keep = [uuid.uuid5(NAMESPACE, f"patient:{key}") for key, _ in DEMO_PATIENTS]
         await conn.execute("DELETE FROM patients WHERE id <> ALL($1::uuid[])", keep)
     finally:
