@@ -1,11 +1,13 @@
-# ADR-0021: A Go SSE gateway for the admin realtime feed (stretch S1)
+# ADR-0021: A Go SSE gateway for the admin realtime feed (realtime gateway)
 
 - Date: 2026-10-16
 - Deciders: engineering
 
 ## Status
 
-Accepted (gated stretch S1; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
+**Amended 2026-10-17: optional, and built only after the admin dashboard ([ADR-0010](0010-thin-nextjs-booking-ui.md)). The dashboard starts with server revalidation.**
+
+Accepted (gated realtime gateway; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
 ## Context
 
@@ -29,7 +31,7 @@ Option 2, as `services/realtime` (`clinic-realtime`).
 - **Why Go for this specific job:**
   - Each idle stream is a parked goroutine (a few KB of stack) rather than an asyncio task plus a Python-level response object, so one small instance holds many more idle streams for the same memory. This is an engineering expectation, not a measurement; records the Cloud Run memory utilization observed during its 30-minute tab test in README section 10.
   - A static binary in a distroless image (expected well under 30 MB; measure with `docker image inspect --format '{{.Size}}'`) starts fast, which matters on a scale-to-zero service whose first request is a browser waiting for a stream.
-  - The standard library covers HTTP, SSE framing, HMAC (S3) and structured logging; pgx v5 is the only runtime dependency. The supply-chain surface is small and govulncheck covers it.
+  - The standard library covers HTTP, SSE framing, HMAC (Google sign-in) and structured logging; pgx v5 is the only runtime dependency. The supply-chain surface is small and govulncheck covers it.
 - **Why a separate service at all** (this also rules out option 1): streams on their own Cloud Run service cannot consume `clinic-api` concurrency, so a stream flood cannot block booking. The service scales to zero independently and can be cut without touching the API.
 - **Shape:** `GET /stream` and `GET /health`; min 0 / max 2 instances, `--concurrency 1 --cpu 0.25` (amended by the $0 audit: at 1 vCPU a dashboard held 8 h a day for a week passes the monthly CPU allowance on its own; at 0.25 vCPU it uses about 28%; the hosting lock review bounds the adversarial case server-side with a monthly stream budget, at most 86,400 vCPU-s; [ADR-0014](0014-hosting-region-and-cost.md) has the arithmetic, and `MAX_STREAMS_PER_INSTANCE` becomes 1), 256 MiB, timeout 300 s, region us-east4, reached only through the front door ([ADR-0023](0023-zero-cost-edge-front-door.md)); role `clinic_realtime` with column-level SELECT on `appointment_events` only (ADR-0015); problem+json errors whose `type` URIs point at the API's `/problems` catalogue.
 - **Contract with FastAPI:** the `appointment_events` table schema plus a versioned JSON payload (`schema_version: 1`) defined in `contracts/events/appointment-event.v1.schema.json`. Go tests validate every marshalled event against it; the web validates incoming events with a zod schema tested against the same file's examples. Breaking changes mean `schema_version: 2` and a second event name, never an in-place change.
@@ -52,4 +54,4 @@ Section 1 "components, key decisions, trade-offs"; "REST API in FastAPI, DRF or 
 
 ## Review trigger
 
-More than 5 gateway instances, more than 500 concurrent streams, a cursor query p95 above 50 ms, or Neon connection errors from the gateway: move fan-out to a single relay (Upstash Redis pub/sub or Pub/Sub). If S1 is dropped, or the admin feed is removed later, delete the service rather than keep a second runtime for nothing.
+More than 5 gateway instances, more than 500 concurrent streams, a cursor query p95 above 50 ms, or Neon connection errors from the gateway: move fan-out to a single relay (Upstash Redis pub/sub or Pub/Sub). If the realtime gateway is dropped, or the admin feed is removed later, delete the service rather than keep a second runtime for nothing.
