@@ -5,6 +5,9 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
+  // A shared CI runner is slow on the first request to each page; a booking is several API calls.
+  expect: { timeout: 15_000 },
+  workers: process.env.CI ? 2 : undefined,
   reporter: "list",
   use: {
     baseURL: "http://localhost:3100",
