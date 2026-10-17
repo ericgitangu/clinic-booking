@@ -49,6 +49,12 @@ Option 1.
 - **Stream caps:** the only rate-style limit that is built is the gateway's per-IP and per-instance concurrent stream cap (realtime gateway, ADR-0021). General rate limiting stays deferred.
 - **Booking cap:** none. A cap would lock reviewers out of shared demo patients and block the smoke test.
 
+**Amendment (2026-10-18): what replaced the stretch items.** The decision to keep the public REST API unauthenticated stands. The stretch items above were built differently:
+
+- **Bot protection** is Google reCAPTCHA (Enterprise, score-based), not Cloudflare Turnstile, as decided in [ADR-0022](0022-admin-auth-and-bot-protection.md) and built in [ADR-0029](0029-booking-flow.md): the booking server actions verify a token per action (book, reschedule, cancel). Turnstile was never built.
+- **Rate limiting** exists at the Vercel proxy (`packages/api/src/proxy/rate-limit.ts`): a per-client fixed window, per warm instance, default 120 requests a minute (`RATE_LIMIT_PER_MINUTE`), with a smaller shared bucket for requests that arrive with no client address. It is not in FastAPI, so the "future rate limiting" bullet about keying inside the API is still not built.
+- **Identity** is Google sign-in in the two Next.js apps ([ADR-0024](0024-google-sign-in-with-better-auth.md), roles in [ADR-0030](0030-staff-roles-and-access.md)). FastAPI does **not** verify Google ID tokens or JWKS: it trusts a short-lived HMAC-signed assertion (`X-Internal-Assertion`, `backend/app/core/assertion.py`) that the apps' servers attach to `/internal/*` calls, so the "Admin identity" bullet describing JWKS verification in FastAPI was not built. A `current_principal` dependency for the public routes is still not built.
+
 ## Consequences
 
 - Good: the brief's endpoints work exactly as written for reviewers. No fragile cross-service dependency.

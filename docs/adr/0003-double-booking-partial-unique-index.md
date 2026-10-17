@@ -43,4 +43,6 @@ Option 1, with these additions:
 
 ## Review trigger
 
-Variable slot durations, or a clinic in a non-half-hour offset such as +05:45. Either one means migrating to option 2. Before that, check `SELECT name FROM pg_available_extensions WHERE name='btree_gist'` on Neon. That check is recorded during and is unverified until then.
+Variable slot durations, or a clinic in a non-half-hour offset such as +05:45. Either one means migrating to option 2. Before that, check `SELECT name FROM pg_available_extensions WHERE name='btree_gist'` on Neon.
+
+**Verified 2026-10-18 on the live Neon project:** `pg_available_extensions` lists `btree_gist` 1.7, but it is not installed; the installed extensions are `plpgsql` and `citext` only. The double-booking guard that is built is the partial unique btree index `uq_appt_doctor_slot_booked` on `appointments (doctor_id, starts_at) WHERE status = 'booked'`, plus `uq_appt_patient_slot_booked` on `(patient_id, starts_at)`. Neither needs `btree_gist`; only the exclusion-constraint alternative (option 2) would, and it is available on Neon if that migration is ever needed.

@@ -59,6 +59,8 @@ Option 3. Everything runs on real Postgres 17: no mocked repositories, no SQLite
 - **Stretch S3:** one negative test per token check (`aud`, `iss`, `exp`, `alg`, allowlist, `email_verified`, JWKS outage) against a locally served JWKS, plus ticket tests in Go (the ticket tests move to S1, with the stream budget).
 - **Stretch S2, S4:** vitest for the service-worker caching rules (data routes network-only) and the Turnstile route (forward once on success; no forward on failure or timeout; upstream problems passed through).
 
+**Amendment (2026-10-18): Playwright is in CI.** The Web layer bullet above says "No Playwright"; that is no longer true. The `e2e-real` job (in the `pr` and `release` workflows) starts the real API and Postgres from `docker-compose` (migrations and seed included), runs the generated-client test against them (`packages/api/tests/real-api.test.ts`), the two-instance sign-in test (`apps/booking/tests/two-instances.test.ts`), builds `apps/booking` and runs its Playwright scenarios (`pnpm -C apps/booking test:e2e`). There is no stand-in API. The admin app has a Playwright suite too, run locally with `make e2e-admin` (`scripts/e2e_admin.sh`); it is not a CI job yet. `verify_claims.py` still covers the API end to end after deploy. For stretch S4, the Turnstile route was never built; the reCAPTCHA reject paths are covered by unit tests.
+
 ## Consequences
 
 - Good: the README's race claim is backed by two assertions that would each fail if the harness didn't race or the index didn't hold.
@@ -70,4 +72,4 @@ Option 3. Everything runs on real Postgres 17: no mocked repositories, no SQLite
 
 ## Review trigger
 
-UI regressions. That means a Playwright smoke run against the Vercel production URL.
+UI regressions. That means a Playwright smoke run against the Vercel production URL. (Amended 2026-10-18: Playwright already runs in CI against the real API in compose, see above; a run against the production URL is still not done.)

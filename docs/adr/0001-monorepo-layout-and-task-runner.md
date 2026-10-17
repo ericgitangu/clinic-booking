@@ -24,9 +24,11 @@ The repository holds a Python API, an optional Next.js app, IaC and CI config. W
 
 Option 2.
 
-- **Top-level directories:** `backend/`, `web/`, `infra/`, `docs/`, `scripts/`, `contracts/`, `.circleci/`.
+- **Top-level directories:** `backend/`, `apps/` (`booking`, `admin`), `packages/` (`ui`, `api`), `infra/`, `docs/`, `scripts/`, `contracts/`, `.circleci/`.
 - **Entry points:** `make help` lists every target. CI calls the same Make targets wherever practical.
 - **Stretch S1:** `services/realtime/` is a single Go module with its own `go.mod`. With one module there is no `go.work`; the Makefile adds `rt-*` targets that `cd` into it. `contracts/events/` holds the versioned JSON Schema shared by FastAPI, the gateway and the web. The Go module imports nothing from the other packages, so there is still no cross-package build graph. If S1 is cut before merges, neither directory exists; if it is cut after, only `contracts/events/` remains.
+
+**Amendment (2026-10-18): the workspace as built.** The pnpm workspace declared in `pnpm-workspace.yaml` is `apps/*` and `packages/*`: two apps (`apps/booking`, `apps/admin`) and two packages (`packages/ui`, `packages/api`), decided in [ADR-0027](0027-two-apps-in-a-workspace.md). Option 2 above said the workspace "contains only `web/`"; that single directory no longer exists. The decision itself (a Makefile entry point, a uv project in `backend/`, a pnpm workspace at the root) is unchanged. Stretch S1 is not built: there is no `services/realtime/` Go module and no `contracts/events/` directory yet; `contracts/` holds only `openapi.json`.
 
 ## Consequences
 

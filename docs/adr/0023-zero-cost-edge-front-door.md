@@ -68,6 +68,8 @@ done
 
 **Superseded design (first $0 draft, kept for the record).** A separate route-handler-only Vercel project `clinic-frontdoor` in `frontdoor/`, with the catch-all `frontdoor/src/app/[[...path]]/route.ts`, its own `vercel.json`, service account `clinic-frontdoor@`, WIF condition `project:clinic-frontdoor` and CI jobs `frontdoor-quality` / `ship-frontdoor`. Merged into `web/` by the engineer's decision (rename map).
 
+**Amendment (2026-10-18): paths and job names as built.** The front door is the booking app (`apps/booking`, Vercel project `clinic-web`) since [ADR-0027](0027-two-apps-in-a-workspace.md): the proxy route is `apps/booking/src/app/api/[...path]/route.ts` with its logic in `packages/api/src/proxy/`, `/docs`, `/redoc` and `/openapi.json` are under `apps/booking/src/app/`, and `vercel.json` exists per app (`apps/booking/vercel.json`, `apps/admin/vercel.json`). It is deployed by `ship-booking`, not `ship-web`; the admin app (`clinic-admin`) is a second project that calls the API with its own service account. Where this ADR says `web/` or "the single Vercel project", read the booking app; the original text stays as the record.
+
 ## Consequences
 
 - Good: Cloud Run's internet egress stays inside the only free egress tier, and every request that bypasses the front door costs nothing. Removing `allUsers` is also a security gain: the run.app URLs are no longer an unauthenticated surface.
