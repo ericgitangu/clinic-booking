@@ -33,6 +33,22 @@ describe("page shell", () => {
     const html = renderToStaticMarkup(<SiteFooter />);
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="/terms"');
+    expect(html).toContain('href="/data"');
+  });
+
+  it("opens other sites safely and names every column", () => {
+    const html = renderToStaticMarkup(<SiteFooter />);
+    for (const title of [
+      "Clinic",
+      "Assessment",
+      "Legal",
+      "Built by Eric Gitangu",
+    ]) {
+      expect(html).toContain(`aria-label="${title}"`);
+    }
+    const external = html.match(/<a [^>]*target="_blank"[^>]*>/g) ?? [];
+    expect(external.length).toBeGreaterThan(10);
+    for (const a of external) expect(a).toContain('rel="noopener noreferrer"');
   });
 });
 
