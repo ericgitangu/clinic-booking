@@ -33,6 +33,8 @@ describe("search and sharing metadata", () => {
     const urls = sitemap().map((e) => e.url);
     expect(urls).toContain(SITE.url);
     expect(urls).toContain(`${SITE.url}/docs`);
+    for (const p of ["/privacy", "/terms", "/openapi.json"])
+      expect(urls).toContain(`${SITE.url}${p}`);
   });
 
   it("keeps crawlers out of the API, admin, sign-in and cron routes and points at the sitemap", () => {

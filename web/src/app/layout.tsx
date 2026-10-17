@@ -12,6 +12,9 @@ const sans = Atkinson_Hyperlegible_Next({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "optional",
+  // No metrics are published for this font, so Next cannot size a fallback; ask for plain system fonts instead of warning.
+  adjustFontFallback: false,
+  fallback: ["system-ui", "Segoe UI", "Roboto", "Arial", "sans-serif"],
 });
 
 export { metadata, viewport };
