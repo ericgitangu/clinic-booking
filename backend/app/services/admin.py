@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clinic_zone import current_clinic_zone
 from app.core.clock import Clock
 from app.domain.errors import AppointmentNotFound, DomainError
 from app.repositories import admin as repo
@@ -29,7 +30,6 @@ from app.schemas.admin import (
     SeriesPoint,
     Totals,
 )
-from app.schemas.common import CLINIC_TZ
 
 MAX_DAYS = {"day": 90, "hour": 7}
 DEFAULT_LIMIT = 25
@@ -42,7 +42,7 @@ class InvalidAdminQuery(DomainError):
 
 async def _zone(session: AsyncSession) -> ZoneInfo:
     name = await repo.clinic_timezone(session)
-    return ZoneInfo(name) if name else CLINIC_TZ
+    return ZoneInfo(name) if name else current_clinic_zone()
 
 
 def _bounds(zone: ZoneInfo, start: date, end: date) -> tuple[datetime, datetime]:

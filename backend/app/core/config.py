@@ -7,6 +7,7 @@ the environment; ``.env.example`` documents every one. There are no secrets in t
 from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,6 +36,8 @@ class Settings(BaseSettings):
     BOOKING_HORIZON_DAYS: int = 90
     WEB_ORIGIN: str = "http://localhost:3000"
     PUBLIC_BASE_URL: str = "http://localhost:8080"
+    # Used only while the clinics table is empty; otherwise the clinic row's timezone decides.
+    DEFAULT_CLINIC_TZ: str = "Africa/Nairobi"
     LOG_LEVEL: str = "info"
     GIT_SHA: str = "unknown"
     # HMAC key shared with the web apps' server side. Unset means every /internal/* call is
@@ -55,6 +58,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"INTERNAL_SIGNING_KEY must be at least {_MIN_SIGNING_KEY_CHARS} characters."
             )
+        return value
+
+    @field_validator("DEFAULT_CLINIC_TZ")
+    @classmethod
+    def _known_zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"DEFAULT_CLINIC_TZ is not an IANA zone: {value!r}") from exc
         return value
 
     @field_validator("DATABASE_URL")

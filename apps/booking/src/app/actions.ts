@@ -82,6 +82,13 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
+// 1-255 visible ASCII characters, as the API requires; anything else is replaced, never forwarded.
+function attemptKey(sent: string | undefined): string {
+  return sent !== undefined && /^[\x21-\x7e]{1,255}$/.test(sent)
+    ? sent
+    : crypto.randomUUID();
+}
+
 async function signedIn(): Promise<Identity | null> {
   return getIdentity();
 }
@@ -110,10 +117,14 @@ export async function bookAppointment(
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
-  const booked = await api.bookMine(caller, {
-    doctor_id: doctor,
-    starts_at: when,
-  });
+  // The form makes one key per booking attempt and sends it again with a retry of that attempt.
+  // A request that arrives without a usable one still gets a fresh key, so a double submit that
+  // overlaps is collapsed by the API either way.
+  const booked = await api.bookMine(
+    caller,
+    { doctor_id: doctor, starts_at: when },
+    attemptKey(blank(fd.get("idempotency_key"))),
+  );
   if (!booked.ok) {
     const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
     return failed(booked, {

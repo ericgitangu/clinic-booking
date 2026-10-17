@@ -10,6 +10,7 @@ from app.api.deps import get_clock, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import DoctorNotFound
+from app.domain.slots import DEFAULT_SLOT_MINUTES, slot_length
 from app.models.doctor import Doctor as DoctorModel
 from app.models.working_hours import WorkingHours
 from app.repositories import doctors as doctor_repo
@@ -83,9 +84,14 @@ async def doctor_availability(
     doctor_id: uuid.UUID,
     response: Response,
     date: date = Query(...),  # noqa: A002  # matches the ?date= query param name
+    slot_minutes: int = Query(
+        DEFAULT_SLOT_MINUTES,
+        description="Slot length in minutes: 5 to 1440 and a divisor of 1440. Defaults to 30.",
+    ),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
 ) -> Availability:
     response.headers.update(_NO_STORE)
-    return await get_availability(session, clock, settings, doctor_id, date)
+    slot = slot_length(slot_minutes)
+    return await get_availability(session, clock, settings, doctor_id, date, slot)

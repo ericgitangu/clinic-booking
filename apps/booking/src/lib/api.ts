@@ -79,10 +79,21 @@ export const myAppointment = (caller: Caller, id: string) =>
     { caller },
   );
 
-export const bookMine = (caller: Caller, body: MeAppointmentCreate) =>
+// The key is chosen once per booking attempt by the form and reused when the same attempt is sent
+// again, so a retry after a lost response returns the booking already made instead of SLOT_TAKEN.
+export const bookMine = (
+  caller: Caller,
+  body: MeAppointmentCreate,
+  idempotencyKey: string,
+) =>
   callApi(
     "bookMine",
-    (client) => bookMineInternalMeAppointmentsPost({ client, body }),
+    (client) =>
+      bookMineInternalMeAppointmentsPost({
+        client,
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
     { caller },
   );
 

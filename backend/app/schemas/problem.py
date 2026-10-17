@@ -24,12 +24,14 @@ class ProblemCode(enum.StrEnum):
     DATE_OUT_OF_RANGE = "DATE_OUT_OF_RANGE"
     SLOT_MISALIGNED = "SLOT_MISALIGNED"
     OUTSIDE_WORKING_HOURS = "OUTSIDE_WORKING_HOURS"
+    IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
     SLOT_TAKEN = "SLOT_TAKEN"
     PATIENT_DOUBLE_BOOKED = "PATIENT_DOUBLE_BOOKED"
     APPOINTMENT_ALREADY_CANCELLED = "APPOINTMENT_ALREADY_CANCELLED"
     APPOINTMENT_ALREADY_STARTED = "APPOINTMENT_ALREADY_STARTED"
     PATIENT_PHONE_EXISTS = "PATIENT_PHONE_EXISTS"
     CONCURRENT_UPDATE = "CONCURRENT_UPDATE"
+    IDEMPOTENCY_KEY_CONSUMED = "IDEMPOTENCY_KEY_CONSUMED"
     ACCESS_EXISTS = "ACCESS_EXISTS"
     OWNER_PROTECTED = "OWNER_PROTECTED"
     ACCESS_NOT_FOUND = "ACCESS_NOT_FOUND"
@@ -103,3 +105,20 @@ def strip_json_from_error_responses(spec: dict[str, object]) -> None:
                 content.pop("application/json", None)
                 if not content:
                     response.pop("content", None)
+
+
+REPLAYED_HEADER = "Idempotent-Replayed"
+
+# Documents the header on the 201 of a keyed POST. The model is the operation's own response_model,
+# so only the header is added here.
+REPLAY_HEADER: dict[int | str, dict[str, object]] = {
+    201: {
+        "description": "Created, or the earlier booking replayed for the same Idempotency-Key",
+        "headers": {
+            REPLAYED_HEADER: {
+                "description": "`true` when this response replays an earlier booking.",
+                "schema": {"type": "string", "enum": ["true"]},
+            }
+        },
+    }
+}

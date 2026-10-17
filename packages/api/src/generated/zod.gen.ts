@@ -262,12 +262,14 @@ export const zProblemCode = z.enum([
     'DATE_OUT_OF_RANGE',
     'SLOT_MISALIGNED',
     'OUTSIDE_WORKING_HOURS',
+    'IDEMPOTENCY_KEY_REUSED',
     'SLOT_TAKEN',
     'PATIENT_DOUBLE_BOOKED',
     'APPOINTMENT_ALREADY_CANCELLED',
     'APPOINTMENT_ALREADY_STARTED',
     'PATIENT_PHONE_EXISTS',
     'CONCURRENT_UPDATE',
+    'IDEMPOTENCY_KEY_CONSUMED',
     'ACCESS_EXISTS',
     'OWNER_PROTECTED',
     'ACCESS_NOT_FOUND',
@@ -349,7 +351,7 @@ export const zSlot = z.object({
 export const zAvailability = z.object({
     date: z.string(),
     doctor_id: z.uuid(),
-    slot_minutes: z.literal(30).optional().default(30),
+    slot_minutes: z.int().optional().default(30),
     slots: z.array(zSlot),
     timezone: z.string()
 });
@@ -422,8 +424,12 @@ export const zDoctorList = z.object({
 
 export const zCreateAppointmentAppointmentsPostBody = zAppointmentCreate;
 
+export const zCreateAppointmentAppointmentsPostHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(255).regex(/^[\x21-\x7e]{1,255}$/).nullish()
+});
+
 /**
- * Successful Response
+ * Created, or the earlier booking replayed for the same Idempotency-Key
  */
 export const zCreateAppointmentAppointmentsPostResponse = zAppointment;
 
@@ -477,7 +483,8 @@ export const zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetPath = z.object({
 });
 
 export const zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetQuery = z.object({
-    date: z.iso.date()
+    date: z.iso.date(),
+    slot_minutes: z.int().optional().default(30)
 });
 
 /**
@@ -605,8 +612,12 @@ export const zMyAppointmentsInternalMeAppointmentsGetResponse = zPatientAppointm
 
 export const zBookMineInternalMeAppointmentsPostBody = zMeAppointmentCreate;
 
+export const zBookMineInternalMeAppointmentsPostHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(255).regex(/^[\x21-\x7e]{1,255}$/).nullish()
+});
+
 /**
- * Successful Response
+ * Created, or the earlier booking replayed for the same Idempotency-Key
  */
 export const zBookMineInternalMeAppointmentsPostResponse = zAppointment;
 

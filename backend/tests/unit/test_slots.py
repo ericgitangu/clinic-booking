@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from app.domain.slots import Slot, generate_slots, grid_for_date
+import pytest
+
+from app.domain.slots import InvalidSlotLength, Slot, generate_slots, grid_for_date, slot_length
 
 NAIROBI = ZoneInfo("Africa/Nairobi")
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -76,3 +78,53 @@ def test_empty_windows_yield_no_slots() -> None:
     assert (
         generate_slots([], [], NAIROBI, datetime(2026, 10, 26).date(), FAR_PAST, timedelta(0)) == []
     )
+
+
+# --- slot length is a parameter -------------------------------------------------
+
+
+def test_default_slot_length_is_thirty_minutes() -> None:
+    assert slot_length(30) == timedelta(minutes=30)
+    slots = generate_slots(
+        OTIENO_MON, [], NAIROBI, datetime(2026, 10, 26).date(), FAR_PAST, timedelta(0)
+    )
+    assert all(s.ends_at - s.starts_at == timedelta(minutes=30) for s in slots)
+
+
+def test_sixty_minute_slots_halve_the_grid() -> None:
+    slots = generate_slots(
+        OTIENO_MON,
+        [],
+        NAIROBI,
+        datetime(2026, 10, 26).date(),
+        FAR_PAST,
+        timedelta(0),
+        slot_length(60),
+    )
+    assert len(slots) == 8
+    assert all(s.ends_at - s.starts_at == timedelta(minutes=60) for s in slots)
+    assert _local_times(slots, NAIROBI)[:2] == [(8, 0), (9, 0)]
+
+
+def test_a_slot_that_does_not_fit_the_window_is_not_offered() -> None:
+    slots = generate_slots(
+        [(time(8, 0), time(9, 30))],
+        [],
+        NAIROBI,
+        datetime(2026, 10, 26).date(),
+        FAR_PAST,
+        timedelta(0),
+        slot_length(60),
+    )
+    assert _local_times(slots, NAIROBI) == [(8, 0)]
+
+
+def test_valid_lengths_are_the_divisors_of_a_day_from_five_minutes() -> None:
+    for minutes in (5, 10, 15, 20, 30, 45, 60, 90, 120, 480, 1440):
+        assert slot_length(minutes) == timedelta(minutes=minutes)
+
+
+def test_invalid_lengths_are_refused() -> None:
+    for minutes in (-30, 0, 1, 4, 7, 25, 50, 1441, 2000, 10**9):
+        with pytest.raises(InvalidSlotLength):
+            slot_length(minutes)

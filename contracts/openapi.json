@@ -430,7 +430,6 @@
             "type": "string"
           },
           "slot_minutes": {
-            "const": 30,
             "default": 30,
             "title": "Slot Minutes",
             "type": "integer"
@@ -1062,12 +1061,14 @@
           "DATE_OUT_OF_RANGE",
           "SLOT_MISALIGNED",
           "OUTSIDE_WORKING_HOURS",
+          "IDEMPOTENCY_KEY_REUSED",
           "SLOT_TAKEN",
           "PATIENT_DOUBLE_BOOKED",
           "APPOINTMENT_ALREADY_CANCELLED",
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
+          "IDEMPOTENCY_KEY_CONSUMED",
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
           "ACCESS_NOT_FOUND",
@@ -1310,6 +1311,29 @@
     "/appointments": {
       "post": {
         "operationId": "create_appointment_appointments_post",
+        "parameters": [
+          {
+            "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "pattern": "^[\\x21-\\x7e]{1,255}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1329,7 +1353,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Created, or the earlier booking replayed for the same Idempotency-Key",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when this response replays an earlier booking.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "409": {
             "content": {
@@ -1611,6 +1646,18 @@
               "format": "date",
               "title": "Date",
               "type": "string"
+            }
+          },
+          {
+            "description": "Slot length in minutes: 5 to 1440 and a divisor of 1440. Defaults to 30.",
+            "in": "query",
+            "name": "slot_minutes",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Slot length in minutes: 5 to 1440 and a divisor of 1440. Defaults to 30.",
+              "title": "Slot Minutes",
+              "type": "integer"
             }
           }
         ],
@@ -2447,6 +2494,29 @@
       },
       "post": {
         "operationId": "book_mine_internal_me_appointments_post",
+        "parameters": [
+          {
+            "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "pattern": "^[\\x21-\\x7e]{1,255}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2466,7 +2536,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Created, or the earlier booking replayed for the same Idempotency-Key",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when this response replays an earlier booking.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {

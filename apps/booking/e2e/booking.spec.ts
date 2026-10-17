@@ -5,7 +5,9 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { firstDoctor, hhmm, pick } from "./api";
+import { callApi } from "@clinic/api/call";
+import { bookMineInternalMeAppointmentsPost } from "@clinic/api/generated";
+import { API, firstDoctor, hhmm, pick } from "./api";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // Real stack: this app, the real API and database (docker compose), and a real Better Auth session
@@ -287,4 +289,56 @@ test("the booking screens never scroll sideways on a 360px phone", async ({
     expect(scroll, path).toBeLessThanOrEqual(inner);
   }
   await closeAll(context, signedOut);
+});
+
+test("the form's idempotency key is the one the API got: a retry of the booking returns it, a new time gets a new key", async ({
+  browser,
+}) => {
+  const { doctorId, slots } = await pick(4);
+  const { context, page, person } = await signedIn(browser);
+  const keyOf = () =>
+    page.locator('input[name="idempotency_key"]').inputValue();
+
+  await page.goto(details(doctorId, slots[0]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+  const key = await keyOf();
+  expect(key).toMatch(/^[\x21-\x7e]{1,255}$/);
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You are booked" }),
+  ).toBeVisible();
+  const booked = page.url().split("/").pop();
+
+  // The same attempt, sent again by a client that never saw the response: the API recognises the
+  // key the form sent and returns the booking that was made, not SLOT_TAKEN.
+  process.env.API_URL = API;
+  const retry = await callApi(
+    "bookMine",
+    (client) =>
+      bookMineInternalMeAppointmentsPost({
+        client,
+        body: { doctor_id: doctorId, starts_at: slots[0] },
+        headers: { "Idempotency-Key": key },
+      }),
+    {
+      caller: {
+        sub: person.googleSub,
+        email: person.email,
+        role: "patient",
+        emailVerified: true,
+      },
+    },
+  );
+  expect(retry).toMatchObject({ ok: true, status: 201 });
+  expect(retry.ok && retry.data.id).toBe(booked);
+
+  // Another time is another attempt: a fresh key.
+  await page.goto(details(doctorId, slots[1]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+  expect(await keyOf()).not.toBe(key);
+  await closeAll(context);
 });
