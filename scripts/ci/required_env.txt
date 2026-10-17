@@ -1,0 +1,15 @@
+# One line per variable a web app cannot serve sign-in without: <app> <NAME>.
+# Names only. The unit tests keep the sign-in names in step with packages/api/src/auth-env.ts,
+# and vercel_env_check.sh refuses to ship an app whose Vercel project lacks any of them.
+booking BETTER_AUTH_URL
+booking BETTER_AUTH_SECRET
+booking GOOGLE_CLIENT_ID
+booking GOOGLE_CLIENT_SECRET
+booking INTERNAL_SIGNING_KEY
+booking API_URL
+admin BETTER_AUTH_URL
+admin BETTER_AUTH_SECRET
+admin GOOGLE_CLIENT_ID
+admin GOOGLE_CLIENT_SECRET
+admin INTERNAL_SIGNING_KEY
+admin API_URL

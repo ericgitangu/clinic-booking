@@ -314,6 +314,58 @@ bash "$HERE/skip_unless_changed.sh" backend/ >/dev/null 2>&1
 expect "skip: fails CLOSED (runs the job) when main cannot be fetched" "$([ -f "$FX/agent" ] && echo halted || echo ran)" ran
 git remote set-url origin "$WORK/origin.git"
 
+# =========================================================================================
+# vercel_env_check.sh: names only, per app and environment; a gap refuses the ship.
+# =========================================================================================
+cat > "$WORK/bin/vercel" <<'FAKE'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "env ls" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
+[ -f "$FX/denied" ] && { echo "Error: Not authorized" >&2; exit 1; }
+cat "$FX/env_ls"
+FAKE
+chmod +x "$WORK/bin/vercel"
+env_row() { printf ' %-40s %-26s %-19s %s\n' "$1" "SECRET-VALUE-MUST-NOT-LEAK" Sensitive "$2"; }
+env_table() { # <environments> <name...>
+  local envs="$1"; shift
+  printf '\n name  value  type  environments\n'
+  for n in "$@"; do env_row "$n" "$envs"; done
+  printf '\nCommon next commands:\n- `vercel env add`\n'
+}
+ALL="BETTER_AUTH_URL BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL"
+
+new_fx env_ok
+env_table Production $ALL OTHER > "$FX/env_ls"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: passes when every name is set for production" "$rc" 0
+expect "env check: never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_missing
+env_table Production BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL > "$FX/env_ls"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: refuses when a name is missing" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names the missing variable" "$(grep -c 'BETTER_AUTH_URL' <<<"$out")" 1
+expect "env check: a failure never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_none
+printf '> No Environment Variables found for team/clinic-admin\n' > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
+expect "env check: refuses an empty project (the 2026-10 admin outage)" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_wrong_target
+env_table Preview $ALL > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: a Preview-only value does not satisfy production" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_all_envs
+env_table "All Environments" $ALL > "$FX/env_ls"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: All Environments counts" "$rc" 0
+
+new_fx env_denied
+touch "$FX/denied"
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: fails closed when the listing is refused" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

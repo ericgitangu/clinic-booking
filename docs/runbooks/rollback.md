@@ -86,3 +86,11 @@ Prometheus-compatible or a custom HTTP POST); it is not turned on here.
 ### When the Vercel token is refused (403)
 
 `scripts/ci/vercel_prod.sh` stops with "the Vercel token was refused (403)" when `VERCEL_TOKEN` cannot read the deployment behind a host. Both apps use the `vercel-prod` context, so the token must be a team-scoped token that can see **both** projects (`clinic-web` and `clinic-admin`). The ship and rollback jobs print `Vercel target: app=… project=… team=…` first, so the logs show which project id the job used. To fix a refused token, create a new team-scoped token and update `VERCEL_TOKEN` in the context.
+
+## A web app that is missing settings
+
+Before `ship-booking` and `ship-admin` deploy, `scripts/ci/vercel_env_check.sh` lists the names (never
+the values) of the project's production variables and refuses the ship if any name in
+`scripts/ci/required_env.txt` is absent. If one slips through anyway, the sign-in routes answer a
+503 "Sign-in is not configured" page and log one `auth_not_configured` line naming the missing
+variables, so the fix is to add them in Vercel and redeploy; no rollback is needed for that alone.
