@@ -5,6 +5,7 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
+import { readPatient } from "@/lib/patient-cookie";
 
 export const metadata: Metadata = { title: "Booked", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -15,7 +16,12 @@ export default async function Confirmed({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const appt = await api.getAppointment(id);
+  const [appt, patient] = await Promise.all([
+    api.getAppointment(id),
+    readPatient(),
+  ]);
+  // Only the patient this browser was signed to may see the booking.
+  if (appt.ok && (!patient || appt.data.patient_id !== patient.id)) notFound();
   if (!appt.ok) {
     if (appt.status < 500) notFound();
     return (

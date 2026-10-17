@@ -36,6 +36,11 @@ describe("problem copy", () => {
       expect(message.length).toBeGreaterThan(10);
     }
   });
+  it("does not confirm that a phone number is registered", () => {
+    expect(describeProblem("PATIENT_PHONE_EXISTS").message).not.toMatch(
+      /already|registered|exists/i,
+    );
+  });
   it("treats an unknown code as a server problem", () => {
     expect(describeProblem("SOMETHING_NEW").severity).toBe("critical");
   });

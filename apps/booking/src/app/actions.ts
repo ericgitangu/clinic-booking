@@ -6,7 +6,9 @@ import { z } from "zod";
 import * as api from "@/lib/api";
 import { addDays, clinicDay } from "@/lib/clinic-time";
 import { checkHuman, type Action } from "@/lib/human-check";
+import { logError } from "@clinic/api/proxy/log";
 import {
+  cookieConfigured,
   forgetPatient,
   readPatient,
   rememberPatient,
@@ -82,6 +84,11 @@ export async function bookAppointment(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
+  if (!cookieConfigured()) {
+    // Without the signing secret nothing could be remembered, so refuse before creating anything.
+    logError("booking refused: CLINIC_COOKIE_SECRET is not set", {});
+    return error("INTERNAL_ERROR");
+  }
   const remembered =
     fd.get("as_remembered") === "1" ? await readPatient() : null;
   const parsed = BookSchema.safeParse({
@@ -112,12 +119,7 @@ export async function bookAppointment(
       email: input.email ?? null,
     });
     if (!created.ok) {
-      return error(created.code, {
-        fieldErrors:
-          created.code === "PATIENT_PHONE_EXISTS"
-            ? { phone: "Already registered." }
-            : undefined,
-      });
+      return error(created.code);
     }
     patientId = created.data.id;
     // Remember at once: if the slot turns out to be taken, the retry reuses this patient.

@@ -45,7 +45,6 @@ export default async function MyAppointments({
   const upcoming = items.filter(
     (a) => a.status === "booked" && Date.parse(a.starts_at) > now,
   );
-  const earlier = items.filter((a) => !upcoming.includes(a));
 
   return (
     <section className="py-10">
@@ -93,30 +92,6 @@ export default async function MyAppointments({
               ))}
             </ul>
           )}
-
-          {earlier.length > 0 ? (
-            <>
-              <h2 className="mt-10 font-heading text-xl font-semibold">
-                Earlier and cancelled
-              </h2>
-              <ul className="mt-4 space-y-3">
-                {earlier.map((a) => (
-                  <li
-                    key={a.id}
-                    className="rounded-xl border border-border p-4 text-muted-foreground"
-                  >
-                    <p className="text-base font-medium text-foreground">
-                      {formatWhen(a.starts_at)}
-                    </p>
-                    <p className="text-base">
-                      {a.doctor.full_name}
-                      {a.status === "cancelled" ? ", cancelled" : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
         </>
       )}
 

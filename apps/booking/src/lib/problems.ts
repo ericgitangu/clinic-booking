@@ -39,7 +39,7 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
   },
   PATIENT_PHONE_EXISTS: {
     message:
-      "That phone number is already registered. Use a different number, or leave it out.",
+      "We could not create that patient. Use a different number, or leave it out.",
     severity: "error",
   },
   VALIDATION_ERROR: {

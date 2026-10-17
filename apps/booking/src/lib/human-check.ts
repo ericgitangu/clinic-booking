@@ -3,20 +3,29 @@ import { logError } from "@clinic/api/proxy/log";
 
 export type Action = "book" | "cancel" | "reschedule";
 
-// Production always checks. Elsewhere (previews cannot reach Google as our identity, local
-// development has no credentials) RECAPTCHA_ENFORCE=false turns the check off.
+// The check can be switched off only for automated tests: RECAPTCHA_ENFORCE=false together with
+// NODE_ENV=test or E2E=1, and never when VERCEL_ENV is production. In every other case it runs, and
+// if it cannot run (no keys, no way to reach Google) the request is refused.
 export function enforced(env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.VERCEL_ENV === "production") return true;
-  return env.RECAPTCHA_ENFORCE !== "false";
+  const testRun = env.NODE_ENV === "test" || env.E2E === "1";
+  return !(env.RECAPTCHA_ENFORCE === "false" && testRun);
 }
 
 export type HumanCheck = { ok: true } | { ok: false; unavailable: boolean };
 
+export interface HumanDeps {
+  env?: NodeJS.ProcessEnv;
+  verify?: typeof verifyRecaptcha;
+}
+
 export async function checkHuman(
   token: string | null | undefined,
   action: Action,
-  env: NodeJS.ProcessEnv = process.env,
+  deps: HumanDeps = {},
 ): Promise<HumanCheck> {
+  const env = deps.env ?? process.env;
+  const verify = deps.verify ?? verifyRecaptcha;
   if (!enforced(env)) return { ok: true };
   const siteKey = env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   const serviceAccount = env.RECAPTCHA_SERVICE_ACCOUNT_EMAIL;
@@ -25,7 +34,7 @@ export async function checkHuman(
     return { ok: false, unavailable: true };
   }
   const minScore = Number(env.RECAPTCHA_MIN_SCORE);
-  const result = await verifyRecaptcha({
+  const result = await verify({
     token,
     expectedAction: action,
     siteKey,
