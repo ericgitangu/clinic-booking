@@ -224,12 +224,11 @@ cd ../..
 It creates two budgets: `clinic-alerts-1usd` (alerts, on this project's gross spend, **not** the
 whole account: the account already bills about $5 a month for the other projects) and `clinic-run-spend-cap-3usd`
 (a **gross** $3 budget scoped to this project and Cloud Run, credits excluded). Neither the
-Terraform provider nor the CLI has any attribute that pauses or caps usage, so turning the
-second one into an enforced cap is a console action, and **whether this billing account can
-enforce it is UNVERIFIED**.
+Terraform provider nor the CLI has any attribute that pauses or caps usage, so the second one
+must be an enforced cap created in the console (verified possible on this account, 2026-10-18;
+see step 1 and the note below). Terraform now creates only the alerts budget.
 
-1. Console -> Billing -> Budgets & alerts -> `clinic-run-spend-cap-3usd`: enable the
-   usage-pausing / cap action if the console offers it for this account. Screenshot it.
+1. Console -> Billing -> Budgets & alerts: create a **Spend cap enforcement** budget named `clinic-run-spend-cap-3usd` ($3 gross, this project, Cloud Run, thresholds 0.5/0.8/1.0). An existing budget cannot be converted, and a spend cap allows one budget per project and service, so delete any alerts-only budget with the same project and service first. Screenshot the "Configured" status.
 2. Confirm both budgets exist:
 
    ```bash
@@ -239,9 +238,9 @@ enforce it is UNVERIFIED**.
    ```
 
    Expected: `clinic-alerts-1usd` and `clinic-run-spend-cap-3usd`.
-3. Record the budget id and the outcome here: `BUDGET_ID=<fill in>`; cap action: `<enabled | not offered>`.
+3. Record the budget id and the outcome here: `BUDGET_ID=bfd734ab-ef98-414a-8bb1-b6442c1dec94`; cap action: enabled (status "Configured", verified 2026-10-18).
 
-**Verified 2026-10-18 in the Cloud Billing console:** both clinic budgets show "Spend cap status: Not applicable", so they are alerts-only, and month-to-date gross is $0.02 on each. An existing budget cannot be converted into a spend cap; a cap must be created as a new budget in the console ([guide](https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps)). That has not been approved or done. Until the console shows "Configured", treat `clinic-run-spend-cap-3usd` as an alert, not a cap.
+**History and result, 2026-10-18.** The Terraform-created budget showed "Spend cap status: Not applicable" (alerts-only; an existing budget cannot be converted, [guide](https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps)). With the user's approval it was deleted and recreated in the console as a spend cap under the same name; the console now shows "Configured". It is console-managed, not Terraform. An enforced cap resets monthly and is a last-resort backstop; the $0 mechanism is the free-tier arithmetic plus the realtime ticket budget.
 
 If the console does not offer a cap for this account, the remaining protection is
 `--max-instances 3`, IAM-only access, the egress alert and the free-tier arithmetic in the
