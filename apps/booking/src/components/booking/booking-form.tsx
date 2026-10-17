@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import { Button } from "@clinic/ui/components/ui/button";
 import { Input } from "@clinic/ui/components/ui/input";
 import { Label } from "@clinic/ui/components/ui/label";
@@ -58,6 +58,10 @@ export function BookingForm({
     initialState,
   );
   const getToken = useRecaptcha("book");
+  // Until the page has hydrated a submit would be a plain browser form post, which would put the
+  // patient's name in the address bar. The button stays off until the handler is attached.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   useActionFeedback(state);
   const fe = state.status === "error" ? (state.fieldErrors ?? {}) : {};
 
@@ -161,7 +165,7 @@ export function BookingForm({
           type="submit"
           size="lg"
           className="h-12 w-full text-base"
-          disabled={pending}
+          disabled={!ready || pending}
         >
           {pending ? "Booking…" : "Confirm booking"}
         </Button>
