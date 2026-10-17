@@ -13,6 +13,7 @@ locals {
     "sts.googleapis.com",
     "billingbudgets.googleapis.com",
     "monitoring.googleapis.com",
+    "recaptchaenterprise.googleapis.com", # score-based reCAPTCHA keys and assessments
     "logging.googleapis.com",
     "cloudresourcemanager.googleapis.com", # project IAM bindings
     "serviceusage.googleapis.com",         # enabling/reading APIs, user_project_override
