@@ -44,14 +44,12 @@ describe("the real route handler", () => {
   });
 
   it("forwards a normal request to the API", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response('{"ok":true}', {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response('{"ok":true}', {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
     const res = await call(["doctors"], {
       "x-vercel-forwarded-for": "203.0.113.5",
     });

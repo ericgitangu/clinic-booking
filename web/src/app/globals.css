@@ -1,0 +1,170 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Palette taken from the Idyllic lotus mark: ink navy (the wordmark), lotus blue, aqua, on a cool mist. */
+:root {
+  --background: #f4f8fc;
+  --foreground: #14204f;
+  --card: #ffffff;
+  --card-foreground: #14204f;
+  --popover: #ffffff;
+  --popover-foreground: #14204f;
+  --primary: #243a8c;
+  --primary-foreground: #ffffff;
+  --secondary: #e3eef9;
+  --secondary-foreground: #14204f;
+  --muted: #e9f1f8;
+  --muted-foreground: #4a5b80;
+  --accent: #d5ecfa;
+  --accent-foreground: #14204f;
+  --destructive: #b3261e;
+  --border: #cbdceb;
+  --input: #cbdceb;
+  --ring: #1c75bc;
+  --chart-1: #243a8c;
+  --chart-2: #1c75bc;
+  --chart-3: #29abe2;
+  --chart-4: #5a6f9e;
+  --chart-5: #9fb7d6;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14204f;
+  --sidebar-primary: #243a8c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3eef9;
+  --sidebar-accent-foreground: #14204f;
+  --sidebar-border: #cbdceb;
+  --sidebar-ring: #1c75bc;
+}
+
+.dark {
+  --background: #0a1130;
+  --foreground: #e8f0fa;
+  --card: #111a42;
+  --card-foreground: #e8f0fa;
+  --popover: #111a42;
+  --popover-foreground: #e8f0fa;
+  --primary: #5cc8f5;
+  --primary-foreground: #0a1130;
+  --secondary: #1a2658;
+  --secondary-foreground: #e8f0fa;
+  --muted: #16204f;
+  --muted-foreground: #a3b4d6;
+  --accent: #1f2e6a;
+  --accent-foreground: #e8f0fa;
+  --destructive: #ff8a80;
+  --border: #28356f;
+  --input: #28356f;
+  --ring: #5cc8f5;
+  --chart-1: #5cc8f5;
+  --chart-2: #3d8fd6;
+  --chart-3: #8fb4ff;
+  --chart-4: #7f93c9;
+  --chart-5: #c2d3f0;
+  --sidebar: #111a42;
+  --sidebar-foreground: #e8f0fa;
+  --sidebar-primary: #5cc8f5;
+  --sidebar-primary-foreground: #0a1130;
+  --sidebar-accent: #1f2e6a;
+  --sidebar-accent-foreground: #e8f0fa;
+  --sidebar-border: #28356f;
+  --sidebar-ring: #5cc8f5;
+}
+
+/* The one moment of motion: the mark settles in once on load. Off for reduced motion. */
+@keyframes lotus-settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lotus-settle {
+  animation: lotus-settle 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lotus-settle {
+    animation: none;
+  }
+}
+
+/* Side padding that clears the notch and the home bar in landscape on phones. */
+.pad-safe-x {
+  padding-inline: max(1.25rem, env(safe-area-inset-left))
+    max(1.25rem, env(safe-area-inset-right));
+}
+
+@layer base {
+  /* 16px form controls: iOS zooms the page when a smaller field takes focus. */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* The reCAPTCHA badge is hidden; the footer carries Google's attribution instead. */
+.grecaptcha-badge {
+  visibility: hidden;
+}
