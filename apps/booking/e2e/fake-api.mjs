@@ -129,7 +129,10 @@ createServer(async (req, res) => {
   const parts = url.pathname.split("/").filter(Boolean);
   const m = req.method;
   try {
-    if (m === "GET" && url.pathname === "/health")
+    if (
+      m === "GET" &&
+      (url.pathname === "/health" || url.pathname === "/ready")
+    )
       return json(res, 200, { status: "ok" });
     if (m === "GET" && url.pathname === "/doctors")
       return json(res, 200, { items: DOCTORS });

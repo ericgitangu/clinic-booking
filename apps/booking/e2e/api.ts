@@ -38,23 +38,34 @@ export function firstDoctor(): Promise<string> {
   return doctorId;
 }
 
-// The nth upcoming day (counting from n = 0) on which the first doctor has at least four free
-// times. Each scenario passes its own n, so scenarios running in parallel use different days.
+// Scenario n gets its own calendar week, so scenarios running in parallel can never meet on a day,
+// whatever else has been booked: the Tuesday n weeks after the first Tuesday that is at least ten
+// days out (the landing page's copy-paste steps book within the first week). If that Tuesday has
+// fewer than four free times, the next three days of the same week are tried.
+const isTuesday = (day: string) =>
+  new Date(`${day}T12:00:00Z`).getUTCDay() === 2;
+let firstTuesday: number | null = null;
+function weekStart(n: number): string {
+  if (firstTuesday === null) {
+    let d = 10;
+    while (!isTuesday(addDays(today(), d))) d++;
+    firstTuesday = d;
+  }
+  return addDays(today(), firstTuesday + 7 * n);
+}
+
 export async function pick(n: number): Promise<Picked> {
   const id = await firstDoctor();
-  let seen = 0;
-  for (let i = 1; i <= 80; i++) {
-    const day = addDays(today(), i);
+  const start = weekStart(n);
+  for (let i = 0; i < 4; i++) {
+    const day = addDays(start, i);
     const a = await getJson<{ slots: { starts_at: string }[] }>(
       `/doctors/${id}/availability?date=${day}`,
     );
-    if (a.slots.length >= 4) {
-      if (seen === n)
-        return { doctorId: id, day, slots: a.slots.map((s) => s.starts_at) };
-      seen++;
-    }
+    if (a.slots.length >= 4)
+      return { doctorId: id, day, slots: a.slots.map((s) => s.starts_at) };
   }
-  throw new Error(`no bookable day number ${n} in the next 80 days`);
+  throw new Error(`no day with four free times in the week of ${start}`);
 }
 
 export async function patientOf(appointmentId: string): Promise<string> {
