@@ -301,7 +301,13 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
 
   # C5: Artifact Registry cleanup policies and size. A missing sizeBytes field is a FAIL, not a pass.
   local c5
-  c5="$(gc artifacts repositories describe clinic --location "$REGION" --project "$PROJECT" --format=json 2>/dev/null | jq -r '((.cleanupPolicies // {}) | keys | sort | join(",")) + " " + ((.sizeBytes | tonumber) < 400000000 | tostring)' 2>/dev/null)"
+  # gcloud's JSON for a repository omits sizeBytes (it only prints it as text), so the size comes
+  # from the REST API, billed to this project.
+  local c5_policies c5_size tok
+  tok="$(gc auth print-access-token 2>/dev/null)"
+  c5_policies="$(gc artifacts repositories describe clinic --location "$REGION" --project "$PROJECT" --format=json 2>/dev/null | jq -r '(.cleanupPolicies // {}) | keys | sort | join(",")' 2>/dev/null)"
+  c5_size="$(curl -s -H "Authorization: Bearer $tok" -H "x-goog-user-project: $PROJECT" "https://artifactregistry.googleapis.com/v1/projects/$PROJECT/locations/$REGION/repositories/clinic" | jq -r '(.sizeBytes // empty) | tonumber | (. < 400000000) | tostring' 2>/dev/null)"
+  c5="$c5_policies $c5_size"
   [ "$c5" = "delete-old,delete-untagged,keep-2 true" ] && pass "C5 AR cleanup policies and size" || fail "C5 AR '${c5:-no sizeBytes or unreadable}'"
 
   # C6: <= 2 versions per package (the listed name is a full path; use its basename).
@@ -357,7 +363,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   # C13: Neon project region and fixed size (needs neonctl; reported as SKIP, never as PASS).
   if command -v neonctl >/dev/null && [ -n "${NEON_PROJECT_ID:-}" ]; then
     local c13
-    c13="$(neonctl projects get "$NEON_PROJECT_ID" -o json 2>/dev/null | jq -r '[.project.region_id, .project.default_endpoint_settings.autoscaling_limit_min_cu, .project.default_endpoint_settings.autoscaling_limit_max_cu] | map(tostring) | join(" ")')"
+    c13="$(neonctl projects get "$NEON_PROJECT_ID" -o json 2>/dev/null | jq -r '[.region_id, .default_endpoint_settings.autoscaling_limit_min_cu, .default_endpoint_settings.autoscaling_limit_max_cu] | map(tostring) | join(" ")')"
     [ "$c13" = "aws-us-east-1 0.25 0.25" ] && pass "C13 Neon aws-us-east-1 fixed 0.25 CU" || fail "C13 Neon '${c13:-unreadable}'"
   else
     echo "SKIP  C13 Neon region and size: needs neonctl and NEON_PROJECT_ID (check the console instead)"
