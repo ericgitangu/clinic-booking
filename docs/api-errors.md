@@ -10,6 +10,8 @@ current state; may succeed later or in another state.
 
 | Code | Status | Slug | Title | When |
 |---|---|---|---|---|
+| UNAUTHENTICATED | 401 | unauthenticated | Unauthenticated | The internal assertion is missing, malformed, expired or does not match the request. |
+| FORBIDDEN | 403 | forbidden | Forbidden | The internal assertion is valid but its role may not use this endpoint. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
 | TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | The datetime is naive (and nothing else is wrong). |
 | UNKNOWN_DOCTOR | 422 | unknown-doctor | Unknown doctor | The body references a non-existent or inactive doctor. |
@@ -25,6 +27,9 @@ current state; may succeed later or in another state.
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
+| ACCESS_EXISTS | 409 | access-exists | Access exists | This email already has active access; change its role instead. |
+| OWNER_PROTECTED | 409 | owner-protected | Owner protected | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
+| ACCESS_NOT_FOUND | 404 | access-not-found | Access not found | No active access for this email. |
 | DOCTOR_NOT_FOUND | 404 | doctor-not-found | Doctor not found | No such doctor (including inactive). |
 | PATIENT_NOT_FOUND | 404 | patient-not-found | Patient not found | No such patient. |
 | APPOINTMENT_NOT_FOUND | 404 | appointment-not-found | Appointment not found | No such appointment. |

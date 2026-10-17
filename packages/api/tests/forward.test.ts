@@ -178,6 +178,47 @@ describe("resolveUpstream rejects unsafe or empty segments", () => {
   });
 });
 
+describe("resolveUpstream never proxies /internal", () => {
+  // Next decodes the catch-all once and collapses dot segments before this runs, so these are the
+  // shapes the proxy actually sees for /api/internal/x, /api/%69nternal/x, /api/./internal/x and
+  // /api/a/../internal/x (the last two become plain ["internal", "x"]).
+  const variants: [string, string[]][] = [
+    ["plain", ["internal", "admin", "metrics"]],
+    [
+      "percent-encoded letter, decoded by Next",
+      ["internal", "admin", "access"],
+    ],
+    ["dot segment collapsed by the URL parser", ["internal", "x"]],
+    [
+      "parent segment collapsed by the URL parser",
+      ["internal", "admin", "session"],
+    ],
+    ["capitalised", ["Internal", "admin", "metrics"]],
+    ["upper case", ["INTERNAL", "admin", "metrics"]],
+    ["mixed case", ["iNtErNaL", "x"]],
+    ["full-width letters", ["ｉｎｔｅｒｎａｌ", "x"]],
+    ["bare", ["internal"]],
+  ];
+  it.each(variants)("%s -> notfound", (_label, segments) => {
+    expect(resolveUpstream(segments)).toEqual({ kind: "notfound" });
+  });
+
+  it("still rejects the still-encoded and literal-dot spellings", () => {
+    expect(resolveUpstream(["%69nternal", "x"])).toEqual({ kind: "notfound" });
+    expect(resolveUpstream([".", "internal", "x"])).toEqual({
+      kind: "notfound",
+    });
+    expect(resolveUpstream(["a", "..", "internal"])).toEqual({
+      kind: "notfound",
+    });
+  });
+
+  it("only the first segment is special: a later 'internal' is an ordinary path", () => {
+    expect(resolveUpstream(["doctors", "internal"]).kind).toBe("proxy");
+    expect(resolveUpstream(["internals"]).kind).toBe("proxy");
+  });
+});
+
 describe("forward failure handling", () => {
   const base = { baseUrl: "https://api.example.run.app", upstreamPath: "/x" };
 

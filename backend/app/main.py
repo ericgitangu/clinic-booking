@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from app.api.routers import appointments, doctors, health, patients, problems
+from app.api.routers import admin, appointments, doctors, health, patients, problems
 from app.core.config import Settings
 from app.core.cors import add_cors
 from app.core.logging import configure_logging
@@ -44,6 +44,10 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(doctors.router)
     app.include_router(patients.router)
     app.include_router(appointments.router)
+    app.include_router(admin.router)
+    app.include_router(admin.identity_router)
+    app.include_router(admin.manage_router)
+    app.include_router(admin.access_router)
 
     # Error responses carry only application/problem+json in the served spec, too.
     _default_openapi = app.openapi

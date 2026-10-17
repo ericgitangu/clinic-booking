@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e
+        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -115,3 +115,6 @@ e2e: ## Playwright checks against the real API and database (docker compose, mig
 	docker compose down -v
 	docker compose up -d --wait
 	cd apps/booking && pnpm build && pnpm test:e2e
+
+e2e-admin: ## Playwright for apps/admin against the real build, API and Postgres (compose); only Google sign-in is replaced
+	bash scripts/e2e_admin.sh

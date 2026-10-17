@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # asyncpg does not accept these DSN query params; libpq-style users expect them, so we
 # reject them loudly rather than letting asyncpg raise an opaque error at connect time.
 _BANNED_DSN_PARAMS = ("sslmode", "channel_binding")
+_MIN_SIGNING_KEY_CHARS = 32
 
 
 class Settings(BaseSettings):
@@ -36,6 +37,25 @@ class Settings(BaseSettings):
     PUBLIC_BASE_URL: str = "http://localhost:8080"
     LOG_LEVEL: str = "info"
     GIT_SHA: str = "unknown"
+    # HMAC key shared with the web apps' server side. Unset means every /internal/* call is
+    # refused (fail closed), so a deployment without the key cannot be reached by accident.
+    INTERNAL_SIGNING_KEY: SecretStr | None = None
+    # Comma-separated owner emails. An owner is always `owner`, needs no staff_access row and can
+    # never be granted, changed or revoked through the API. Must match the admin app's variable.
+    ADMIN_EMAILS: str = ""
+
+    @field_validator("INTERNAL_SIGNING_KEY", mode="before")
+    @classmethod
+    def _signing_key_strength(cls, value: object) -> object:
+        # An empty variable (compose passes `${VAR:-}`) means "not configured", never an empty key.
+        if value is None or (isinstance(value, str) and value == ""):
+            return None
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if not isinstance(raw, str) or len(raw) < _MIN_SIGNING_KEY_CHARS:
+            raise ValueError(
+                f"INTERNAL_SIGNING_KEY must be at least {_MIN_SIGNING_KEY_CHARS} characters."
+            )
+        return value
 
     @field_validator("DATABASE_URL")
     @classmethod
@@ -61,6 +81,10 @@ class Settings(BaseSettings):
                 "these libpq params. Use '?ssl=require' instead."
             )
         return value
+
+    @property
+    def owner_emails(self) -> frozenset[str]:
+        return frozenset(e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip())
 
     @property
     def cors_origins(self) -> list[str]:

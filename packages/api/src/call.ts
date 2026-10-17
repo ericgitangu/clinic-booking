@@ -7,6 +7,7 @@
 // as a structured `contract_violation` event (operation, status and the paths of the zod issues,
 // never a value) and surfaced as a generic failure. Each call parses its body once.
 import { ZodError } from "zod";
+import { ASSERTION_HEADER, signAssertion } from "./assertion";
 import { createClient, createConfig, type Client } from "./generated/client";
 import type { ProblemCode } from "./generated/types.gen";
 import { zProblem } from "./generated/zod.gen";
@@ -23,7 +24,8 @@ export type ApiFailureCode =
   | "CONTRACT_VIOLATION"
   | "UPSTREAM_AUTH_FAILED"
   | "UPSTREAM_UNREACHABLE"
-  | "API_NOT_CONFIGURED";
+  | "API_NOT_CONFIGURED"
+  | "SIGNING_KEY_NOT_SET";
 
 export type ApiFailure =
   | {
@@ -52,10 +54,20 @@ export type ApiFailure =
 export type ApiSuccess<T> = { ok: true; status: number; data: T };
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
 
+// Who is calling /internal/*, for the signed assertion (see assertion.ts). The key is read from
+// INTERNAL_SIGNING_KEY. Omit for the public endpoints, which take no assertion.
+export interface Caller {
+  sub: string;
+  email: string;
+  /** The role the API should see; "none" only when asking what role an email holds. */
+  role: string;
+}
+
 export interface CallOptions {
   // Seconds Next may reuse a GET response; omit for always fresh.
   revalidate?: number;
   timeoutMs?: number;
+  caller?: Caller;
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -109,6 +121,10 @@ export async function callApi<D>(
   const baseUrl = (process.env.API_URL ?? "").replace(/\/+$/, "");
   if (!baseUrl) return unavailable(503, "API_NOT_CONFIGURED");
 
+  const signingKey = process.env.INTERNAL_SIGNING_KEY;
+  if (opts.caller && !signingKey)
+    return unavailable(503, "SIGNING_KEY_NOT_SET");
+
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const client = createClient(
     createConfig({
@@ -116,6 +132,23 @@ export async function callApi<D>(
       throwOnError: false,
       fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
         const req = new Request(input, init);
+        if (opts.caller && signingKey) {
+          // Signed over the request as it is about to be sent: method, path with query, body.
+          const url = new URL(req.url);
+          req.headers.set(
+            ASSERTION_HEADER,
+            signAssertion(
+              {
+                ...opts.caller,
+                method: req.method,
+                path: url.pathname + url.search,
+                body: await req.clone().text(),
+                now: new Date(),
+              },
+              signingKey,
+            ),
+          );
+        }
         if (minting_enabled()) {
           try {
             const token = await mintIdToken(

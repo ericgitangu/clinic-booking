@@ -1,19 +1,27 @@
-import { Button } from "@clinic/ui/components/ui/button";
+import { forbidden, redirect } from "next/navigation";
+import { SignInButton } from "@/components/sign-in-button";
 import { SITE } from "@/lib/site";
+import { getStaff } from "@/lib/session";
 
-// The sign-in gate. Sign-in is not wired yet, so the button says so instead of pretending.
-export default function SignInGate() {
+export const dynamic = "force-dynamic";
+
+// The sign-in gate. Someone already in goes to the dashboard; someone signed in without access
+// sees the 403 page rather than a sign-in button that would only loop.
+export default async function SignInGate() {
+  const staff = await getStaff();
+  if (staff) {
+    if (staff.role) redirect("/dashboard");
+    forbidden();
+  }
   return (
     <section className="mx-auto max-w-md py-16">
       <h1 className="font-heading text-3xl font-semibold tracking-tight">
         {SITE.name}
       </h1>
       <p className="mt-4 text-lg leading-8 text-muted-foreground">
-        Staff sign in with their Google account. Sign-in is not available yet.
+        For clinic staff. Sign in with the Google account the owner added.
       </p>
-      <Button size="lg" className="mt-8 h-11 w-full text-base" disabled>
-        Sign in with Google
-      </Button>
+      <SignInButton />
     </section>
   );
 }
