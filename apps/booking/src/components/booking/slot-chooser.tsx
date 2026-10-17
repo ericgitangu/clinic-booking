@@ -1,0 +1,155 @@
+"use client";
+
+import Link from "next/link";
+import { startTransition, useActionState, useState } from "react";
+import { Button } from "@clinic/ui/components/ui/button";
+import { rescheduleAppointment } from "@/app/actions";
+import { initialState } from "@/lib/action-state";
+import { clinicDay, formatTime } from "@/lib/clinic-time";
+import { NextSlots } from "@/components/booking/next-slots";
+import { StickyCta } from "@/components/booking/sticky-cta";
+import { useActionFeedback } from "@/components/booking/use-action-feedback";
+import { useRecaptcha } from "@/components/booking/use-recaptcha";
+
+type Props =
+  | { mode: "details"; doctorId: string; slots: { starts_at: string }[] }
+  | {
+      mode: "reschedule";
+      appointmentId: string;
+      slots: { starts_at: string }[];
+    };
+
+function SlotRadios({
+  slots,
+  value,
+  onChange,
+}: {
+  slots: { starts_at: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="sr-only">Free times</legend>
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+        {slots.map((s) => (
+          <li key={s.starts_at}>
+            <label className="block">
+              <input
+                type="radio"
+                name="slot"
+                value={s.starts_at}
+                checked={value === s.starts_at}
+                onChange={() => onChange(s.starts_at)}
+                className="peer sr-only"
+              />
+              <span className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-base font-semibold hover:bg-accent peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring">
+                {formatTime(s.starts_at)}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </fieldset>
+  );
+}
+
+export function SlotChooser(props: Props) {
+  const [selected, setSelected] = useState("");
+  const [state, formAction, pending] = useActionState(
+    rescheduleAppointment,
+    initialState,
+  );
+  const getToken = useRecaptcha("reschedule");
+  useActionFeedback(state);
+
+  if (props.slots.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border p-6 text-base text-muted-foreground">
+        No free times on this day. Pick another date above.
+      </p>
+    );
+  }
+
+  if (props.mode === "details") {
+    const href = selected
+      ? `/book/${props.doctorId}/details?starts_at=${encodeURIComponent(selected)}`
+      : "";
+    return (
+      <>
+        <SlotRadios
+          slots={props.slots}
+          value={selected}
+          onChange={setSelected}
+        />
+        <StickyCta
+          hint={
+            selected
+              ? `You picked ${formatTime(selected)}.`
+              : "Pick a time to continue."
+          }
+        >
+          {selected ? (
+            <Button asChild size="lg" className="h-12 w-full text-base">
+              <Link href={href}>Continue</Link>
+            </Button>
+          ) : (
+            <Button size="lg" className="h-12 w-full text-base" disabled>
+              Continue
+            </Button>
+          )}
+        </StickyCta>
+      </>
+    );
+  }
+
+  const { appointmentId } = props;
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        fd.set("starts_at", selected);
+        fd.set("recaptcha_token", await getToken().catch(() => ""));
+        startTransition(() => formAction(fd));
+      }}
+    >
+      <input type="hidden" name="appointment_id" value={appointmentId} />
+      <SlotRadios slots={props.slots} value={selected} onChange={setSelected} />
+      {state.status === "error" && state.code === "SLOT_TAKEN" ? (
+        <div
+          role="alert"
+          className="mt-6 rounded-lg border border-border bg-muted p-4"
+        >
+          <p className="text-base font-semibold">{state.message}</p>
+          <div className="mt-3">
+            <NextSlots
+              slots={state.nextSlots ?? []}
+              hrefFor={(iso) =>
+                `/appointments/${appointmentId}/reschedule?date=${clinicDay(iso)}`
+              }
+            />
+          </div>
+        </div>
+      ) : state.status === "error" ? (
+        <p role="alert" className="mt-6 text-base text-destructive">
+          {state.message}
+        </p>
+      ) : null}
+      <StickyCta
+        hint={
+          selected ? `New time: ${formatTime(selected)}.` : "Pick a new time."
+        }
+      >
+        <Button
+          type="submit"
+          size="lg"
+          className="h-12 w-full text-base"
+          disabled={!selected || pending}
+        >
+          {pending ? "Moving…" : "Move appointment"}
+        </Button>
+      </StickyCta>
+    </form>
+  );
+}

@@ -18,7 +18,7 @@
 
 The earlier address, <https://sil-clinic-booking.vercel.app>, still serves the same deployment.
 
-There is no booking UI; the API is the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
+The booking pages at `/book` and `/appointments` sit on top of the API, which is still the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
 ## 2. Verify the claims in 10 minutes
 

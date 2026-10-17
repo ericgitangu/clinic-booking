@@ -19,6 +19,7 @@ export const THEME_COLORS = { light: "#f4f8fc", dark: "#0a1130" } as const;
 // Pages crawlers may index. Anything not listed (admin, auth, cron) is also disallowed in robots.
 export const PUBLIC_PATHS = [
   "/",
+  "/book",
   "/privacy",
   "/terms",
   "/about",

@@ -18,7 +18,7 @@ export default tseslint.config(
   },
   // Node build scripts and flat-config files.
   {
-    files: ["scripts/**/*.mjs", "*.mjs", "*.config.ts"],
+    files: ["scripts/**/*.mjs", "e2e/**/*.mjs", "*.mjs", "*.config.ts"],
     languageOptions: { globals: { ...globals.node } },
   },
 );

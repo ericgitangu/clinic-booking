@@ -32,5 +32,6 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0026](0026-branding-and-seo.md) | Branding and SEO | Accepted, decided by the engineer 2026-10-17 | Section 4 "Honesty matters" |
 | [0027](0027-two-apps-in-a-workspace.md) | Two web apps in one workspace: booking and admin | Accepted, decided by the engineer 2026-10-17 | Section 1 "components, key decisions, trade-offs" |
 | [0028](0028-public-hostnames.md) | Public hostnames on ericgitangu.com | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
+| [0029](0029-booking-flow.md) | The booking flow: server actions, an interim patient cookie, one human check per action | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
 
 **Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make lint` checks the markdown.
