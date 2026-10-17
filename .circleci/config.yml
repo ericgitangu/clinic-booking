@@ -540,6 +540,22 @@ jobs:
             pnpm -C apps/booking exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e
       - run:
+          name: Lighthouse budgets on / /book /about /data (production build, docs/adr/0026)
+          command: |
+            # Same build and API as the scenarios above; chromium is the Playwright one. lhci is
+            # pinned inside the script. The result is recorded, not raised, so the reports are
+            # stored as artifacts even when a budget is missed; the next step enforces it.
+            set +e
+            E2E_API_URL=http://127.0.0.1:8080 bash scripts/ci/lighthouse.sh
+            echo $? > /tmp/lighthouse-exit
+            exit 0
+      - store_artifacts:
+          path: /tmp/lighthouse
+          destination: lighthouse
+      - run:
+          name: Enforce the Lighthouse budgets
+          command: test "$(cat /tmp/lighthouse-exit)" = 0
+      - run:
           name: API logs
           command: docker compose logs api | tail -80
           when: on_fail
@@ -684,6 +700,77 @@ jobs:
           command: |
             pip install --quiet httpx
             bash scripts/ci/public_smoke.sh
+      - run:
+          name: IAM deny-proof, direct run.app (403 anonymous, 401 junk bearer; no credentials)
+          command: |
+            # Written as a redacted record and kept as an artifact (docs/adr/0016 proof, docs/evidence).
+            mkdir -p /tmp/evidence
+            bash scripts/ci/deny_probe.sh run-app /tmp/evidence/iam-deny-run-app.txt
+      - store_artifacts:
+          path: /tmp/evidence/iam-deny-run-app.txt
+          destination: evidence/iam-deny-run-app.txt
+
+  zap-prod:
+    # ZAP baseline against the live site once the release is verified (docs/adr/0017). Passive only,
+    # read-only against production: it spiders for one minute and inspects responses. Same image
+    # digest and rules file as the PR dast job; exit 0/2 pass, 1/3 fail.
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Halt unless this commit was promoted (otherwise the scan would test an older release)
+          command: |
+            if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
+              echo "This commit was not promoted; skipping the production scan."
+              circleci-agent step halt
+            fi
+      - run:
+          name: Halt if a newer commit already owns main
+          command: bash scripts/ci/require_head.sh
+      - run:
+          name: ZAP baseline against the public site (passive, one-minute spider)
+          command: |
+            set +e
+            bash scripts/ci/zap_prod_baseline.sh
+            echo $? > /tmp/zap-prod-exit
+            exit 0
+      - store_artifacts:
+          path: .zap/zap-prod-report.html
+      - store_artifacts:
+          path: .zap/zap-prod-report.json
+      - run:
+          name: Enforce the scan result
+          command: test "$(cat /tmp/zap-prod-exit)" = 0
+
+  wif-deny-probe:
+    # Runs only on the test/wif-deny branch (workflow wif-deny), on the empty oidc-probe context:
+    # the token exchange must be refused and no deploy variable may be present (docs/adr/0016).
+    docker:
+      - image: mirror.gcr.io/cimg/base:current
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: WIF exchange is refused and the deploy variables are absent
+          command: |
+            mkdir -p /tmp/evidence
+            set +e
+            bash scripts/ci/deny_probe.sh wif /tmp/evidence/iam-deny-wif.txt; a=$?
+            bash scripts/ci/deny_probe.sh context /tmp/evidence/iam-deny-context.txt; b=$?
+            echo "$a$b" > /tmp/wif-probe-exit
+            exit 0
+      - store_artifacts:
+          path: /tmp/evidence
+          destination: evidence
+      - run:
+          name: Enforce the probes
+          command: test "$(cat /tmp/wif-probe-exit)" = 00
 
   cost-static:
     docker:
@@ -744,6 +831,13 @@ workflows:
       - web-quality
       - e2e-real
       - cost-static
+
+  wif-deny:
+    when:
+      equal: [test/wif-deny, << pipeline.git.branch >>]
+    jobs:
+      - wif-deny-probe:
+          context: oidc-probe
 
   release:
     when:
@@ -843,3 +937,7 @@ workflows:
           context: gcp-deploy
           requires:
             - ship-api
+      - zap-prod:
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - smoke-public
