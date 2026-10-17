@@ -29,3 +29,7 @@ output "circleci_wif_provider" {
 output "vercel_wif_provider" {
   value = google_iam_workload_identity_pool_provider.vercel.name
 }
+
+output "admin_sa_email" {
+  value = google_service_account.admin.email
+}

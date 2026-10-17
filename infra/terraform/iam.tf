@@ -25,6 +25,12 @@ resource "google_service_account" "web" {
   depends_on   = [google_project_service.enabled]
 }
 
+resource "google_service_account" "admin" {
+  account_id   = "clinic-admin"
+  display_name = "Vercel admin app identity"
+  depends_on   = [google_project_service.enabled]
+}
+
 resource "google_service_account" "smoke" {
   account_id   = "clinic-smoke"
   display_name = "Smoke-test invoker"

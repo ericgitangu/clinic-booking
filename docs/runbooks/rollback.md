@@ -36,7 +36,7 @@ candidate and is pruned.
 
 ## Web
 
-Vercel keeps previous production deployments: Vercel dashboard, `clinic-web`, Deployments,
+Vercel keeps previous production deployments for each app (`clinic-web` is the booking app, `clinic-admin` the admin app): Vercel dashboard, the project, Deployments,
 pick the last good one, "Promote to Production" (or `vercel rollback --scope <team>`).
 Roll the API back first if the web build shipped a contract the old API lacks, and the web
 second so the two never disagree.
@@ -74,8 +74,8 @@ After any Vercel rollback, automatic alias assignment stays off until the next r
 `ship-web` run restores it: its `ensure` step sees the public alias is not serving the new
 deployment and promotes it, then fails the job if it still is not.
 
-Deploy markers (`circleci run release plan` / `update`) are recorded for `clinic-api` and
-`clinic-web`. `.circleci/rollback.yml` is the manual, one-click rollback for the CircleCI UI. It
+Deploy markers (`circleci run release plan` / `update`) are recorded for `clinic-api`,
+`clinic-web` and `clinic-admin`. The automatic rollback restores both apps after the API; `VERCEL_APP=admin` makes `vercel_prod.sh` work on the admin host. `.circleci/rollback.yml` is the manual, one-click rollback for the CircleCI UI. It
 uses the same guards (`rollback.sh --to-tag` also checks the tag exists). Its API job goes to the
 tagged revision it is given, but its web job always goes to the previous production deployment and
 ignores `TARGET_VERSION`, because Vercel deployments are not tagged with the release and must be activated once

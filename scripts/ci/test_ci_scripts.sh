@@ -148,6 +148,11 @@ export VERCEL="$WORK/bin/fakevercel" VERCEL_ORG_ID=team_x
 new_fx vp; echo dpl_old > "$FX/serving"
 out="$(bash "$HERE/vercel_prod.sh" current 2>/dev/null)"; expect "vercel_prod: current reads the serving deployment" "$out" dpl_old
 export VERCEL_PROJECT_ID=prj_x
+: > "$FX/vcalls"
+VERCEL_APP=admin bash "$HERE/vercel_prod.sh" current >/dev/null 2>&1
+expect "vercel_prod: the admin app reads its own host" "$(head -1 "$FX/vcalls" | rg -c 'clinic-admin.ericgitangu.com')" 1
+VERCEL_APP=other bash "$HERE/vercel_prod.sh" current >/dev/null 2>&1; rc=$?
+expect "vercel_prod: an unknown app is refused (exit 2)" "$rc" 2
 out="$(bash "$HERE/vercel_prod.sh" previous 2>/dev/null)"; expect "vercel_prod: previous skips the live deployment" "$out" dpl_prior
 bash "$HERE/vercel_prod.sh" ensure dpl_new >/dev/null 2>&1; rc=$?
 expect "vercel_prod: ensure promotes a deployment the alias is not serving" "$rc:$(cat "$FX/serving")" "0:dpl_new"
