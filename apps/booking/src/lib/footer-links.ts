@@ -12,7 +12,7 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
     links: [
       {
         label: "Book an appointment",
-        href: "/",
+        href: "/book",
         external: false,
         icon: "calendar",
       },

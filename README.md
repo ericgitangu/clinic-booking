@@ -18,7 +18,7 @@
 
 The earlier address, <https://sil-clinic-booking.vercel.app>, still serves the same deployment.
 
-There is no booking UI; the API is the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
+The booking pages at `/book` and `/appointments` sit on top of the API, which is still the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
 ## 2. Verify the claims in 10 minutes
 
@@ -234,7 +234,7 @@ The local race test and the production run agree: exactly one booking wins, and 
 
 ## 10. Operations, cost & security posture
 
-**Security note.** The REST API is unauthenticated, exactly as the brief specifies, so anyone who has an appointment or patient id can read or change it there: that is an IDOR by design. The web app closes it on its own side: patients sign in with Google, a server-side layer maps the account to one patient, and the browser never calls the API directly (ADR-0024). The API itself is not hardened against it.
+**Security note.** reCAPTCHA and the patient-ownership check protect the web UI flows. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works; it is rate-limited per IP, and patient-scoped reads rely on unguessable UUIDs. Accepted debt, review trigger: API authentication with Google sign-in. In detail: the REST API at `/api` is unauthenticated on purpose: the brief asks for a public REST API and reviewers use Swagger's Try it out through that path. It is rate limited per IP, and reads of one patient's appointments rely on the ids being unguessable UUIDs, so anyone who has an appointment or patient id can read or change it there. That is accepted debt, and it also means the phone-number check on patient creation (a duplicate phone returns `PATIENT_PHONE_EXISTS`) tells an API caller whether a number is registered. What the web screens add protects those screens only: the reCAPTCHA check, and the signed cookie that limits "My appointments", cancel and reschedule to the patient the browser booked as. They do not protect the API. API authentication arrives with Google sign-in (ADR-0024); until then the debt stays (ADR-0012, ADR-0022, ADR-0029).
 
 **Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.28 a month there (accepted); Cloud Run compute and egress stay within the free tier.
 
