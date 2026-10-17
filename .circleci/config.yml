@@ -482,7 +482,7 @@ jobs:
       - checkout
       - run:
           name: Skip when apps/, packages/ and contracts/ are untouched (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json scripts/ci/lighthouse/
       - restore_cache:
           keys:
             - pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
@@ -492,6 +492,9 @@ jobs:
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm audit --prod --audit-level high
+            # the pinned Lighthouse CI runner has its own lockfile and so its own audit
+            pnpm --dir scripts/ci/lighthouse install --frozen-lockfile --ignore-scripts
+            pnpm --dir scripts/ci/lighthouse audit --audit-level high
             pnpm -r --if-present test
             pnpm -r --if-present build
             # Both built apps, started with no sign-in settings, must answer 503, never 500.
@@ -512,7 +515,7 @@ jobs:
       - checkout
       - run:
           name: Skip when nothing this job covers changed (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json scripts/ci/lighthouse.sh scripts/ci/lighthouserc.cjs scripts/ci/lighthouse/ .circleci/
       - run:
           name: Throwaway keys for this run (the API checks signed assertions, the app signs sessions)
           command: |
@@ -555,6 +558,49 @@ jobs:
       - run:
           name: Enforce the Lighthouse budgets
           command: test "$(cat /tmp/lighthouse-exit)" = 0
+      - run:
+          name: API logs
+          command: docker compose logs api | tail -80
+          when: on_fail
+
+  admin-e2e:
+    # The admin app's Playwright scenarios against its production build, the real API and the real
+    # Postgres from docker-compose (migrations and seed included). Only Google's own sign-in is
+    # replaced, by apps/admin/e2e/support/test-auth.ts. Keys are fresh per run and only in the job's
+    # environment; no .env file is written.
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
+      - run:
+          name: Throwaway keys for this run (the API checks signed assertions, the app signs sessions)
+          command: |
+            echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            # the one admin e-mail the API and the app both trust; the specs sign in as it
+            echo "export ADMIN_EMAILS=owner@clinic.example" >> "$BASH_ENV"
+      - run:
+          name: API and database (compose runs the migrations and the seed)
+          command: docker compose up -d --build --wait
+      - run:
+          name: Build the admin app and run its scenarios against the real API
+          command: |
+            # The machine image has no Node 24: fetch the official build and check it against its
+            # published SHA-256 before using it.
+            curl -fsSLO https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.xz
+            echo "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df  node-v24.14.0-linux-x64.tar.xz" | sha256sum -c -
+            sudo tar -xJf node-v24.14.0-linux-x64.tar.xz -C /usr/local --strip-components=1
+            node --version
+            sudo npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile --ignore-scripts
+            pnpm -C apps/admin build
+            pnpm -C apps/admin exec playwright install --with-deps chromium
+            E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
       - run:
           name: API logs
           command: docker compose logs api | tail -80
@@ -709,6 +755,7 @@ jobs:
       - store_artifacts:
           path: /tmp/evidence/iam-deny-run-app.txt
           destination: evidence/iam-deny-run-app.txt
+          when: always
 
   zap-prod:
     # ZAP baseline against the live site once the release is verified (docs/adr/0017). Passive only,
@@ -768,6 +815,7 @@ jobs:
       - store_artifacts:
           path: /tmp/evidence
           destination: evidence
+          when: always
       - run:
           name: Enforce the probes
           command: test "$(cat /tmp/wif-probe-exit)" = 00
@@ -830,6 +878,7 @@ workflows:
       - dast
       - web-quality
       - e2e-real
+      - admin-e2e
       - cost-static
 
   wif-deny:
@@ -855,6 +904,7 @@ workflows:
       - build-scan
       - web-quality
       - e2e-real
+      - admin-e2e
       - cost-static
       - build-scan-push:
           context: gcp-deploy
@@ -884,6 +934,7 @@ workflows:
           app: admin
           requires:
             - web-quality
+            - admin-e2e
       - ship-app:
           name: ship-booking
           app: booking
@@ -938,6 +989,5 @@ workflows:
           requires:
             - ship-api
       - zap-prod:
-          serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - smoke-public

@@ -1,19 +1,32 @@
 #!/usr/bin/env bash
 #
 # Lighthouse CI over the booking app's production build (docs/adr/0026). Serves `next start` on its
-# own port against the API already running, then runs @lhci/cli (exact version below, released
-# 2025-06-25) with the budgets in scripts/ci/lighthouserc.cjs. Zero cost: it runs inside the
+# own port against the API already running, then runs @lhci/cli (exact version in
+# scripts/ci/lighthouse/package.json and its lockfile, released 2025-06-25) with the budgets in scripts/ci/lighthouserc.cjs. Zero cost: it runs inside the
 # e2e-real job's machine, after the build and the Playwright scenarios, and calls no public URL.
+#
+# Runs on every push to main. On other branches it is skipped unless apps/, packages/ui/ or the
+# Lighthouse files changed relative to main (fails open: any git problem runs it).
 #
 # Needs: apps/booking already built (pnpm -C apps/booking build), the API at $E2E_API_URL, and a
 # Chrome: $LH_CHROME_PATH, else the Chromium Playwright installed.
-# Output: $LHCI_OUTPUT_DIR (default /tmp/lighthouse) holds one HTML and one JSON report per run.
-# lhci keeps its raw runs in ./.lighthouseci of the working directory, so it runs from the output
-# directory and the repository stays clean.
+# Output: $LHCI_OUTPUT_DIR (default /tmp/lighthouse) holds one HTML and one JSON report per run,
+# and is the only directory CI stores. lhci's raw runs stay in scripts/ci/lighthouse/.lighthouseci,
+# which is git-ignored and never uploaded, so every report exists once.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-LHCI_VERSION=0.15.1
+LH_DIR=scripts/ci/lighthouse   # holds the exact @lhci/cli version and its lockfile
+LH_WATCH="apps/ packages/ui/ scripts/ci/lighthouse scripts/ci/lighthouserc.cjs"
+if [ "${CIRCLE_BRANCH:-main}" != main ]; then
+  git fetch origin main --quiet 2>/dev/null || true
+  if base="$(git merge-base origin/main HEAD 2>/dev/null)" \
+     && changed="$(git diff --name-only "$base" HEAD -- $LH_WATCH 2>/dev/null)" \
+     && [ -z "$changed" ]; then
+    echo "no changes under: $LH_WATCH; skipping Lighthouse"
+    exit 0
+  fi
+fi
 PORT="${LH_PORT:-3101}"
 export LHCI_BASE_URL="http://localhost:${PORT}"
 ROOT="$PWD"
@@ -46,5 +59,9 @@ for _ in $(seq 1 30); do
 done
 curl -sf -o /dev/null "$LHCI_BASE_URL/about" || { echo "next start never answered:"; cat "$LOG"; exit 1; }
 
-cd "$LHCI_OUTPUT_DIR"
-pnpm dlx "@lhci/cli@${LHCI_VERSION}" autorun --config="$ROOT/scripts/ci/lighthouserc.cjs"
+rm -rf "$LH_DIR/.lighthouseci"
+pnpm --dir "$LH_DIR" install --frozen-lockfile --ignore-scripts
+rc=0
+pnpm --dir "$LH_DIR" exec lhci autorun --config="$ROOT/scripts/ci/lighthouserc.cjs" || rc=$?
+node "$LH_DIR/summary.mjs" "$LHCI_OUTPUT_DIR" || true
+exit "$rc"
