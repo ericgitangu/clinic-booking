@@ -95,7 +95,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 - Short artifact, cache and workspace retention set in Plan → Usage Controls; artifacts limited to JUnit, coverage XML and `zap-report.html`.
 - Docker Official Images and the `cimg/*` executors are pulled through `mirror.gcr.io` (official images by digest), with no Docker Hub login and no `dockerhub-ro` context (engineer, 2026-10-16), so there is no Docker Hub credential to hold. Residual: the mirror is a cache of Docker Hub, so a `cimg` tag it has not cached falls through to Docker Hub's anonymous limit; the four tags in use resolved through it when checked (2026-10-16).
 
-**Web deploy.** `vercel pull --yes --environment=production && vercel build --prod && vercel deploy --prebuilt --prod`. `web/vercel.json` disables Vercel's own Git deployments. Run with `--cwd web`; one project, which carries the proxy, so this job is lean core.
+**Web deploy.** `vercel pull --yes --environment=production && vercel build --prod && vercel deploy --prebuilt --prod`. `web/vercel.json` disables Vercel's own Git deployments. Run from the repo root with the project's Root Directory set to `web` (with `--cwd web` the prebuilt file map does not resolve in a pnpm workspace); one project, which carries the proxy, so this job is lean core.
 
 ## Consequences
 
