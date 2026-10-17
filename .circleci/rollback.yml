@@ -44,7 +44,7 @@ jobs:
             circleci run release plan rollback-web --environment-name=<< pipeline.deploy.environment_name >> \
               --component-name=<< pipeline.deploy.component_name >> --target-version="${TARGET_VERSION}" --rollback
       - run:
-          name: Point production at the previous Vercel deployment
+          name: Point production at the previous Vercel deployment (TARGET_VERSION is not used here)
           command: |
             sudo npm install -g vercel@59.5.0 --ignore-scripts
             bash scripts/ci/vercel_prod.sh rollback "$(bash scripts/ci/vercel_prod.sh previous)"

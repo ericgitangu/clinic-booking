@@ -536,7 +536,7 @@ jobs:
       - run:
           name: Only roll the web app back if the API went back first
           command: |
-            grep -qx rolled-back /tmp/ws/rollback_state 2>/dev/null || {
+            grep -Eqx "rolled-back|already-previous" /tmp/ws/rollback_state 2>/dev/null || {
               echo "FAIL: the API was not rolled back, so the web app stays on the release that matches it."; exit 1; }
       - run:
           name: Point production at the previous deployment, by id

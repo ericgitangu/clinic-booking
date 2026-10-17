@@ -53,6 +53,7 @@ esac
 live="$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json |
   jq -r '[.status.traffic[]? | select((.percent // 0) == 100) | .revisionName][0] // empty')"
 if [ "$live" = "$previous" ]; then
+  mkdir -p "$IN"; echo already-previous > "$IN/rollback_state"
   echo "rollback: already on $previous"; exit 0
 fi
 if [ -n "$current" ] && [ "$live" != "$current" ]; then

@@ -105,6 +105,7 @@ rb_setup already rev-p "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
 bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
 expect "rollback: already on the previous revision is a no-op (exit 0)" "$rc" 0
 expect "rollback: no-op makes no traffic change" "$(cnt 'update-traffic')" 0
+expect "rollback: no-op still records a state for the workspace" "$(cat "$PROMOTE_DIR/rollback_state")" already-previous
 
 rb_setup first rev-b ""
 echo '{"revisions":["rev-b"],"current":"rev-b","previous":""}' > "$PROMOTE_DIR/keep.json"
