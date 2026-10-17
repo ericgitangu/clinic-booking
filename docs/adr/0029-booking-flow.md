@@ -14,7 +14,7 @@ The patient screens need to list doctors, show free times, book, cancel and resc
 
 ## Considered options
 
-1. Server actions and server components calling the API, with a cookie until sign-in (chosen). No browser code holds a credential, and the human check runs where it cannot be skipped.
+1. Server actions and server components calling the API, with a cookie until sign-in (chosen). No browser code holds a credential, and the human check runs on the server for every screen flow.
 2. The browser calls `/api/*` through the proxy with a generated client. Fewer server files, but the human check would have to live in the proxy for every route.
 3. Wait for sign-in before building any booking screen. Cleaner identity, but nothing to show for the booking half of the brief.
 
@@ -29,6 +29,8 @@ The patient screens need to list doctors, show free times, book, cancel and resc
 - **Tests run twice.** `apps/booking/e2e/booking.spec.ts` runs against an in-memory stand-in API (`e2e/fake-api.mjs`) for the fast run, and the same scenarios run in CI (job `e2e-real`) against the real API and database from `docker-compose` with migrations and seed. Times are found through the API, so weekends and closed days are skipped without a fixed date.
 
 ### What this does not protect
+
+reCAPTCHA and the patient-ownership check protect the web UI flows. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP, and patient-scoped reads rely on unguessable UUIDs. This is accepted debt; the review trigger is API authentication with Google sign-in.
 
 The public REST API at `/api` is unauthenticated on purpose: the brief asks for a public REST API and reviewers try it through Swagger. It is rate limited per IP, reads of one patient's appointments rely on unguessable UUIDs, and the reCAPTCHA check and the cookie are not applied there. So the checks above protect the web screens only; anyone who calls the API directly with an appointment or patient id can read or change it, and a duplicate phone on patient creation still tells an API caller that the number exists. This is accepted debt, recorded in ADR-0012 and ADR-0022 and in README section 10. API authentication arrives with Google sign-in (ADR-0024).
 
