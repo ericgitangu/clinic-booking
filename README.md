@@ -261,7 +261,7 @@ AI usage is summarized here in section 11; commit messages carry no tooling trai
 
 Prerequisites: Docker, uv and pnpm, plus the Vercel CLI for the web app's environment.
 
-The web app reads its settings from `web/.env.local`, which is gitignored. `web/.env.example` lists every variable name with a comment and no values. Run this once, signed in to Vercel, to fill the file from the project's Development environment:
+The web app reads its settings from `web/.env.local`, which is gitignored. `web/.env.example` lists every variable name with a comment and no values. Run this once, signed in to Vercel, to fill the file from the project's Development environment. Vercel never returns variables marked Sensitive (the Google client, the auth secret and the like), so the command prints which ones to copy into the file by hand:
 
 ```bash
 make env-pull
