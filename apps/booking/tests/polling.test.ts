@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { IDLE_MS, POLL_MS, pickWasTaken, pollInterval } from "@/lib/polling";
+import {
+  IDLE_MS,
+  MAX_BACKOFF_MS,
+  POLL_MS,
+  pickWasTaken,
+  pollInterval,
+} from "@/lib/polling";
 
 describe("patient polling", () => {
   it("polls every 15 s and goes idle after 10 minutes", () => {
@@ -10,6 +16,14 @@ describe("patient polling", () => {
   it("refetches on the interval until the person goes idle, then stops", () => {
     expect(pollInterval(false)).toBe(POLL_MS);
     expect(pollInterval(true)).toBe(false);
+  });
+
+  it("backs off 15, 30, 60, 120 s on consecutive failures and caps there", () => {
+    expect(
+      [0, 1, 2, 3, 4, 10, 1000].map((n) => pollInterval(false, n)),
+    ).toEqual([15_000, 30_000, 60_000, 120_000, 120_000, 120_000, 120_000]);
+    expect(MAX_BACKOFF_MS).toBe(120_000);
+    expect(pollInterval(true, 3)).toBe(false); // idle still wins over backoff
   });
 
   it("calls a pick taken only when it was set and has left the list", () => {

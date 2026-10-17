@@ -47,7 +47,7 @@ describe("proxy when sign-in is not configured", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
-  // Next's own matcher semantics decide whether proxy(req()) runs for a URL, so this fails if a route
+  // Next's own matcher semantics decide whether proxy() runs for a URL, so this fails if a route
   // that needs sign-in drops out of config.matcher or a public one is pulled in.
   const runs = (url: string) => unstable_doesMiddlewareMatch({ config, url });
 

@@ -10,7 +10,14 @@ import { IDLE_MS, POLL_MS, pollInterval } from "@/lib/polling";
 // The browser reaches the API only through the same-origin proxy, never Cloud Run.
 client.setConfig({ baseUrl: "/api" });
 
-const INPUT_EVENTS = ["pointerdown", "pointermove", "keydown", "touchstart"];
+const INPUT_EVENTS = [
+  "pointerdown",
+  "pointermove",
+  "keydown",
+  "touchstart",
+  "wheel",
+  "scroll",
+];
 
 /**
  * Free times for one doctor and day, kept current. The server-rendered list is the first
@@ -20,16 +27,35 @@ const INPUT_EVENTS = ["pointerdown", "pointermove", "keydown", "touchstart"];
  */
 export function useLiveSlots(initial: Availability) {
   const [idle, setIdle] = useState(false);
+  // True once the polling is running (interval subscribed, idle timer armed). Exposed to the page
+  // as a data attribute so tests wait for it instead of racing hydration.
+  const [armed, setArmed] = useState(false);
   const lastInput = useRef(0);
+  // Refreshes that failed in a row; reset by the first success. Read by refetchInterval.
+  const failures = useRef(0);
 
+  const base = doctorAvailabilityDoctorsDoctorIdAvailabilityGetOptions({
+    path: { doctor_id: initial.doctor_id },
+    query: { date: initial.date },
+  });
   const query = useQuery({
-    ...doctorAvailabilityDoctorsDoctorIdAvailabilityGetOptions({
-      path: { doctor_id: initial.doctor_id },
-      query: { date: initial.date },
-    }),
+    ...base,
+    queryFn: async (ctx) => {
+      try {
+        const data = await base.queryFn!(ctx);
+        failures.current = 0;
+        return data;
+      } catch (err) {
+        failures.current += 1;
+        throw err;
+      }
+    },
     initialData: initial,
     staleTime: POLL_MS,
-    refetchInterval: pollInterval(idle),
+    // A failed poll is not retried inside the fetch (that would double the rate, and a 429 must not
+    // be retried at all); the backed-off interval is the retry.
+    retry: false,
+    refetchInterval: () => pollInterval(idle, failures.current),
     refetchOnWindowFocus: !idle,
   });
 
@@ -39,8 +65,9 @@ export function useLiveSlots(initial: Availability) {
     const bump = () => {
       lastInput.current = Date.now();
     };
+    // Capture, so a scroll inside any element counts (scroll events do not bubble).
     for (const e of INPUT_EVENTS)
-      window.addEventListener(e, bump, { passive: true });
+      window.addEventListener(e, bump, { passive: true, capture: true });
     let timer: ReturnType<typeof setTimeout>;
     const arm = (ms: number) => {
       timer = setTimeout(() => {
@@ -50,9 +77,11 @@ export function useLiveSlots(initial: Availability) {
       }, ms);
     };
     arm(IDLE_MS);
+    setArmed(true);
     return () => {
       clearTimeout(timer);
-      for (const e of INPUT_EVENTS) window.removeEventListener(e, bump);
+      for (const e of INPUT_EVENTS)
+        window.removeEventListener(e, bump, { capture: true });
     };
   }, [idle]);
 
@@ -62,5 +91,13 @@ export function useLiveSlots(initial: Availability) {
     void refetch();
   }, [refetch]);
 
-  return { slots: query.data.slots, idle, resume, refresh: refetch };
+  return {
+    slots: query.data.slots,
+    idle,
+    armed,
+    // The last refresh failed: the list on screen may be out of date.
+    failing: query.isError,
+    resume,
+    refresh: refetch,
+  };
 }

@@ -24,6 +24,25 @@ async function context(browser: Browser): Promise<BrowserContext> {
   return browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": ip() } });
 }
 
+// PW_CPU_THROTTLE=4 slows the page's CPU 4x (Chrome DevTools protocol), as a busy CI runner does.
+async function openPage(ctx: BrowserContext): Promise<Page> {
+  const page = await ctx.newPage();
+  const rate = Number(process.env.PW_CPU_THROTTLE ?? 1);
+  if (rate > 1) {
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate });
+  }
+  return page;
+}
+
+// The polling hook marks the page once its interval and idle timer are running. Driving the clock
+// before that would race hydration: a timer armed after the jump never sees the time that passed.
+const polling = (page: Page) =>
+  expect(page.locator("[data-polling]")).toHaveAttribute(
+    "data-polling",
+    "armed",
+  );
+
 const isAvailability = (url: string) =>
   url.includes("/api/doctors/") && url.includes("/availability");
 
@@ -61,7 +80,7 @@ async function setVisibility(page: Page, state: "hidden" | "visible") {
 async function bookAs(browser: Browser, doctorId: string, startsAt: string) {
   const ctx = await context(browser);
   await ctx.addCookies(await sessionCookies(newPerson()));
-  const page = await ctx.newPage();
+  const page = await openPage(ctx);
   await page.goto(
     `/book/${doctorId}/details?starts_at=${encodeURIComponent(startsAt)}`,
   );
@@ -77,9 +96,10 @@ test("a time another person books disappears from an open page without a reload"
 }) => {
   const { doctorId, day, slots } = await pick(9);
   const ctx = await context(browser);
-  const page = await ctx.newPage();
+  const page = await openPage(ctx);
   await page.clock.install();
   await page.goto(`/book/${doctorId}?date=${day}`);
+  await polling(page);
   const taken = page.getByText(hhmm(slots[0]), { exact: true });
   const kept = page.getByText(hhmm(slots[3]), { exact: true });
   await expect(taken).toBeVisible();
@@ -106,9 +126,10 @@ test("a time the person had picked and someone else books says it was just taken
 }) => {
   const { doctorId, day, slots } = await pick(9);
   const ctx = await context(browser);
-  const page = await ctx.newPage();
+  const page = await openPage(ctx);
   await page.clock.install();
   await page.goto(`/book/${doctorId}?date=${day}`);
+  await polling(page);
   await page.getByText(hhmm(slots[1]), { exact: true }).click();
   await expect(page.getByRole("link", { name: "Continue" })).toBeVisible();
 
@@ -127,10 +148,11 @@ test("polling runs while the tab is visible, pauses when hidden and catches up o
 }) => {
   const { doctorId, day, slots } = await pick(10);
   const ctx = await context(browser);
-  const page = await ctx.newPage();
+  const page = await openPage(ctx);
   await page.clock.install();
   const calls = availabilityCalls(page);
   await page.goto(`/book/${doctorId}?date=${day}`);
+  await polling(page);
   await expect(page.getByText(hhmm(slots[0]), { exact: true })).toBeVisible();
   expect(calls).toHaveLength(0); // the first answer came from the server render
 
@@ -154,10 +176,11 @@ test("polling stops after ten idle minutes and a click resumes it", async ({
 }) => {
   const { doctorId, day, slots } = await pick(10);
   const ctx = await context(browser);
-  const page = await ctx.newPage();
+  const page = await openPage(ctx);
   await page.clock.install();
   const calls = availabilityCalls(page);
   await page.goto(`/book/${doctorId}?date=${day}`);
+  await polling(page);
   await expect(page.getByText(hhmm(slots[0]), { exact: true })).toBeVisible();
 
   // No pointer or keyboard input for ten minutes (the clock jumps; intervals fire once).

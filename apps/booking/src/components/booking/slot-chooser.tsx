@@ -58,14 +58,24 @@ function SlotRadios({
 function LiveNotice({
   taken,
   idle,
+  armed,
+  failing,
   onResume,
 }: {
   taken: string;
   idle: boolean;
+  armed: boolean;
+  failing: boolean;
   onResume: () => void;
 }) {
   return (
     <>
+      <span hidden data-polling={armed ? "armed" : "pending"} />
+      {failing ? (
+        <p aria-live="polite" className="mb-4 text-sm text-muted-foreground">
+          Couldn&apos;t refresh the times just now. Trying again shortly.
+        </p>
+      ) : null}
       {taken ? (
         <p
           role="status"
@@ -90,7 +100,9 @@ function LiveNotice({
 export function SlotChooser(props: Props) {
   const [selected, setSelected] = useState("");
   const [taken, setTaken] = useState("");
-  const { slots, idle, resume, refresh } = useLiveSlots(props.availability);
+  const { slots, idle, armed, failing, resume, refresh } = useLiveSlots(
+    props.availability,
+  );
   // A time the person had picked that is gone from the latest list: say so and clear the pick.
   useEffect(() => {
     if (pickWasTaken(selected, slots)) {
@@ -112,7 +124,15 @@ export function SlotChooser(props: Props) {
     if (lostRace) void refresh();
   }, [lostRace, refresh]);
 
-  const notice = <LiveNotice taken={taken} idle={idle} onResume={resume} />;
+  const notice = (
+    <LiveNotice
+      taken={taken}
+      idle={idle}
+      armed={armed}
+      failing={failing}
+      onResume={resume}
+    />
+  );
 
   if (slots.length === 0) {
     return (

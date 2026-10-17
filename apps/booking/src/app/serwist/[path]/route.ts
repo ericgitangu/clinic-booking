@@ -11,4 +11,6 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
     swSrc: "src/sw/sw.ts",
     globPatterns: ["public/offline.html"],
     useNativeEsbuild: true,
+    // No source map: the worker's source is not served (and /serwist/sw.js.map does not exist).
+    esbuildOptions: { sourcemap: false },
   });
