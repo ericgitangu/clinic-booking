@@ -95,8 +95,14 @@ test("a double booking says the time was just taken and offers the next free tim
   await expect(alert).toContainText("That time was just taken.");
   await expect(alert).toContainText("Here are the next free times");
   // A suggested time leads straight to a details page for that time, and it books.
-  await alert.getByRole("link").first().click();
-  await expect(b.page).toHaveURL(/\/details\?starts_at=/);
+  const suggestion = alert.getByRole("link").first();
+  const suggestedHref = await suggestion.getAttribute("href");
+  await suggestion.click();
+  // The page is already on a details URL (for the taken time), so wait for the suggested one,
+  // otherwise the next click can land on the old page.
+  await expect(b.page).toHaveURL(
+    (u) => u.pathname + u.search === suggestedHref,
+  );
   await b.page.getByRole("button", { name: "Confirm booking" }).click();
   await expect(
     b.page.getByRole("heading", { name: "You are booked" }),
