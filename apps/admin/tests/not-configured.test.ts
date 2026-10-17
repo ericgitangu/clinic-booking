@@ -1,3 +1,4 @@
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetNotConfiguredLog } from "@clinic/api/auth-env";
 import { config, proxy } from "@/proxy";
@@ -39,7 +40,18 @@ describe("proxy when sign-in is not configured", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it("covers the routes that need sign-in", () => {
-    expect(config.matcher.length).toBeGreaterThan(0);
+  // Next's own matcher semantics decide whether proxy() runs for a URL, so this fails if a route
+  // that needs sign-in drops out of config.matcher or a public one is pulled in.
+  const runs = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+
+  it.each(["/", "/dashboard"])("guards %s", (path) => {
+    expect(runs(path)).toBe(true);
   });
+
+  it.each(["/robots.txt", "/favicon.ico", "/_next/static/x"])(
+    "does not guard %s",
+    (path) => {
+      expect(runs(path)).toBe(false);
+    },
+  );
 });

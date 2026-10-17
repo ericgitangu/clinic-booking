@@ -366,6 +366,21 @@ touch "$FX/denied"
 bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
 expect "env check: fails closed when the listing is refused" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
+# =========================================================================================
+# not_configured_smoke.sh: refuses to run an app whose directory holds an .env file, because
+# `next start` would load it and the test would report a false FAIL. Never moves the file.
+# =========================================================================================
+new_fx smoke_env
+mkdir -p "$WORK/smoke/admin" "$WORK/smoke/booking"
+: > "$WORK/smoke/admin/.env.local"        # a fixture in a temp dir, not a real env file
+: > "$WORK/smoke/booking/.env.production"
+out="$(APPS_DIR="$WORK/smoke" bash "$HERE/not_configured_smoke.sh" 2>&1)"; rc=$?
+expect "smoke: refuses (non-zero) when apps hold .env files" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "smoke: names the admin file to move aside" "$(grep -c 'admin/.env.local exists' <<<"$out")" 1
+expect "smoke: names the booking file to move aside" "$(grep -c 'booking/.env.production exists' <<<"$out")" 1
+expect "smoke: leaves the developer's files in place" "$([ -e "$WORK/smoke/admin/.env.local" ] && [ -e "$WORK/smoke/booking/.env.production" ] && echo kept)" kept
+expect "smoke: does not start a server for a refused app" "$(grep -c 'did not start' <<<"$out")" 0
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
