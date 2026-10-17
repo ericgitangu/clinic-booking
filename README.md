@@ -221,6 +221,18 @@ These are deductions from the configuration, not load tests.
 
 <!-- pyramid · race-test assertions · observed coverage % · how to run each layer -->
 
+**Everything runs against the real thing.** The web app's gate is the `e2e-real` CI job: it brings up the real API and Postgres with docker compose (migrations and seed included) and runs every browser scenario (`apps/booking/e2e`) and the generated client's tests (`packages/api/tests/real-api.test.ts`) against them: booking, a double booking, cancelling, cancelling twice, rescheduling, a past time, a time under an hour away, the typed error for each, and the landing page's own curl steps. There is no stand-in for our own API. The one stand-in is inside `real-api.test.ts`, where a real response is damaged on its way back to prove contract drift is caught, because a correct server never sends one. The reCAPTCHA check is switched off for test runs only (`apps/booking/src/lib/human-check.ts`), and its verifier is covered by unit tests of every reject path.
+
+**Generated client.** The types, zod schemas and SDK in `packages/api/src/generated` come from `contracts/openapi.json` (`make gen-client`, `@hey-api/openapi-ts`), and the lint job fails if they differ from a fresh run. Every call checks its request and response against them (ADR-0011, ADR-0029).
+
+Run each layer locally: `make lint hygiene`; backend tests with `cd backend && uv run pytest` against the compose database; web unit tests with `pnpm -r test` (add `REAL_API_URL=http://127.0.0.1:8080` to include the real-API client tests); browser tests with `make e2e`, which starts compose first.
+
+**What is real and what is stood in for.** The gate for the web app is the `e2e-real` CI job: it brings up the real API and Postgres with docker compose (migrations and seed included) and runs the browser scenarios (`apps/booking/e2e`) and the generated client's tests (`packages/api/tests/real-api.test.ts`) against them. Those cover booking, a double booking, cancelling, cancelling twice, rescheduling, a past time, a time under an hour away, and the typed error for each. Stand-ins exist only where a real response cannot be produced: `packages/api/tests/call.test.ts` feeds the client answers a correct server never sends (to prove contract drift is caught), and one real-API case damages a real response in transit for the same reason. The in-memory API stand-in (`apps/booking/e2e/fake-api.mjs`, job `web-e2e`) is only for fast feedback and is not proof of anything. No third-party service is faked in these tests; the reCAPTCHA check is switched off for test runs only (`apps/booking/src/lib/human-check.ts`) and its verifier is covered by unit tests of the reject paths.
+
+**Generated client.** The types, zod schemas and SDK in `packages/api/src/generated` come from `contracts/openapi.json` (`make gen-client`, `@hey-api/openapi-ts`), and the lint job fails if they differ from a fresh run. Every call checks its request and response against them (ADR-0011, ADR-0029).
+
+Run each layer locally: `make lint hygiene`; backend tests with `cd backend && uv run pytest` against the compose database; web unit tests with `pnpm -r test` (add `REAL_API_URL=http://127.0.0.1:8080` to include the real-API client tests); browser tests with `E2E_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking test:e2e` for the real run, or without the variable for the fast stand-in run.
+
 Observed in production on 2026-10-17: 20 parallel `POST /api/appointments` for one slot returned one 201 and 19 409s (`SLOT_TAKEN`).
 The local race test and the production run agree: exactly one booking wins, and the database, not application code, is what decides.
 
