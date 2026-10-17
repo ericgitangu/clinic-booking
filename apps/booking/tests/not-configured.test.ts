@@ -1,7 +1,11 @@
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetNotConfiguredLog } from "@clinic/api/auth-env";
+import { NextRequest } from "next/server";
 import { config, proxy } from "@/proxy";
+
+const req = (url = "https://clinic.ericgitangu.com/appointments") =>
+  new NextRequest(url);
 
 const NAMES = [
   "BETTER_AUTH_URL",
@@ -19,8 +23,8 @@ describe("proxy when sign-in is not configured", () => {
 
   it("answers 503 with the not-configured page and logs once, names only", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const first = proxy();
-    proxy();
+    const first = proxy(req());
+    proxy(req());
     expect(first.status).toBe(503);
     expect(await first.text()).toContain("Sign-in is not configured");
     expect(spy).toHaveBeenCalledTimes(1);
@@ -38,12 +42,12 @@ describe("proxy when sign-in is not configured", () => {
     vi.stubEnv("BETTER_AUTH_SECRET", "s");
     vi.stubEnv("GOOGLE_CLIENT_ID", "i");
     vi.stubEnv("GOOGLE_CLIENT_SECRET", "c");
-    const res = proxy();
+    const res = proxy(req());
     expect(res.status).toBe(200);
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
-  // Next's own matcher semantics decide whether proxy() runs for a URL, so this fails if a route
+  // Next's own matcher semantics decide whether proxy(req()) runs for a URL, so this fails if a route
   // that needs sign-in drops out of config.matcher or a public one is pulled in.
   const runs = (url: string) => unstable_doesMiddlewareMatch({ config, url });
 
