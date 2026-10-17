@@ -59,9 +59,6 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
-      shadcn:
-        specifier: ^4.21.5
-        version: 4.21.5(supports-color@7.2.0)
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -99,6 +96,9 @@ importers:
       prettier:
         specifier: 3.9.10
         version: 3.9.10
+      shadcn:
+        specifier: ^4.21.5
+        version: 4.21.5(supports-color@7.2.0)
       typescript:
         specifier: 5.9.3
         version: 5.9.3

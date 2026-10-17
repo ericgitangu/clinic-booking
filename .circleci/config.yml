@@ -475,7 +475,7 @@ jobs:
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm -C web build
-            PW_CHANNEL=chrome pnpm -C web test:e2e
+            PW_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable)" pnpm -C web test:e2e
 
   verify-release:
     docker:
