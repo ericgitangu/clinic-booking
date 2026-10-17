@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import type { ApiFailure } from "@clinic/api/call";
 import {
   availability,
@@ -10,6 +10,7 @@ import {
   rescheduleForPatient,
   revokeAccess as revoke,
 } from "@/lib/api";
+import { METRICS_TAG } from "@/lib/metrics-cache";
 import { authorise, callerFor } from "@/lib/session";
 
 export type ActionResult =
@@ -68,6 +69,7 @@ export async function grantAccess(
     return { ok: false, message: "Enter a valid email address and a role." };
   const res = await grant(callerFor(staff, staff.role), address, role);
   if (!res.ok) return describe(res, "Enter a valid email address and a role.");
+  updateTag(METRICS_TAG);
   revalidatePath("/access");
   return { ok: true, message: `Access granted to ${address}.` };
 }
@@ -82,6 +84,7 @@ export async function changeAccessRole(
   if (!grantable(role)) return { ok: false, message: "Pick a role." };
   const res = await changeRole(callerFor(staff, staff.role), address, role);
   if (!res.ok) return describe(res, "Pick a role.");
+  updateTag(METRICS_TAG);
   revalidatePath("/access");
   return { ok: true, message: `${address} is now ${role}.` };
 }
@@ -92,6 +95,7 @@ export async function revokeAccess(email: string): Promise<ActionResult> {
   const address = normalise(email);
   const res = await revoke(callerFor(staff, staff.role), address);
   if (!res.ok) return describe(res, "That is not a valid email address.");
+  updateTag(METRICS_TAG);
   revalidatePath("/access");
   return { ok: true, message: `Access revoked for ${address}.` };
 }
@@ -113,6 +117,7 @@ export async function cancelAppointment(
     `${text} (cancelled by clinic staff)`,
   );
   if (!res.ok) return describe(res, "Give a reason of at least 3 characters.");
+  updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: "Appointment cancelled." };
 }
@@ -129,6 +134,7 @@ export async function rescheduleAppointment(
     startsAt,
   );
   if (!res.ok) return describe(res, "Pick a time.");
+  updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: "Appointment rescheduled." };
 }
@@ -149,4 +155,14 @@ export async function loadSlots(
     ok: true,
     slots: res.data.slots.map((s) => ({ startsAt: s.starts_at })),
   };
+}
+
+// The dashboard's refresh button: expires the cached metrics so the next render asks the API.
+// Any role that may view the dashboard may refresh it; nothing is written.
+export async function refreshMetrics(): Promise<ActionResult> {
+  const staff = await authorise("view");
+  if (!staff) return DENIED;
+  updateTag(METRICS_TAG);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Dashboard refreshed." };
 }

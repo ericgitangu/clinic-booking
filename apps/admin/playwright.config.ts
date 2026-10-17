@@ -24,7 +24,10 @@ export default defineConfig({
         : { channel: "chrome" }),
   },
   webServer: {
-    command: "pnpm exec next start -p 3101",
+    // The dashboard metrics are cached on disk for sixty seconds. A server started within
+    // a minute of the last run would otherwise serve that run's numbers for this run's database, so
+    // each run starts with an empty data cache.
+    command: "rm -rf .next/cache/fetch-cache && pnpm exec next start -p 3101",
     url: "http://localhost:3101/robots.txt",
     reuseExistingServer: false,
     timeout: 60_000,
