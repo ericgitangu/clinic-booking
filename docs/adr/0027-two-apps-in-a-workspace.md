@@ -63,7 +63,7 @@ pnpm-workspace.yaml   packages: apps/*, packages/*
 
 ### CI and rollback
 
-- Two build jobs and two ship jobs (`ship-booking`, `ship-admin`) in the same serial group as the API. A new CircleCI context `vercel-admin` holds the admin project's id (and its own copy of the team token); `vercel-prod` stays the booking context.
+- Two build jobs and two ship jobs (`ship-booking`, `ship-admin`) in the same serial group as the API. Both use the `vercel-prod` context, whose team-scoped token can deploy either project; the admin jobs override `VERCEL_PROJECT_ID` with the admin project's id (not a secret) so no second token is stored.
 - `verify-release` checks both public hosts, and the rollback covers both: each ship job records the deployment that was live, and `rollback-web` restores each app by id. The API rollback is unchanged and still runs first.
 
 ## Consequences

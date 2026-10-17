@@ -379,6 +379,10 @@ jobs:
       app:
         description: The app directory under apps/ (booking or admin)
         type: string
+      project_id:
+        description: Vercel project id for this app when it differs from the context's (not a secret)
+        type: string
+        default: ""
       component:
         description: The component name on the CircleCI deploy marker
         type: string
@@ -388,6 +392,13 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - run:
+          name: Select the Vercel project for this app (the context holds the booking project's id)
+          command: |
+            echo 'export VERCEL_APP="<< parameters.app >>"' >> "$BASH_ENV"
+            if [ -n "<< parameters.project_id >>" ]; then
+              echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
+            fi
       - attach_workspace:
           at: /tmp/ws
       - run:
@@ -559,12 +570,23 @@ jobs:
       app:
         description: The app directory under apps/ (booking or admin)
         type: string
+      project_id:
+        description: Vercel project id for this app when it differs from the context's (not a secret)
+        type: string
+        default: ""
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
     working_directory: ~/repo
     steps:
       - checkout
+      - run:
+          name: Select the Vercel project for this app (the context holds the booking project's id)
+          command: |
+            echo 'export VERCEL_APP="<< parameters.app >>"' >> "$BASH_ENV"
+            if [ -n "<< parameters.project_id >>" ]; then
+              echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
+            fi
       - attach_workspace:
           at: /tmp/ws
       - run:
@@ -736,7 +758,8 @@ workflows:
           name: ship-admin
           app: admin
           component: clinic-admin
-          context: vercel-admin
+          context: vercel-prod
+          project_id: prj_Y5T4nteV26yu6A9pVSMy2YLZgE4w
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
@@ -761,7 +784,8 @@ workflows:
       - rollback-app:
           name: rollback-admin
           app: admin
-          context: vercel-admin
+          context: vercel-prod
+          project_id: prj_Y5T4nteV26yu6A9pVSMy2YLZgE4w
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - rollback-api

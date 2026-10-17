@@ -34,6 +34,10 @@ jobs:
       app:
         description: The app directory under apps/ (booking or admin)
         type: string
+      project_id:
+        description: Vercel project id for this app when it differs from the context's (not a secret)
+        type: string
+        default: ""
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
     resource_class: small
@@ -42,6 +46,13 @@ jobs:
       TARGET_VERSION: << pipeline.deploy.target_version >>
     steps:
       - checkout
+      - run:
+          name: Select the Vercel project for this app (the context holds the booking project's id)
+          command: |
+            echo 'export VERCEL_APP="<< parameters.app >>"' >> "$BASH_ENV"
+            if [ -n "<< parameters.project_id >>" ]; then
+              echo 'export VERCEL_PROJECT_ID="<< parameters.project_id >>"' >> "$BASH_ENV"
+            fi
       - run:
           name: Deploy marker, planned rollback
           command: |
@@ -77,4 +88,5 @@ workflows:
     jobs:
       - rollback-app:
           app: admin
-          context: vercel-admin
+          context: vercel-prod
+          project_id: prj_Y5T4nteV26yu6A9pVSMy2YLZgE4w

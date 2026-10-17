@@ -320,4 +320,4 @@ vercel api -X PATCH "/v9/projects/clinic-admin?teamId=$VERCEL_ORG_ID" -f rootDir
 vercel domains add clinic-admin.ericgitangu.com clinic-admin --scope "$TEAM"
 ```
 
-CircleCI needs a `vercel-admin` context holding that project's `VERCEL_PROJECT_ID`, plus `VERCEL_ORG_ID` and a team token, beside `vercel-prod` for the booking app.
+CircleCI needs no extra context: the admin jobs use `vercel-prod` (its team-scoped token can deploy both projects) and override `VERCEL_PROJECT_ID` with the admin project's id, which is not a secret and is set in `.circleci/config.yml`.
