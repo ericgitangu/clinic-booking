@@ -14,7 +14,7 @@ const HTML = `<!doctype html>
     <div id="swagger-ui"></div>
     <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.3/swagger-ui-bundle.js" integrity="sha384-h00llMzD1afyNow1pDmnZKlHsUZgp9KE9HXLFXF2CvbwsBY0+WBO4f75SfGwvM4K" crossorigin="anonymous"></script>
     <script>
-      window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });
+      window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui", deepLinking: true });
     </script>
   </body>
 </html>`;
