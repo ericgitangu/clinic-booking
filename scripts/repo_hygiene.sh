@@ -4,7 +4,8 @@
 #   a) a tracked file that should be ignored (local junk, secrets, build output, local-only docs)
 #   b) an untracked file that is neither ignored nor allowlisted
 #   c) AI-code smells in tracked code outside docs/
-# Allowlist: scripts/hygiene_allow.txt, one `path-glob | line-regex | reason` per line. The
+# Generated shadcn primitives (web/src/components/ui) are skipped by the smell scan but stay under
+# eslint and tsc. Allowlist: scripts/hygiene_allow.txt, one `path-glob | line-regex | reason` per line. The
 # default is empty. Run from anywhere; operates on the git repository containing this script.
 set -uo pipefail
 
@@ -85,7 +86,7 @@ PL
 is_code() { case "$1" in
   *.py|*.ts|*.tsx|*.js|*.mjs|*.sh|*.go|*.tf|*.sql|*.yml|*.yaml|Makefile|*/Makefile|*/Dockerfile|Dockerfile) return 0 ;; esac; return 1; }
 skip_smell() { case "$1" in
-  docs/*|*.lock|pnpm-lock.yaml|*/generated/*|contracts/openapi.json|.husky/_/*|scripts/repo_hygiene.sh|scripts/repo_hygiene_selftest.sh|.terraform.lock.hcl) return 0 ;; esac; return 1; }
+  docs/*|web/src/components/ui/*|*.lock|pnpm-lock.yaml|*/generated/*|contracts/openapi.json|.husky/_/*|scripts/repo_hygiene.sh|scripts/repo_hygiene_selftest.sh|.terraform.lock.hcl) return 0 ;; esac; return 1; }
 
 while IFS= read -r f; do
   is_code "$f" || continue

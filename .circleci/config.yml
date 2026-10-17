@@ -459,6 +459,25 @@ jobs:
           paths:
             - ~/.local/share/pnpm/store
 
+  web-e2e:
+    docker:
+      - image: mirror.gcr.io/cimg/node:24.14-browsers
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Skip when web/ and contracts/ are untouched (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh web/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
+      - run:
+          name: Build the web app and run the mobile layout checks (Playwright's Chromium)
+          command: |
+            sudo npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile --ignore-scripts
+            pnpm -C web build
+            pnpm -C web exec playwright install chromium
+            PW_BUNDLED=1 pnpm -C web test:e2e
+
   verify-release:
     docker:
       - image: mirror.gcr.io/cimg/python:3.12
@@ -639,6 +658,7 @@ workflows:
       - build-scan
       - dast
       - web-quality
+      - web-e2e
       - cost-static
 
   release:
@@ -656,6 +676,7 @@ workflows:
       - sca
       - build-scan
       - web-quality
+      - web-e2e
       - cost-static
       - build-scan-push:
           context: gcp-deploy
