@@ -58,8 +58,20 @@ function isSafeSegment(segment: string): boolean {
   return !/[/\\?#%\u0000-\u001f\u007f]/.test(segment);
 }
 
+// /internal/* is for the web apps' servers only (they call the API directly with a signed
+// assertion). The public proxy refuses it outright instead of relying on the API to say no.
+// Next has already decoded the catch-all once and collapsed dot segments in the URL, so
+// "/api/%69nternal/x" and "/api/./internal/x" both arrive here as ["internal", "x"]; the first
+// segment is compared after Unicode normalisation and lower-casing so no spelling gets through.
+function isInternal(first: string): boolean {
+  return first.normalize("NFKC").toLowerCase() === "internal";
+}
+
 export function resolveUpstream(segments: string[]): Upstream {
   if (segments.length === 0 || !segments.every(isSafeSegment)) {
+    return { kind: "notfound" };
+  }
+  if (isInternal(segments[0])) {
     return { kind: "notfound" };
   }
   const joined = "/" + segments.join("/");

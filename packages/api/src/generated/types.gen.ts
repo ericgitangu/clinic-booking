@@ -5,6 +5,106 @@ export type ClientOptions = {
 };
 
 /**
+ * AccessEntry
+ */
+export type AccessEntry = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Granted At
+     */
+    granted_at: string | null;
+    /**
+     * Granted By
+     */
+    granted_by: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'owner' | 'admin' | 'viewer';
+    /**
+     * Source
+     */
+    source: 'env' | 'db';
+};
+
+/**
+ * AccessList
+ */
+export type AccessList = {
+    /**
+     * Items
+     */
+    items: Array<AccessEntry>;
+};
+
+/**
+ * AdminAppointment
+ */
+export type AdminAppointment = {
+    /**
+     * Cancellation Reason
+     */
+    cancellation_reason: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Ends At
+     */
+    ends_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Patient Id
+     */
+    patient_id: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Status
+     */
+    status: 'booked' | 'cancelled';
+};
+
+/**
+ * AdminAppointmentPage
+ */
+export type AdminAppointmentPage = {
+    /**
+     * Items
+     */
+    items: Array<AdminAppointment>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+};
+
+/**
  * Appointment
  */
 export type Appointment = {
@@ -152,6 +252,16 @@ export type CancelRequest = {
 };
 
 /**
+ * ChangeRoleRequest
+ */
+export type ChangeRoleRequest = {
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+};
+
+/**
  * Clinic
  */
 export type Clinic = {
@@ -167,6 +277,22 @@ export type Clinic = {
      * Timezone
      */
     timezone: string;
+};
+
+/**
+ * DateRange
+ *
+ * Clinic-local dates; ``from`` inclusive, ``to`` exclusive.
+ */
+export type DateRange = {
+    /**
+     * From
+     */
+    from: string;
+    /**
+     * To
+     */
+    to: string;
 };
 
 /**
@@ -200,6 +326,36 @@ export type DoctorList = {
      * Items
      */
     items: Array<Doctor>;
+};
+
+/**
+ * DoctorLoad
+ */
+export type DoctorLoad = {
+    /**
+     * Booked Visits
+     */
+    booked_visits: number;
+    /**
+     * Cancelled Actions
+     */
+    cancelled_actions: number;
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Utilization
+     */
+    utilization: number | null;
 };
 
 /**
@@ -239,6 +395,20 @@ export type ErrorItem = {
 };
 
 /**
+ * GrantRequest
+ */
+export type GrantRequest = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -256,6 +426,66 @@ export type Health = {
      * Status
      */
     status: 'ok';
+};
+
+/**
+ * Lineage
+ */
+export type Lineage = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Events
+     */
+    events: Array<LineageEvent>;
+};
+
+/**
+ * LineageEvent
+ */
+export type LineageEvent = {
+    /**
+     * Event Type
+     */
+    event_type: 'booked' | 'rescheduled' | 'cancelled';
+    /**
+     * From Starts At
+     */
+    from_starts_at: string | null;
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Occurred At
+     */
+    occurred_at: string;
+    /**
+     * To Starts At
+     */
+    to_starts_at: string | null;
+};
+
+/**
+ * Metrics
+ */
+export type Metrics = {
+    /**
+     * Bucket
+     */
+    bucket: 'day' | 'hour';
+    /**
+     * Per Doctor
+     */
+    per_doctor: Array<DoctorLoad>;
+    range: DateRange;
+    /**
+     * Series
+     */
+    series: Array<SeriesPoint>;
+    totals: Totals;
 };
 
 /**
@@ -354,7 +584,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -390,6 +620,42 @@ export type RescheduleRequest = {
 };
 
 /**
+ * SeriesPoint
+ */
+export type SeriesPoint = {
+    /**
+     * Booked
+     */
+    booked: number;
+    /**
+     * Bucket Start
+     */
+    bucket_start: string;
+    /**
+     * Cancelled
+     */
+    cancelled: number;
+    /**
+     * Rescheduled
+     */
+    rescheduled: number;
+};
+
+/**
+ * SessionInfo
+ */
+export type SessionInfo = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Role
+     */
+    role: 'owner' | 'admin' | 'viewer' | null;
+};
+
+/**
  * Slot
  */
 export type Slot = {
@@ -401,6 +667,28 @@ export type Slot = {
      * Starts At
      */
     starts_at: string;
+};
+
+/**
+ * Totals
+ */
+export type Totals = {
+    /**
+     * Booked
+     */
+    booked: number;
+    /**
+     * Cancelled
+     */
+    cancelled: number;
+    /**
+     * Rescheduled
+     */
+    rescheduled: number;
+    /**
+     * Upcoming Active
+     */
+    upcoming_active: number;
 };
 
 /**
@@ -684,6 +972,407 @@ export type HealthHealthGetResponses = {
 };
 
 export type HealthHealthGetResponse = HealthHealthGetResponses[keyof HealthHealthGetResponses];
+
+export type ListAccessInternalAdminAccessGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/access';
+};
+
+export type ListAccessInternalAdminAccessGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type ListAccessInternalAdminAccessGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessList;
+};
+
+export type ListAccessInternalAdminAccessGetResponse = ListAccessInternalAdminAccessGetResponses[keyof ListAccessInternalAdminAccessGetResponses];
+
+export type GrantAccessInternalAdminAccessPostData = {
+    body: GrantRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/access';
+};
+
+export type GrantAccessInternalAdminAccessPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type GrantAccessInternalAdminAccessPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: AccessEntry;
+};
+
+export type GrantAccessInternalAdminAccessPostResponse = GrantAccessInternalAdminAccessPostResponses[keyof GrantAccessInternalAdminAccessPostResponses];
+
+export type RevokeAccessInternalAdminAccessEmailDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Email
+         */
+        email: string;
+    };
+    query?: never;
+    url: '/internal/admin/access/{email}';
+};
+
+export type RevokeAccessInternalAdminAccessEmailDeleteErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type RevokeAccessInternalAdminAccessEmailDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessEntry;
+};
+
+export type RevokeAccessInternalAdminAccessEmailDeleteResponse = RevokeAccessInternalAdminAccessEmailDeleteResponses[keyof RevokeAccessInternalAdminAccessEmailDeleteResponses];
+
+export type ChangeAccessRoleInternalAdminAccessEmailPatchData = {
+    body: ChangeRoleRequest;
+    path: {
+        /**
+         * Email
+         */
+        email: string;
+    };
+    query?: never;
+    url: '/internal/admin/access/{email}';
+};
+
+export type ChangeAccessRoleInternalAdminAccessEmailPatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ChangeAccessRoleInternalAdminAccessEmailPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessEntry;
+};
+
+export type ChangeAccessRoleInternalAdminAccessEmailPatchResponse = ChangeAccessRoleInternalAdminAccessEmailPatchResponses[keyof ChangeAccessRoleInternalAdminAccessEmailPatchResponses];
+
+export type ListAppointmentsInternalAdminAppointmentsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Status
+         */
+        status?: 'booked' | 'cancelled' | 'all';
+        /**
+         * Doctor Id
+         */
+        doctor_id?: string | null;
+        /**
+         * From
+         */
+        from?: string | null;
+        /**
+         * To
+         */
+        to?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/internal/admin/appointments';
+};
+
+export type ListAppointmentsInternalAdminAppointmentsGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ListAppointmentsInternalAdminAppointmentsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminAppointmentPage;
+};
+
+export type ListAppointmentsInternalAdminAppointmentsGetResponse = ListAppointmentsInternalAdminAppointmentsGetResponses[keyof ListAppointmentsInternalAdminAppointmentsGetResponses];
+
+export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData = {
+    body: CancelRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/cancel';
+};
+
+export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: Appointment;
+};
+
+export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses[keyof CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses];
+
+export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData = {
+    body?: never;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/lineage';
+};
+
+export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Lineage;
+};
+
+export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse = GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses[keyof GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses];
+
+export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData = {
+    body: RescheduleRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/reschedule';
+};
+
+export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: Appointment;
+};
+
+export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse = RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses[keyof RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses];
+
+export type GetMetricsInternalAdminMetricsGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * From
+         */
+        from: string;
+        /**
+         * To
+         */
+        to: string;
+        /**
+         * Bucket
+         */
+        bucket?: 'day' | 'hour';
+    };
+    url: '/internal/admin/metrics';
+};
+
+export type GetMetricsInternalAdminMetricsGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type GetMetricsInternalAdminMetricsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Metrics;
+};
+
+export type GetMetricsInternalAdminMetricsGetResponse = GetMetricsInternalAdminMetricsGetResponses[keyof GetMetricsInternalAdminMetricsGetResponses];
+
+export type GetSessionInfoInternalAdminSessionGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/session';
+};
+
+export type GetSessionInfoInternalAdminSessionGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+};
+
+export type GetSessionInfoInternalAdminSessionGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: SessionInfo;
+};
+
+export type GetSessionInfoInternalAdminSessionGetResponse = GetSessionInfoInternalAdminSessionGetResponses[keyof GetSessionInfoInternalAdminSessionGetResponses];
 
 export type PostPatientPatientsPostData = {
     body: PatientCreate;

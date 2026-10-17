@@ -31,6 +31,18 @@ class ErrorSpec:
 # feature that raises them. Order: 422, 409, 404, 405, 503, 500.
 CATALOGUE: tuple[ErrorSpec, ...] = (
     ErrorSpec(
+        "UNAUTHENTICATED",
+        401,
+        "Unauthenticated",
+        "The internal assertion is missing, malformed, expired or does not match the request.",
+    ),
+    ErrorSpec(
+        "FORBIDDEN",
+        403,
+        "Forbidden",
+        "The internal assertion is valid but its role may not use this endpoint.",
+    ),
+    ErrorSpec(
         "VALIDATION_ERROR",
         422,
         "Validation error",
@@ -112,6 +124,19 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "Concurrent update",
         "A deadlock or serialization failure persisted after one retry.",
     ),
+    ErrorSpec(
+        "ACCESS_EXISTS",
+        409,
+        "Access exists",
+        "This email already has active access; change its role instead.",
+    ),
+    ErrorSpec(
+        "OWNER_PROTECTED",
+        409,
+        "Owner protected",
+        "The owner's access is fixed by configuration and cannot be granted, changed or revoked.",
+    ),
+    ErrorSpec("ACCESS_NOT_FOUND", 404, "Access not found", "No active access for this email."),
     ErrorSpec("DOCTOR_NOT_FOUND", 404, "Doctor not found", "No such doctor (including inactive)."),
     ErrorSpec("PATIENT_NOT_FOUND", 404, "Patient not found", "No such patient."),
     ErrorSpec("APPOINTMENT_NOT_FOUND", 404, "Appointment not found", "No such appointment."),
@@ -150,6 +175,15 @@ class DomainError(Exception):
         self.slug = spec.slug
         self.detail = detail or spec.description
         super().__init__(self.detail)
+
+
+# Internal (backend-for-frontend) endpoints only; the public API has no authentication.
+class Unauthenticated(DomainError):
+    code = "UNAUTHENTICATED"
+
+
+class Forbidden(DomainError):
+    code = "FORBIDDEN"
 
 
 # Domain-raised errors (slots / booking rules). Repository/service layers raise the rest.
@@ -220,3 +254,15 @@ class AppointmentNotFound(DomainError):
 
 class DbUnavailable(DomainError):
     code = "DB_UNAVAILABLE"
+
+
+class AccessExists(DomainError):
+    code = "ACCESS_EXISTS"
+
+
+class OwnerProtected(DomainError):
+    code = "OWNER_PROTECTED"
+
+
+class AccessNotFound(DomainError):
+    code = "ACCESS_NOT_FOUND"

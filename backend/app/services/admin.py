@@ -1,0 +1,172 @@
+"""Admin dashboard queries: range handling, cursors and the per-doctor join.
+
+Dates are clinic-local (``clinics.timezone``); ``from`` is inclusive and ``to`` exclusive.
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import json
+import uuid
+from datetime import UTC, date, datetime, time
+from zoneinfo import ZoneInfo
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.clock import Clock
+from app.domain.errors import AppointmentNotFound, DomainError
+from app.repositories import admin as repo
+from app.schemas.admin import (
+    AdminAppointment,
+    AdminAppointmentPage,
+    Bucket,
+    DateRange,
+    DoctorLoad,
+    Lineage,
+    LineageEvent,
+    Metrics,
+    SeriesPoint,
+    Totals,
+)
+from app.schemas.common import CLINIC_TZ
+
+MAX_DAYS = {"day": 90, "hour": 7}
+DEFAULT_LIMIT = 25
+MAX_LIMIT = 100
+
+
+class InvalidAdminQuery(DomainError):
+    code = "VALIDATION_ERROR"
+
+
+async def _zone(session: AsyncSession) -> ZoneInfo:
+    name = await repo.clinic_timezone(session)
+    return ZoneInfo(name) if name else CLINIC_TZ
+
+
+def _bounds(zone: ZoneInfo, start: date, end: date) -> tuple[datetime, datetime]:
+    """Clinic-local midnight of both dates as UTC instants."""
+    return (
+        datetime.combine(start, time.min, zone).astimezone(UTC),
+        datetime.combine(end, time.min, zone).astimezone(UTC),
+    )
+
+
+def encode_cursor(starts_at: datetime, appointment_id: uuid.UUID) -> str:
+    body = {"s": starts_at.astimezone(UTC).isoformat(), "i": str(appointment_id)}
+    raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    bad = InvalidAdminQuery("cursor is not a cursor issued by this endpoint")
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+        body = json.loads(raw)
+        if not isinstance(body, dict) or set(body) != {"s", "i"}:
+            raise bad
+        s, i = body["s"], body["i"]
+        if not isinstance(s, str) or not isinstance(i, str):
+            raise bad
+        starts_at = datetime.fromisoformat(s)
+        if starts_at.tzinfo is None:
+            raise bad
+        return starts_at.astimezone(UTC), uuid.UUID(i)
+    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+        # json.JSONDecodeError and UnicodeDecodeError are ValueError subclasses.
+        raise bad from exc
+
+
+async def metrics(
+    session: AsyncSession, clock: Clock, *, start: date, end: date, bucket: Bucket
+) -> Metrics:
+    if end <= start:
+        raise InvalidAdminQuery("'to' must be after 'from'")
+    if (end - start).days > MAX_DAYS[bucket]:
+        raise InvalidAdminQuery(f"bucket={bucket} allows at most {MAX_DAYS[bucket]} days")
+
+    zone = await _zone(session)
+    from_ts, to_ts = _bounds(zone, start, end)
+
+    rows = await repo.series(session, bucket=bucket, from_ts=from_ts, to_ts=to_ts)
+    series = [SeriesPoint(**{**r, "bucket_start": r["bucket_start"].isoformat()}) for r in rows]
+    upcoming = await repo.upcoming_active(session, now=clock.now())
+
+    doctors = await repo.doctors(session)
+    visits = await repo.visits_by_doctor(session, from_ts=from_ts, to_ts=to_ts)
+    cancels = await repo.cancel_actions_by_doctor(session, from_ts=from_ts, to_ts=to_ts)
+    capacity = await repo.capacity_by_doctor(session, from_date=start, to_date=end)
+
+    per_doctor: list[DoctorLoad] = []
+    for d in doctors:
+        did = d["doctor_id"]
+        # A deactivated doctor stays listed while they still have activity in the range.
+        if not d["is_active"] and not (visits.get(did) or cancels.get(did)):
+            continue
+        cap = capacity.get(did, 0)
+        booked_visits = visits.get(did, 0)
+        per_doctor.append(
+            DoctorLoad(
+                doctor_id=did,
+                name=d["name"],
+                booked_visits=booked_visits,
+                cancelled_actions=cancels.get(did, 0),
+                capacity=cap,
+                utilization=round(booked_visits / cap, 4) if cap > 0 else None,
+            )
+        )
+
+    return Metrics(
+        range=DateRange(from_=start, to=end),
+        bucket=bucket,
+        series=series,
+        totals=Totals(
+            booked=sum(p.booked for p in series),
+            rescheduled=sum(p.rescheduled for p in series),
+            cancelled=sum(p.cancelled for p in series),
+            upcoming_active=upcoming,
+        ),
+        per_doctor=per_doctor,
+    )
+
+
+async def appointments(
+    session: AsyncSession,
+    *,
+    status: str,
+    doctor_id: uuid.UUID | None,
+    start: date | None,
+    end: date | None,
+    limit: int,
+    cursor: str | None,
+) -> AdminAppointmentPage:
+    if start is not None and end is not None and end <= start:
+        raise InvalidAdminQuery("'to' must be after 'from'")
+    after = decode_cursor(cursor) if cursor else None
+    zone = await _zone(session)
+    from_ts = _bounds(zone, start, start)[0] if start else None
+    to_ts = _bounds(zone, end, end)[0] if end else None
+
+    rows = await repo.appointments_page(
+        session,
+        status=status,
+        doctor_id=doctor_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        after=after,
+        limit=limit,
+    )
+    page, has_more = rows[:limit], len(rows) > limit
+    items = [AdminAppointment.model_validate(r) for r in page]
+    next_cursor = encode_cursor(page[-1]["starts_at"], page[-1]["id"]) if has_more else None
+    return AdminAppointmentPage(items=items, next_cursor=next_cursor)
+
+
+async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
+    if not await repo.appointment_exists(session, appointment_id):
+        raise AppointmentNotFound()
+    rows = await repo.lineage(session, appointment_id)
+    return Lineage(
+        appointment_id=appointment_id, events=[LineageEvent.model_validate(r) for r in rows]
+    )

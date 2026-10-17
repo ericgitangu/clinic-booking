@@ -18,6 +18,11 @@ trustPolicyExclude:
   - '@vercel/cli-exec@1.0.1'
   - '@vercel/oidc@4.0.1'
   - semver@6.3.1
+  # recharts (the dashboard charts) depends on reselect, whose 5.1.1 release has no publish
+  # provenance while an earlier release had. Checked on the registry 2026-10-17: the maintainers
+  # are the Redux team and 5.1.1 is the latest tag. TECH DEBT: accepted by exact version, not
+  # audited line by line; drop this entry once reselect publishes with provenance again.
+  - reselect@5.1.1
 allowBuilds:
   unrs-resolver: false
 minimumReleaseAgeExclude:

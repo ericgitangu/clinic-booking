@@ -1,6 +1,188 @@
 {
   "components": {
     "schemas": {
+      "AccessEntry": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "granted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted At"
+          },
+          "granted_by": {
+            "title": "Granted By",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "env",
+              "db"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "granted_by",
+          "granted_at",
+          "revoked_at",
+          "source"
+        ],
+        "title": "AccessEntry",
+        "type": "object"
+      },
+      "AccessList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccessEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AccessList",
+        "type": "object"
+      },
+      "AdminAppointment": {
+        "properties": {
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "patient_id": {
+            "format": "uuid",
+            "title": "Patient Id",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "doctor_id",
+          "doctor_name",
+          "patient_id",
+          "patient_name",
+          "starts_at",
+          "ends_at",
+          "status",
+          "cancellation_reason",
+          "created_at"
+        ],
+        "title": "AdminAppointment",
+        "type": "object"
+      },
+      "AdminAppointmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAppointment"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "AdminAppointmentPage",
+        "type": "object"
+      },
       "Appointment": {
         "properties": {
           "cancellation_reason": {
@@ -254,6 +436,24 @@
         "title": "CancelRequest",
         "type": "object"
       },
+      "ChangeRoleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ChangeRoleRequest",
+        "type": "object"
+      },
       "Clinic": {
         "properties": {
           "id": {
@@ -276,6 +476,27 @@
           "timezone"
         ],
         "title": "Clinic",
+        "type": "object"
+      },
+      "DateRange": {
+        "description": "Clinic-local dates; ``from`` inclusive, ``to`` exclusive.",
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "DateRange",
         "type": "object"
       },
       "Doctor": {
@@ -328,6 +549,52 @@
           "items"
         ],
         "title": "DoctorList",
+        "type": "object"
+      },
+      "DoctorLoad": {
+        "properties": {
+          "booked_visits": {
+            "title": "Booked Visits",
+            "type": "integer"
+          },
+          "cancelled_actions": {
+            "title": "Cancelled Actions",
+            "type": "integer"
+          },
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "name",
+          "booked_visits",
+          "cancelled_actions",
+          "capacity",
+          "utilization"
+        ],
+        "title": "DoctorLoad",
         "type": "object"
       },
       "DoctorRef": {
@@ -387,6 +654,32 @@
         "title": "ErrorItem",
         "type": "object"
       },
+      "GrantRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ],
+        "title": "GrantRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -412,6 +705,124 @@
           "status"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "Lineage": {
+        "properties": {
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "appointment_id",
+          "events"
+        ],
+        "title": "Lineage",
+        "type": "object"
+      },
+      "LineageEvent": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "booked",
+              "rescheduled",
+              "cancelled"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "from_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Starts At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "to_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Starts At"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "from_starts_at",
+          "to_starts_at",
+          "occurred_at"
+        ],
+        "title": "LineageEvent",
+        "type": "object"
+      },
+      "Metrics": {
+        "properties": {
+          "bucket": {
+            "enum": [
+              "day",
+              "hour"
+            ],
+            "title": "Bucket",
+            "type": "string"
+          },
+          "per_doctor": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorLoad"
+            },
+            "title": "Per Doctor",
+            "type": "array"
+          },
+          "range": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          }
+        },
+        "required": [
+          "range",
+          "bucket",
+          "series",
+          "totals",
+          "per_doctor"
+        ],
+        "title": "Metrics",
         "type": "object"
       },
       "Patient": {
@@ -582,6 +993,8 @@
       },
       "ProblemCode": {
         "enum": [
+          "UNAUTHENTICATED",
+          "FORBIDDEN",
           "VALIDATION_ERROR",
           "TIMEZONE_REQUIRED",
           "UNKNOWN_DOCTOR",
@@ -597,6 +1010,9 @@
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
+          "ACCESS_EXISTS",
+          "OWNER_PROTECTED",
+          "ACCESS_NOT_FOUND",
           "DOCTOR_NOT_FOUND",
           "PATIENT_NOT_FOUND",
           "APPOINTMENT_NOT_FOUND",
@@ -656,6 +1072,64 @@
         "title": "RescheduleRequest",
         "type": "object"
       },
+      "SeriesPoint": {
+        "properties": {
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "bucket_start": {
+            "title": "Bucket Start",
+            "type": "string"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "rescheduled": {
+            "title": "Rescheduled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucket_start",
+          "booked",
+          "rescheduled",
+          "cancelled"
+        ],
+        "title": "SeriesPoint",
+        "type": "object"
+      },
+      "SessionInfo": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "owner",
+                  "admin",
+                  "viewer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ],
+        "title": "SessionInfo",
+        "type": "object"
+      },
       "Slot": {
         "properties": {
           "ends_at": {
@@ -674,6 +1148,34 @@
           "ends_at"
         ],
         "title": "Slot",
+        "type": "object"
+      },
+      "Totals": {
+        "properties": {
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "rescheduled": {
+            "title": "Rescheduled",
+            "type": "integer"
+          },
+          "upcoming_active": {
+            "title": "Upcoming Active",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "booked",
+          "rescheduled",
+          "cancelled",
+          "upcoming_active"
+        ],
+        "title": "Totals",
         "type": "object"
       },
       "ValidationError": {
@@ -1103,6 +1605,670 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/internal/admin/access": {
+      "get": {
+        "operationId": "list_access_internal_admin_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "List Access",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "grant_access_internal_admin_access_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Grant Access",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/access/{email}": {
+      "delete": {
+        "operationId": "revoke_access_internal_admin_access__email__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email",
+            "required": true,
+            "schema": {
+              "maxLength": 254,
+              "minLength": 3,
+              "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
+              "title": "Email",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Revoke Access",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "change_access_role_internal_admin_access__email__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email",
+            "required": true,
+            "schema": {
+              "maxLength": 254,
+              "minLength": 3,
+              "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
+              "title": "Email",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Change Access Role",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments": {
+      "get": {
+        "operationId": "list_appointments_internal_admin_appointments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "booked",
+                "cancelled",
+                "all"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doctor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppointmentPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "List Appointments",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/cancel": {
+      "patch": {
+        "operationId": "cancel_for_patient_internal_admin_appointments__appointment_id__cancel_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Cancel For Patient",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/lineage": {
+      "get": {
+        "operationId": "get_lineage_internal_admin_appointments__appointment_id__lineage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lineage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Get Lineage",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/reschedule": {
+      "patch": {
+        "operationId": "reschedule_for_patient_internal_admin_appointments__appointment_id__reschedule_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Reschedule For Patient",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/metrics": {
+      "get": {
+        "operationId": "get_metrics_internal_admin_metrics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "enum": [
+                "day",
+                "hour"
+              ],
+              "title": "Bucket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Metrics"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Get Metrics",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/session": {
+      "get": {
+        "operationId": "get_session_info_internal_admin_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Get Session Info",
+        "tags": [
+          "admin"
         ]
       }
     },

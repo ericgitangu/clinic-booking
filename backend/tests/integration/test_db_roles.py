@@ -38,3 +38,59 @@ async def test_app_role_cannot_rewrite_migration_head(owner_conn: asyncpg.Connec
     assert not await can("INSERT")
     assert not await can("DELETE")
     assert await can("SELECT")
+
+
+async def _privileges(owner_conn: asyncpg.Connection, table: str) -> dict[str, bool]:
+    return {
+        p: bool(
+            await owner_conn.fetchval(
+                "SELECT has_table_privilege('clinic_app', $1, $2)", f"public.{table}", p
+            )
+        )
+        for p in ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE")
+    }
+
+
+async def test_staff_access_is_never_deletable_by_the_app(
+    owner_conn: asyncpg.Connection,
+) -> None:
+    assert await _privileges(owner_conn, "staff_access") == {
+        "SELECT": True,
+        "INSERT": True,
+        "UPDATE": True,
+        "DELETE": False,
+        "TRUNCATE": False,
+    }
+
+
+async def test_staff_audit_is_append_only_for_the_app(owner_conn: asyncpg.Connection) -> None:
+    assert await _privileges(owner_conn, "staff_access_audit") == {
+        "SELECT": True,
+        "INSERT": True,
+        "UPDATE": False,
+        "DELETE": False,
+        "TRUNCATE": False,
+    }
+
+
+async def test_app_role_cannot_rewrite_or_erase_an_audit_row(
+    app_conn: asyncpg.Connection,
+) -> None:
+    tx = app_conn.transaction()
+    await tx.start()
+    try:
+        await app_conn.execute(
+            "INSERT INTO staff_access_audit (actor_email, action, target_email) "
+            "VALUES ('a@x.io', 'grant', 'b@x.io')"
+        )
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await app_conn.execute("UPDATE staff_access_audit SET actor_email = 'z@x.io'")
+    finally:
+        await tx.rollback()
+    tx = app_conn.transaction()
+    await tx.start()
+    try:
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await app_conn.execute("DELETE FROM staff_access_audit")
+    finally:
+        await tx.rollback()
