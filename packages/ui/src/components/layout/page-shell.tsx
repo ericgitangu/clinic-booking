@@ -11,12 +11,14 @@ export function PageShell({
   navLinks,
   footerColumns,
   footerNotice,
+  headerTrailing,
 }: {
   children: ReactNode;
   name: string;
   navLinks: readonly NavLink[];
   footerColumns: readonly FooterColumn[];
   footerNotice: string;
+  headerTrailing?: ReactNode;
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -26,7 +28,7 @@ export function PageShell({
       >
         Skip to content
       </a>
-      <SiteHeader name={name} links={navLinks} />
+      <SiteHeader name={name} links={navLinks} trailing={headerTrailing} />
       <main id="main" className="pad-safe-x mx-auto w-full max-w-5xl flex-1">
         {children}
       </main>

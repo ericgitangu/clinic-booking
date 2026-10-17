@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
+import { SessionMenu } from "@/components/account/session-menu";
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { FOOTER_COLUMNS } from "@/lib/footer-links";
 import { metadata, viewport } from "@/lib/metadata";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             navLinks={NAV_LINKS}
             footerColumns={FOOTER_COLUMNS}
             footerNotice={FOOTER_NOTICE}
+            headerTrailing={<SessionMenu />}
           >
             {children}
           </PageShell>

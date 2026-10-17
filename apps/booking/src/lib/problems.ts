@@ -58,6 +58,14 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "Someone changed this at the same moment. Try again.",
     severity: "warning",
   },
+  UNAUTHENTICATED: {
+    message: "Sign in with Google to continue.",
+    severity: "warning",
+  },
+  PATIENT_NOT_FOUND: {
+    message: "We could not find your patient record. Try booking again.",
+    severity: "error",
+  },
   CONTRACT_VIOLATION: {
     message: "Something went wrong on our side. Try again in a moment.",
     severity: "critical",

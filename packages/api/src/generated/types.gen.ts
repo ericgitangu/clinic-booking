@@ -45,6 +45,32 @@ export type AccessList = {
 };
 
 /**
+ * AccountLinkRequest
+ *
+ * What the web app knows from the sign-in besides the signed identity: the display name.
+ */
+export type AccountLinkRequest = {
+    /**
+     * Full Name
+     */
+    full_name: string;
+};
+
+/**
+ * AccountLinked
+ */
+export type AccountLinked = {
+    /**
+     * Created
+     */
+    created: boolean;
+    /**
+     * Patient Id
+     */
+    patient_id: string;
+};
+
+/**
  * AdminAppointment
  */
 export type AdminAppointment = {
@@ -466,6 +492,22 @@ export type LineageEvent = {
      * To Starts At
      */
     to_starts_at: string | null;
+};
+
+/**
+ * MeAppointmentCreate
+ *
+ * Booking as the signed-in patient: the patient comes from the account, never from the body.
+ */
+export type MeAppointmentCreate = {
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
 };
 
 /**
@@ -973,6 +1015,41 @@ export type HealthHealthGetResponses = {
 
 export type HealthHealthGetResponse = HealthHealthGetResponses[keyof HealthHealthGetResponses];
 
+export type LinkAccountInternalAccountsLinkPostData = {
+    body: AccountLinkRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/accounts/link';
+};
+
+export type LinkAccountInternalAccountsLinkPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type LinkAccountInternalAccountsLinkPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccountLinked;
+    /**
+     * The patient was created by this call
+     */
+    201: AccountLinked;
+};
+
+export type LinkAccountInternalAccountsLinkPostResponse = LinkAccountInternalAccountsLinkPostResponses[keyof LinkAccountInternalAccountsLinkPostResponses];
+
 export type ListAccessInternalAdminAccessGetData = {
     body?: never;
     path?: never;
@@ -1373,6 +1450,217 @@ export type GetSessionInfoInternalAdminSessionGetResponses = {
 };
 
 export type GetSessionInfoInternalAdminSessionGetResponse = GetSessionInfoInternalAdminSessionGetResponses[keyof GetSessionInfoInternalAdminSessionGetResponses];
+
+export type MyAppointmentsInternalMeAppointmentsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/internal/me/appointments';
+};
+
+export type MyAppointmentsInternalMeAppointmentsGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type MyAppointmentsInternalMeAppointmentsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: PatientAppointments;
+};
+
+export type MyAppointmentsInternalMeAppointmentsGetResponse = MyAppointmentsInternalMeAppointmentsGetResponses[keyof MyAppointmentsInternalMeAppointmentsGetResponses];
+
+export type BookMineInternalMeAppointmentsPostData = {
+    body: MeAppointmentCreate;
+    path?: never;
+    query?: never;
+    url: '/internal/me/appointments';
+};
+
+export type BookMineInternalMeAppointmentsPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    503: unknown;
+};
+
+export type BookMineInternalMeAppointmentsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: Appointment;
+};
+
+export type BookMineInternalMeAppointmentsPostResponse = BookMineInternalMeAppointmentsPostResponses[keyof BookMineInternalMeAppointmentsPostResponses];
+
+export type MyAppointmentInternalMeAppointmentsAppointmentIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/me/appointments/{appointment_id}';
+};
+
+export type MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Appointment;
+};
+
+export type MyAppointmentInternalMeAppointmentsAppointmentIdGetResponse = MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses[keyof MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses];
+
+export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData = {
+    body: CancelRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/me/appointments/{appointment_id}/cancel';
+};
+
+export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: Appointment;
+};
+
+export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse = CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses[keyof CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses];
+
+export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData = {
+    body: RescheduleRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/me/appointments/{appointment_id}/reschedule';
+};
+
+export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: Appointment;
+};
+
+export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses[keyof RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses];
 
 export type PostPatientPatientsPostData = {
     body: PatientCreate;

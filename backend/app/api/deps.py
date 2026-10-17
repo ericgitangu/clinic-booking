@@ -75,6 +75,18 @@ async def require_identity(
     return _verify(request, clock, await request.body())
 
 
+async def require_verified_identity(
+    request: Request, clock: Clock = Depends(get_clock)
+) -> assertion.Principal:
+    """A valid, request-bound assertion whose email the sign-in provider verified. Everything a
+    patient does with an account (link, book, list, cancel, reschedule) is refused otherwise."""
+    principal = _verify(request, clock, await request.body())
+    if not principal.email_verified:
+        _refuse("email not verified", "FORBIDDEN")
+        raise Forbidden()
+    return principal
+
+
 def require_role(*allowed: Role) -> Callable[..., Awaitable[assertion.Principal]]:
     """Gate for ``/internal/admin/*``: the assertion must be valid and bound to the request, its
     role must be one of ``allowed``, and the database must agree the caller holds that role right

@@ -10,7 +10,8 @@ import {
   formatWhen,
   isValidDay,
 } from "@/lib/clinic-time";
-import { readPatient } from "@/lib/patient-cookie";
+import { SignInPrompt } from "@/components/account/sign-in-prompt";
+import { callerFor, getIdentity } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Reschedule",
@@ -27,9 +28,19 @@ export default async function Reschedule({
 }) {
   const { id } = await params;
   const { date } = await searchParams;
-  const patient = await readPatient();
-  const appt = await api.getAppointment(id);
-  if (!patient || !appt.ok || appt.data.patient_id !== patient.id) notFound();
+  const who = await getIdentity();
+  if (!who) {
+    return (
+      <SignInPrompt
+        title="Sign in to reschedule"
+        body="Only the account that booked an appointment can change it."
+        returnTo={`/appointments/${id}/reschedule`}
+      />
+    );
+  }
+  // 404 for an appointment that is not this person's, the same as for one that does not exist.
+  const appt = await api.myAppointment(callerFor(who), id);
+  if (!appt.ok) notFound();
 
   if (appt.data.status === "cancelled") {
     return (

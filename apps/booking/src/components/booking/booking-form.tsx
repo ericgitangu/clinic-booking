@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { Button } from "@clinic/ui/components/ui/button";
-import { Input } from "@clinic/ui/components/ui/input";
-import { Label } from "@clinic/ui/components/ui/label";
 import { bookAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
 import { NextSlots } from "@/components/booking/next-slots";
@@ -12,62 +10,30 @@ import { StickyCta } from "@/components/booking/sticky-cta";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
 
-function Field({
-  id,
-  label,
-  hint,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id} className="text-base">
-        {label}
-      </Label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="text-base text-destructive">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
+// Booking as the signed-in person: the patient is whoever the session belongs to, so there is
+// nothing to type. The server checks the session again when this is submitted.
 export function BookingForm({
   doctorId,
   startsAt,
-  rememberedName,
+  name,
 }: {
   doctorId: string;
   startsAt: string;
-  rememberedName: string | null;
+  name: string;
 }) {
   const [state, formAction, pending] = useActionState(
     bookAppointment,
     initialState,
   );
   const getToken = useRecaptcha("book");
-  // Until the page has hydrated a submit would be a plain browser form post, which would put the
-  // patient's name in the address bar. The button stays off until the handler is attached.
+  // Until the page has hydrated a submit would be a plain browser form post. The button stays off
+  // until the handler is attached.
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   useActionFeedback(state);
-  const fe = state.status === "error" ? (state.fieldErrors ?? {}) : {};
 
   return (
     <form
-      noValidate
       className="space-y-6"
       onSubmit={async (e) => {
         e.preventDefault();
@@ -106,59 +72,9 @@ export function BookingForm({
         </div>
       ) : null}
 
-      {rememberedName ? (
-        <>
-          <input type="hidden" name="as_remembered" value="1" />
-          <p className="text-base">
-            Booking as <span className="font-semibold">{rememberedName}</span>.
-          </p>
-        </>
-      ) : (
-        <>
-          <Field id="full_name" label="Full name" error={fe.full_name}>
-            <Input
-              id="full_name"
-              name="full_name"
-              autoComplete="name"
-              required
-              minLength={2}
-              maxLength={200}
-              aria-invalid={Boolean(fe.full_name)}
-              aria-describedby={fe.full_name ? "full_name-error" : undefined}
-              className="h-12"
-            />
-          </Field>
-          <Field
-            id="phone"
-            label="Phone (optional)"
-            hint="International format, like +254712345678."
-            error={fe.phone}
-          >
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              aria-invalid={Boolean(fe.phone)}
-              aria-describedby={fe.phone ? "phone-error" : "phone-hint"}
-              className="h-12"
-            />
-          </Field>
-          <Field id="email" label="Email (optional)" error={fe.email}>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              aria-invalid={Boolean(fe.email)}
-              aria-describedby={fe.email ? "email-error" : undefined}
-              className="h-12"
-            />
-          </Field>
-        </>
-      )}
+      <p className="text-base">
+        Booking as <span className="font-semibold">{name}</span>.
+      </p>
 
       <StickyCta>
         <Button

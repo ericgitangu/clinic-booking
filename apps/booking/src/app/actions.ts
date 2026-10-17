@@ -9,30 +9,20 @@ import {
 } from "@clinic/api/call";
 import {
   zCancelRequest,
-  zPostPatientPatientsPostBody,
+  zMeAppointmentCreate,
   zRescheduleRequest,
-  zAppointmentCreate,
 } from "@clinic/api/generated/zod.gen";
-import { logError } from "@clinic/api/proxy/log";
 import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
 import { addDays, clinicDay } from "@/lib/clinic-time";
 import { checkHuman, type Action } from "@/lib/human-check";
-import {
-  cookieConfigured,
-  forgetPatient,
-  readPatient,
-  rememberPatient,
-} from "@/lib/patient-cookie";
 import { describeProblem, fieldMessages } from "@/lib/problems";
+import { patientName } from "@/lib/identity";
+import { callerFor, getIdentity, type Identity } from "@/lib/session";
 
 // Request bodies are checked with the schemas generated from the contract, never with rules
 // written here: the form says what is wrong in plain words (lib/problems.ts), the contract says
 // what is valid.
-const appointmentWhen = zAppointmentCreate.pick({
-  doctor_id: true,
-  starts_at: true,
-});
 
 function blank(v: FormDataEntryValue | null): string | undefined {
   const t = typeof v === "string" ? v.trim() : "";
@@ -51,8 +41,6 @@ function invalid(issues: FieldIssue[]): ActionState {
   return error("VALIDATION_ERROR", { fieldErrors: fieldMessages(issues) });
 }
 
-// A failed API call as a screen state. A request the contract refused becomes field errors; a
-// contract violation or an unreachable API becomes the generic critical message.
 function failed(
   f: ApiFailure,
   extra: Partial<Extract<ActionState, { status: "error" }>> = {},
@@ -60,6 +48,8 @@ function failed(
   if (f.kind === "invalid_request") return invalid(f.issues);
   return error(f.code, extra);
 }
+
+const SIGN_IN_FIRST = error("UNAUTHENTICATED");
 
 async function human(
   fd: FormData,
@@ -92,69 +82,40 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
+async function signedIn(): Promise<Identity | null> {
+  return getIdentity();
+}
+
 export async function bookAppointment(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
-  if (!cookieConfigured()) {
-    // Without the signing secret nothing could be remembered, so refuse before creating anything.
-    logError("booking refused: CLINIC_COOKIE_SECRET is not set", {});
-    return error("INTERNAL_ERROR");
-  }
-  const remembered =
-    fd.get("as_remembered") === "1" ? await readPatient() : null;
+  const who = await signedIn();
+  if (!who) return SIGN_IN_FIRST;
   const doctorId = blank(fd.get("doctor_id"));
   const startsAt = blank(fd.get("starts_at"));
-
-  // Check everything the booking needs before creating anything, so a bad time never leaves a
-  // patient behind.
-  const patientBody = remembered
-    ? null
-    : {
-        full_name: blank(fd.get("full_name")),
-        phone: blank(fd.get("phone")) ?? null,
-        email: blank(fd.get("email")) ?? null,
-      };
-  const issues = [
-    ...(patientBody
-      ? checkRequest(zPostPatientPatientsPostBody, patientBody)
-      : []),
-    ...checkRequest(appointmentWhen, {
-      doctor_id: doctorId,
-      starts_at: startsAt,
-    }),
-  ];
+  const issues = checkRequest(zMeAppointmentCreate, {
+    doctor_id: doctorId,
+    starts_at: startsAt,
+  });
   if (issues.length > 0) return invalid(issues);
-  // Narrowed by the checks above.
   const doctor = doctorId as string;
   const when = startsAt as string;
 
   const blocked = await human(fd, "book");
   if (blocked) return blocked;
 
-  let patientId = remembered?.id;
-  if (!patientId) {
-    const created = await api.createPatient(
-      patientBody as {
-        full_name: string;
-        phone: string | null;
-        email: string | null;
-      },
-    );
-    if (!created.ok) return failed(created);
-    patientId = created.data.id;
-    // Remember at once: if the slot turns out to be taken, the retry reuses this patient.
-    await rememberPatient({ id: patientId, name: created.data.full_name });
-  }
+  const caller = callerFor(who);
+  // Idempotent: makes the patient the first time this person books, finds it every time after.
+  const linked = await api.linkAccount(caller, patientName(who));
+  if (!linked.ok) return failed(linked);
 
-  const booked = await api.createAppointment({
+  const booked = await api.bookMine(caller, {
     doctor_id: doctor,
-    patient_id: patientId,
     starts_at: when,
   });
   if (!booked.ok) {
-    const taken =
-      !booked.ok && booked.kind === "problem" && booked.code === "SLOT_TAKEN";
+    const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
     return failed(booked, {
       nextSlots: taken ? await nextFreeSlots(doctor, when) : undefined,
       doctorId: doctor,
@@ -163,33 +124,12 @@ export async function bookAppointment(
   redirect(`/book/confirmed/${booked.data.id}`);
 }
 
-// A visitor may only change appointments that belong to the patient this browser remembers.
-async function owned(
-  id: string,
-): Promise<{ ok: true; doctorId: string } | { ok: false; state: ActionState }> {
-  const patient = await readPatient();
-  if (!patient) return { ok: false, state: error("APPOINTMENT_NOT_FOUND") };
-  const found = await api.getAppointment(id);
-  // An id that is not a UUID is refused by the contract before any call: it is simply not found.
-  if (!found.ok) {
-    return {
-      ok: false,
-      state:
-        found.kind === "invalid_request"
-          ? error("APPOINTMENT_NOT_FOUND")
-          : failed(found),
-    };
-  }
-  if (found.data.patient_id !== patient.id) {
-    return { ok: false, state: error("APPOINTMENT_NOT_FOUND") };
-  }
-  return { ok: true, doctorId: found.data.doctor_id };
-}
-
 export async function cancelAppointment(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
+  const who = await signedIn();
+  if (!who) return SIGN_IN_FIRST;
   const id = blank(fd.get("appointment_id")) ?? "";
   const reason = blank(fd.get("reason"));
   const issues = checkRequest(zCancelRequest, { reason });
@@ -197,11 +137,13 @@ export async function cancelAppointment(
 
   const blocked = await human(fd, "cancel");
   if (blocked) return blocked;
-  const own = await owned(id);
-  if (!own.ok) return own.state;
 
-  const done = await api.cancelAppointment(id, reason as string);
-  if (!done.ok) return failed(done);
+  const done = await api.cancelMine(callerFor(who), id, reason as string);
+  if (!done.ok) {
+    // An id that is not a UUID is refused by the contract before any call: it is simply not found.
+    if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
+    return failed(done);
+  }
   revalidatePath("/appointments");
   return { status: "done", message: "Appointment cancelled." };
 }
@@ -210,6 +152,8 @@ export async function rescheduleAppointment(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
+  const who = await signedIn();
+  if (!who) return SIGN_IN_FIRST;
   const id = blank(fd.get("appointment_id")) ?? "";
   const startsAt = blank(fd.get("starts_at"));
   const issues = checkRequest(zRescheduleRequest, { starts_at: startsAt });
@@ -217,25 +161,25 @@ export async function rescheduleAppointment(
 
   const blocked = await human(fd, "reschedule");
   if (blocked) return blocked;
-  const own = await owned(id);
-  if (!own.ok) return own.state;
 
-  const done = await api.rescheduleAppointment(id, startsAt as string);
+  const caller = callerFor(who);
+  const done = await api.rescheduleMine(caller, id, startsAt as string);
   if (!done.ok) {
+    if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
     const taken = done.kind === "problem" && done.code === "SLOT_TAKEN";
+    let doctorId: string | undefined;
+    if (taken) {
+      const own = await api.myAppointment(caller, id);
+      doctorId = own.ok ? own.data.doctor_id : undefined;
+    }
     return failed(done, {
-      nextSlots: taken
-        ? await nextFreeSlots(own.doctorId, startsAt as string)
-        : undefined,
-      doctorId: own.doctorId,
+      nextSlots:
+        taken && doctorId
+          ? await nextFreeSlots(doctorId, startsAt as string)
+          : undefined,
+      doctorId,
     });
   }
   revalidatePath("/appointments");
   redirect("/appointments?rescheduled=1");
-}
-
-export async function clearRememberedPatient(): Promise<void> {
-  await forgetPatient();
-  revalidatePath("/appointments");
-  redirect("/book");
 }
