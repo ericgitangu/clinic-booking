@@ -135,7 +135,10 @@ cat > "$WORK/bin/fakevercel" <<'FAKE'
 #!/usr/bin/env bash
 echo "$*" >> "$FX/vcalls"
 case "$1" in
-  api) case "$2" in
+  api) [ -f "$FX/telemetry" ] && printf '> NOTE: The Vercel CLI now collects telemetry.\n> https://vercel.com/docs/cli/about-telemetry\n'
+       [ -f "$FX/refused" ] && { echo 'Error: Not authorized: Trying to access resource under scope "team". You must re-authenticate to this scope or use a token with access to this scope. (403)'; exit 1; }
+       [ -f "$FX/notjson" ] && { echo 'something unexpected'; exit 0; }
+       case "$2" in
          */v6/deployments*) echo "{\"deployments\":[{\"uid\":\"$(cat "$FX/serving")\"},{\"uid\":\"dpl_prior\"}]}" ;;
          *) echo "{\"id\":\"$(cat "$FX/serving")\"}" ;;
        esac ;;
@@ -148,6 +151,20 @@ export VERCEL="$WORK/bin/fakevercel" VERCEL_ORG_ID=team_x
 new_fx vp; echo dpl_old > "$FX/serving"
 out="$(bash "$HERE/vercel_prod.sh" current 2>/dev/null)"; expect "vercel_prod: current reads the serving deployment" "$out" dpl_old
 export VERCEL_PROJECT_ID=prj_x
+touch "$FX/telemetry"
+out="$(bash "$HERE/vercel_prod.sh" current 2>/dev/null)"; expect "vercel_prod: a telemetry banner before the JSON is skipped" "$out" dpl_old
+rm -f "$FX/telemetry"
+touch "$FX/refused"
+err="$(bash "$HERE/vercel_prod.sh" current 2>&1 >/dev/null)"; rc=$?
+expect "vercel_prod: a refused token fails with exit 1" "$rc" 1
+expect "vercel_prod: a refused token says so plainly" "$(printf '%s' "$err" | rg -c 'token was refused')" 1
+expect "vercel_prod: a refused token does not end in a parser error" "$(printf '%s' "$err" | grep -cE 'Traceback|ValueError')" 0
+rm -f "$FX/refused"
+touch "$FX/notjson"
+err="$(bash "$HERE/vercel_prod.sh" current 2>&1 >/dev/null)"; rc=$?
+expect "vercel_prod: a non-JSON answer fails with exit 1" "$rc" 1
+expect "vercel_prod: a non-JSON answer quotes what the CLI said" "$(printf '%s' "$err" | rg -c 'no JSON from the Vercel API')" 1
+rm -f "$FX/notjson"
 : > "$FX/vcalls"
 VERCEL_APP=admin bash "$HERE/vercel_prod.sh" current >/dev/null 2>&1
 expect "vercel_prod: the admin app reads its own host" "$(head -1 "$FX/vcalls" | rg -c 'clinic-admin.ericgitangu.com')" 1
