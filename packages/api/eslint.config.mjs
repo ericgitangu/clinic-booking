@@ -3,7 +3,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["node_modules/**"] },
+  { ignores: ["node_modules/**", "src/generated/**", ".drift-tmp/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -58,11 +58,34 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "Someone changed this at the same moment. Try again.",
     severity: "warning",
   },
+  CONTRACT_VIOLATION: {
+    message: "Something went wrong on our side. Try again in a moment.",
+    severity: "critical",
+  },
   RATE_LIMITED: {
     message: "Too many requests. Wait a minute and try again.",
     severity: "warning",
   },
 };
+
+// Words for a field the contract refused, chosen by field (the zod issue code is not shown).
+const FIELD_COPY: Record<string, string> = {
+  full_name: "Enter your full name.",
+  phone: "Use international format, like +254712345678.",
+  email: "Enter a valid email address.",
+  reason: "Say briefly why (at least 3 characters).",
+  starts_at: "Pick a time.",
+  doctor_id: "Pick a doctor.",
+};
+
+export function fieldMessages(
+  issues: { field: string; code: string }[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const i of issues)
+    out[i.field] ??= FIELD_COPY[i.field] ?? "Check this field.";
+  return out;
+}
 
 export function describeProblem(code: string): {
   message: string;

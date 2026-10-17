@@ -43,14 +43,17 @@ const addDays = (day, n) =>
     .slice(0, 10);
 
 function problem(res, status, code, detail) {
+  // Every field the contract's Problem schema requires.
   res.writeHead(status, { "content-type": "application/problem+json" });
   res.end(
     JSON.stringify({
       type: `about:blank#${code}`,
       title: code,
       status,
-      code,
       detail,
+      instance: "/",
+      code,
+      request_id: randomUUID(),
     }),
   );
 }

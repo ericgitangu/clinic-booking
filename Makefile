@@ -75,8 +75,8 @@ sec: ## Local security checks (SAST/DAST run in CI)
 openapi: ## Export the OpenAPI contract
 	$(BE) python -m scripts.export_openapi
 
-gen-client: ## Regenerate the TS client (web)
-	pnpm -C apps/booking gen:api
+gen-client: ## Regenerate the TS types, zod schemas and SDK from contracts/openapi.json (packages/api/src/generated)
+	pnpm -C packages/api gen
 
 verify: ## Verify live claims (URL=...)
 	uv run --project backend python scripts/verify_claims.py --base-url "$(URL)"

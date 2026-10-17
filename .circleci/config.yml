@@ -92,6 +92,11 @@ jobs:
           name: make hygiene
           command: make hygiene
       - run:
+          name: Generated API client is fresh (regenerate from the contract, no diff allowed)
+          command: |
+            make gen-client
+            git diff --exit-code packages/api/src/generated
+      - run:
           name: Repo hygiene self-test
           command: bash scripts/repo_hygiene_selftest.sh
 

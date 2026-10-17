@@ -5,12 +5,15 @@
   "type": "module",
   "exports": {
     "./proxy/*": "./src/proxy/*.ts",
+    "./generated": "./src/generated/index.ts",
+    "./generated/*": "./src/generated/*.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen": "openapi-ts"
   },
   "dependencies": {
     "@vercel/oidc": "4.0.1",
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "26.6.5",
     "eslint": "9.39.5",
     "globals": "17.13.0",
