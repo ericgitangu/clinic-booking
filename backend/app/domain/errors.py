@@ -27,8 +27,7 @@ class ErrorSpec:
         return _slug(self.code)
 
 
-# The core catalogue. Codes for optional features (e.g. IDEMPOTENCY_KEY_*) are added with the
-# feature that raises them. Order: 422, 409, 404, 405, 503, 500.
+# The catalogue. Order: 401/403, 422, 409, 404, 405, 503, 500.
 CATALOGUE: tuple[ErrorSpec, ...] = (
     ErrorSpec(
         "UNAUTHENTICATED",
@@ -89,6 +88,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "[start, start + 30 min) is not inside a working window.",
     ),
     ErrorSpec(
+        "IDEMPOTENCY_KEY_REUSED",
+        422,
+        "Idempotency key reused",
+        "The Idempotency-Key was already used with a different doctor or time.",
+    ),
+    ErrorSpec(
         "SLOT_TAKEN",
         409,
         "Slot taken",
@@ -123,6 +128,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         409,
         "Concurrent update",
         "A deadlock or serialization failure persisted after one retry.",
+    ),
+    ErrorSpec(
+        "IDEMPOTENCY_KEY_CONSUMED",
+        409,
+        "Idempotency key consumed",
+        "The Idempotency-Key belongs to an appointment that is no longer booked.",
     ),
     ErrorSpec(
         "ACCESS_EXISTS",
@@ -266,3 +277,11 @@ class OwnerProtected(DomainError):
 
 class AccessNotFound(DomainError):
     code = "ACCESS_NOT_FOUND"
+
+
+class IdempotencyKeyReused(DomainError):
+    code = "IDEMPOTENCY_KEY_REUSED"
+
+
+class IdempotencyKeyConsumed(DomainError):
+    code = "IDEMPOTENCY_KEY_CONSUMED"

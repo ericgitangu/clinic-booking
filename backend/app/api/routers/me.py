@@ -14,7 +14,13 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, get_session, get_settings, require_verified_identity
+from app.api.deps import (
+    IdempotencyKey,
+    get_clock,
+    get_session,
+    get_settings,
+    require_verified_identity,
+)
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -33,7 +39,7 @@ from app.schemas.appointment import (
     PatientAppointments,
     RescheduleRequest,
 )
-from app.schemas.problem import problem_responses
+from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
 from app.services import booking
 
 router = APIRouter(
@@ -140,6 +146,7 @@ async def my_appointments(
                 cancelled_at=appt.cancelled_at,
                 created_at=appt.created_at,
                 updated_at=appt.updated_at,
+                timezone=appt.timezone,
                 doctor=DoctorRef(
                     id=doctor.id, full_name=doctor.full_name, specialty=doctor.specialty
                 ),
@@ -177,11 +184,12 @@ async def my_appointment(
     "/me/appointments",
     response_model=Appointment,
     status_code=201,
-    responses=problem_responses(404, 409, 422, 503),
+    responses={**problem_responses(404, 409, 422, 503), **REPLAY_HEADER},
 )
 async def book_mine(
     body: MeAppointmentCreate,
     response: Response,
+    idempotency_key: IdempotencyKey = None,
     who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
@@ -189,15 +197,18 @@ async def book_mine(
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     patient_id = await _linked_patient(session, who)
-    appt = await booking.book(
+    booked = await booking.book(
         session,
         clock,
         settings,
         doctor_id=body.doctor_id,
         patient_id=patient_id,
         starts_at=body.starts_at,
+        idempotency_key=idempotency_key,
     )
-    return _to_schema(appt)
+    if booked.replayed:
+        response.headers[REPLAYED_HEADER] = "true"
+    return _to_schema(booked.appointment)
 
 
 @router.patch(

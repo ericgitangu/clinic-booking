@@ -74,3 +74,49 @@ async def test_availability_uses_local_day_bounds(
     tue = await client.get(f"/doctors/{did}/availability?date=2026-10-27")
     tue_starts = {s["starts_at"] for s in tue.json()["slots"]}
     assert any("T09:00:00+03:00" in s for s in tue_starts)  # next day unaffected
+
+
+@pytest.mark.parametrize("doctor", ["otieno", "kamau"])
+@pytest.mark.parametrize("day", ["2026-10-26", "2026-10-28"])
+async def test_every_offered_slot_books_with_the_advertised_end(
+    client: httpx.AsyncClient, reset_appointments: None, doctor: str, day: str
+) -> None:
+    # The feed and the booking rules must agree: whatever availability offers, POST accepts, and
+    # the appointment spans exactly the advertised interval.
+    did = seeded_doctor_id(doctor)
+    offered = (await client.get(f"/doctors/{did}/availability?date={day}")).json()["slots"]
+    assert len(offered) >= 8, "the doctor works that day"
+    patients = [seeded_patient_id(k) for k in ("amina", "brian", "wanjiru")]
+    for i, slot in enumerate(offered):
+        resp = await client.post(
+            "/appointments",
+            json={
+                "doctor_id": str(did),
+                "patient_id": str(patients[i % len(patients)]),
+                "starts_at": slot["starts_at"],
+            },
+        )
+        assert resp.status_code == 201, (slot, resp.text)
+        booked = resp.json()
+        assert booked["starts_at"] == slot["starts_at"]
+        assert booked["ends_at"] == slot["ends_at"]
+    after = (await client.get(f"/doctors/{did}/availability?date={day}")).json()["slots"]
+    assert after == [], "once every offered slot is booked, nothing is offered"
+
+
+async def test_availability_has_no_slot_length_parameter(client: httpx.AsyncClient) -> None:
+    # Doctors work in 30-minute slots and the bookable grid is fixed by the booking rules, so the
+    # feed offers no way to ask for another length: not in the contract, and ignored on the wire.
+    spec = (await client.get("/openapi.json")).json()
+    params = spec["paths"]["/doctors/{doctor_id}/availability"]["get"]["parameters"]
+    assert [p["name"] for p in params] == ["doctor_id", "date"]
+
+    did = seeded_doctor_id("otieno")
+    plain = (await client.get(f"/doctors/{did}/availability?date=2026-10-26")).json()
+    asked = await client.get(f"/doctors/{did}/availability?date=2026-10-26&slot_minutes=60")
+    assert asked.status_code == 200
+    assert asked.json() == plain
+    assert asked.json()["slot_minutes"] == 30
+    for slot in asked.json()["slots"]:
+        starts = datetime.fromisoformat(slot["starts_at"])
+        assert datetime.fromisoformat(slot["ends_at"]) - starts == timedelta(minutes=30)

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, get_session, get_settings
+from app.api.deps import IdempotencyKey, get_clock, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import AppointmentNotFound
@@ -17,7 +17,7 @@ from app.schemas.appointment import (
     CancelRequest,
     RescheduleRequest,
 )
-from app.schemas.problem import problem_responses
+from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
 from app.services import booking
 
 router = APIRouter(tags=["appointments"])
@@ -33,26 +33,30 @@ def _to_schema(appt: AppointmentModel) -> Appointment:
     "/appointments",
     response_model=Appointment,
     status_code=201,
-    responses=problem_responses(409, 422, 503),
+    responses={**problem_responses(409, 422, 503), **REPLAY_HEADER},
 )
 async def create_appointment(
     body: AppointmentCreate,
     response: Response,
+    idempotency_key: IdempotencyKey = None,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
 ) -> Appointment:
-    appt = await booking.book(
+    booked = await booking.book(
         session,
         clock,
         settings,
         doctor_id=body.doctor_id,
         patient_id=body.patient_id,
         starts_at=body.starts_at,
+        idempotency_key=idempotency_key,
     )
-    response.headers["Location"] = f"/appointments/{appt.id}"
+    response.headers["Location"] = f"/appointments/{booked.appointment.id}"
     response.headers.update(_NO_STORE)
-    return _to_schema(appt)
+    if booked.replayed:
+        response.headers[REPLAYED_HEADER] = "true"
+    return _to_schema(booked.appointment)
 
 
 @router.get(
