@@ -9,7 +9,7 @@ import { hhmm, pick } from "./api";
 import { newPerson, sessionCookies } from "./support/auth";
 import { IDLE_MS, POLL_MS } from "../src/lib/polling";
 
-// ADR-0009, patient side, against the real API and database. The 15 s and 10 min waits are real
+// Patient polling, against the real API and database. The 15 s and 10 min waits are real
 // timings of the app, so the browser's clock is driven (page.clock) instead of sleeping; every
 // request still goes over the real network to the real API. Only the second booker's slot (week 9)
 // is written; the other scenarios only read, so none of them can meet another spec's data.

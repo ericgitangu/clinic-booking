@@ -7,13 +7,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IDLE_MS, POLL_MS, pollInterval } from "@/lib/polling";
 
-// The browser reaches the API only through the same-origin proxy (ADR-0010), never Cloud Run.
+// The browser reaches the API only through the same-origin proxy, never Cloud Run.
 client.setConfig({ baseUrl: "/api" });
 
 const INPUT_EVENTS = ["pointerdown", "pointermove", "keydown", "touchstart"];
 
 /**
- * Free times for one doctor and day, kept current (ADR-0009). The server-rendered list is the first
+ * Free times for one doctor and day, kept current. The server-rendered list is the first
  * answer. While the tab is visible the list is refetched every POLL_MS (TanStack Query pauses the
  * interval when the document is hidden and refetches when the tab is shown again). After IDLE_MS
  * without pointer or keyboard input polling stops until `resume` is called.

@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // forwards for each address). maxRedirects: 0 shows the redirect itself rather than its target.
 const LEGACY = "sil-clinic-booking.vercel.app";
 
-test.describe("the old vercel.app host (ADR-0028)", () => {
+test.describe("the old vercel.app host", () => {
   test("308s to the branded host keeping the path and query", async ({
     request,
   }) => {

@@ -1,4 +1,4 @@
-// The patient polling numbers from ADR-0009, in one place so the hook and the tests agree.
+// The patient polling numbers, in one place so the hook and the tests agree.
 
 /** Refetch availability this often while the tab is visible. */
 export const POLL_MS = 15_000;

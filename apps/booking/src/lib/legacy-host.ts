@@ -1,4 +1,4 @@
-// ADR-0028: the generated *.vercel.app alias was the first public address. Now that patients use
+// The generated *.vercel.app alias was the first public address. Now that patients use
 // the branded host it is demoted to a redirect. Only that exact production host is matched:
 // preview deployments (sil-clinic-booking-git-<branch>-<team>.vercel.app, the per-deployment hash
 // hosts) and localhost keep serving, so previews and local runs stay usable.

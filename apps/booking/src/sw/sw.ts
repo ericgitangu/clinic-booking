@@ -1,4 +1,4 @@
-// The service worker (ADR-0010): it caches the static app shell and nothing else.
+// The service worker: it caches the static app shell and nothing else.
 //
 // Cached: content-hashed files under /_next/static (immutable by name), the brand images, and one
 // offline page precached at install. Everything else goes to the network untouched: navigations

@@ -7,7 +7,7 @@ import { SITE } from "@/lib/site";
 const hostMatches = (host: string) =>
   new RegExp(`^${legacyHostRedirect.has[0].value}$`).test(host);
 
-describe("legacy vercel.app host redirect (ADR-0028)", () => {
+describe("legacy vercel.app host redirect", () => {
   it("matches the production alias and nothing else", () => {
     expect(hostMatches(LEGACY_HOST)).toBe(true);
     for (const other of [

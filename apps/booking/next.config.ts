@@ -6,7 +6,7 @@ import { legacyHostRedirect } from "./src/lib/legacy-host";
 const nextConfig: NextConfig = {
   images: { unoptimized: true },
   transpilePackages: ["@clinic/ui", "@clinic/api"],
-  // The old *.vercel.app production host redirects to the branded one (ADR-0028).
+  // The old *.vercel.app production host redirects to the branded one.
   redirects: async () => [legacyHostRedirect],
 };
 
