@@ -158,7 +158,7 @@ resource "google_storage_bucket_iam_member" "deployer_state_bucket_meta" {
   member = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# ---- reCAPTCHA assessments from the web app's server side (ADR-0022) ---------------------------
+# ---- reCAPTCHA assessments from the web app's server side ---------------------------------------
 # The BFF verifies score-based reCAPTCHA tokens with projects.assessments.create. It has no API
 # key and no secret: Vercel's OIDC identity (the same federated principal that mints the Cloud Run
 # ID token) may mint short-lived tokens for this one account, and the account holds only the
