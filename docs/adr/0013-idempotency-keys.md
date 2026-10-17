@@ -7,7 +7,7 @@
 
 Accepted (T2, second item cut)
 
-**Build status (audit 2026-10-17): Not built.** Cut for time. Only the CORS and proxy header passthrough exists: no key column, fingerprint, replay flow or error codes, and the booking client sends no key. A retried POST after a lost response still gets 409 `SLOT_TAKEN`.
+**Build status (audit 2026-10-17): Not built on `main`; being added in PR #31 (not merged yet).** Cut for time at the audit. Only the CORS and proxy header passthrough exists: no key column, fingerprint, replay flow or error codes, and the booking client sends no key. A retried POST after a lost response still gets 409 `SLOT_TAKEN`.
 
 ## Context
 
@@ -37,6 +37,12 @@ Option 3.
 
 - Good: no extra table, and keys live exactly as long as the booking.
 - Bad: no stored response bodies, so the replay semantics are "current state". This is documented.
+
+**Amendment (2026-10-18):** three things recorded for the build in PR #31 (not merged yet); the text above is kept.
+
+- **Chosen design.** Option 3 as written: the idempotency key and the request fingerprint are columns on `appointments`, not a separate keys table.
+- **No IN_PROGRESS state.** A concurrent duplicate request blocks on the unique index until the first transaction commits, and then replays the stored result, so there is no window in which a second request could observe a half-finished one and no state to represent it.
+- **PATCH reschedule is unkeyed.** A retry of a reschedule to the same start is a 200 no-op, so it needs no key. If PATCH-style operations ever need keys, that is the review trigger below for a generic keys table.
 
 ## Assessment line
 
