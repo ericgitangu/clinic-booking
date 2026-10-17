@@ -95,7 +95,7 @@ export default function Home() {
         <h3 className="mt-8 font-heading text-lg font-semibold">Required</h3>
         <ul className="mt-4 grid gap-4 md:grid-cols-2">
           {REQUIRED.map((e) => (
-            <EvidenceCard key={e.method + e.path} e={e} required />
+            <EvidenceCard key={e.operationId} e={e} required />
           ))}
         </ul>
         <h3 className="mt-10 font-heading text-lg font-semibold">Bonus</h3>
@@ -147,7 +147,11 @@ export default function Home() {
             </li>
           ))}
         </ol>
-        <p className="mt-8 text-base">
+        <p className="mt-8 max-w-[65ch] text-base leading-7 text-muted-foreground">
+          To run them against a local stack, set{" "}
+          <code>API=http://localhost:8080</code> in the first block.
+        </p>
+        <p className="mt-3 text-base">
           The same checks, with what I saw when I ran them, are in{" "}
           <a
             className={LINK}

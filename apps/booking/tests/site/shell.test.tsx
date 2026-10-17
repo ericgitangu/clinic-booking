@@ -116,6 +116,10 @@ describe("landing page", () => {
     }
   });
 
+  it("tells the reader how to point the steps at a local stack", () => {
+    expect(html).toContain("API=http://localhost:8080");
+  });
+
   it("links the README sections it cites", () => {
     expect(html).toContain("#2-verify-the-claims-in-10-minutes");
     expect(html).toContain("#11-ai-reflection");
