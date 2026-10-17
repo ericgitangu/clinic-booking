@@ -1,7 +1,10 @@
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { ADMIN_APP_LIVE, FOOTER_COLUMNS } from "@/lib/footer-links";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The status line calls the API on the server; the page test only needs its place in the markup.
+vi.mock("@/components/landing/status-line", () => ({ StatusLine: () => null }));
 import Home from "@/app/page";
 import PrivacyPage from "@/app/privacy/page";
 import TermsPage from "@/app/terms/page";
@@ -80,16 +83,47 @@ describe("page shell", () => {
 describe("landing page", () => {
   const html = renderToStaticMarkup(<Home />);
 
-  it("has one h1 and links only to routes that exist", () => {
+  it("has one h1 with the exact app name, and the one-line description", () => {
     expect(html.match(/<h1/g)).toHaveLength(1);
-    for (const href of ["/docs", "/redoc", "/openapi.json", "/api/health"]) {
-      expect(html).toContain(`href="${href}"`);
+    expect(html).toContain(`>${SITE.name}</h1>`);
+    expect(html).toContain(
+      "A clinic appointment API with a booking app, built for the Savannah Informatics backend assessment.",
+    );
+  });
+
+  it("leads with the booking page and links Swagger and the source", () => {
+    expect(html).toContain('href="/book"');
+    expect(html).toContain('href="/docs"');
+    expect(html).toContain(
+      'href="https://github.com/ericgitangu/clinic-booking"',
+    );
+    expect(html).not.toContain("coming next");
+  });
+
+  it("has a Swagger deep link and a screen link on every evidence card", () => {
+    expect((html.match(/href="\/docs#\//g) ?? []).length).toBe(6);
+    expect((html.match(/Try it in Swagger/g) ?? []).length).toBe(6);
+  });
+
+  it("names the sections the brief reader looks for", () => {
+    for (const t of [
+      "What the brief asked for, and where to try it",
+      "Verify the claims in 10 minutes",
+      "How it\u2019s built",
+      "Section 4: AI usage",
+    ]) {
+      expect(html, t).toContain(t);
     }
   });
 
-  it("leads with the booking page that exists", () => {
-    expect(html).toContain('href="/book"');
-    expect(html).not.toContain("coming next");
+  it("tells the reader how to point the steps at a local stack", () => {
+    expect(html).toContain("API=http://localhost:8080");
+  });
+
+  it("links the README sections it cites", () => {
+    expect(html).toContain("#2-verify-the-claims-in-10-minutes");
+    expect(html).toContain("#11-ai-reflection");
+    expect(html).toContain("#10-operations-cost--security-posture");
   });
 });
 

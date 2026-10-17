@@ -2,25 +2,37 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import {
+  checkRequest,
+  type ApiFailure,
+  type FieldIssue,
+} from "@clinic/api/call";
+import {
+  zCancelRequest,
+  zPostPatientPatientsPostBody,
+  zRescheduleRequest,
+  zAppointmentCreate,
+} from "@clinic/api/generated/zod.gen";
+import { logError } from "@clinic/api/proxy/log";
+import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
 import { addDays, clinicDay } from "@/lib/clinic-time";
 import { checkHuman, type Action } from "@/lib/human-check";
-import { logError } from "@clinic/api/proxy/log";
 import {
   cookieConfigured,
   forgetPatient,
   readPatient,
   rememberPatient,
 } from "@/lib/patient-cookie";
-import type { ActionState, NextSlot } from "@/lib/action-state";
-import { describeProblem } from "@/lib/problems";
+import { describeProblem, fieldMessages } from "@/lib/problems";
 
-const uuid = z.string().uuid();
-// The API refuses a time without an offset; the picker always sends one.
-const isoWithOffset = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/);
+// Request bodies are checked with the schemas generated from the contract, never with rules
+// written here: the form says what is wrong in plain words (lib/problems.ts), the contract says
+// what is valid.
+const appointmentWhen = zAppointmentCreate.pick({
+  doctor_id: true,
+  starts_at: true,
+});
 
 function blank(v: FormDataEntryValue | null): string | undefined {
   const t = typeof v === "string" ? v.trim() : "";
@@ -33,6 +45,20 @@ function error(
 ): ActionState {
   const { message, severity } = describeProblem(code);
   return { status: "error", code, message, severity, ...extra };
+}
+
+function invalid(issues: FieldIssue[]): ActionState {
+  return error("VALIDATION_ERROR", { fieldErrors: fieldMessages(issues) });
+}
+
+// A failed API call as a screen state. A request the contract refused becomes field errors; a
+// contract violation or an unreachable API becomes the generic critical message.
+function failed(
+  f: ApiFailure,
+  extra: Partial<Extract<ActionState, { status: "error" }>> = {},
+): ActionState {
+  if (f.kind === "invalid_request") return invalid(f.issues);
+  return error(f.code, extra);
 }
 
 async function human(
@@ -66,20 +92,6 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
-const BookSchema = z.object({
-  doctor_id: uuid,
-  starts_at: isoWithOffset,
-  full_name: z.string().min(2, "Enter your full name.").max(200),
-  phone: z
-    .string()
-    .regex(
-      /^\+[1-9][0-9]{7,14}$/,
-      "Use international format, like +254712345678.",
-    )
-    .optional(),
-  email: z.string().email("Enter a valid email address.").optional(),
-});
-
 export async function bookAppointment(
   _prev: ActionState,
   fd: FormData,
@@ -91,52 +103,62 @@ export async function bookAppointment(
   }
   const remembered =
     fd.get("as_remembered") === "1" ? await readPatient() : null;
-  const parsed = BookSchema.safeParse({
-    doctor_id: blank(fd.get("doctor_id")),
-    starts_at: blank(fd.get("starts_at")),
-    full_name: remembered?.name ?? blank(fd.get("full_name")),
-    phone: remembered ? undefined : blank(fd.get("phone")),
-    email: remembered ? undefined : blank(fd.get("email")),
-  });
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = String(issue.path[0] ?? "form");
-      fieldErrors[key] ??= issue.message;
-    }
-    return error("VALIDATION_ERROR", { fieldErrors });
-  }
-  const input = parsed.data;
+  const doctorId = blank(fd.get("doctor_id"));
+  const startsAt = blank(fd.get("starts_at"));
+
+  // Check everything the booking needs before creating anything, so a bad time never leaves a
+  // patient behind.
+  const patientBody = remembered
+    ? null
+    : {
+        full_name: blank(fd.get("full_name")),
+        phone: blank(fd.get("phone")) ?? null,
+        email: blank(fd.get("email")) ?? null,
+      };
+  const issues = [
+    ...(patientBody
+      ? checkRequest(zPostPatientPatientsPostBody, patientBody)
+      : []),
+    ...checkRequest(appointmentWhen, {
+      doctor_id: doctorId,
+      starts_at: startsAt,
+    }),
+  ];
+  if (issues.length > 0) return invalid(issues);
+  // Narrowed by the checks above.
+  const doctor = doctorId as string;
+  const when = startsAt as string;
 
   const blocked = await human(fd, "book");
   if (blocked) return blocked;
 
   let patientId = remembered?.id;
   if (!patientId) {
-    const created = await api.createPatient({
-      full_name: input.full_name,
-      phone: input.phone ?? null,
-      email: input.email ?? null,
-    });
-    if (!created.ok) {
-      return error(created.code);
-    }
+    const created = await api.createPatient(
+      patientBody as {
+        full_name: string;
+        phone: string | null;
+        email: string | null;
+      },
+    );
+    if (!created.ok) return failed(created);
     patientId = created.data.id;
     // Remember at once: if the slot turns out to be taken, the retry reuses this patient.
     await rememberPatient({ id: patientId, name: created.data.full_name });
   }
 
   const booked = await api.createAppointment({
-    doctor_id: input.doctor_id,
+    doctor_id: doctor,
     patient_id: patientId,
-    starts_at: input.starts_at,
+    starts_at: when,
   });
   if (!booked.ok) {
-    const nextSlots =
-      booked.code === "SLOT_TAKEN"
-        ? await nextFreeSlots(input.doctor_id, input.starts_at)
-        : undefined;
-    return error(booked.code, { nextSlots, doctorId: input.doctor_id });
+    const taken =
+      !booked.ok && booked.kind === "problem" && booked.code === "SLOT_TAKEN";
+    return failed(booked, {
+      nextSlots: taken ? await nextFreeSlots(doctor, when) : undefined,
+      doctorId: doctor,
+    });
   }
   redirect(`/book/confirmed/${booked.data.id}`);
 }
@@ -144,27 +166,24 @@ export async function bookAppointment(
 // A visitor may only change appointments that belong to the patient this browser remembers.
 async function owned(
   id: string,
-): Promise<
-  | { ok: true; doctorId: string; startsAt: string }
-  | { ok: false; state: ActionState }
-> {
+): Promise<{ ok: true; doctorId: string } | { ok: false; state: ActionState }> {
   const patient = await readPatient();
-  if (!uuid.safeParse(id).success || !patient) {
-    return { ok: false, state: error("APPOINTMENT_NOT_FOUND") };
-  }
+  if (!patient) return { ok: false, state: error("APPOINTMENT_NOT_FOUND") };
   const found = await api.getAppointment(id);
-  if (!found.ok)
+  // An id that is not a UUID is refused by the contract before any call: it is simply not found.
+  if (!found.ok) {
     return {
       ok: false,
-      state: error(found.code === "UNKNOWN" ? "INTERNAL_ERROR" : found.code),
+      state:
+        found.kind === "invalid_request"
+          ? error("APPOINTMENT_NOT_FOUND")
+          : failed(found),
     };
-  if (found.data.patient_id !== patient.id)
+  }
+  if (found.data.patient_id !== patient.id) {
     return { ok: false, state: error("APPOINTMENT_NOT_FOUND") };
-  return {
-    ok: true,
-    doctorId: found.data.doctor_id,
-    startsAt: found.data.starts_at,
-  };
+  }
+  return { ok: true, doctorId: found.data.doctor_id };
 }
 
 export async function cancelAppointment(
@@ -172,23 +191,17 @@ export async function cancelAppointment(
   fd: FormData,
 ): Promise<ActionState> {
   const id = blank(fd.get("appointment_id")) ?? "";
-  const reason = z
-    .string()
-    .min(3, "Say briefly why (at least 3 characters).")
-    .max(500);
-  const r = reason.safeParse(blank(fd.get("reason")) ?? "");
-  if (!r.success)
-    return error("VALIDATION_ERROR", {
-      fieldErrors: { reason: r.error.issues[0].message },
-    });
+  const reason = blank(fd.get("reason"));
+  const issues = checkRequest(zCancelRequest, { reason });
+  if (issues.length > 0) return invalid(issues);
 
   const blocked = await human(fd, "cancel");
   if (blocked) return blocked;
   const own = await owned(id);
   if (!own.ok) return own.state;
 
-  const done = await api.cancelAppointment(id, r.data);
-  if (!done.ok) return error(done.code);
+  const done = await api.cancelAppointment(id, reason as string);
+  if (!done.ok) return failed(done);
   revalidatePath("/appointments");
   return { status: "done", message: "Appointment cancelled." };
 }
@@ -198,24 +211,24 @@ export async function rescheduleAppointment(
   fd: FormData,
 ): Promise<ActionState> {
   const id = blank(fd.get("appointment_id")) ?? "";
-  const when = isoWithOffset.safeParse(blank(fd.get("starts_at")) ?? "");
-  if (!when.success)
-    return error("VALIDATION_ERROR", {
-      fieldErrors: { starts_at: "Pick a time." },
-    });
+  const startsAt = blank(fd.get("starts_at"));
+  const issues = checkRequest(zRescheduleRequest, { starts_at: startsAt });
+  if (issues.length > 0) return invalid(issues);
 
   const blocked = await human(fd, "reschedule");
   if (blocked) return blocked;
   const own = await owned(id);
   if (!own.ok) return own.state;
 
-  const done = await api.rescheduleAppointment(id, when.data);
+  const done = await api.rescheduleAppointment(id, startsAt as string);
   if (!done.ok) {
-    const nextSlots =
-      done.code === "SLOT_TAKEN"
-        ? await nextFreeSlots(own.doctorId, when.data)
-        : undefined;
-    return error(done.code, { nextSlots, doctorId: own.doctorId });
+    const taken = done.kind === "problem" && done.code === "SLOT_TAKEN";
+    return failed(done, {
+      nextSlots: taken
+        ? await nextFreeSlots(own.doctorId, startsAt as string)
+        : undefined,
+      doctorId: own.doctorId,
+    });
   }
   revalidatePath("/appointments");
   redirect("/appointments?rescheduled=1");

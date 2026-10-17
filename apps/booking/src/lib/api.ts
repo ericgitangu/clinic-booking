@@ -1,62 +1,90 @@
-// The calls the booking screens make, typed. Server-only: they run in server components and
-// server actions.
+// The calls the booking screens make. Server-only: they run in server components and server
+// actions. Each one goes through the generated SDK in @clinic/api, which checks the request and the
+// response against the contract (see call.ts).
 import { callApi } from "@clinic/api/call";
 import {
-  AppointmentSchema,
-  AvailabilitySchema,
-  DoctorListSchema,
-  DoctorSchema,
-  PatientAppointmentsSchema,
-  PatientSchema,
-} from "@clinic/api/schemas";
+  cancelAppointmentAppointmentsAppointmentIdCancelPatch,
+  createAppointmentAppointmentsPost,
+  doctorAvailabilityDoctorsDoctorIdAvailabilityGet,
+  getAppointmentAppointmentsAppointmentIdGet,
+  getDoctorDoctorsDoctorIdGet,
+  listDoctorsDoctorsGet,
+  patientAppointmentsPatientsPatientIdAppointmentsGet,
+  postPatientPatientsPost,
+  readyReadyGet,
+  rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch,
+  type AppointmentCreate,
+  type PatientCreate,
+} from "@clinic/api/generated";
 
 export const listDoctors = () =>
-  callApi("/doctors", { schema: DoctorListSchema, revalidate: 300 });
-
-export const getDoctor = (id: string) =>
-  callApi(`/doctors/${encodeURIComponent(id)}`, {
-    schema: DoctorSchema,
+  callApi("listDoctors", (client) => listDoctorsDoctorsGet({ client }), {
     revalidate: 300,
   });
 
+export const getDoctor = (id: string) =>
+  callApi(
+    "getDoctor",
+    (client) =>
+      getDoctorDoctorsDoctorIdGet({ client, path: { doctor_id: id } }),
+    {
+      revalidate: 300,
+    },
+  );
+
 export const getAvailability = (doctorId: string, day: string) =>
-  callApi(`/doctors/${encodeURIComponent(doctorId)}/availability?date=${day}`, {
-    schema: AvailabilitySchema,
-  });
+  callApi("doctorAvailability", (client) =>
+    doctorAvailabilityDoctorsDoctorIdAvailabilityGet({
+      client,
+      path: { doctor_id: doctorId },
+      query: { date: day },
+    }),
+  );
 
-export const createPatient = (body: {
-  full_name: string;
-  phone?: string | null;
-  email?: string | null;
-}) => callApi("/patients", { method: "POST", body, schema: PatientSchema });
+export const createPatient = (body: PatientCreate) =>
+  callApi("postPatient", (client) => postPatientPatientsPost({ client, body }));
 
-export const createAppointment = (body: {
-  doctor_id: string;
-  patient_id: string;
-  starts_at: string;
-}) =>
-  callApi("/appointments", { method: "POST", body, schema: AppointmentSchema });
+export const createAppointment = (body: AppointmentCreate) =>
+  callApi("createAppointment", (client) =>
+    createAppointmentAppointmentsPost({ client, body }),
+  );
 
 export const getAppointment = (id: string) =>
-  callApi(`/appointments/${encodeURIComponent(id)}`, {
-    schema: AppointmentSchema,
-  });
+  callApi("getAppointment", (client) =>
+    getAppointmentAppointmentsAppointmentIdGet({
+      client,
+      path: { appointment_id: id },
+    }),
+  );
 
 export const listPatientAppointments = (patientId: string) =>
-  callApi(`/patients/${encodeURIComponent(patientId)}/appointments`, {
-    schema: PatientAppointmentsSchema,
-  });
+  callApi("patientAppointments", (client) =>
+    patientAppointmentsPatientsPatientIdAppointmentsGet({
+      client,
+      path: { patient_id: patientId },
+    }),
+  );
 
 export const cancelAppointment = (id: string, reason: string) =>
-  callApi(`/appointments/${encodeURIComponent(id)}/cancel`, {
-    method: "PATCH",
-    body: { reason },
-    schema: AppointmentSchema,
-  });
+  callApi("cancelAppointment", (client) =>
+    cancelAppointmentAppointmentsAppointmentIdCancelPatch({
+      client,
+      path: { appointment_id: id },
+      body: { reason },
+    }),
+  );
 
 export const rescheduleAppointment = (id: string, startsAt: string) =>
-  callApi(`/appointments/${encodeURIComponent(id)}/reschedule`, {
-    method: "PATCH",
-    body: { starts_at: startsAt },
-    schema: AppointmentSchema,
+  callApi("rescheduleAppointment", (client) =>
+    rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch({
+      client,
+      path: { appointment_id: id },
+      body: { starts_at: startsAt },
+    }),
+  );
+
+export const ready = () =>
+  callApi("ready", (client) => readyReadyGet({ client }), {
+    revalidate: 30,
+    timeoutMs: 5000,
   });

@@ -17,32 +17,20 @@ export default defineConfig({
         ? {}
         : { channel: "chrome" }),
   },
-  webServer: [
-    // The API stand-in for the fast run (see e2e/fake-api.mjs). With E2E_API_URL set the tests
-    // run against a real API instead (the e2e-real CI job) and the stand-in is not started.
-    ...(process.env.E2E_API_URL
-      ? []
-      : [
-          {
-            command: "node e2e/fake-api.mjs",
-            url: "http://127.0.0.1:3199/health",
-            reuseExistingServer: !process.env.CI,
-            timeout: 15_000,
-          },
-        ]),
-    {
-      command: "pnpm exec next start -p 3100",
-      url: "http://localhost:3100",
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
-      env: {
-        API_URL: process.env.E2E_API_URL ?? "http://127.0.0.1:3199",
-        // The human check is off for test runs only (see lib/human-check.ts); there is no Google here.
-        E2E: "1",
-        RECAPTCHA_ENFORCE: "false",
-        // A throwaway signing key for the remembered-patient cookie, only ever used by these tests.
-        CLINIC_COOKIE_SECRET: "e2e-only-secret-e2e-only-secret-e2e-only-secret",
-      },
+  // Every scenario runs against the real API and database: docker compose with migrations and
+  // seed (`make e2e` starts it; CI's e2e-real job does too). E2E_API_URL points elsewhere if needed.
+  webServer: {
+    command: "pnpm exec next start -p 3100",
+    url: "http://localhost:3100",
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
+    env: {
+      API_URL: process.env.E2E_API_URL ?? "http://127.0.0.1:8080",
+      // The human check is off for test runs only (see lib/human-check.ts); there is no Google here.
+      E2E: "1",
+      RECAPTCHA_ENFORCE: "false",
+      // A throwaway signing key for the remembered-patient cookie, only ever used by these tests.
+      CLINIC_COOKIE_SECRET: "e2e-only-secret-e2e-only-secret-e2e-only-secret",
     },
-  ],
+  },
 });
