@@ -1,4 +1,6 @@
-// A small in-memory stand-in for the clinic API, used only by the end-to-end tests. It follows the
+// STAND-IN for our own API, kept for the fast browser run in the web-e2e job only. It is not proof
+// of anything: the e2e-real job runs the same scenarios against the real API and database and is
+// the gate. A small in-memory stand-in for the clinic API, used only by the end-to-end tests. It follows the
 // same rules the real API enforces for the cases the tests cover (taken slot, past slot, one hour of
 // notice, already cancelled, duplicate phone), so the booking screens can be driven through every
 // error path without a database. The real API is exercised by backend tests and scripts/verify_claims.py.

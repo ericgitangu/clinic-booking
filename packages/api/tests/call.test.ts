@@ -1,3 +1,8 @@
+// A stood-in transport: these tests exercise the client's validation (what it does with a valid
+// answer, a valid problem, a malformed answer, a malformed problem and a refused request) on every
+// operation, which includes answers a correct server never sends. The real-API counterparts, run
+// against docker compose in CI, are in real-api.test.ts. Nothing here is the proof that the API
+// itself behaves; that is the real-API test and the e2e-real job.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { callApi, type ApiResult } from "../src/call";
 import * as sdk from "../src/generated";

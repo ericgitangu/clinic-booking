@@ -26,7 +26,7 @@ The patient screens need to list doctors, show free times, book, cancel and resc
 - **A taken slot is a normal outcome.** On `SLOT_TAKEN` the action returns the next free times for that doctor and the screen offers them, one tap each.
 - **My appointments lists upcoming appointments only.** The patient endpoint does not return cancelled appointments, so the screen does not pretend to show them.
 - **A duplicate phone number gets a generic message** ("We could not create that patient...") on the screens.
-- **Tests run twice.** `apps/booking/e2e/booking.spec.ts` runs against an in-memory stand-in API (`e2e/fake-api.mjs`) for the fast run, and the same scenarios run in CI (job `e2e-real`) against the real API and database from `docker-compose` with migrations and seed. Times are found through the API, so weekends and closed days are skipped without a fixed date.
+- **The real API is the gate.** The browser scenarios in `apps/booking/e2e/booking.spec.ts` run in CI (job `e2e-real`) against the real API and database from `docker-compose` with migrations and seed, and so does `packages/api/tests/real-api.test.ts` (reads, typed problems, the whole booking path). A faster run of the same scenarios against an in-memory stand-in (`e2e/fake-api.mjs`, job `web-e2e`) is kept for quick feedback and is not proof of anything. Stand-ins are for third parties only (Google), and the one place a real response is damaged on purpose, to prove contract drift is caught, is labelled in the test. Times are found through the API, so weekends and closed days are skipped without a fixed date.
 
 ### What this does not protect
 
