@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built.** Both partial unique indexes, the duration and alignment CHECKs and the SQLSTATE to 409 mapping are in migration 0001 and covered by tests. Unverified: the Neon `btree_gist` check.
+
 ## Context
 
 The brief says: "Once booked the slot must not be available to others." Checks in application code race when POSTs arrive concurrently. `SELECT ... FOR UPDATE` cannot lock a row that doesn't exist yet.

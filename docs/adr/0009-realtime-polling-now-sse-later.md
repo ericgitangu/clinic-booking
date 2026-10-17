@@ -7,6 +7,8 @@
 
 Accepted. This revision supersedes this ADR's own earlier decision to defer SSE entirely: patient polling is unchanged, and an admin-only SSE feed is stretch item S1, built only after Gate B.
 
+**Build status (audit 2026-10-17): Mostly pending.** Built: the 409 `SLOT_TAKEN` path with its "just taken" copy. Pending: patient polling (visible-tab refetch with an idle stop) and the admin SSE gateway (S1). TanStack Query is not in the apps.
+
 ## Context
 
 - **What realtime would buy.** The database already guarantees correctness, so push would only improve UX: a competing patient would see a slot disappear before submitting, and clinic staff would see bookings land as they happen.

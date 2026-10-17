@@ -36,3 +36,40 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0030](0030-staff-roles-and-access.md) | Staff roles granted by email, enforced in the app and again in the API | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
 
 **Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make lint` checks the markdown.
+
+## Build status
+
+Checked against the code on 2026-10-17 (read, not run). Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
+
+| ADR | Build status |
+|---|---|
+| 0001 | Stale in places |
+| 0002 | Built |
+| 0003 | Built |
+| 0004 | Built |
+| 0005 | Built, one gap |
+| 0006 | Built, catalogue incomplete |
+| 0007 | Built |
+| 0008 | Built |
+| 0009 | Mostly pending |
+| 0010 | Partly built, text stale |
+| 0011 | Built, text stale |
+| 0012 | Built in the web layer, text stale |
+| 0013 | Not built |
+| 0014 | Mostly built, text stale |
+| 0015 | Built, S1 pending |
+| 0016 | Built, text stale |
+| 0017 | Mostly built |
+| 0018 | Built, text stale |
+| 0019 | Built |
+| 0020 | Partly pending |
+| 0021 | Not built |
+| 0022 | Superseded in part |
+| 0023 | Built for the API |
+| 0024 | Built |
+| 0025 | Pending PR #27 |
+| 0026 | Mostly built |
+| 0027 | Built |
+| 0028 | Mostly built |
+| 0029 | Built |
+| 0030 | Built |

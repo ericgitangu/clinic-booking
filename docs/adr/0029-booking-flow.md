@@ -8,6 +8,8 @@
 
 Accepted. The booking screens live in `apps/booking`; the browser never talks to Cloud Run for them. Amended 2026-10-18: patients sign in with Google (ADR-0024) and the interim cookie is gone.
 
+**Build status (audit 2026-10-17): Built.** Server components read and server actions write, with Google sign-in, per-action reCAPTCHA and the real-API e2e job. The Context still says sign-in arrives later, and one section is duplicated.
+
 ## Context
 
 The patient screens need to list doctors, show free times, book, cancel and reschedule. Sign-in with Google arrives in a later slice, so for now nothing says who a visitor is. The API changes state, so it needs the human check from ADR-0022.

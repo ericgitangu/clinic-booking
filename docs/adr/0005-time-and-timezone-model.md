@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, one gap.** UTC storage, the injected clock, the ruff time bans and the Berlin DST tests are in. Response datetimes are rendered in a hardcoded Nairobi zone, so a second clinic still needs a code change.
+
 ## Context
 
 "A patient sees free slots ... on a day." A day only means something in a timezone. "Not in past" needs a single clock that tests can control.

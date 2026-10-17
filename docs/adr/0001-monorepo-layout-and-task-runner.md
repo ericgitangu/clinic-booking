@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Stale in places.** Built: the Makefile entry point and the root git-hygiene tooling. The workspace is now `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` rather than a single `web/`. Pending: the Go module and `contracts/events/` (stretch S1).
+
 ## Context
 
 The repository holds a Python API, an optional Next.js app, IaC and CI config. We looked at moon, a Makefile, and uv/pnpm/go workspaces. Every tool a reviewer has to learn before they can run the tests is a cost to them.

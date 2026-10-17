@@ -9,6 +9,8 @@
 
 Accepted. The site carries the Idyllic brand and is set up so a link to it previews properly and a crawler can read it.
 
+**Build status (audit 2026-10-17): Mostly built.** Built in `apps/booking`: brand assets, generated icons and share image, metadata, sitemap and robots. The admin app is not indexed and has only a favicon. Pending: the Lighthouse step and the signed-in accessibility check in CI, and the light logo file.
+
 ## Context
 
 A booking site that looks like a template and shares as a blank card does not read as finished. The Idyllic logos already exist in a sibling project (`../unicorns/web/public/`: `idyllic-logo.png`, `idyllic-logo-dark.png`, `idyllic-mark.png`).

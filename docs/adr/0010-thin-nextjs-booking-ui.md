@@ -10,6 +10,8 @@
 
 Accepted. The web project is lean core because its proxy route handlers and landing page are the public URL ([ADR-0023](0023-zero-cost-edge-front-door.md)). The pages and features below are built as droppable slices in the order of the cut line at the end; dropping a slice never removes the proxy or the landing page.
 
+**Build status (audit 2026-10-17): Partly built, text stale.** Built as two apps: the server-first booking flow, sign-in, the admin dashboard with its read-only `/internal/admin/*` endpoints and indexes, and reCAPTCHA. Pending: the PWA service worker (only a manifest exists), the 60 second cached admin metrics, and emails and the reminder cron (PR #27). Paths and `/admin` routes in the body predate the split: they are `apps/booking`, `apps/admin`, `/dashboard` and `/access`.
+
 ## Context
 
 The brief only requires the API, but its scenario is a patient flow: "sees free slots ... picks one, books it ... Patients can cancel." The engineer decided to ship the whole flow as a real product: a booking UI for signed-in patients, an admin dashboard, branding, and email.

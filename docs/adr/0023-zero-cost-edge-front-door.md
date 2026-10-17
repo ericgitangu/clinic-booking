@@ -10,6 +10,8 @@
 
 Accepted, decided by the engineer 2026-10-16: Vercel hosts the frontend and GCP hosts the backend (option 1), with one simplification adopted now: a single Vercel project, the Next.js app in `web/`, carries the front door as route handlers (Decision). (Superseded by the decision. Option 2 remains the documented fallback only if cannot mint an ID token; see Review trigger.) The hosting lock review hardened the implementation inside this decision without re-opening it: static doc routes, exact token-exchange calls, a Vercel bootstrap step, `Location` rewriting, header rules and a credential-free public smoke.
 
+**Build status (audit 2026-10-17): Built for the API.** IAM-gated Cloud Run in us-east4 behind Vercel proxies that mint ID tokens through OIDC federation. There are two Vercel projects (booking, admin), not one. Pending: the realtime parts and the scripted kill switch in the runbook. Unverified: SSE flushing through the proxy and the latency figures.
+
 ## Context
 
 - **The rule.** Total cost must be $0, proven from official pricing, not estimated as "low".

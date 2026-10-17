@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built.** FastAPI serves REST with OpenAPI 3.1 and the docs routes are public through the front door. No tRPC, GraphQL or gRPC was introduced. The Go gateway paragraph depends on ADR-0021, which is not built.
+
 ## Context
 
 We looked at tRPC, gRPC, GraphQL, ConnectRPC and REST over HTTP/2, and whether TanStack Query can be combined with tRPC and gRPC. The brief lists REST verbs and paths and asks for HTTP status codes.

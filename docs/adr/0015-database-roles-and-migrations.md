@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, S1 pending.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place. Migration 0003 is `0003_staff_access`, not `0003_event_cursor`. Pending: the read-only realtime role (S1).
+
 ## Context
 
 - **Ordering.** Migrations run against the shared production database before the new revision is smoke-tested. A destructive migration would break the live revision even when the smoke test fails.

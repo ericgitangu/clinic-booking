@@ -8,6 +8,8 @@
 
 Accepted. The patient app and the admin dashboard are two separate Next.js 16 apps in one pnpm workspace, deployed as two Vercel projects, sharing code through two internal packages.
 
+**Build status (audit 2026-10-17): Built.** Two Next.js apps share `packages/ui` and `packages/api`, ship as two Vercel projects, and have separate service accounts, CI ship jobs and rollbacks. `@clinic/api` now holds more than the proxy core (`callApi`, the assertion, reCAPTCHA, the generated client). Admin sign-in is open and the role gates access (ADR-0030). The Vercel project settings live outside the repository.
+
 ## Context
 
 - ADR-0010 put the dashboard inside the one web app under `/admin`. That makes the patient bundle carry admin code, puts both audiences behind one sign-in surface and one deployment, and makes every admin change redeploy the patient site.

@@ -9,6 +9,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, text stale.** Keyless deploy to Cloud Run, tag then promote, and the cost checks are in. The web release is now `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs. Pending: the Go realtime lane, and the saved WIF deny-proof logs.
+
 ## Context
 
 - **Why not GitHub Actions.** It is unavailable to us this month because of a billing issue. The repository stays on GitHub.

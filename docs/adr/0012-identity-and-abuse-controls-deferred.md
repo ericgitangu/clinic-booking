@@ -10,6 +10,8 @@
 
 Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot protection at the API. Gated stretch: Google OAuth for the admin area only (Google sign-in) and Cloudflare Turnstile on the UI booking route (bot check), both per ADR-0022.
 
+**Build status (audit 2026-10-17): Built in the web layer, text stale.** The public API stays unauthenticated by design. Sign-in, roles, reCAPTCHA (not Turnstile) and per-minute rate limiting are built in the web layer, and FastAPI trusts the signed assertion rather than verifying Google tokens. Pending: a `current_principal` dependency and the README section 10 IDOR and phone-oracle statement.
+
 ## Context
 
 - **The gap.** Without identity, anyone holding an appointment UUID can cancel or reschedule it, and `GET /patients/{id}/appointments` exposes PII. That is IDOR.

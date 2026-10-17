@@ -7,6 +7,8 @@
 
 Accepted (built with the UI)
 
+**Build status (audit 2026-10-17): Built, text stale.** The contract is exported to `contracts/openapi.json` and generated into `packages/api` with hey-api 0.99.0 as types, zod and an SDK, with a CI freshness check. Not generated: TanStack Query hooks and the SSE event schema. The `.gitattributes` generated path in the body is out of date.
+
 ## Context
 
 We want end-to-end types between a Python backend and a TypeScript frontend without writing the schema twice. zod and pydantic must never drift apart.

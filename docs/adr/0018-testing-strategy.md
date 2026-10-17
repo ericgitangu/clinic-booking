@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, text stale.** The unit, integration, race and naive-control suites run on real Postgres in CI, and Playwright now runs in the `e2e-real` job. Pending: the idempotent replay race case (needs ADR-0013), a separate 95 percent domain coverage gate, and all stretch-feature tests.
+
 ## Context
 
 The brief asks for "at least basic test coverage of booking logic". The headline claim, that a slot can never be double-booked, needs evidence that the test really exercises concurrency. A test that would pass even with sequential requests isn't evidence.

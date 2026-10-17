@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Mostly built, text stale.** Cloud Run, Artifact Registry and the budgets are in us-east4 behind an IAM-gated front door, with `cost_check.sh` guarding the limits. The web tier is two Vercel apps, not one `web` project. Console or external, not visible in the repo: the $3 spend cap and the Neon settings. Pending: the realtime service (S1).
+
 ## Context
 
 - **Cost rule.** Our infrastructure rule forbids always-on resources: no min-instances > 0, no NAT, no load balancer, no Cloud SQL.

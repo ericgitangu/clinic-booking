@@ -12,6 +12,8 @@ Accepted, with two changes of mind that supersede the original design below:
 
 Patient authentication of the public REST API remains out of scope ([ADR-0012](0012-identity-and-abuse-controls-deferred.md)).
 
+**Build status (audit 2026-10-17): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. Pending: the stream ticket, with the realtime gateway.
+
 ## Context
 
 - **What the realtime gateway exposes.** `/admin`, `GET /admin/metrics` and the gateway's `/stream` carry only non-PII aggregates, so they are public until sign-in ships. Once an admin area exists it should have an admin boundary.
