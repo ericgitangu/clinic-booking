@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built.** Slots come from a pure function over working hours, booked starts and a lead time. Slot length is a module constant, not a parameter as the text shows.
+
 ## Context
 
 The brief says: "Each doctor has set working hours and works in 30-minute slots."

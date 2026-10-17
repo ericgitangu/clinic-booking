@@ -10,6 +10,8 @@
 
 Accepted. Patients and the admin sign in with Google, and the web app's server side (the BFF) is the only place that checks the session. The public REST API stays exactly as the brief specifies: no authentication, working from Swagger.
 
+**Build status (audit 2026-10-17): Built.** Better Auth with stateless cookie sessions, patient account linking, `/internal/me` and signed internal assertions. Roles are resolved on every request from the `ADMIN_EMAILS` owner list plus API-managed access, not fixed in the session. Each app has its own instance (ADR-0027).
+
 ## Context
 
 - The brief asks for an API with no authentication, and that API is unchanged. But a booking UI with no identity shows every patient everything, which is the IDOR we have been stating as debt (ADR-0012).

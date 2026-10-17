@@ -7,6 +7,8 @@
 
 Accepted (T2, second item cut)
 
+**Build status (audit 2026-10-17): Not built.** Cut for time. Only the CORS and proxy header passthrough exists: no key column, fingerprint, replay flow or error codes, and the booking client sends no key. A retried POST after a lost response still gets 409 `SLOT_TAKEN`.
+
 ## Context
 
 A mobile client whose first POST succeeded but whose response was lost will retry. Without idempotency, the retry gets 409 `SLOT_TAKEN`. That tells the actual booker they lost the slot they hold.

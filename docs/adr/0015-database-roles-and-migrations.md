@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, S1 pending.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place. Migration 0003 is `0003_staff_access`, not `0003_event_cursor`. Pending: the read-only realtime role (S1).
+
 ## Context
 
 - **Ordering.** Migrations run against the shared production database before the new revision is smoke-tested. A destructive migration would break the live revision even when the smoke test fails.
@@ -36,9 +38,11 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 - **Same model everywhere:** compose and CI create `clinic_app` from `backend/docker/initdb/01-roles.sql`, so tests run against the same privilege model as production. Stretch S1 adds `02-realtime-role.sql` for `clinic_realtime`, run by `backend-test` right after `01-roles.sql` and mounted into the `dast` compose stack; the PR is not mergeable until CI creates both roles. Parallel migration branches must end with one alembic head (`alembic heads | wc -l` → `1` in `backend-quality`).
 - **Migration safety:**
   - Migrations are expand-only.
-  - `scripts/migration_lint.sh` fails CI on `DROP TABLE|COLUMN`, `RENAME`, `SET NOT NULL` or `ALTER COLUMN ... TYPE`, unless the line carries `# contract-ok: <reason>`.
+  - `scripts/migration_lint.sh` scans only the `upgrade()` body, line by line, and fails CI on `DROP TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|VIEW|FUNCTION|TRIGGER|SCHEMA|EXTENSION|SEQUENCE`, `ALTER COLUMN`, `DROP NOT NULL`, `DROP DEFAULT`, `RENAME`, `TRUNCATE`, `DELETE FROM`, and the Alembic calls `op.drop_*`, `op.alter_column` and `op.rename_*`, unless the line carries `# contract-ok` (give the reason after it). A destructive statement built in a helper, across lines or at runtime is not seen and needs a review by hand.
   - `migrations/env.py` takes `pg_advisory_lock(727001)`, so concurrent executions serialize.
 - **Seed:** `INSERT ... ON CONFLICT (id) DO UPDATE` only. It never deletes.
+
+**Amendment (2026-10-18): migrations as built.** The versions in `backend/migrations/versions/` are `0001_initial`, `0002_admin_indexes`, `0003_staff_access` and `0004_patient_accounts`. Migration `0003_event_cursor`, named in the stretch S1 bullet above, was only the S1 plan: S1 is not built, so there is no `0003_event_cursor`, no `clinic_realtime` role and no realtime secret. If S1 is built, its event-cursor migration takes the next free number after `0004`, not `0003`. The tolerance rule described for the S1 grants (skip with a `NOTICE` when the role is missing) is unchanged as a design.
 
 ## Consequences
 

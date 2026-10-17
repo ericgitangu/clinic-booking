@@ -7,6 +7,8 @@
 
 Accepted. Patients get an email when they book, reschedule or cancel, and a reminder the evening before.
 
+**Build status (audit 2026-10-17): Pending PR #27.** Nothing here is on main yet. Booking acknowledgements, the evening-before reminder, the claim and sent endpoints, the migration and the cron are built in PR #27 and become live when it merges.
+
 ## Context
 
 - A booking you cannot find later is half a feature. Emails also show the system doing work after the request ends.

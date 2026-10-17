@@ -11,7 +11,7 @@ because the machine's active account is a different one:
 ```bash
 export PROJECT=sil-clinic-booking
 export GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com
-export WEB=https://<clinic-web production domain>
+export WEB=https://clinic.ericgitangu.com   # the booking app (ADR-0028); the admin app is https://clinic-admin.ericgitangu.com
 export PUBLIC_API="$WEB/api"
 ```
 
@@ -53,10 +53,10 @@ Follow `docs/runbooks/base-image-cve.md`, then re-release.
 
 ## Automatic rollback
 
-After `ship-web`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
+After `ship-booking` and `ship-admin`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
 includes `/ready` through the public URL, for about 90 seconds of retries (cold starts). If it
 still fails, `rollback-api` (only the `gcp-deploy` context) runs `scripts/ci/rollback.sh`, then
-`rollback-web` (only the `vercel-prod` context) points production at the previous deployment by
+`rollback-booking` and `rollback-admin` (both the `rollback-app` job, only the `vercel-prod` context) point production at the previous deployment of each app by
 id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the release stays red.
 
 - `rollback.sh` reads `keep.json` from `promote.sh` and refuses (exit 2) when there is no previous
@@ -66,12 +66,12 @@ id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the 
   fails loudly.
 - Migrations are expand-only (`scripts/migration_lint.sh`), so the previous revision still runs
   against the migrated database. That is why a traffic move is a safe rollback.
-- `vercel rollback` turns off automatic alias assignment. `ship-web` therefore records the live
+- `vercel rollback` turns off automatic alias assignment. `ship-booking` and `ship-admin` therefore record the live
   deployment id first and, after every deploy, checks that the public alias serves the new
   deployment (promoting it if not).
 
 After any Vercel rollback, automatic alias assignment stays off until the next release. The next
-`ship-web` run restores it: its `ensure` step sees the public alias is not serving the new
+`ship-booking` / `ship-admin` run restores it: its `ensure` step sees the public alias is not serving the new
 deployment and promotes it, then fails the job if it still is not.
 
 Deploy markers (`circleci run release plan` / `update`) are recorded for `clinic-api`,
@@ -86,3 +86,13 @@ Prometheus-compatible or a custom HTTP POST); it is not turned on here.
 ### When the Vercel token is refused (403)
 
 `scripts/ci/vercel_prod.sh` stops with "the Vercel token was refused (403)" when `VERCEL_TOKEN` cannot read the deployment behind a host. Both apps use the `vercel-prod` context, so the token must be a team-scoped token that can see **both** projects (`clinic-web` and `clinic-admin`). The ship and rollback jobs print `Vercel target: app=… project=… team=…` first, so the logs show which project id the job used. To fix a refused token, create a new team-scoped token and update `VERCEL_TOKEN` in the context.
+
+## Kill switch (being added)
+
+For a runaway-cost or abuse event when a rollback is not the right tool, a kill switch script is being added by a separate change: `scripts/ops/kill_switch.sh`. It does not exist in the repository at this commit, so nothing below can be run yet. The planned interface:
+
+- `--dry-run`: print what would change, change nothing.
+- `--apply`: take the API (and with it the apps' public path) offline.
+- `--restore`: undo `--apply` and bring the service back.
+
+Run `--dry-run` first and read its output. The exact flags, what `--apply` touches and the verification steps will be written here once the script has merged; until then the manual tools are the traffic move in the API section above, and in the Google Cloud console, removing the `run.invoker` binding for `clinic-web` and `clinic-admin`.

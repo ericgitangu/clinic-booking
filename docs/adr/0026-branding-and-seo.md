@@ -9,6 +9,8 @@
 
 Accepted. The site carries the Idyllic brand and is set up so a link to it previews properly and a crawler can read it.
 
+**Build status (audit 2026-10-17): Mostly built.** Built in `apps/booking`: brand assets, generated icons and share image, metadata, sitemap and robots. The admin app is not indexed and has only a favicon. Pending: the Lighthouse step and the signed-in accessibility check in CI, and the light logo file.
+
 ## Context
 
 A booking site that looks like a template and shares as a blank card does not read as finished. The Idyllic logos already exist in a sibling project (`../unicorns/web/public/`: `idyllic-logo.png`, `idyllic-logo-dark.png`, `idyllic-mark.png`).
@@ -23,7 +25,7 @@ A booking site that looks like a template and shares as a blank card does not re
 
 Option 2.
 
-- **Assets:** copy only what is used into `web/public`: the light logo, the dark logo and the mark.
+- **Assets:** copy only what is used into `apps/booking/public` (was `web/public`): the light logo, the dark logo and the mark.
 - **Icons:** Next.js file conventions: a static `app/favicon.ico`, plus `app/icon.tsx` and `app/apple-icon.tsx` as `ImageResponse` routes, with `generateImageMetadata` producing the 192 and 512 pixel icons the manifest needs (<https://nextjs.org/docs/app/api-reference/file-conventions/metadata/app-icons>, read 2026-10-17). They are generated from the mark and the PWA manifest icons use the same source.
 - **Share image:** `app/opengraph-image.tsx` with `ImageResponse` from `next/og`, rendered at build time. `images.unoptimized` stays on, so image optimization (5,000 transformations on Hobby) is never used.
 - **Footer:** one `SiteFooter` component on every page, carrying the reCAPTCHA attribution required while the badge is hidden ([ADR-0022](0022-admin-auth-and-bot-protection.md)).

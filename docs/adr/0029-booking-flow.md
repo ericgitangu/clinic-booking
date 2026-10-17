@@ -8,9 +8,11 @@
 
 Accepted. The booking screens live in `apps/booking`; the browser never talks to Cloud Run for them. Amended 2026-10-18: patients sign in with Google (ADR-0024) and the interim cookie is gone.
 
+**Build status (audit 2026-10-17): Built.** Server components read and server actions write, with Google sign-in, per-action reCAPTCHA and the real-API e2e job. The Context still says sign-in arrives later, and one section is duplicated.
+
 ## Context
 
-The patient screens need to list doctors, show free times, book, cancel and reschedule. Sign-in with Google arrives in a later slice, so for now nothing says who a visitor is. The API changes state, so it needs the human check from ADR-0022.
+The patient screens need to list doctors, show free times, book, cancel and reschedule. Sign-in with Google ([ADR-0024](0024-google-sign-in-with-better-auth.md)) says who the visitor is. The API changes state, so it also needs the human check from ADR-0022.
 
 ## Considered options
 
@@ -30,9 +32,7 @@ The patient screens need to list doctors, show free times, book, cancel and resc
 
 ### What this does not protect
 
-reCAPTCHA and the patient-ownership check protect the web UI flows. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP, and patient-scoped reads rely on unguessable UUIDs. This is accepted debt; the review trigger is API authentication with Google sign-in.
-
-The public REST API at `/api` is unauthenticated on purpose: the brief asks for a public REST API and reviewers try it through Swagger. It is rate limited per IP, reads of one patient's appointments rely on unguessable UUIDs, and the reCAPTCHA check and the sign-in are not applied there. So the checks above protect the web screens only; anyone who calls the API directly with an appointment or patient id can read or change it, and a duplicate phone on patient creation still tells an API caller that the number exists. This is accepted debt, recorded in ADR-0012 and ADR-0022 and in README section 10. Signing in protects the screens and the `/internal` routes, not the public API.
+The public REST API at `/api` is unauthenticated on purpose: the brief asks for a public REST API and reviewers try it through Swagger, so Try it out works. It is rate limited per IP, and reads of one patient's appointments rely on unguessable UUIDs. The reCAPTCHA check, the patient-ownership check and the sign-in are not applied there: they protect the web screens (and, for sign-in, the `/internal` routes), not the public API. So anyone who calls the API directly with an appointment or patient id can read or change it, and a duplicate phone on patient creation still tells an API caller that the number exists. This is accepted debt, recorded in ADR-0012 and ADR-0022 and in README section 10; the review trigger is API authentication with Google sign-in.
 
 ## Consequences
 
@@ -41,12 +41,12 @@ The public REST API at `/api` is unauthenticated on purpose: the brief asks for 
 - Bad: the public API stays open, as described above.
 - Bad: sessions are stateless, so one cannot be revoked before it expires (seven days).
 - Bad: booking now needs a Google account; there is no guest booking.
-- Bad: the stand-in API can drift from the real one; the real-API job is what catches that.
+- Bad: the generated client can drift from the real API; the real-API job is what catches that (there is no stand-in API).
 - Bad: the human check on a live deploy cannot be rehearsed on a preview, because only the production Vercel subject is trusted by Google. A preview cannot book at all, since the check is on and cannot reach Google there.
 
 ## Assessment line
 
-Section 1 "key decisions, trade-offs": how a patient books safely before accounts exist.
+Section 1 "key decisions, trade-offs": how a patient books safely: a signed-in account plus a human check per action.
 
 ## Review trigger
 

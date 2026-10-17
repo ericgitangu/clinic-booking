@@ -9,6 +9,8 @@
 
 Accepted (gated realtime gateway; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
+**Build status (audit 2026-10-17): Not built.** Optional and not built. The admin dashboard uses server revalidation, as the amendment says. Only the `appointment_events` table and the proxy's realtime audience and timeout plumbing exist. The Go service, its role, CI lane, ship job and event contract are pending.
+
 ## Context
 
 - **The job.** Hold many long-lived, mostly idle HTTP connections and push a few small events to them. Read one table. Never write, never decide availability.

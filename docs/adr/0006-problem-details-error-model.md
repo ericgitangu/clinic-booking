@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built, catalogue incomplete.** The RFC 9457 model, the closed code catalogue and its test are in. Auth and access codes (401, 403 and the access errors) exist beyond the table here. Pending: the two idempotency codes, which wait on ADR-0013.
+
 ## Context
 
 The brief asks for "meaningful errors + correct HTTP status codes". Clients need a stable, machine-readable code, not prose.

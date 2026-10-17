@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Partly pending.** Commits carry no tooling trailers and README section 11 has its structure and commit note. Pending, for the engineer: the section 11 entries, the per-package table, and the `v1.0.0` tag with its recorded SHA.
+
 ## Context
 
 The brief's Section 4 asks how AI was used and says "honesty matters more than the answer". We also want a clean history and a clean tree: no tooling trailers in commits, and no local tooling files in the repository.

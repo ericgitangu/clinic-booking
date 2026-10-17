@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (audit 2026-10-17): Built.** Reschedule is an in-place UPDATE under a row lock, with one jittered retry on deadlock or serialization failure and a 409 `CONCURRENT_UPDATE` after that. Race and deadlock tests cover it.
+
 ## Context
 
 Reschedule must free the old slot and validate the new one "like fresh booking", and it must error if the appointment is cancelled. Concurrent cancels, reschedules and swaps must never produce two booked rows or a 5xx.

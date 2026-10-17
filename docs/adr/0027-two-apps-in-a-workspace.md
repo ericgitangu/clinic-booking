@@ -8,6 +8,8 @@
 
 Accepted. The patient app and the admin dashboard are two separate Next.js 16 apps in one pnpm workspace, deployed as two Vercel projects, sharing code through two internal packages.
 
+**Build status (audit 2026-10-17): Built.** Two Next.js apps share `packages/ui` and `packages/api`, ship as two Vercel projects, and have separate service accounts, CI ship jobs and rollbacks. `@clinic/api` now holds more than the proxy core (`callApi`, the assertion, reCAPTCHA, the generated client). Admin sign-in is open and the role gates access (ADR-0030). The Vercel project settings live outside the repository.
+
 ## Context
 
 - ADR-0010 put the dashboard inside the one web app under `/admin`. That makes the patient bundle carry admin code, puts both audiences behind one sign-in surface and one deployment, and makes every admin change redeploy the patient site.
@@ -64,7 +66,7 @@ pnpm-workspace.yaml   packages: apps/*, packages/*
 ### CI and rollback
 
 - Two build jobs and two ship jobs (`ship-booking`, `ship-admin`) in the same serial group as the API. Both use the `vercel-prod` context, whose team-scoped token can deploy either project; the admin jobs override `VERCEL_PROJECT_ID` with the admin project's id (not a secret) so no second token is stored.
-- `verify-release` checks both public hosts, and the rollback covers both: each ship job records the deployment that was live, and `rollback-web` restores each app by id. The API rollback is unchanged and still runs first.
+- `verify-release` checks both public hosts, and the rollback covers both: each ship job records the deployment that was live, and the `rollback-booking` and `rollback-admin` jobs (both the `rollback-app` job) restore each app by id. The API rollback is unchanged and still runs first.
 
 ## Consequences
 
@@ -81,6 +83,11 @@ Section 1 "components, key decisions, trade-offs": two audiences, two apps.
 ## Implementation note
 
 Landed as written, with two differences. `@clinic/api` holds only the proxy core so far: the generated zod schemas and `callApi` arrive with the first slice that needs them. The patient app's Vercel Root Directory moves from `web` to `apps/booking` when this change merges, because the project setting is not in the repository.
+
+**Amendment (2026-10-18): what `@clinic/api` holds and who may sign in to admin.**
+
+- `@clinic/api` holds more than the proxy core. Besides `forward`, `mintIdToken`, `rateLimit` and `logRequest` (`src/proxy/`), it holds `callApi` (`src/call.ts`), the signed assertion (`src/assertion.ts`), the reCAPTCHA check (`src/recaptcha.ts`) and the client generated from the contract (`src/generated/`: types, zod schemas and the SDK, [ADR-0011](0011-openapi-codegen-contract.md)). The Implementation note above, which says it holds only the proxy core, describes the first commit.
+- The "Identity and sign-in" bullet says the admin app refuses every sign-in that is not the allowlisted verified email. As built, admin sign-in is open to any Google account with a verified email, and the role decides access: the owner comes from `ADMIN_EMAILS`, everyone else needs an active `staff_access` row, and a signed-in person with no role sees the forbidden page ([ADR-0030](0030-staff-roles-and-access.md)). The separate Better Auth instance, secret and host-only cookie per app are as decided.
 
 ## Review trigger
 
