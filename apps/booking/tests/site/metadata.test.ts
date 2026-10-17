@@ -7,7 +7,7 @@ import { SITE, THEME_COLORS } from "@/lib/site";
 
 describe("search and sharing metadata", () => {
   it("sets a title template and an absolute base so share links resolve", () => {
-    expect(metadata.metadataBase?.href).toBe(`${SITE.url}/`);
+    expect(new URL(String(metadata.metadataBase)).href).toBe(`${SITE.url}/`);
     expect(metadata.title).toMatchObject({
       default: SITE.name,
       template: `%s | ${SITE.name}`,
