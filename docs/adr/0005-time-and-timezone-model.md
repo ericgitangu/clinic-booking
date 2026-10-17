@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built, one gap.** UTC storage, the injected clock, the ruff time bans and the Berlin DST tests are in. Response datetimes are rendered in a hardcoded Nairobi zone, so a second clinic still needs a code change.
+**Build status (audit 2026-10-17): Built, one gap.** UTC storage, the injected clock, the ruff time bans and the Berlin DST tests are in. Response datetimes are rendered in a hardcoded Nairobi zone, so a second clinic still needs a code change; being changed in PR #31 (not merged yet).
 
 ## Context
 
@@ -40,6 +40,8 @@ Option 3.
 - Good: tests are deterministic and independent of the weekday they run on.
 - Bad: one extra join to read the clinic's zone.
 - Bad: DST tests run in `Europe/Berlin` (spring-forward and fall-back) even though Nairobi has no DST, so the code is proven for zones we don't serve yet.
+
+**Amendment (2026-10-18), pending the merge of PR #31.** Each response renders datetimes in its own doctor's clinic timezone (`clinics.timezone`). `DEFAULT_CLINIC_TZ` is used only when there is no clinic. The hard-coded Nairobi zone is gone, so a second clinic no longer needs a code change.
 
 ## Assessment line
 

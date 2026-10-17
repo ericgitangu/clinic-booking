@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built.** Slots come from a pure function over working hours, booked starts and a lead time. Slot length is a module constant, not a parameter as the text shows.
+**Build status (audit 2026-10-17): Built.** Slots come from a pure function over working hours, booked starts and a lead time. Slot length is a module constant, not a parameter as the text shows; being changed in PR #31 (not merged yet).
 
 ## Context
 
@@ -32,6 +32,13 @@ Option 1.
 - Good: working hours are the only source of truth, and a change to them takes effect immediately.
 - Good: at most 48 iterations per request.
 - Bad: uniqueness has to come from the appointments constraint (ADR-0003). There is no slot row to lock.
+
+**Amendment (2026-10-18), pending the merge of PR #31.**
+
+- The slot length is a parameter of the pure domain function, and the function filters candidate slots against booked **intervals** by overlap, not by exact start.
+- The public API always uses the brief's fixed 30-minute slot: the same constant the booking path and the database checks use.
+- A public `slot_minutes` parameter was tried in PR #31 and removed, because it advertised slots that booking rejected or booked at a different length.
+- Per-clinic slot lengths would need a new column, parameterised checks and an exclusion constraint. The exclusion constraint needs `btree_gist`, which is available on Neon but not installed ([ADR-0003](0003-double-booking-partial-unique-index.md)). That is the review trigger.
 
 ## Assessment line
 
