@@ -17,7 +17,7 @@ Vercel project `clinic-admin`, Production. Set sensitive values with `vercel env
 | `API_URL` | no | The Cloud Run URL of `clinic-api`. |
 | `GCP_PROJECT_NUMBER`, `GCP_SERVICE_ACCOUNT_EMAIL` | no | Identity federation to Cloud Run, as for the booking app, with the `clinic-admin` service account. |
 
-The API (Cloud Run `clinic-api`) needs `INTERNAL_SIGNING_KEY` (from Secret Manager) and `ADMIN_EMAILS` (the same value as the app). Without `INTERNAL_SIGNING_KEY` every `/internal/*` call is refused. The migration `0003` needs a role that may run `CREATE EXTENSION citext`.
+The API (Cloud Run `clinic-api`) gets `INTERNAL_SIGNING_KEY` from the Secret Manager secret `clinic-internal-signing-key` (`ship-api` passes it with `--set-secrets`) and `ADMIN_EMAILS` (the same value as the app). Without `INTERNAL_SIGNING_KEY` every `/internal/*` call is refused. The migration `0003` needs a role that may run `CREATE EXTENSION citext`.
 
 ## Live check, once after the first deploy
 
