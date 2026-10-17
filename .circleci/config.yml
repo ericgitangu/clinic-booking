@@ -345,7 +345,7 @@ jobs:
           paths:
             - ~/.local/share/pnpm/store
       - persist_to_workspace:
-          root: /home/circleci/repo/web/.vercel
+          root: /home/circleci/repo/.vercel
           paths:
             - output
 
@@ -369,11 +369,19 @@ jobs:
           name: Halt if a newer commit already owns main
           command: bash scripts/ci/require_head.sh
       - run:
+          name: Install dependencies without lifecycle scripts
+          command: |
+            # The prebuilt output lists files under the root node_modules, and the CLI checks that
+            # they exist before uploading, so a fresh checkout needs the same install as the build.
+            # Scripts stay off, so no package code runs in the job that holds the Vercel token.
+            sudo npm install -g pnpm@12.5.1
+            pnpm install --frozen-lockfile --ignore-scripts
+      - run:
           name: Deploy the prebuilt output (the only step that needs the Vercel token)
           command: |
-            mkdir -p web/.vercel
-            cp -R /tmp/ws/output web/.vercel/output
-            npm_config_ignore_scripts=true npx --yes vercel@59.5.0 deploy --prebuilt --prod --cwd web
+            mkdir -p .vercel
+            cp -R /tmp/ws/output .vercel/output
+            npm_config_ignore_scripts=true npx --yes vercel@59.5.0 deploy --prebuilt --prod
 
   web-quality:
     docker:
