@@ -360,12 +360,22 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     fail "C11 skipped: set BILLING_ACCOUNT to check the budgets"
   fi
 
-  # C12: the egress alert policy exists.
-  if gc monitoring policies list --project "$PROJECT" --format='value(displayName)' 2>/dev/null | qgrep -x 'clinic-run-egress-daily'; then
+  # C12: the egress alert policy exists. Read through the REST API with the account's token (as C5
+  # does): in CI the gcloud `monitoring policies list` wrapper found nothing for the deployer even
+  # though the policy exists and the same call works as the deployer by hand. The HTTP status is
+  # printed on failure so the cause is visible.
+  local c12_tok c12_body c12_code c12_n
+  c12_tok="$(gc auth print-access-token 2>/dev/null)"
+  c12_body="$(mktemp)"
+  c12_code="$(curl -s -o "$c12_body" -w '%{http_code}' -H "Authorization: Bearer $c12_tok" -H "x-goog-user-project: $PROJECT" \
+    -G "https://monitoring.googleapis.com/v3/projects/$PROJECT/alertPolicies" --data-urlencode 'filter=display_name="clinic-run-egress-daily"')"
+  c12_n="$(jq -r '(.alertPolicies // []) | length' "$c12_body" 2>/dev/null)"
+  if [ "$c12_code" = 200 ] && [ "${c12_n:-0}" -ge 1 ]; then
     pass "C12 egress alert policy exists"
   else
-    fail "C12 egress alert policy clinic-run-egress-daily not found"
+    fail "C12 egress alert policy clinic-run-egress-daily not found (HTTP $c12_code, matches: ${c12_n:-none}, $(jq -r '.error.message // empty' "$c12_body" 2>/dev/null | cut -c1-120))"
   fi
+  rm -f "$c12_body"
 
   # C13: Neon project region and fixed size (needs neonctl; reported as SKIP, never as PASS).
   if command -v neonctl >/dev/null && [ -n "${NEON_PROJECT_ID:-}" ]; then
