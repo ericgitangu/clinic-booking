@@ -134,6 +134,8 @@ jobs:
               -m "not race and not control" \
               --junitxml=test-results/pytest/results.xml \
               --cov=app --cov-report=xml --cov-fail-under=85
+            # the domain rules carry their own, higher bar, read from the .coverage data the run above wrote
+            uv run coverage report --include='app/domain/*' --fail-under=95
             uv run pytest -m race -rA
             uv run pytest -m control -rA
       - store_test_results:
