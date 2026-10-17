@@ -5,6 +5,8 @@
 
 ## Status
 
+**Amended 2026-10-17: optional, and built only after the admin dashboard ([ADR-0010](0010-thin-nextjs-booking-ui.md)). The dashboard starts with server revalidation.**
+
 Accepted (gated stretch S1; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
 ## Context

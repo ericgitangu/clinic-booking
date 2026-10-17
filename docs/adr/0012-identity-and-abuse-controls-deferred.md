@@ -6,6 +6,8 @@
 
 ## Status
 
+**Amended 2026-10-17: patient and admin sign-in are now built at the web app's server side ([ADR-0024](0024-google-sign-in-with-better-auth.md)). The public REST API is still unauthenticated, as the brief specifies, so the IDOR there remains by design and is closed only in the UI path.**
+
 Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot protection at the API. Gated stretch: Google OAuth for the admin area only (S3) and Cloudflare Turnstile on the UI booking route (S4), both per ADR-0022.
 
 ## Context

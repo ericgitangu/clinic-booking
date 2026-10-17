@@ -5,6 +5,8 @@
 
 ## Status
 
+**Amended 2026-10-17: the Google sign-in part (S3) is reinstated, widened to patients and the admin, and is now specified in [ADR-0024](0024-google-sign-in-with-better-auth.md) with Better Auth instead of Auth.js. The Turnstile bot check (S4) stays cut.** The text below is kept as the original design.
+
 Accepted (gated stretch: S3 cut 2nd, S4 cut 1st). Patient authentication remains deferred under ADR-0012.
 
 **Amended 2026-10-16: S3 and S4 are cut by the engineer 2026-10-16, deferred with review trigger.** Review trigger: an admin area that serves more than the unauthenticated aggregates, or observed abuse of the public booking route. The design below is kept unchanged for that day.
