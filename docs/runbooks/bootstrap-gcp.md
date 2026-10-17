@@ -270,6 +270,9 @@ Save the log URLs of the two negative tests (WIF deny, context deny) here:
 `<fill in>`.
 
 ```bash
+# In CI (release workflow) the same script runs as the deployer with read-only roles; the billing
+# checks (budgets and the project list) are SKIPPED there because the deployer must never hold a
+# role on the shared billing account, so run them here as BILLING_GCLOUD_ACCOUNT.
 # read-only live guards; GCLOUD_ACCOUNT makes every call use your account, BILLING_ACCOUNT
 # and BILLING_GCLOUD_ACCOUNT enable the budget checks, NEON_PROJECT_ID enables the Neon check (otherwise reported as SKIP)
 GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" BILLING_GCLOUD_ACCOUNT="$BILLING_GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check

@@ -362,9 +362,12 @@ jobs:
           paths:
             - ~/.local/share/pnpm/store
       - persist_to_workspace:
-          root: /home/circleci/repo/.vercel
+          # The prebuilt output points at files in the repo tree (web/.next, about 27 MB), not only
+          # at .vercel/output, so both travel to the deploy job.
+          root: /home/circleci/repo
           paths:
-            - output
+            - .vercel/output
+            - web/.next
 
   ship-web:
     docker:
@@ -408,7 +411,8 @@ jobs:
           name: Deploy the prebuilt output (the only step that needs the Vercel token)
           command: |
             mkdir -p .vercel
-            cp -R /tmp/ws/output .vercel/output
+            cp -R /tmp/ws/.vercel/output .vercel/output
+            cp -R /tmp/ws/web/.next web/.next
             URL="$(npm_config_ignore_scripts=true vercel deploy --prebuilt --prod | tail -1)"
             echo "deployed $URL"
             NEW="$(bash scripts/ci/vercel_prod.sh id-of "$URL")"
