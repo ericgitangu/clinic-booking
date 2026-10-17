@@ -381,6 +381,175 @@ expect "smoke: names the booking file to move aside" "$(grep -c 'booking/.env.pr
 expect "smoke: leaves the developer's files in place" "$([ -e "$WORK/smoke/admin/.env.local" ] && [ -e "$WORK/smoke/booking/.env.production" ] && echo kept)" kept
 expect "smoke: does not start a server for a refused app" "$(grep -c 'did not start' <<<"$out")" 0
 
+# =========================================================================================
+# scripts/ops/kill_switch.sh against a stateful fake gcloud (its own bin dir, so the fakes above
+# stay untouched). Policies live in $FX/policy.<svc>.json and are really edited by the fake.
+# =========================================================================================
+KS="$HERE/../ops/kill_switch.sh"
+mkdir -p "$WORK/ksbin"
+cat > "$WORK/ksbin/gcloud" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$FX/ks.calls"
+svc="$4"
+pf="$FX/policy.$svc.json"
+case "$*" in
+  "run services describe"*)
+    [ -f "$FX/missing.$svc" ] && { echo "ERROR: Cannot find service [$svc]" >&2; exit 1; }
+    echo "$svc" ;;
+  "run services get-iam-policy"*) cat "$pf" ;;
+  "run services remove-iam-policy-binding"*)
+    m="$(sed -n 's/.*--member=\([^ ]*\).*/\1/p' <<<"$*")"
+    jq --arg m "$m" '.etag="changed" | .bindings |= map(.members |= map(select(. != $m))) | .bindings |= map(select((.members|length) > 0))' "$pf" > "$pf.n" && mv "$pf.n" "$pf" ;;
+  "run services add-iam-policy-binding"*)
+    m="$(sed -n 's/.*--member=\([^ ]*\).*/\1/p' <<<"$*")"
+    jq --arg m "$m" '.etag="changed2" | if any(.bindings[]; .role=="roles/run.invoker") then .bindings |= map(if .role=="roles/run.invoker" then .members += [$m] else . end) else .bindings += [{role:"roles/run.invoker",members:[$m]}] end' "$pf" > "$pf.n" && mv "$pf.n" "$pf" ;;
+  *) echo "fake gcloud (kill switch): unhandled: $*" >&2; exit 99 ;;
+esac
+FAKE
+chmod +x "$WORK/ksbin/gcloud"
+P=sil-clinic-booking
+WEB="serviceAccount:clinic-web@$P.iam.gserviceaccount.com"
+ADM="serviceAccount:clinic-admin@$P.iam.gserviceaccount.com"
+SMK="serviceAccount:clinic-smoke@$P.iam.gserviceaccount.com"
+ks_setup() { # <name>
+  new_fx "ks.$1"
+  for svc in clinic-api clinic-realtime; do
+    jq -n --arg w "$WEB" --arg a "$ADM" --arg s "$SMK" \
+      '{etag:"orig",bindings:[{role:"roles/run.invoker",members:[$w,$a,$s]},{role:"roles/run.admin",members:["user:eng@example.com"]}]}' > "$FX/policy.$svc.json"
+  done
+  export KILL_SWITCH_STATE="$WORK/ks-state.$1.json"; rm -f "$KILL_SWITCH_STATE" "$KILL_SWITCH_STATE.restored"
+}
+ks() { PATH="$WORK/ksbin:$PATH" bash "$KS" "$@"; }
+inv() { jq -r '[.bindings[]|select(.role=="roles/run.invoker")|.members[]]|sort|join(",")' "$FX/policy.$1.json"; }
+SORTED_ALL="$(printf '%s\n' "$ADM" "$SMK" "$WEB" | sort | paste -sd, -)"
+
+ks_setup dry
+ks >"$FX/out" 2>&1; rc=$?
+expect "kill_switch: default is a dry run (exit 0)" "$rc" 0
+expect "kill_switch: dry run makes no mutating call" "$(grep -c 'iam-policy-binding' "$FX/ks.calls")" 0
+expect "kill_switch: dry run names the bindings it would remove" "$(grep -c '^kill: remove' "$FX/out")" 4
+expect "kill_switch: dry run writes no state" "$([ -e "$KILL_SWITCH_STATE" ] && echo wrote || echo none)" none
+expect "kill_switch: every gcloud call names the project and region" \
+  "$(grep -vc -- '--project sil-clinic-booking' "$FX/ks.calls")$(grep -vc -- '--region us-east4' "$FX/ks.calls")" 00
+
+ks_setup apply
+cp "$FX/policy.clinic-api.json" "$FX/before.api"; cp "$FX/policy.clinic-realtime.json" "$FX/before.rt"
+ks --apply >"$FX/out" 2>&1; rc=$?
+expect "kill_switch --apply: exit 0" "$rc" 0
+expect "kill_switch --apply: clinic-api keeps only clinic-smoke" "$(inv clinic-api)" "$SMK"
+expect "kill_switch --apply: clinic-realtime keeps only clinic-smoke" "$(inv clinic-realtime)" "$SMK"
+expect "kill_switch --apply: other roles untouched" "$(jq -r '[.bindings[]|select(.role=="roles/run.admin")|.members[]]|join(",")' "$FX/policy.clinic-api.json")" "user:eng@example.com"
+expect "kill_switch --apply: prior state recorded before the first removal" \
+  "$(jq -r '.snapshots["clinic-api"].etag' "$KILL_SWITCH_STATE")" orig
+expect "kill_switch --apply: four removals" "$(grep -c 'remove-iam-policy-binding' "$FX/ks.calls")" 4
+expect "kill_switch --apply: a second kill while a record exists is refused (exit 2)" "$(ks --apply >/dev/null 2>&1; echo $?)" 2
+expect "kill_switch --restore (no --apply) is a dry run" "$(ks --restore >/dev/null 2>&1; echo "$?:$(inv clinic-api)")" "0:$SMK"
+ks --restore --apply >"$FX/out" 2>&1; rc=$?
+expect "kill_switch --restore --apply: exit 0" "$rc" 0
+expect "kill_switch --restore: clinic-api invoker members exactly as before" "$(inv clinic-api)" "$SORTED_ALL"
+expect "kill_switch --restore: clinic-realtime invoker members exactly as before" "$(inv clinic-realtime)" "$SORTED_ALL"
+expect "kill_switch --restore: other roles still intact" "$(jq -r '[.bindings[]|select(.role=="roles/run.admin")|.members[]]|join(",")' "$FX/policy.clinic-api.json")" "user:eng@example.com"
+expect "kill_switch --restore: the state file is retired" "$([ -e "$KILL_SWITCH_STATE" ] && echo kept || echo moved)$([ -e "$KILL_SWITCH_STATE.restored" ] && echo +restored)" "moved+restored"
+expect "kill_switch --restore: with no record it refuses (exit 2)" "$(ks --restore --apply >/dev/null 2>&1; echo $?)" 2
+
+ks_setup missing
+touch "$FX/missing.clinic-realtime"
+ks --apply >"$FX/out" 2>&1; rc=$?
+expect "kill_switch: a missing clinic-realtime is skipped (exit 0)" "$rc" 0
+expect "kill_switch: clinic-api still killed when clinic-realtime is missing" "$(inv clinic-api)" "$SMK"
+expect "kill_switch: nothing is run against the missing service" "$(grep -c 'iam-policy.* clinic-realtime\|iam-policy-binding clinic-realtime' "$FX/ks.calls")" 0
+
+ks_setup again
+ks --apply >/dev/null 2>&1; rm -f "$KILL_SWITCH_STATE"
+ks --apply >"$FX/out" 2>&1; rc=$?
+expect "kill_switch: nothing left to remove is exit 0 and writes no state" "$rc$([ -e "$KILL_SWITCH_STATE" ] && echo wrote)" 0
+
+ks_setup wrongproj
+ks --project other-project --apply >/dev/null 2>&1; rc=$?
+expect "kill_switch: a wrong --project is refused (exit 2)" "$rc" 2
+ks --region europe-west1 --apply >/dev/null 2>&1
+expect "kill_switch: a wrong --region is refused (exit 2)" "$?" 2
+ks --mode scale --apply >/dev/null 2>&1
+expect "kill_switch: --mode scale is refused, not half-implemented (exit 2)" "$?" 2
+expect "kill_switch: refusals make no gcloud call at all" "$([ -e "$FX/ks.calls" ] && echo called || echo none)" none
+ks_setup cond
+jq '.bindings[0].condition={title:"t",expression:"true"}' "$FX/policy.clinic-api.json" > "$FX/c.json" && mv "$FX/c.json" "$FX/policy.clinic-api.json"
+ks --apply >/dev/null 2>&1
+expect "kill_switch: a conditional invoker binding is refused (exit 2) before any removal" "$?:$(grep -c 'remove-iam' "$FX/ks.calls")" "2:0"
+
+# =========================================================================================
+# zap_prod_baseline.sh with a fake docker: the exit-code mapping, the passive baseline, the
+# pinned digest shared with the PR DAST job, and the rules file.
+# =========================================================================================
+cat > "$WORK/bin/fakedocker" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$FX/docker.calls"
+exit "$(cat "$FX/docker.exit")"
+FAKE
+chmod +x "$WORK/bin/fakedocker"
+export ZAP_DOCKER="$WORK/bin/fakedocker"
+for pair in "0:0" "2:0" "1:1" "3:1"; do
+  new_fx "zap$pair"; echo "${pair%%:*}" > "$FX/docker.exit"
+  bash "$HERE/zap_prod_baseline.sh" >/dev/null 2>&1; rc=$?
+  expect "zap prod: ZAP exit ${pair%%:*} gives job exit ${pair##*:}" "$rc" "${pair##*:}"
+done
+expect "zap prod: runs zap-baseline.py (passive), never the active or API scan" \
+  "$(grep -c 'zap-baseline.py' "$FX/docker.calls")$(grep -cE 'zap-full-scan|zap-api-scan|-a( |$)' "$FX/docker.calls")" 10
+expect "zap prod: uses the shared rules file and a bounded spider" "$(grep -c -- '-c rules.tsv -m 1 -T 3' "$FX/docker.calls")" 1
+expect "zap prod: targets the public web URL over https" "$(grep -c -- '-t https://' "$FX/docker.calls")" 1
+zap_digest="$(sed -n 's/^ZAP_IMAGE=.*@\(sha256:[0-9a-f]*\)".*/\1/p' "$HERE/zap_prod_baseline.sh")"
+expect "zap prod: pinned by digest, the dast job in the CI config uses the same digest" \
+  "$(grep -c "zaproxy@$zap_digest" "$HERE/../../.circleci/config.yml")" 1
+unset ZAP_DOCKER
+
+# =========================================================================================
+# deny_probe.sh against a local stand-in server (the Google STS endpoint and the Cloud Run
+# front end are third parties; the stand-in answers like them: 403/401 and an STS rejection).
+# =========================================================================================
+cat > "$WORK/stub.py" <<'PY'
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+MODE = sys.argv[2]
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        code = 200 if MODE == "open" else (401 if self.headers.get("X-Serverless-Authorization") else 403)
+        self.send_response(code); self.end_headers()
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if MODE == "open":
+            self.send_response(200); self.end_headers(); self.wfile.write(json.dumps({"access_token": "ya29.SECRETSECRETSECRETSECRET"}).encode()); return
+        self.send_response(403); self.send_header("Content-Type", "application/json"); self.end_headers()
+        self.wfile.write(json.dumps({"error": "unauthorized_client", "error_description": "rejected by the attribute condition for projects/291652953712 token abcdefghijklmnopqrstuvwxyz0123"}).encode())
+HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+PY
+start_stub() { python3 "$WORK/stub.py" "$1" "$2" >/dev/null 2>&1 & echo $! > "$WORK/stub.pid"; for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$1/" && break; sleep 0.3; done; }
+stop_stub() { kill "$(cat "$WORK/stub.pid")" 2>/dev/null; wait "$(cat "$WORK/stub.pid")" 2>/dev/null; }
+new_fx probe; OUT="$WORK/probe.out"
+start_stub 18097 deny
+PROBE_RUN_APP_URL=http://127.0.0.1:18097 bash "$HERE/deny_probe.sh" run-app "$OUT.runapp" >/dev/null 2>&1; rc=$?
+expect "deny_probe run-app: 403 anonymous and 401 junk bearer pass" "$rc:$(grep -c 'result=PASS' "$OUT.runapp")" "0:2"
+CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:18097/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wif" >/dev/null 2>&1; rc=$?
+expect "deny_probe wif: a rejected exchange passes" "$rc:$(grep -c 'result=PASS' "$OUT.wif")" "0:1"
+expect "deny_probe wif: project number and long opaque strings are redacted" \
+  "$(grep -c '291652953712\|abcdefghijklmnopqrstuvwxyz' "$OUT.wif")$(grep -c '\[redacted\]' "$OUT.wif")" 01
+expect "deny_probe wif: the OIDC token is never written" "$(grep -c 'eyJhbGciOi' "$OUT.wif")" 0
+stop_stub
+start_stub 18098 open
+PROBE_RUN_APP_URL=http://127.0.0.1:18098 bash "$HERE/deny_probe.sh" run-app "$OUT.open" >/dev/null 2>&1; rc=$?
+expect "deny_probe run-app: an open service FAILS the probe" "$rc:$(grep -c 'result=FAIL' "$OUT.open")" "1:2"
+CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:18098/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wifopen" >/dev/null 2>&1; rc=$?
+expect "deny_probe wif: an issued access token FAILS the probe" "$rc:$(grep -c 'observed=ISSUED' "$OUT.wifopen")" "1:1"
+expect "deny_probe wif: an issued token is not written to the record" "$(grep -c 'SECRETSECRET' "$OUT.wifopen")" 0
+stop_stub
+env -u GOOGLE_PROJECT_ID -u GOOGLE_PROJECT_NUMBER -u DEPLOYER_SA -u PUBLIC_BASE_URL -u VERCEL_TOKEN -u VERCEL_ORG_ID -u VERCEL_PROJECT_ID \
+  bash "$HERE/deny_probe.sh" context "$OUT.ctx" >/dev/null 2>&1; rc=$?
+expect "deny_probe context: no deploy variables in the job passes" "$rc" 0
+env -u VERCEL_ORG_ID GOOGLE_PROJECT_ID=x bash "$HERE/deny_probe.sh" context "$OUT.ctx2" >/dev/null 2>&1; rc=$?
+expect "deny_probe context: a leaked deploy variable fails" "$rc:$(grep -c 'context-var-GOOGLE_PROJECT_ID.*result=FAIL' "$OUT.ctx2")" "1:1"
+bash "$HERE/deny_probe.sh" bogus "$OUT.x" >/dev/null 2>&1
+expect "deny_probe: an unknown mode is a usage error (exit 2)" "$?" 2
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

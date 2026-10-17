@@ -33,6 +33,23 @@ fail() { printf 'FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 
 CI=.circleci/config.yml
 
+# C11 (evidence half): the API cannot say whether a budget has a spend cap, so the console value is
+# recorded in docs/evidence/spend-cap-2026-10-18.md and read here. It must exist, name the budget id
+# and record "Spend cap status: Configured"; anything else fails.
+SPEND_CAP_EVIDENCE=docs/evidence/spend-cap-2026-10-18.md
+SPEND_CAP_BUDGET_ID=bfd734ab-ef98-414a-8bb1-b6442c1dec94
+spend_cap_evidence() {
+  local f=$SPEND_CAP_EVIDENCE
+  if [ ! -f "$f" ]; then fail "C11 cap status not readable via API; evidence file missing: $f"; return; fi
+  if ! grep -qE '^- Spend cap status: Configured[[:space:]]*$' "$f"; then
+    fail "C11 cap status not readable via API; $f does not record 'Spend cap status: Configured' (the budget is alerts-only until it does)"; return
+  fi
+  if ! grep -qF "$SPEND_CAP_BUDGET_ID" "$f"; then
+    fail "C11 cap status not readable via API; $f does not name budget id $SPEND_CAP_BUDGET_ID"; return
+  fi
+  pass "C11 cap status not readable via API; see $f (records Configured for budget $SPEND_CAP_BUDGET_ID)"
+}
+
 # ------------------------------------------------------------------------------------------
 # STATIC
 # ------------------------------------------------------------------------------------------
@@ -177,6 +194,8 @@ static_checks() {
   else
     fail "terraform does not remove roles/editor from the default Compute service account (google_project_iam_member_remove)"
   fi
+
+  spend_cap_evidence
 
   # ---- web: Vercel region and git deploys, Next images, regions, route layout ----
   local vj found_vj=0
@@ -347,7 +366,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     pass "C10 paid scanners and managed build disabled"
   fi
 
-  # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API.
+  # C11: both budgets exist. The cap ACTION is a console setting and cannot be read from the API,
+  # so it is judged from the recorded console evidence (spend_cap_evidence).
+  spend_cap_evidence
   if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ] && [ -n "${CIRCLECI:-}" ]; then
     echo "SKIP  C11 budgets: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
   elif [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
@@ -356,7 +377,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     local c11
     # --billing-project: the budgets API is billed to a project the caller can use; the billing user's gcloud default quota project may not be one.
     c11="$(gcb --billing-project "$PROJECT" billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json 2>/dev/null | jq -r '[.[].displayName | select(startswith("clinic-"))] | sort | join(",")')"
-    [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap action: confirm in the console)" || fail "C11 budgets '${c11:-unreadable}'"
+    [ "$c11" = "clinic-alerts-1usd,clinic-run-spend-cap-3usd" ] && pass "C11 both budgets exist (cap status not readable via API; see $SPEND_CAP_EVIDENCE)" || fail "C11 budgets '${c11:-unreadable}'"
   else
     fail "C11 skipped: set BILLING_ACCOUNT to check the budgets"
   fi
