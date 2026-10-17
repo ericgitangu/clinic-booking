@@ -41,7 +41,7 @@ Option 3.
 - Bad: one extra join to read the clinic's zone.
 - Bad: DST tests run in `Europe/Berlin` (spring-forward and fall-back) even though Nairobi has no DST, so the code is proven for zones we don't serve yet.
 
-**Amendment (2026-10-18), pending the merge of PR #31.** Each response renders datetimes in its own doctor's clinic timezone (`clinics.timezone`). `DEFAULT_CLINIC_TZ` is used only when there is no clinic. The hard-coded Nairobi zone is gone, so a second clinic no longer needs a code change.
+**Amendment (2026-10-18), pending the merge of PR #31.** Each appointment and availability response renders datetimes in its own doctor's clinic zone (`clinics.timezone`). Resources that have no clinic (a patient's `created_at`, staff access grants) and the admin dashboard's day bounds use the process-level `DEFAULT_CLINIC_TZ`. Lineage events are converted in the service to their clinic zone rather than carrying a timezone field. The Appointment contract gained an additive, required `timezone` response field. The hard-coded Nairobi zone is gone, so a second clinic no longer needs a code change.
 
 ## Assessment line
 
