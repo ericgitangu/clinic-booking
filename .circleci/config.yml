@@ -316,7 +316,7 @@ jobs:
             : "${WEB_ORIGIN:?gcp-deploy context is missing WEB_ORIGIN}"
             : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
-            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN}" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
+            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=developer.ericgitangu@gmail.com" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
       - run:
           name: Tag-URL smoke behind the C19 egress gate
           command: |
@@ -435,6 +435,9 @@ jobs:
             sudo npm install -g pnpm@12.5.1 vercel@59.5.0 --ignore-scripts
             pnpm install --frozen-lockfile --ignore-scripts
       - run:
+          name: Refuse to ship when the Vercel project lacks a required variable (names only)
+          command: bash scripts/ci/vercel_env_check.sh "<< parameters.app >>" production
+      - run:
           name: Record the production deployment that is live now (the rollback target)
           command: |
             mkdir -p /tmp/webstate
@@ -488,6 +491,8 @@ jobs:
             pnpm audit --prod --audit-level high
             pnpm -r --if-present test
             pnpm -r --if-present build
+            # Both built apps, started with no sign-in settings, must answer 503, never 500.
+            bash scripts/ci/not_configured_smoke.sh
       - save_cache:
           key: pnpm-v1-{{ checksum "pnpm-lock.yaml" }}
           paths:
