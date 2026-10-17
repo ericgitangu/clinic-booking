@@ -191,43 +191,43 @@ static_checks() {
   done < <(find . \( -name node_modules -o -name .git -o -name .next -o -name .vercel \) -prune -o -name vercel.json -type f -print)
   [ "$found_vj" = 1 ] || fail "no vercel.json found"
 
-  if [ -f web/next.config.ts ]; then
-    if grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*true' \
-       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' web/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*false'; then
+  if [ -f apps/booking/next.config.ts ]; then
+    if grep -vE '^[[:space:]]*(//|\*|/\*)' apps/booking/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*true' \
+       && ! grep -vE '^[[:space:]]*(//|\*|/\*)' apps/booking/next.config.ts | qgrep -E 'unoptimized:[[:space:]]*false'; then
       pass "next images unoptimized"
     else
       fail "next images not unoptimized (or only in a comment)"
     fi
   else
-    fail "web/next.config.ts missing"
+    fail "apps/booking/next.config.ts missing"
   fi
 
-  if [ -d web/src ]; then
+  if [ -d apps/booking/src ]; then
     local pr
-    pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
-    if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under web/src"; else pass "no non-iad1 preferredRegion"; fi
-    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' web/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
-      fail "edge runtime under web/src"
+    pr="$(grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/*/src packages/*/src 2>/dev/null | grep -E 'preferredRegion' | grep -vE 'preferredRegion[[:space:]]*=[[:space:]]*(\[[[:space:]]*)?["'"'"']iad1["'"'"'][[:space:]]*\]?' || true)"
+    if [ -n "$pr" ]; then fail "preferredRegion other than iad1 under apps/*/src or packages/*/src"; else pass "no non-iad1 preferredRegion"; fi
+    if grep -rEhv '^[[:space:]]*(//|\*|/\*)' apps/*/src packages/*/src 2>/dev/null | qgrep -E "runtime[[:space:]]*=[[:space:]]*[\"']edge[\"']"; then
+      fail "edge runtime under apps/*/src or packages/*/src"
     else
       pass "no edge runtime"
     fi
   fi
 
-  if [ -d web/src/app/api ]; then
+  if [ -d apps/booking/src/app/api ]; then
     local routes n
-    routes="$(find web/src/app/api -type f -name 'route.*' | sort)"
+    routes="$(find apps/booking/src/app/api -type f -name 'route.*' | sort)"
     n="$(printf '%s\n' "$routes" | grep -c . || true)"
-    if [ "$n" = 1 ] && [ "$routes" = 'web/src/app/api/[...path]/route.ts' ]; then
-      pass "exactly one route file under web/src/app/api"
+    if [ "$n" = 1 ] && [ "$routes" = 'apps/booking/src/app/api/[...path]/route.ts' ]; then
+      pass "exactly one route file under apps/booking/src/app/api"
     else
-      fail "web/src/app/api route files: expected only [...path]/route.ts, found: $(printf '%s' "$routes" | tr '\n' ' ')"
+      fail "apps/booking/src/app/api route files: expected only [...path]/route.ts, found: $(printf '%s' "$routes" | tr '\n' ' ')"
     fi
   fi
 
   local dr src
   for dr in docs redoc openapi.json; do
-    src="$(find "web/src/app/$dr" -maxdepth 1 -type f -name 'route.*' 2>/dev/null | head -1)"
-    if [ -z "$src" ]; then fail "static doc route missing: web/src/app/$dr"; continue; fi
+    src="$(find "apps/booking/src/app/$dr" -maxdepth 1 -type f -name 'route.*' 2>/dev/null | head -1)"
+    if [ -z "$src" ]; then fail "static doc route missing: apps/booking/src/app/$dr"; continue; fi
     if grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E "^[[:space:]]*export[[:space:]]+const[[:space:]]+dynamic[[:space:]]*=[[:space:]]*[\"']force-static[\"']" \
        && ! grep -vE '^[[:space:]]*(//|\*|/\*)' "$src" | qgrep -E 'lib/proxy|\.\./api|\[\.\.\.path\]|fetch\(|API_URL|process\.env'; then
       pass "static doc route, no proxy or network access: $src"
@@ -280,16 +280,17 @@ live_checks() {
   fi
 
   # C3 probes /ready, not /healthz: Google's frontend answers /healthz itself with a 404, so that path can never show the IAM result.
-  # C2 + C3: invoker members are EXACTLY the web and smoke identities; direct run.app is an IAM denial.
+  # C2 + C3: invoker members are EXACTLY the web, admin and smoke identities; direct run.app is an IAM denial.
   local svc want got dis url c403 c401
-  want="serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
+  want="serviceAccount:clinic-admin@${PROJECT}.iam.gserviceaccount.com
+serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
 serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   for svc in clinic-api clinic-realtime; do
     gc run services describe "$svc" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1 || continue
     got="$(gc run services get-iam-policy "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '[.bindings[]? | select(.role == "roles/run.invoker") | .members[]] | sort | .[]')"
     dis="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '.metadata.annotations["run.googleapis.com/invoker-iam-disabled"] // "false"')"
     if [ "$got" = "$want" ] && [ "$dis" = false ]; then
-      pass "C2 $svc invoker members are exactly clinic-web and clinic-smoke"
+      pass "C2 $svc invoker members are exactly clinic-web, clinic-admin and clinic-smoke"
     else
       fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
     fi

@@ -9,9 +9,9 @@
 # are supplied to the separate deploy job (the only one holding the token) through
 # VERCEL_ORG_ID / VERCEL_PROJECT_ID.
 #
-# Built from the repository root with the project's Root Directory set to web: the pnpm workspace
+# Built from the repository root with the project's Root Directory set to the app (VERCEL_APP_DIR, default apps/booking): the pnpm workspace
 # keeps dependencies in the root node_modules, so the function file map is relative to the root
-# and building or deploying with --cwd web fails on missing files.
+# and building or deploying with --cwd <app> fails on missing files.
 #
 # VERCEL_BUILD_TARGET=preview builds a preview-target output, for rehearsing the deploy layout
 # without touching production (a prebuilt output can only be deployed to the target it was
@@ -19,6 +19,7 @@
 #
 # Output: .vercel/output at the repo root (the Build Output API tree, no secrets).
 set -euo pipefail
+APP_DIR="${VERCEL_APP_DIR:-apps/booking}"
 
 cd "$(dirname "$0")/../.."
 if [ -n "${VERCEL_TOKEN:-}" ]; then
@@ -27,8 +28,8 @@ if [ -n "${VERCEL_TOKEN:-}" ]; then
 fi
 
 mkdir -p .vercel
-cat > .vercel/project.json <<'JSON'
-{"orgId":"team_offline_build","projectId":"prj_offline_build","settings":{"framework":"nextjs","buildCommand":null,"installCommand":null,"outputDirectory":null,"rootDirectory":"web","nodeVersion":"24.x"}}
+cat > .vercel/project.json <<JSON
+{"orgId":"team_offline_build","projectId":"prj_offline_build","settings":{"framework":"nextjs","buildCommand":null,"installCommand":null,"outputDirectory":null,"rootDirectory":"${APP_DIR}","nodeVersion":"24.x"}}
 JSON
 
 VERCEL_TELEMETRY_DISABLED=1 npm_config_ignore_scripts=true \

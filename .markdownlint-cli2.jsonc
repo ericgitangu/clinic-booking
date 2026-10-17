@@ -1,6 +1,6 @@
 {
-  "globs": ["README.md", "docs/**/*.md", "backend/**/*.md", "web/**/*.md", ".github/**/*.md"],
-  "ignores": ["**/node_modules/**", "**/.venv/**", "web/.next/**", "web/test-results/**", "web/playwright-report/**"],
+  "globs": ["README.md", "docs/**/*.md", "backend/**/*.md", "apps/booking/**/*.md", ".github/**/*.md"],
+  "ignores": ["**/node_modules/**", "**/.venv/**", "**/.next/**", "**/test-results/**", "**/playwright-report/**"],
   "config": {
     "default": true,
     // MD013 line length is off: prose is one paragraph per line so a diff reads per paragraph,

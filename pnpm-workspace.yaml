@@ -1,5 +1,6 @@
 packages:
-  - web
+  - apps/*
+  - packages/*
 # Dependency lifecycle scripts are denied by default. unrs-resolver only downloads an optional
 # native resolver that ESLint does not need.
 # Refuse a dependency version whose publish-time trust evidence is weaker than an earlier one.

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 . scripts/ci/public-urls.env
-case "$WEB$RUN_APP_URL" in *REPLACE_BEFORE_FIRST_PUSH*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1 ;; esac
+case "$WEB$ADMIN$RUN_APP_URL" in *REPLACE_BEFORE_FIRST_PUSH*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1 ;; esac
 PUBLIC_API="${WEB}/api"
 
 code() { curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$@"; }
@@ -16,4 +16,5 @@ curl -fsS --max-time 20 "${WEB}/openapi.json" | python3 -c "import sys,json; d=j
 curl -fsS --max-time 20 -o /dev/null "${WEB}/docs"
 test "$(code "${PUBLIC_API}/openapi.json")" = 308
 test "$(code "${RUN_APP_URL}/health")" = 403   # direct run.app stays an IAM denial
+test "$(code -L "${ADMIN}")" = 200         # the admin app serves its sign-in gate
 python3 scripts/verify_claims.py --base-url "$PUBLIC_API"
