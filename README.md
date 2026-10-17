@@ -226,6 +226,8 @@ The local race test and the production run agree: exactly one booking wins, and 
 
 ## 9. Deployment & CI/CD
 
+**Rollback.** Every release is a tagged Cloud Run revision that is smoke-tested before it gets traffic, so going back is a traffic move, not a rebuild. After the web deploy, `verify-release` checks the public URL (including `/ready`, which runs `SELECT 1` against Neon); if that fails it puts the API back on the revision that was live before and rolls the Vercel alias back, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. I rehearsed it on a throwaway service with a revision that cannot reach a database: the check returned 503 and the rollback restored the good revision, with real traffic never touched.
+
 <!-- which branch deploys · pipeline steps · OIDC/WIF · migrations-first · tagged smoke + promote-by-tag · rollback · VERCEL_TOKEN debt -->
 
 ## 10. Operations, cost & security posture

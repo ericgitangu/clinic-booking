@@ -287,8 +287,16 @@ jobs:
       - attach_workspace:
           at: /tmp/ws
       - run:
+          name: Deploy marker, planned (CircleCI Deploys)
+          command: |
+            circleci run release plan ship-api --environment-name=production \
+              --component-name=clinic-api --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARN: deploy marker not recorded"
+      - run:
           name: WIF login
           command: bash scripts/ci/gcp_login.sh
+      - run:
+          name: Deploy marker, running
+          command: circleci run release update ship-api --status=running || true
       - run:
           name: Migrate (Cloud Run job, bounded timeout, no retries)
           command: |
@@ -320,9 +328,18 @@ jobs:
           root: /tmp/promoted
           paths:
             - state
+            - keep.json
       - run:
           name: Prune superseded revisions and images (best effort; cost-check C6 flags leftovers)
           command: bash scripts/ci/prune.sh || echo "WARN prune failed; the next cost-check will report any extra versions"
+      - run:
+          name: Deploy marker, success
+          command: circleci run release update ship-api --status=SUCCESS || true
+          when: on_success
+      - run:
+          name: Deploy marker, failed
+          command: circleci run release update ship-api --status=FAILED --failure-reason="ship-api failed" || true
+          when: on_fail
 
   build-web:
     docker:
@@ -369,6 +386,12 @@ jobs:
           name: Halt if a newer commit already owns main
           command: bash scripts/ci/require_head.sh
       - run:
+          name: Deploy marker, planned and running (CircleCI Deploys)
+          command: |
+            circleci run release plan ship-web --environment-name=production \
+              --component-name=clinic-web --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARN: deploy marker not recorded"
+            circleci run release update ship-web --status=running || true
+      - run:
           name: Install dependencies without lifecycle scripts
           command: |
             # The prebuilt output lists files under the root node_modules, and the CLI checks that
@@ -382,6 +405,14 @@ jobs:
             mkdir -p .vercel
             cp -R /tmp/ws/output .vercel/output
             npm_config_ignore_scripts=true npx --yes vercel@59.5.0 deploy --prebuilt --prod
+      - run:
+          name: Deploy marker, success
+          command: circleci run release update ship-web --status=SUCCESS || true
+          when: on_success
+      - run:
+          name: Deploy marker, failed
+          command: circleci run release update ship-web --status=FAILED --failure-reason="ship-web failed" || true
+          when: on_fail
 
   web-quality:
     docker:
@@ -409,6 +440,51 @@ jobs:
           paths:
             - ~/.local/share/pnpm/store
 
+  verify-release:
+    docker:
+      - image: mirror.gcr.io/cimg/python:3.12-node
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Halt unless this commit was promoted
+          command: |
+            if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
+              echo "This commit was not promoted; nothing to verify or roll back."
+              circleci-agent step halt
+            fi
+      - run:
+          name: Halt if a newer commit already owns main
+          command: bash scripts/ci/require_head.sh
+      - run:
+          name: Public smoke and /ready through the public URL (retried for alias propagation)
+          command: |
+            pip install --quiet httpx
+            for i in 1 2 3; do bash scripts/ci/public_smoke.sh && exit 0; echo "attempt $i failed"; sleep 20; done
+            exit 1
+      - run:
+          name: Roll the API back to the previous revision
+          when: on_fail
+          command: |
+            bash scripts/ci/gcp_login.sh
+            PROMOTE_DIR=/tmp/ws bash scripts/ci/rollback.sh
+      - run:
+          name: Roll the web app back to the previous production deployment
+          when: on_fail
+          command: |
+            sudo npm install -g vercel@59.5.0
+            vercel rollback --yes
+      - run:
+          name: Public smoke after the rollback
+          when: on_fail
+          command: |
+            pip install --quiet httpx
+            sleep 20
+            bash scripts/ci/public_smoke.sh && echo "rolled back: production is healthy again; this release stays red"
+
   smoke-public:
     docker:
       - image: mirror.gcr.io/cimg/python:3.12
@@ -431,16 +507,8 @@ jobs:
       - run:
           name: Public smoke (no Vercel or GCP credentials)
           command: |
-            . scripts/ci/public-urls.env
-            case "$WEB$RUN_APP_URL" in *REPLACE_BEFORE_FIRST_PUSH*) echo "scripts/ci/public-urls.env still has placeholders"; exit 1;; esac
-            PUBLIC_API="${WEB}/api"
             pip install --quiet httpx
-            test "$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_API}/health")" = 200
-            curl -fsS "${WEB}/openapi.json" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['servers'][0]['url']=='/api'"
-            curl -fsS -o /dev/null "${WEB}/docs"
-            test "$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_API}/openapi.json")" = 308
-            test "$(curl -s -o /dev/null -w '%{http_code}' "${RUN_APP_URL}/health")" = 403
-            python3 scripts/verify_claims.py --base-url "$PUBLIC_API"
+            bash scripts/ci/public_smoke.sh
 
   cost-static:
     docker:
@@ -543,10 +611,15 @@ workflows:
           requires:
             - ship-api
             - build-web
-      - smoke-public:
+      - verify-release:
+          context: [gcp-deploy, vercel-prod]
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-web
+      - smoke-public:
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - verify-release
       - cost-check:
           context: gcp-deploy
           requires:

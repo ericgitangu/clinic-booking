@@ -1,0 +1,66 @@
+# Rollback pipeline for CircleCI Deploys (Project Settings -> Deploys -> Rollback Pipeline).
+# CircleCI fills in pipeline.deploy.* from the release being rolled back; target_version is the
+# release to go back to, in the same form the deploy markers use (sha-<7>). The automatic path
+# lives in the release workflow (verify-release); this is the manual, one-click one.
+version: 2.1
+
+jobs:
+  rollback-api:
+    docker:
+      - image: mirror.gcr.io/cimg/python:3.12
+    resource_class: small
+    working_directory: ~/repo
+    environment:
+      TARGET_VERSION: << pipeline.deploy.target_version >>
+    steps:
+      - checkout
+      - run:
+          name: Deploy marker, planned rollback
+          command: |
+            circleci run release plan rollback-api --environment-name=<< pipeline.deploy.environment_name >> \
+              --component-name=<< pipeline.deploy.component_name >> --target-version="${TARGET_VERSION}" --rollback
+      - run:
+          name: Move traffic back to the tagged revision
+          command: |
+            bash scripts/ci/gcp_login.sh
+            gcloud run services update-traffic clinic-api --region us-east4 --to-tags "${TARGET_VERSION}=100"
+      - run:
+          name: Deploy marker, success
+          command: circleci run release update rollback-api --status=SUCCESS
+
+  rollback-web:
+    docker:
+      - image: mirror.gcr.io/cimg/node:24.14
+    resource_class: small
+    working_directory: ~/repo
+    environment:
+      TARGET_VERSION: << pipeline.deploy.target_version >>
+    steps:
+      - checkout
+      - run:
+          name: Deploy marker, planned rollback
+          command: |
+            circleci run release plan rollback-web --environment-name=<< pipeline.deploy.environment_name >> \
+              --component-name=<< pipeline.deploy.component_name >> --target-version="${TARGET_VERSION}" --rollback
+      - run:
+          name: Point production at the previous Vercel deployment
+          command: |
+            sudo npm install -g vercel@59.5.0
+            vercel rollback --yes
+      - run:
+          name: Deploy marker, success
+          command: circleci run release update rollback-web --status=SUCCESS
+
+workflows:
+  rollback-api:
+    when:
+      equal: [clinic-api, << pipeline.deploy.component_name >>]
+    jobs:
+      - rollback-api:
+          context: gcp-deploy
+  rollback-web:
+    when:
+      equal: [clinic-web, << pipeline.deploy.component_name >>]
+    jobs:
+      - rollback-web:
+          context: vercel-prod
