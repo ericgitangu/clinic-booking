@@ -5,7 +5,8 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
-import { readPatient } from "@/lib/patient-cookie";
+import { SignInPrompt } from "@/components/account/sign-in-prompt";
+import { callerFor, getIdentity } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Booked", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -16,12 +17,19 @@ export default async function Confirmed({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [appt, patient] = await Promise.all([
-    api.getAppointment(id),
-    readPatient(),
-  ]);
-  // Only the patient this browser was signed to may see the booking.
-  if (appt.ok && (!patient || appt.data.patient_id !== patient.id)) notFound();
+  const who = await getIdentity();
+  if (!who) {
+    return (
+      <SignInPrompt
+        title="Sign in to see your booking"
+        body="Bookings belong to the Google account that made them."
+        returnTo={`/book/confirmed/${id}`}
+      />
+    );
+  }
+  // The API answers 404 for an appointment that is not this person's, the same as for one that
+  // does not exist.
+  const appt = await api.myAppointment(callerFor(who), id);
   if (!appt.ok) {
     if (appt.status < 500) notFound();
     return (

@@ -106,14 +106,16 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	@printf '%s\n' \
 	  'NOTE: Vercel never returns variables marked Sensitive through env pull.' \
 	  'Copy those into apps/booking/.env.local by hand: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET,' \
-	  'INTERNAL_SIGNING_KEY, CLINIC_COOKIE_SECRET, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
+	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
 e2e: ## Playwright checks against the real API and database (docker compose, migrations and seed) and a production build
 	# A fresh database every time (this removes the compose volume), as in CI: the scenarios book real
 	# slots, and a database that keeps every earlier run eventually has no free times in the week a scenario uses.
-	docker compose down -v
-	docker compose up -d --wait
+	# Throwaway keys for this run: the API verifies the signed assertions with INTERNAL_SIGNING_KEY, and
+	# the app signs its sessions with BETTER_AUTH_SECRET.
+	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32); \
+	docker compose down -v && docker compose up -d --wait && \
 	cd apps/booking && pnpm build && pnpm test:e2e
 
 e2e-admin: ## Playwright for apps/admin against the real build, API and Postgres (compose); only Google sign-in is replaced

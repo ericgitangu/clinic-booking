@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchErrors, ChangeAccessRoleInternalAdminAccessEmailPatchResponses, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostErrors, CreateAppointmentAppointmentsPostResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetErrors, GetAppointmentAppointmentsAppointmentIdGetResponses, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetErrors, GetDoctorDoctorsDoctorIdGetResponses, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetErrors, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetErrors, GetMetricsInternalAdminMetricsGetResponses, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetErrors, GetProblemProblemsSlugGetResponses, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetErrors, GetSessionInfoInternalAdminSessionGetResponses, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostErrors, GrantAccessInternalAdminAccessPostResponses, HealthHealthGetData, HealthHealthGetResponses, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetErrors, ListAccessInternalAdminAccessGetResponses, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetErrors, ListAppointmentsInternalAdminAppointmentsGetResponses, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponses, ListProblemsProblemsGetData, ListProblemsProblemsGetResponses, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetErrors, PatientAppointmentsPatientsPatientIdAppointmentsGetResponses, PostPatientPatientsPostData, PostPatientPatientsPostErrors, PostPatientPatientsPostResponses, ReadyReadyGetData, ReadyReadyGetErrors, ReadyReadyGetResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteErrors, RevokeAccessInternalAdminAccessEmailDeleteResponses } from './types.gen';
-import { zCancelAppointmentAppointmentsAppointmentIdCancelPatchBody, zCancelAppointmentAppointmentsAppointmentIdCancelPatchPath, zCancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchBody, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchPath, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, zChangeAccessRoleInternalAdminAccessEmailPatchBody, zChangeAccessRoleInternalAdminAccessEmailPatchPath, zChangeAccessRoleInternalAdminAccessEmailPatchResponse, zCreateAppointmentAppointmentsPostBody, zCreateAppointmentAppointmentsPostResponse, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetPath, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetQuery, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, zGetAppointmentAppointmentsAppointmentIdGetPath, zGetAppointmentAppointmentsAppointmentIdGetResponse, zGetDoctorDoctorsDoctorIdGetPath, zGetDoctorDoctorsDoctorIdGetResponse, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, zGetMetricsInternalAdminMetricsGetQuery, zGetMetricsInternalAdminMetricsGetResponse, zGetProblemProblemsSlugGetPath, zGetProblemProblemsSlugGetResponse, zGetSessionInfoInternalAdminSessionGetResponse, zGrantAccessInternalAdminAccessPostBody, zGrantAccessInternalAdminAccessPostResponse, zHealthHealthGetResponse, zListAccessInternalAdminAccessGetResponse, zListAppointmentsInternalAdminAppointmentsGetQuery, zListAppointmentsInternalAdminAppointmentsGetResponse, zListDoctorsDoctorsGetResponse, zListProblemsProblemsGetResponse, zPatientAppointmentsPatientsPatientIdAppointmentsGetPath, zPatientAppointmentsPatientsPatientIdAppointmentsGetQuery, zPatientAppointmentsPatientsPatientIdAppointmentsGetResponse, zPostPatientPatientsPostBody, zPostPatientPatientsPostResponse, zReadyReadyGetResponse, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchBody, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchPath, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchPath, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, zRevokeAccessInternalAdminAccessEmailDeletePath, zRevokeAccessInternalAdminAccessEmailDeleteResponse } from './zod.gen';
+import type { BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostErrors, BookMineInternalMeAppointmentsPostResponses, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchErrors, ChangeAccessRoleInternalAdminAccessEmailPatchResponses, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostErrors, CreateAppointmentAppointmentsPostResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetErrors, GetAppointmentAppointmentsAppointmentIdGetResponses, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetErrors, GetDoctorDoctorsDoctorIdGetResponses, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetErrors, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetErrors, GetMetricsInternalAdminMetricsGetResponses, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetErrors, GetProblemProblemsSlugGetResponses, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetErrors, GetSessionInfoInternalAdminSessionGetResponses, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostErrors, GrantAccessInternalAdminAccessPostResponses, HealthHealthGetData, HealthHealthGetResponses, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostErrors, LinkAccountInternalAccountsLinkPostResponses, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetErrors, ListAccessInternalAdminAccessGetResponses, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetErrors, ListAppointmentsInternalAdminAppointmentsGetResponses, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponses, ListProblemsProblemsGetData, ListProblemsProblemsGetResponses, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetErrors, MyAppointmentsInternalMeAppointmentsGetResponses, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetErrors, PatientAppointmentsPatientsPatientIdAppointmentsGetResponses, PostPatientPatientsPostData, PostPatientPatientsPostErrors, PostPatientPatientsPostResponses, ReadyReadyGetData, ReadyReadyGetErrors, ReadyReadyGetResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteErrors, RevokeAccessInternalAdminAccessEmailDeleteResponses } from './types.gen';
+import { zBookMineInternalMeAppointmentsPostBody, zBookMineInternalMeAppointmentsPostResponse, zCancelAppointmentAppointmentsAppointmentIdCancelPatchBody, zCancelAppointmentAppointmentsAppointmentIdCancelPatchPath, zCancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchBody, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchPath, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchBody, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchPath, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, zChangeAccessRoleInternalAdminAccessEmailPatchBody, zChangeAccessRoleInternalAdminAccessEmailPatchPath, zChangeAccessRoleInternalAdminAccessEmailPatchResponse, zCreateAppointmentAppointmentsPostBody, zCreateAppointmentAppointmentsPostResponse, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetPath, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetQuery, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, zGetAppointmentAppointmentsAppointmentIdGetPath, zGetAppointmentAppointmentsAppointmentIdGetResponse, zGetDoctorDoctorsDoctorIdGetPath, zGetDoctorDoctorsDoctorIdGetResponse, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, zGetMetricsInternalAdminMetricsGetQuery, zGetMetricsInternalAdminMetricsGetResponse, zGetProblemProblemsSlugGetPath, zGetProblemProblemsSlugGetResponse, zGetSessionInfoInternalAdminSessionGetResponse, zGrantAccessInternalAdminAccessPostBody, zGrantAccessInternalAdminAccessPostResponse, zHealthHealthGetResponse, zLinkAccountInternalAccountsLinkPostBody, zLinkAccountInternalAccountsLinkPostResponse, zListAccessInternalAdminAccessGetResponse, zListAppointmentsInternalAdminAppointmentsGetQuery, zListAppointmentsInternalAdminAppointmentsGetResponse, zListDoctorsDoctorsGetResponse, zListProblemsProblemsGetResponse, zMyAppointmentInternalMeAppointmentsAppointmentIdGetPath, zMyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, zMyAppointmentsInternalMeAppointmentsGetQuery, zMyAppointmentsInternalMeAppointmentsGetResponse, zPatientAppointmentsPatientsPatientIdAppointmentsGetPath, zPatientAppointmentsPatientsPatientIdAppointmentsGetQuery, zPatientAppointmentsPatientsPatientIdAppointmentsGetResponse, zPostPatientPatientsPostBody, zPostPatientPatientsPostResponse, zReadyReadyGetResponse, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchBody, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchPath, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchPath, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchBody, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPath, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, zRevokeAccessInternalAdminAccessEmailDeletePath, zRevokeAccessInternalAdminAccessEmailDeleteResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -145,6 +145,28 @@ export const healthHealthGet = <ThrowOnError extends boolean = false>(options?: 
     responseValidator: async (data) => await zHealthHealthGetResponse.parseAsync(data),
     url: '/health',
     ...options
+});
+
+/**
+ * Link Account
+ *
+ * Idempotent: the first call for a sign-in creates a patient from the display name and the
+ * verified email and records the link; every later call returns the same patient. It never
+ * adopts an existing patient that happens to share a phone number or an email.
+ */
+export const linkAccountInternalAccountsLinkPost = <ThrowOnError extends boolean = false>(options: Options<LinkAccountInternalAccountsLinkPostData, ThrowOnError>): RequestResult<LinkAccountInternalAccountsLinkPostResponses, LinkAccountInternalAccountsLinkPostErrors, ThrowOnError> => (options.client ?? client).post<LinkAccountInternalAccountsLinkPostResponses, LinkAccountInternalAccountsLinkPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zLinkAccountInternalAccountsLinkPostBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zLinkAccountInternalAccountsLinkPostResponse.parseAsync(data),
+    url: '/internal/accounts/link',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -301,6 +323,88 @@ export const getSessionInfoInternalAdminSessionGet = <ThrowOnError extends boole
     responseValidator: async (data) => await zGetSessionInfoInternalAdminSessionGetResponse.parseAsync(data),
     url: '/internal/admin/session',
     ...options
+});
+
+/**
+ * My Appointments
+ */
+export const myAppointmentsInternalMeAppointmentsGet = <ThrowOnError extends boolean = false>(options?: Options<MyAppointmentsInternalMeAppointmentsGetData, ThrowOnError>): RequestResult<MyAppointmentsInternalMeAppointmentsGetResponses, MyAppointmentsInternalMeAppointmentsGetErrors, ThrowOnError> => (options?.client ?? client).get<MyAppointmentsInternalMeAppointmentsGetResponses, MyAppointmentsInternalMeAppointmentsGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zMyAppointmentsInternalMeAppointmentsGetQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zMyAppointmentsInternalMeAppointmentsGetResponse.parseAsync(data),
+    url: '/internal/me/appointments',
+    ...options
+});
+
+/**
+ * Book Mine
+ */
+export const bookMineInternalMeAppointmentsPost = <ThrowOnError extends boolean = false>(options: Options<BookMineInternalMeAppointmentsPostData, ThrowOnError>): RequestResult<BookMineInternalMeAppointmentsPostResponses, BookMineInternalMeAppointmentsPostErrors, ThrowOnError> => (options.client ?? client).post<BookMineInternalMeAppointmentsPostResponses, BookMineInternalMeAppointmentsPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zBookMineInternalMeAppointmentsPostBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zBookMineInternalMeAppointmentsPostResponse.parseAsync(data),
+    url: '/internal/me/appointments',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * My Appointment
+ */
+export const myAppointmentInternalMeAppointmentsAppointmentIdGet = <ThrowOnError extends boolean = false>(options: Options<MyAppointmentInternalMeAppointmentsAppointmentIdGetData, ThrowOnError>): RequestResult<MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses, MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors, ThrowOnError> => (options.client ?? client).get<MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses, MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zMyAppointmentInternalMeAppointmentsAppointmentIdGetPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zMyAppointmentInternalMeAppointmentsAppointmentIdGetResponse.parseAsync(data),
+    url: '/internal/me/appointments/{appointment_id}',
+    ...options
+});
+
+/**
+ * Cancel Mine
+ */
+export const cancelMineInternalMeAppointmentsAppointmentIdCancelPatch = <ThrowOnError extends boolean = false>(options: Options<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, ThrowOnError>): RequestResult<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError> => (options.client ?? client).patch<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchBody,
+        path: zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse.parseAsync(data),
+    url: '/internal/me/appointments/{appointment_id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reschedule Mine
+ */
+export const rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch = <ThrowOnError extends boolean = false>(options: Options<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, ThrowOnError>): RequestResult<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError> => (options.client ?? client).patch<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchBody,
+        path: zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse.parseAsync(data),
+    url: '/internal/me/appointments/{appointment_id}/reschedule',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

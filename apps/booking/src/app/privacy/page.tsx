@@ -20,8 +20,9 @@ export default function PrivacyPage() {
       <h2>What is stored</h2>
       <ul>
         <li>
-          Your name, and optionally your phone number and email address, when
-          you register or sign in.
+          Your name and email address, taken from your Google account the first
+          time you book. The booking service can also hold a phone number, but
+          this site does not ask for one.
         </li>
         <li>
           Your appointments: the doctor, the time, and whether it was booked,

@@ -26,6 +26,23 @@ export const zAccessList = z.object({
 });
 
 /**
+ * AccountLinkRequest
+ *
+ * What the web app knows from the sign-in besides the signed identity: the display name.
+ */
+export const zAccountLinkRequest = z.object({
+    full_name: z.string().min(2).max(200)
+});
+
+/**
+ * AccountLinked
+ */
+export const zAccountLinked = z.object({
+    created: z.boolean(),
+    patient_id: z.uuid()
+});
+
+/**
  * AdminAppointment
  */
 export const zAdminAppointment = z.object({
@@ -190,6 +207,16 @@ export const zLineageEvent = z.object({
 export const zLineage = z.object({
     appointment_id: z.uuid(),
     events: z.array(zLineageEvent)
+});
+
+/**
+ * MeAppointmentCreate
+ *
+ * Booking as the signed-in patient: the patient comes from the account, never from the body.
+ */
+export const zMeAppointmentCreate = z.object({
+    doctor_id: z.uuid(),
+    starts_at: z.iso.datetime({ offset: true })
 });
 
 /**
@@ -463,6 +490,13 @@ export const zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse = zAvaila
  */
 export const zHealthHealthGetResponse = zHealth;
 
+export const zLinkAccountInternalAccountsLinkPostBody = zAccountLinkRequest;
+
+/**
+ * Successful Response
+ */
+export const zLinkAccountInternalAccountsLinkPostResponse = zAccountLinked;
+
 /**
  * Successful Response
  */
@@ -559,6 +593,53 @@ export const zGetMetricsInternalAdminMetricsGetResponse = zMetrics;
  * Successful Response
  */
 export const zGetSessionInfoInternalAdminSessionGetResponse = zSessionInfo;
+
+export const zMyAppointmentsInternalMeAppointmentsGetQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(50)
+});
+
+/**
+ * Successful Response
+ */
+export const zMyAppointmentsInternalMeAppointmentsGetResponse = zPatientAppointments;
+
+export const zBookMineInternalMeAppointmentsPostBody = zMeAppointmentCreate;
+
+/**
+ * Successful Response
+ */
+export const zBookMineInternalMeAppointmentsPostResponse = zAppointment;
+
+export const zMyAppointmentInternalMeAppointmentsAppointmentIdGetPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zMyAppointmentInternalMeAppointmentsAppointmentIdGetResponse = zAppointment;
+
+export const zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchBody = zCancelRequest;
+
+export const zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse = zAppointment;
+
+export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchBody = zRescheduleRequest;
+
+export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = zAppointment;
 
 export const zPostPatientPatientsPostBody = zPatientCreate;
 

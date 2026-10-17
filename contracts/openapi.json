@@ -80,6 +80,42 @@
         "title": "AccessList",
         "type": "object"
       },
+      "AccountLinkRequest": {
+        "additionalProperties": false,
+        "description": "What the web app knows from the sign-in besides the signed identity: the display name.",
+        "properties": {
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Full Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "title": "AccountLinkRequest",
+        "type": "object"
+      },
+      "AccountLinked": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "format": "uuid",
+            "title": "Patient Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patient_id",
+          "created"
+        ],
+        "title": "AccountLinked",
+        "type": "object"
+      },
       "AdminAppointment": {
         "properties": {
           "cancellation_reason": {
@@ -782,6 +818,28 @@
           "occurred_at"
         ],
         "title": "LineageEvent",
+        "type": "object"
+      },
+      "MeAppointmentCreate": {
+        "additionalProperties": false,
+        "description": "Booking as the signed-in patient: the patient comes from the account, never from the body.",
+        "properties": {
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "starts_at"
+        ],
+        "title": "MeAppointmentCreate",
         "type": "object"
       },
       "Metrics": {
@@ -1608,6 +1666,50 @@
         ]
       }
     },
+    "/internal/accounts/link": {
+      "post": {
+        "description": "Idempotent: the first call for a sign-in creates a patient from the display name and the\nverified email and records the link; every later call returns the same patient. It never\nadopts an existing patient that happens to share a phone number or an email.",
+        "operationId": "link_account_internal_accounts_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountLinked"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Link Account",
+        "tags": [
+          "patient account"
+        ]
+      }
+    },
     "/internal/admin/access": {
       "get": {
         "operationId": "list_access_internal_admin_access_get",
@@ -2269,6 +2371,300 @@
         "summary": "Get Session Info",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/internal/me/appointments": {
+      "get": {
+        "operationId": "my_appointments_internal_me_appointments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientAppointments"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Appointments",
+        "tags": [
+          "patient account"
+        ]
+      },
+      "post": {
+        "operationId": "book_mine_internal_me_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeAppointmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Book Mine",
+        "tags": [
+          "patient account"
+        ]
+      }
+    },
+    "/internal/me/appointments/{appointment_id}": {
+      "get": {
+        "operationId": "my_appointment_internal_me_appointments__appointment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "My Appointment",
+        "tags": [
+          "patient account"
+        ]
+      }
+    },
+    "/internal/me/appointments/{appointment_id}/cancel": {
+      "patch": {
+        "operationId": "cancel_mine_internal_me_appointments__appointment_id__cancel_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Cancel Mine",
+        "tags": [
+          "patient account"
+        ]
+      }
+    },
+    "/internal/me/appointments/{appointment_id}/reschedule": {
+      "patch": {
+        "operationId": "reschedule_mine_internal_me_appointments__appointment_id__reschedule_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Reschedule Mine",
+        "tags": [
+          "patient account"
         ]
       }
     },

@@ -506,6 +506,11 @@ jobs:
           name: Skip when nothing this job covers changed (fails closed)
           command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
       - run:
+          name: Throwaway keys for this run (the API checks signed assertions, the app signs sessions)
+          command: |
+            echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
+      - run:
           name: API and database (compose runs the migrations and the seed)
           command: docker compose up -d --build --wait
       - run:
