@@ -6,6 +6,8 @@
 
 ## Status
 
+**Amended 2026-10-17: each app has its own Better Auth instance and cookie, and the admin app only lets the allowlisted email sign in at all ([ADR-0027](0027-two-apps-in-a-workspace.md)); the redirect URIs follow the hostnames in [ADR-0028](0028-public-hostnames.md).**
+
 Accepted. Patients and the admin sign in with Google, and the web app's server side (the BFF) is the only place that checks the session. The public REST API stays exactly as the brief specifies: no authentication, working from Swagger.
 
 ## Context

@@ -6,6 +6,8 @@
 
 ## Status
 
+**Amended 2026-10-17: there are now two Vercel projects, `clinic-web` (the booking app, which keeps this proxy) and `clinic-admin`, each with its own service account ([ADR-0027](0027-two-apps-in-a-workspace.md)); their public hosts are in [ADR-0028](0028-public-hostnames.md).**
+
 Accepted, decided by the engineer 2026-10-16: Vercel hosts the frontend and GCP hosts the backend (option 1), with one simplification adopted now: a single Vercel project, the Next.js app in `web/`, carries the front door as route handlers (Decision). (Superseded by the decision. Option 2 remains the documented fallback only if cannot mint an ID token; see Review trigger.) The hosting lock review hardened the implementation inside this decision without re-opening it: static doc routes, exact token-exchange calls, a Vercel bootstrap step, `Location` rewriting, header rules and a credential-free public smoke.
 
 ## Context
