@@ -5,11 +5,12 @@
 
 ## Status
 
-**Amended 2026-10-17: the Google sign-in part (Google sign-in) is reinstated, widened to patients and the admin, and is now specified in [ADR-0024](0024-google-sign-in-with-better-auth.md) with Better Auth instead of Auth.js. The Turnstile bot check (bot check) stays cut.** The text below is kept as the original design.
+Accepted, with two changes of mind that supersede the original design below:
 
-Accepted (gated stretch: sign-in cut second, bot check cut first). Patient authentication remains deferred under ADR-0012.
+- **Google sign-in is reinstated** for patients and the admin, specified in [ADR-0024](0024-google-sign-in-with-better-auth.md) with Better Auth instead of Auth.js.
+- **Bot protection is reinstated, with reCAPTCHA instead of Turnstile** (2026-10-17, decided by the engineer). It is specified in the section "Bot protection with reCAPTCHA" at the end of this ADR. The Turnstile design in the body stays as the record of what was considered.
 
-**Amended 2026-10-16: sign-in and the bot check are cut by the engineer 2026-10-16, deferred with review trigger.** Review trigger: an admin area that serves more than the unauthenticated aggregates, or observed abuse of the public booking route. The design below is kept unchanged for that day.
+Patient authentication of the public REST API remains out of scope ([ADR-0012](0012-identity-and-abuse-controls-deferred.md)).
 
 ## Context
 
@@ -67,3 +68,25 @@ Accepted (gated stretch: sign-in cut second, bot check cut first). Patient authe
 ## Review trigger
 
 Any real patient data or any authenticated patient flow: build patient auth per ADR-0012, then move bot enforcement into the API (option 8). More than a handful of admins, or a need for roles: a clinic IdP with a proper session and refresh tokens.
+
+## Bot protection with reCAPTCHA
+
+Every Google resource for this app lives in the one dedicated project `sil-clinic-booking`, and every `gcloud` call passes `--project sil-clinic-booking` explicitly. Nothing is created in, reused from or referenced in another project.
+
+- **Which reCAPTCHA:** reCAPTCHA through Google Cloud (the Enterprise API with a score-based key, the "v3-style" integration), not the classic secret-key flow. There is therefore no secret to hold: the BFF authenticates to the API with its existing Vercel identity.
+- **Key:** created in `sil-clinic-booking` with `gcloud recaptcha keys create --web --integration-type=score --domains=sil-clinic-booking.vercel.app,localhost`. The site key is public and is set as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `web/.env.local`. The API `recaptchaenterprise.googleapis.com` is enabled by Terraform.
+- **Where it runs:** only in the BFF, on the server actions for booking, rescheduling and cancelling, and on sign-up if there is one. Each form has its own action name (`book`, `reschedule`, `cancel`, `signup`), and the BFF checks that the action in the token equals the one the form should have used.
+- **Verification:** the BFF calls `projects.assessments.create` with the token, the site key and the expected action, and accepts only if `tokenProperties.valid` is true, `tokenProperties.action` equals the expected action, and `riskAnalysis.score` is at least `RECAPTCHA_MIN_SCORE` (default 0.5, set in the environment). Tokens expire after two minutes and are single use (<https://docs.cloud.google.com/recaptcha/docs/create-assessment-website>, read 2026-10-17). A missing, invalid, expired, wrong-action or low-score token is refused with a friendly "please try again" and the action is not performed.
+- **Identity, no secret:** a new service account `clinic-recaptcha` holds only `roles/recaptchaenterprise.agent`. The Vercel OIDC principal (the same federated identity as [ADR-0023](0023-zero-cost-edge-front-door.md)) may mint short-lived tokens for that one account (`roles/iam.serviceAccountTokenCreator` on it) and nothing else. The BFF exchanges its Vercel token for a Google token, impersonates `clinic-recaptcha`, and calls the API. Terraform creates all of it and the plan is grepped for anything outside that list before it is applied.
+- **The badge is hidden, and the page says so.** The floating badge is hidden with `.grecaptcha-badge { visibility: hidden; }` and every page footer carries the attribution Google's FAQ now requires: "This site is protected by reCAPTCHA." (<https://docs.cloud.google.com/recaptcha/docs/faq>, read 2026-10-17). The engineer's brief quoted the older longer sentence with links to Google's Privacy Policy and Terms of Service. The FAQ says that since 2 April 2026 those references are removed from the badge itself and recommends removing them from customer sites too, so the footer uses the current sentence; adding the two links back is a one-line change if the engineer prefers the older wording.
+- **Cost:** the Google Cloud pricing and tier pages give a free allowance of 10,000 assessments per calendar month per organization, aggregated over all accounts and sites, then a flat $8 for 10,001 to 100,000 assessments (<https://docs.cloud.google.com/recaptcha/docs/compare-tiers>, <https://docs.cloud.google.com/recaptcha/docs/billing-information>, read 2026-10-17). We make one assessment per booking, reschedule or cancel attempt, so a month of demo traffic is a few hundred at most, far inside the allowance: $0. The risk is the cliff: past 10,000 the month costs $8. It is bounded by the per-IP rate limit in the proxy, the spend alert on this project, and the fact that the check runs only on form submissions, never on page views. The allowance is per organization, so if other projects under the same organization also use reCAPTCHA their assessments count against the same 10,000; this project has no way to see that, which is stated here rather than assumed away.
+- **Limit, stated plainly:** the public REST API, used through Swagger or curl, is not protected by this. That is deliberate: the brief specifies an open API. The check protects the web app's form path only.
+- **Preview deployments:** the Vercel identity provider only accepts tokens from the production environment (`environment:production`), so a preview deployment has no Google identity. A preview therefore cannot verify a token or reach Cloud Run. Previews either run with verification switched off (`RECAPTCHA_ENFORCE=false`, never in production) or are built as production-target deployments of the branch before merging. This is an open point for the slice that builds it.
+
+## Consequences of the reCAPTCHA decision
+
+- Good: no secret, no API key, no new vendor; a reCAPTCHA decision the BFF cannot forge because the score comes from Google.
+- Good: costs $0 at this volume.
+- Bad: tokens need a working browser, so scripted clients of the web app fail by design (the REST API is still open to them).
+- Bad: a new service account, a new role and a new API to keep in Terraform.
+- Bad: an $8 cliff if the shared monthly allowance is exceeded.

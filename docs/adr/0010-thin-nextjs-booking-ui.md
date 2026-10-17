@@ -81,10 +81,10 @@ If time runs out, drop slices in this order, last built first. Each is independe
 1. Emails and the reminder cron ([ADR-0025](0025-email-with-resend.md))
 2. The admin dashboard
 3. Google sign-in ([ADR-0024](0024-google-sign-in-with-better-auth.md)); without it the booking flow falls back to the demo patient picker with a "Demo mode" banner. Emails and the dashboard both depend on sign-in (the address and the role come from Google), which is why they are dropped before it
-4. The booking flow
-5. Design system, branding and SEO ([ADR-0026](0026-branding-and-seo.md)) last, because everything above builds on it
+4. The booking flow, which includes bot protection on the booking, reschedule and cancel actions ([ADR-0022](0022-admin-auth-and-bot-protection.md)); dropping the flow drops the check with it
+5. Design system, branding and SEO ([ADR-0026](0026-branding-and-seo.md)) last, because everything above builds on it. The reCAPTCHA footer attribution lives here, in the site footer, so it is on every page
 
-Optional after all of these: the Go SSE gateway ([ADR-0021](0021-go-realtime-gateway.md)). The Turnstile bot check stays cut ([ADR-0022](0022-admin-auth-and-bot-protection.md)).
+Optional after all of these: the Go SSE gateway ([ADR-0021](0021-go-realtime-gateway.md)). Turnstile stays cut; reCAPTCHA replaces it ([ADR-0022](0022-admin-auth-and-bot-protection.md)).
 
 ## Assessment line
 

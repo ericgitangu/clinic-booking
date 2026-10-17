@@ -278,6 +278,19 @@ Save the log URLs of the two negative tests (WIF deny, context deny) here:
 GCLOUD_ACCOUNT="$GCLOUD_ACCOUNT" BILLING_GCLOUD_ACCOUNT="$BILLING_GCLOUD_ACCOUNT" PROJECT="$PROJECT" BILLING_ACCOUNT="$BILLING_ACCOUNT" make cost-check
 ```
 
+## reCAPTCHA key (web app bot protection)
+
+Everything stays in the `sil-clinic-booking` project; pass `--project` on every call. Terraform enables the API and creates the `clinic-recaptcha` service account first (infra/terraform), then:
+
+```bash
+gcloud recaptcha keys create --web --integration-type=score \
+  --domains=sil-clinic-booking.vercel.app,localhost --display-name=clinic-web \
+  --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
+gcloud recaptcha keys list --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
+```
+
+The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `web/.env.local`. There is no secret: the BFF calls the API as `clinic-recaptcha` through the Vercel identity (ADR-0022).
+
 ## Accepted risks
 
 - **Deployer blast radius.** `run.developer` is project-wide and the deployer can act as the
