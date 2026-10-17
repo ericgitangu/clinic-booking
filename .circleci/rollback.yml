@@ -23,7 +23,8 @@ jobs:
           name: Move traffic back to the tagged revision
           command: |
             bash scripts/ci/gcp_login.sh
-            gcloud run services update-traffic clinic-api --region us-east4 --to-tags "${TARGET_VERSION}=100"
+            # same guards as the automatic rollback: the tag must exist and run an image from our registry
+            bash scripts/ci/rollback.sh --to-tag "${TARGET_VERSION}"
       - run:
           name: Deploy marker, success
           command: circleci run release update rollback-api --status=SUCCESS
@@ -45,8 +46,8 @@ jobs:
       - run:
           name: Point production at the previous Vercel deployment
           command: |
-            sudo npm install -g vercel@59.5.0
-            vercel rollback --yes
+            sudo npm install -g vercel@59.5.0 --ignore-scripts
+            bash scripts/ci/vercel_prod.sh rollback "$(bash scripts/ci/vercel_prod.sh previous)"
       - run:
           name: Deploy marker, success
           command: circleci run release update rollback-web --status=SUCCESS

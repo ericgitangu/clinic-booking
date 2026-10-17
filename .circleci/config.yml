@@ -290,13 +290,13 @@ jobs:
           name: Deploy marker, planned (CircleCI Deploys)
           command: |
             circleci run release plan ship-api --environment-name=production \
-              --component-name=clinic-api --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARN: deploy marker not recorded"
+              --component-name=clinic-api --namespace=clinic --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARNING - the deploy marker was not recorded"
       - run:
           name: WIF login
           command: bash scripts/ci/gcp_login.sh
       - run:
           name: Deploy marker, running
-          command: circleci run release update ship-api --status=running || true
+          command: circleci run release update ship-api --status=running || echo "WARNING - the deploy marker was not updated"
       - run:
           name: Migrate (Cloud Run job, bounded timeout, no retries)
           command: |
@@ -334,11 +334,11 @@ jobs:
           command: bash scripts/ci/prune.sh || echo "WARN prune failed; the next cost-check will report any extra versions"
       - run:
           name: Deploy marker, success
-          command: circleci run release update ship-api --status=SUCCESS || true
+          command: circleci run release update ship-api --status=SUCCESS || echo "WARNING - the deploy marker was not updated"
           when: on_success
       - run:
           name: Deploy marker, failed
-          command: circleci run release update ship-api --status=FAILED --failure-reason="ship-api failed" || true
+          command: circleci run release update ship-api --status=FAILED --failure-reason="ship-api failed" || echo "WARNING - the deploy marker was not updated"
           when: on_fail
 
   build-web:
@@ -389,29 +389,44 @@ jobs:
           name: Deploy marker, planned and running (CircleCI Deploys)
           command: |
             circleci run release plan ship-web --environment-name=production \
-              --component-name=clinic-web --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARN: deploy marker not recorded"
-            circleci run release update ship-web --status=running || true
+              --component-name=clinic-web --namespace=clinic --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARNING - the deploy marker was not recorded"
+            circleci run release update ship-web --status=running || echo "WARNING - the deploy marker was not updated"
       - run:
-          name: Install dependencies without lifecycle scripts
+          name: Install dependencies and the Vercel CLI without lifecycle scripts
           command: |
             # The prebuilt output lists files under the root node_modules, and the CLI checks that
             # they exist before uploading, so a fresh checkout needs the same install as the build.
             # Scripts stay off, so no package code runs in the job that holds the Vercel token.
-            sudo npm install -g pnpm@12.5.1
+            sudo npm install -g pnpm@12.5.1 vercel@59.5.0 --ignore-scripts
             pnpm install --frozen-lockfile --ignore-scripts
+      - run:
+          name: Record the production deployment that is live now (the rollback target)
+          command: |
+            mkdir -p /tmp/webstate
+            bash scripts/ci/vercel_prod.sh current | tee /tmp/webstate/prev
       - run:
           name: Deploy the prebuilt output (the only step that needs the Vercel token)
           command: |
             mkdir -p .vercel
             cp -R /tmp/ws/output .vercel/output
-            npm_config_ignore_scripts=true npx --yes vercel@59.5.0 deploy --prebuilt --prod
+            URL="$(npm_config_ignore_scripts=true vercel deploy --prebuilt --prod | tail -1)"
+            echo "deployed $URL"
+            NEW="$(bash scripts/ci/vercel_prod.sh id-of "$URL")"
+            # A rollback switches off automatic alias assignment, so make sure the public alias
+            # really serves this deployment, promoting it if it does not.
+            bash scripts/ci/vercel_prod.sh ensure "$NEW" | tee /tmp/webstate/new
+      - persist_to_workspace:
+          root: /tmp/webstate
+          paths:
+            - prev
+            - new
       - run:
           name: Deploy marker, success
-          command: circleci run release update ship-web --status=SUCCESS || true
+          command: circleci run release update ship-web --status=SUCCESS || echo "WARNING - the deploy marker was not updated"
           when: on_success
       - run:
           name: Deploy marker, failed
-          command: circleci run release update ship-web --status=FAILED --failure-reason="ship-web failed" || true
+          command: circleci run release update ship-web --status=FAILED --failure-reason="ship-web failed" || echo "WARNING - the deploy marker was not updated"
           when: on_fail
 
   web-quality:
@@ -442,7 +457,7 @@ jobs:
 
   verify-release:
     docker:
-      - image: mirror.gcr.io/cimg/python:3.12-node
+      - image: mirror.gcr.io/cimg/python:3.12
     resource_class: small
     working_directory: ~/repo
     steps:
@@ -460,30 +475,77 @@ jobs:
           name: Halt if a newer commit already owns main
           command: bash scripts/ci/require_head.sh
       - run:
-          name: Public smoke and /ready through the public URL (retried for alias propagation)
+          name: Public smoke and /ready through the public URL (no credentials; about 90 s for cold starts)
           command: |
+            mkdir -p /tmp/verify
             pip install --quiet httpx
-            for i in 1 2 3; do bash scripts/ci/public_smoke.sh && exit 0; echo "attempt $i failed"; sleep 20; done
-            exit 1
+            result=failed
+            for i in 1 2 3 4 5 6; do
+              if bash scripts/ci/public_smoke.sh; then result=ok; break; fi
+              echo "attempt $i failed"; sleep 15
+            done
+            echo "$result" > /tmp/verify/result
+            echo "verify-release result: $result (a failure is handled by rollback-api, rollback-web and smoke-public)"
+      - persist_to_workspace:
+          root: /tmp/verify
+          paths:
+            - result
+
+  rollback-api:
+    docker:
+      - image: mirror.gcr.io/cimg/python:3.12
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
       - run:
-          name: Roll the API back to the previous revision
-          when: on_fail
+          name: Halt unless the public check failed
+          command: |
+            if ! grep -qx failed /tmp/ws/result 2>/dev/null; then
+              echo "The public check passed; nothing to roll back."
+              circleci-agent step halt
+            fi
+      - run:
+          name: Put the API back on the previous revision (exit 2 means it refused, and that stops the web rollback)
           command: |
             bash scripts/ci/gcp_login.sh
             PROMOTE_DIR=/tmp/ws bash scripts/ci/rollback.sh
+      - persist_to_workspace:
+          root: /tmp/ws
+          paths:
+            - rollback_state
+
+  rollback-web:
+    docker:
+      - image: mirror.gcr.io/cimg/node:24.14
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
       - run:
-          name: Roll the web app back to the previous production deployment
-          when: on_fail
+          name: Halt unless the public check failed
           command: |
-            sudo npm install -g vercel@59.5.0
-            vercel rollback --yes
+            if ! grep -qx failed /tmp/ws/result 2>/dev/null; then
+              echo "The public check passed; nothing to roll back."
+              circleci-agent step halt
+            fi
       - run:
-          name: Public smoke after the rollback
-          when: on_fail
+          name: Only roll the web app back if the API went back first
           command: |
-            pip install --quiet httpx
-            sleep 20
-            bash scripts/ci/public_smoke.sh && echo "rolled back: production is healthy again; this release stays red"
+            grep -qx rolled-back /tmp/ws/rollback_state 2>/dev/null || {
+              echo "FAIL: the API was not rolled back, so the web app stays on the release that matches it."; exit 1; }
+      - run:
+          name: Point production at the previous deployment, by id
+          command: |
+            sudo npm install -g vercel@59.5.0 --ignore-scripts
+            bash scripts/ci/vercel_prod.sh rollback "$(cat /tmp/ws/prev)"
+      - run:
+          name: Mark the web deploy as failed
+          command: circleci run release update ship-web --status=FAILED --failure-reason="rolled back by the public check" || echo "WARNING - ship-web was already marked finished, so its marker could not be changed"
 
   smoke-public:
     docker:
@@ -504,6 +566,12 @@ jobs:
       - run:
           name: Halt if a newer commit already owns main
           command: bash scripts/ci/require_head.sh
+      - run:
+          name: A release that was rolled back stays red
+          command: |
+            if grep -qx failed /tmp/ws/result 2>/dev/null; then
+              echo "FAIL: the public check failed and this release was rolled back (see rollback-api and rollback-web)."; exit 1
+            fi
       - run:
           name: Public smoke (no Vercel or GCP credentials)
           command: |
@@ -612,14 +680,23 @@ workflows:
             - ship-api
             - build-web
       - verify-release:
-          context: [gcp-deploy, vercel-prod]
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-web
-      - smoke-public:
+      - rollback-api:
+          context: gcp-deploy
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - verify-release
+      - rollback-web:
+          context: vercel-prod
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - rollback-api
+      - smoke-public:
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - rollback-web
       - cost-check:
           context: gcp-deploy
           requires:

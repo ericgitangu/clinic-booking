@@ -116,6 +116,51 @@ bash "$HERE/rollback.sh" >/dev/null 2>&1; rc=$?
 expect "rollback: nothing promoted means nothing to do (exit 0)" "$rc" 0
 
 
+# manual mode: --to-tag
+rb_setup tag rev-b "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" --to-tag sha-p >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: exit 0 for an existing tag" "$rc" 0
+expect "rollback --to-tag: moves traffic to that tag's revision" "$(cnt 'to-revisions rev-p=100')" 1
+rb_setup notag rev-b "us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:ppp"
+bash "$HERE/rollback.sh" --to-tag sha-gone >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: a tag that does not exist is refused (exit 2)" "$rc" 2
+expect "rollback --to-tag: no traffic change for a missing tag" "$(cnt 'update-traffic')" 0
+rb_setup tag_hello rev-b "us-docker.pkg.dev/cloudrun/container/hello"
+bash "$HERE/rollback.sh" --to-tag sha-p >/dev/null 2>&1; rc=$?
+expect "rollback --to-tag: the placeholder image is refused (exit 2)" "$rc" 2
+
+# vercel_prod.sh with a fake vercel
+cat > "$WORK/bin/fakevercel" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" >> "$FX/vcalls"
+case "$1" in
+  api) case "$2" in
+         */v6/deployments*) echo "{\"deployments\":[{\"uid\":\"$(cat "$FX/serving")\"},{\"uid\":\"dpl_prior\"}]}" ;;
+         *) echo "{\"id\":\"$(cat "$FX/serving")\"}" ;;
+       esac ;;
+  promote) echo "$2" > "$FX/serving" ;;
+  rollback) [ -f "$FX/rollback_broken" ] || echo "$2" > "$FX/serving" ;;
+esac
+FAKE
+chmod +x "$WORK/bin/fakevercel"
+export VERCEL="$WORK/bin/fakevercel" VERCEL_ORG_ID=team_x
+new_fx vp; echo dpl_old > "$FX/serving"
+out="$(bash "$HERE/vercel_prod.sh" current 2>/dev/null)"; expect "vercel_prod: current reads the serving deployment" "$out" dpl_old
+export VERCEL_PROJECT_ID=prj_x
+out="$(bash "$HERE/vercel_prod.sh" previous 2>/dev/null)"; expect "vercel_prod: previous skips the live deployment" "$out" dpl_prior
+bash "$HERE/vercel_prod.sh" ensure dpl_new >/dev/null 2>&1; rc=$?
+expect "vercel_prod: ensure promotes a deployment the alias is not serving" "$rc:$(cat "$FX/serving")" "0:dpl_new"
+bash "$HERE/vercel_prod.sh" ensure dpl_new >/dev/null 2>&1
+expect "vercel_prod: ensure does not promote twice" "$(grep -c '^promote' "$FX/vcalls")" 1
+bash "$HERE/vercel_prod.sh" rollback dpl_old >/dev/null 2>&1
+expect "vercel_prod: rollback points production at the named deployment" "$(cat "$FX/serving")" dpl_old
+touch "$FX/rollback_broken"; bash "$HERE/vercel_prod.sh" rollback dpl_new >/dev/null 2>&1; rc=$?
+expect "vercel_prod: a rollback that does not take fails (exit 1)" "$rc" 1
+bash "$HERE/vercel_prod.sh" rollback "" >/dev/null 2>&1; rc=$?
+expect "vercel_prod: no recorded previous deployment is refused (exit 2)" "$rc" 2
+unset VERCEL
+
+
 # =========================================================================================
 new_fx skipped_in_between
 cat > "$FX/service_before.json" <<'J'

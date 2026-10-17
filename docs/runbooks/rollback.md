@@ -53,17 +53,26 @@ Follow `docs/runbooks/base-image-cve.md`, then re-release.
 
 ## Automatic rollback
 
-`verify-release` (after `ship-web`, before `smoke-public`) runs `scripts/ci/public_smoke.sh`, which
-includes `/ready` through the public URL. If it still fails after three tries it runs
-`scripts/ci/rollback.sh` (API: `--to-revisions <previous>=100`) and `vercel rollback --yes` (web),
-checks again, and leaves the release red. `rollback.sh` reads `keep.json` from `promote.sh` and
-refuses (exit 2) when there is no previous revision, when the previous one is not an image from
-this project's `clinic` registry (the placeholder hello image would take the API down), or when
-production is no longer on the revision this release promoted.
+After `ship-web`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
+includes `/ready` through the public URL, for about 90 seconds of retries (cold starts). If it
+still fails, `rollback-api` (only the `gcp-deploy` context) runs `scripts/ci/rollback.sh`, then
+`rollback-web` (only the `vercel-prod` context) points production at the previous deployment by
+id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the release stays red.
+
+- `rollback.sh` reads `keep.json` from `promote.sh` and refuses (exit 2) when there is no previous
+  revision, when the previous one is not an image from this project's `clinic` registry (the
+  placeholder hello image would take the API down), or when production is no longer on the
+  revision this release promoted. If it refuses, the web rollback does not run and the pipeline
+  fails loudly.
+- Migrations are expand-only (`scripts/migration_lint.sh`), so the previous revision still runs
+  against the migrated database. That is why a traffic move is a safe rollback.
+- `vercel rollback` turns off automatic alias assignment. `ship-web` therefore records the live
+  deployment id first and, after every deploy, checks that the public alias serves the new
+  deployment (promoting it if not).
 
 Deploy markers (`circleci run release plan` / `update`) are recorded for `clinic-api` and
-`clinic-web`. `.circleci/rollback.yml` is the manual, one-click rollback for the CircleCI UI: it
-must be activated once under Project Settings -> Deploys -> Rollback Pipeline (UI only).
-CircleCI's own *automatic* rollback also needs the continuous-validation level and a monitor
-sending webhooks (Datadog, Prometheus-compatible or a custom HTTP POST); it is not turned on here,
-the in-pipeline rollback above is the automatic path.
+`clinic-web`. `.circleci/rollback.yml` is the manual, one-click rollback for the CircleCI UI. It
+uses the same guards (`rollback.sh --to-tag` also checks the tag exists) and must be activated once
+under Project Settings -> Deploys -> Rollback Pipeline (UI only). CircleCI's own *automatic*
+rollback also needs the continuous-validation level and a monitor sending webhooks (Datadog,
+Prometheus-compatible or a custom HTTP POST); it is not turned on here.
