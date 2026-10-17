@@ -7,11 +7,67 @@
 
 ## 1. Live URLs
 
-<!-- WEB landing page · API base · Swagger · ReDoc · openapi.json · booking UI (if shipped) · CircleCI pipelines -->
+| What | Where |
+|---|---|
+| Landing page | <https://sil-clinic-booking.vercel.app> |
+| API base | <https://sil-clinic-booking.vercel.app/api> |
+| Swagger UI | <https://sil-clinic-booking.vercel.app/docs> |
+| ReDoc | <https://sil-clinic-booking.vercel.app/redoc> |
+| OpenAPI spec | <https://sil-clinic-booking.vercel.app/openapi.json> |
+| Pipelines | <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
+
+There is no booking UI; the API is the product. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
 ## 2. Verify the claims in 10 minutes
 
-<!-- Step 0: create your own patient · Swagger walkthrough · `make verify URL=...` · `make test-race` -->
+Everything below was run against production on 2026-10-17 (UTC). The commands are copy-paste; the output is what I saw.
+
+```bash
+W=https://sil-clinic-booking.vercel.app
+for p in / /docs /openapi.json /api/doctors /api/ready; do
+  printf '%-14s ' $p; curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $W$p
+done
+curl -s -o /dev/null -w 'direct Cloud Run: %{http_code}\n' https://clinic-api-2shno7sa7q-uk.a.run.app/ready
+```
+
+| Path | Observed |
+|---|---|
+| `/` | `200 text/html` |
+| `/docs` (Swagger UI) | `200 text/html` |
+| `/openapi.json` | `200 application/json` |
+| `/api/doctors` | `200 application/json`, 5 doctors seeded, the first is "Dr. Achieng Otieno" |
+| `/api/ready` | `200 application/json` (the proxy reaches Cloud Run) |
+| Cloud Run directly, `/ready` | `403`: it is IAM-only |
+
+**Step 0: make your own patient and a free slot.** Use a patient of your own, not mine.
+
+```bash
+API=$W/api
+PATIENT=$(curl -s -XPOST $API/patients -H 'content-type: application/json' -d '{"full_name":"Your Name"}' | jq -r .id)
+DOCTOR=$(curl -s $API/doctors | jq -r '.items[2].id')
+curl -s "$API/doctors/$DOCTOR/availability?date=2026-10-19" | jq '.slots[0]'   # pick a starts_at
+```
+
+**One booking wins 20 simultaneous requests.** Set `SLOT` to a `starts_at` from above (I used 2026-10-19T09:30:00+03:00 with the third doctor):
+
+```bash
+BODY="{\"doctor_id\":\"$DOCTOR\",\"patient_id\":\"$PATIENT\",\"starts_at\":\"$SLOT\"}"
+seq 20 | xargs -P20 -I{} curl -s -o /dev/null -w '%{http_code}\n' -XPOST $API/appointments \
+  -H 'content-type: application/json' -d "$BODY" | sort | uniq -c
+```
+
+Observed: `1 201` and `19 409`. The partial unique index rejects the other 19 as `SLOT_TAKEN`. On my local compose stack on 2026-10-16 the same 20-way run also gave one 201 and 19 409s, and the slot then disappeared from availability. The committed test `backend/tests/concurrency/test_race_same_slot.py` fires 25 requests and expects one 201 and 24 409s; run it with `make test-race`.
+
+**Cancelling twice.** Take the appointment id from the 201 response:
+
+```bash
+curl -s -XPATCH $API/appointments/$ID/cancel -H 'content-type: application/json' -d '{"reason":"gate check cleanup"}' -w ' %{http_code}\n'
+curl -s -XPATCH $API/appointments/$ID/cancel -H 'content-type: application/json' -d '{"reason":"gate check cleanup"}' -w ' %{http_code}\n'
+```
+
+Observed: the first returns `200`. The second returns `409` as `application/problem+json` with code `APPOINTMENT_ALREADY_CANCELLED` and a `request_id`.
+
+**The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`). The build session reported 17/17 passing and a green live cost check (`cost_check.sh --live`) after the first release. I have not re-run those two myself, so treat them as reported.
 
 ## 3. System design
 
@@ -162,6 +218,9 @@ These are deductions from the configuration, not load tests.
 ## 7. Testing
 
 <!-- pyramid · race-test assertions · observed coverage % · how to run each layer -->
+
+Observed in production on 2026-10-17: 20 parallel `POST /api/appointments` for one slot returned one 201 and 19 409s (`SLOT_TAKEN`).
+The local race test and the production run agree: exactly one booking wins, and the database, not application code, is what decides.
 
 ## 8. Ambiguities & decisions
 
