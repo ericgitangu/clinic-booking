@@ -25,13 +25,18 @@ export function SiteHeader({
         </Link>
         <div className="flex items-center">
           <nav aria-label="Primary" className="hidden items-center sm:flex">
-            {/* The docs link is the only one wide screens need; the rest live in the phone menu. */}
-            <a
-              href={links[0].href}
-              className="inline-flex min-h-11 items-center rounded-md px-3 text-base font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {links[0].label}
-            </a>
+            {/* Wide screens show the links marked inline; the rest live in the phone menu. */}
+            {links
+              .filter((l) => l.inline)
+              .map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className="inline-flex min-h-11 items-center rounded-md px-3 text-base font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {l.label}
+                </a>
+              ))}
           </nav>
           <ThemeToggle />
           <MobileNav links={links} />

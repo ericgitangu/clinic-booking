@@ -8,7 +8,8 @@ import { redact } from "./log";
 
 const REFRESH_SKEW_MS = 5 * 60 * 1000;
 
-export type MintStage = "config" | "oidc" | "sts" | "generateIdToken";
+export type MintStage =
+  "config" | "oidc" | "sts" | "generateIdToken" | "generateAccessToken";
 
 // Carries only the failing stage, an HTTP status and a short redacted detail: enough to tell
 // "the principal is wrong" from "the role is wrong" from "an env var is missing" in the logs.
@@ -50,20 +51,20 @@ export interface MintDeps {
   now: () => number;
 }
 
-const defaultDeps: MintDeps = {
+export const defaultDeps: MintDeps = {
   oidcToken: getVercelOidcToken,
   fetchImpl: (...args) => fetch(...args),
   now: () => Date.now(),
 };
 
-function requireEnv(name: string): string {
+export function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value)
     throw new TokenMintError("config", undefined, `${name} is not set`);
   return value;
 }
 
-async function failure(
+export async function failure(
   stage: MintStage,
   resp: Response,
 ): Promise<TokenMintError> {
@@ -76,11 +77,11 @@ async function failure(
   return new TokenMintError(stage, resp.status, detail);
 }
 
-async function mint(audience: string, deps: MintDeps): Promise<string> {
-  // Validate configuration first: a missing value would otherwise become a malformed STS
-  // audience or a ":generateIdToken" URL and fail with a confusing remote error.
-  const projectNumber = requireEnv("GCP_PROJECT_NUMBER");
-  const serviceAccount = requireEnv("GCP_SERVICE_ACCOUNT_EMAIL");
+// Vercel OIDC token -> STS -> a federated access token for the workload identity pool.
+export async function federate(
+  projectNumber: string,
+  deps: MintDeps,
+): Promise<string> {
   const pool = process.env.GCP_WORKLOAD_IDENTITY_POOL_ID || "vercel";
   const provider =
     process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID || "vercel";
@@ -112,6 +113,15 @@ async function mint(audience: string, deps: MintDeps): Promise<string> {
   const { access_token: accessToken } = (await stsResp.json()) as {
     access_token: string;
   };
+  return accessToken;
+}
+
+async function mint(audience: string, deps: MintDeps): Promise<string> {
+  // Validate configuration first: a missing value would otherwise become a malformed STS
+  // audience or a ":generateIdToken" URL and fail with a confusing remote error.
+  const projectNumber = requireEnv("GCP_PROJECT_NUMBER");
+  const serviceAccount = requireEnv("GCP_SERVICE_ACCOUNT_EMAIL");
+  const accessToken = await federate(projectNumber, deps);
 
   const idResp = await deps.fetchImpl(
     `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccount}:generateIdToken`,

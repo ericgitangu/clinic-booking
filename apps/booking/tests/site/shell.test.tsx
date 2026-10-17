@@ -87,9 +87,9 @@ describe("landing page", () => {
     }
   });
 
-  it("does not promise booking pages that are not there yet", () => {
-    expect(html).not.toContain('href="/doctors"');
-    expect(html).toContain("Online booking pages are coming next");
+  it("leads with the booking page that exists", () => {
+    expect(html).toContain('href="/book"');
+    expect(html).not.toContain("coming next");
   });
 });
 

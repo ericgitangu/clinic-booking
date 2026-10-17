@@ -105,7 +105,7 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	@printf '%s\n' \
 	  'NOTE: Vercel never returns variables marked Sensitive through env pull.' \
 	  'Copy those into apps/booking/.env.local by hand: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET,' \
-	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
+	  'INTERNAL_SIGNING_KEY, CLINIC_COOKIE_SECRET, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
 e2e: ## Playwright checks against a production build (apps/booking): sideways scroll and touch targets at 360, 768, 1280
