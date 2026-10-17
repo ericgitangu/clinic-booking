@@ -68,3 +68,49 @@ test("the phone menu opens and lists the pages", async ({ page }) => {
     page.getByRole("link", { name: "OpenAPI contract" }),
   ).toBeVisible();
 });
+
+const HANDLER_PATHS = ["/docs", "/redoc", "/openapi.json"];
+
+test.describe("footer", () => {
+  test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
+
+  test("fits a 360px screen without sideways scroll", async ({ page }) => {
+    await page.goto("/about");
+    await page.locator("footer").scrollIntoViewIfNeeded();
+    const { scroll, inner } = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      inner: window.innerWidth,
+    }));
+    expect(scroll).toBeLessThanOrEqual(inner);
+  });
+
+  test("every footer link resolves or is a well-formed external URL", async ({
+    page,
+    request,
+  }) => {
+    await page.goto("/");
+    const links = await page.locator("footer a").evaluateAll((as) =>
+      as.map((a) => ({
+        href: a.getAttribute("href") ?? "",
+        rel: a.getAttribute("rel") ?? "",
+      })),
+    );
+    expect(links.length).toBeGreaterThan(15);
+    for (const { href, rel } of links) {
+      if (href.startsWith("/")) {
+        // The docs routes proxy to the API, which only the deployed site can reach.
+        if (HANDLER_PATHS.includes(href)) continue;
+        expect((await request.get(href)).status(), href).toBe(200);
+      } else {
+        const url = new URL(href);
+        if (process.env.E2E_CHECK_EXTERNAL === "1") {
+          const res = await request.get(href);
+          expect(res.status(), href).toBeLessThan(400);
+        }
+        expect(url.protocol, href).toBe("https:");
+        expect(rel, href).toContain("noopener");
+        expect(rel, href).toContain("noreferrer");
+      }
+    }
+  });
+});
