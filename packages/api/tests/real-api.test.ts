@@ -450,6 +450,188 @@ describe.skipIf(!REAL)("against the real API", () => {
     expect(cancelled.ok && cancelled.data.status).toBe("cancelled");
   });
 
+  it("runs the reminder claim as the system caller only, with a lease, and counts emails against the day", async () => {
+    expect(
+      process.env.INTERNAL_SIGNING_KEY,
+      "INTERNAL_SIGNING_KEY",
+    ).toBeTruthy();
+    const tag = Math.random().toString(36).slice(2, 10);
+    const patient = {
+      sub: `sub-${tag}-r`,
+      email: `r-${tag}@clinic.example`,
+      role: "patient",
+      emailVerified: true,
+    };
+    const system = {
+      sub: "system:reminders",
+      email: "reminders@ericgitangu.com",
+      role: "system",
+      emailVerified: true,
+    };
+
+    // The reminder routes are for the run itself: a patient, or no assertion, is refused.
+    const asPatient = await callApi(
+      "claimReminders",
+      (client) =>
+        sdk.claimRemindersInternalRemindersClaimPost({
+          client,
+          query: { limit: 5 },
+        }),
+      { caller: patient },
+    );
+    expect(asPatient).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 403,
+      code: "FORBIDDEN",
+    });
+    const anon = await callApi("claimReminders", (client) =>
+      sdk.claimRemindersInternalRemindersClaimPost({
+        client,
+        query: { limit: 5 },
+      }),
+    );
+    expect(anon).toMatchObject({ ok: false, kind: "problem", status: 401 });
+
+    // A patient with an email books a time on a far-out day, and the run for that date finds it once.
+    await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Remind Me" },
+        }),
+      { caller: patient },
+    );
+    const booked = await callApi(
+      "bookMine",
+      (client) =>
+        sdk.bookMineInternalMeAppointmentsPost({
+          client,
+          body: { doctor_id: doctorId, starts_at: slots[3] },
+        }),
+      { caller: patient },
+    );
+    expect(booked.ok).toBe(true);
+    if (!booked.ok) return;
+    const claim = await callApi(
+      "claimReminders",
+      (client) =>
+        sdk.claimRemindersInternalRemindersClaimPost({
+          client,
+          query: { limit: 50, on: day },
+        }),
+      { caller: system },
+    );
+    expect(claim.ok && claim.data.items.map((i) => i.appointment_id)).toContain(
+      booked.data.id,
+    );
+    const mine = claim.ok
+      ? claim.data.items.find((i) => i.appointment_id === booked.data.id)
+      : undefined;
+    expect(mine).toMatchObject({
+      patient_email: patient.email,
+      patient_name: "Remind Me",
+    });
+    // inside its lease it is not handed out again
+    const second = await callApi(
+      "claimReminders",
+      (client) =>
+        sdk.claimRemindersInternalRemindersClaimPost({
+          client,
+          query: { limit: 50, on: day },
+        }),
+      { caller: system },
+    );
+    expect(
+      second.ok && second.data.items.map((i) => i.appointment_id),
+    ).not.toContain(booked.data.id);
+    // marked sent only when asked, quoting the claim it was sent under, and then never again
+    const quoted = { claimed_at: mine!.claimed_at, starts_at: mine!.starts_at };
+    const stale = await callApi(
+      "markReminderSent",
+      (client) =>
+        sdk.markReminderSentInternalRemindersAppointmentIdSentPost({
+          client,
+          path: { appointment_id: booked.data.id },
+          body: { ...quoted, claimed_at: "2000-01-01T00:00:00+03:00" },
+        }),
+      { caller: system },
+    );
+    expect(stale).toMatchObject({ ok: true, data: { sent: false } }); // a claim that is not this one
+    const marked = await callApi(
+      "markReminderSent",
+      (client) =>
+        sdk.markReminderSentInternalRemindersAppointmentIdSentPost({
+          client,
+          path: { appointment_id: booked.data.id },
+          body: quoted,
+        }),
+      { caller: system },
+    );
+    expect(marked).toMatchObject({ ok: true, data: { sent: true } });
+    const twice = await callApi(
+      "markReminderSent",
+      (client) =>
+        sdk.markReminderSentInternalRemindersAppointmentIdSentPost({
+          client,
+          path: { appointment_id: booked.data.id },
+          body: quoted,
+        }),
+      { caller: system },
+    );
+    expect(twice).toMatchObject({ ok: true, data: { sent: false } });
+    const unknown = await callApi(
+      "markReminderSent",
+      (client) =>
+        sdk.markReminderSentInternalRemindersAppointmentIdSentPost({
+          client,
+          path: { appointment_id: ID_NONE },
+          body: quoted,
+        }),
+      { caller: system },
+    );
+    expect(unknown).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 404,
+      code: "APPOINTMENT_NOT_FOUND",
+    });
+
+    // Today and the past are not a reminder day.
+    const past = await callApi(
+      "claimReminders",
+      (client) =>
+        sdk.claimRemindersInternalRemindersClaimPost({
+          client,
+          query: { limit: 5, on: ymd.format(new Date()) },
+        }),
+      { caller: system },
+    );
+    expect(past).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 422,
+      code: "DATE_OUT_OF_RANGE",
+    });
+
+    // Every accepted email counts against the day.
+    const before = await callApi(
+      "emailsToday",
+      (client) => sdk.emailsTodayInternalEmailsTodayGet({ client }),
+      { caller: patient },
+    );
+    const after = await callApi(
+      "recordEmail",
+      (client) => sdk.recordEmailInternalEmailsRecordPost({ client }),
+      { caller: patient },
+    );
+    expect(before.ok && after.ok && after.data.sent).toBe(
+      before.ok && before.data.sent + 1,
+    );
+    expect(after.ok && after.data.daily_limit).toBe(100);
+  });
+
   // The stood-in part, and the only one: the real server answers, then the body is damaged on the way
   // back, because a correct server never sends a response that violates its own contract.
   const damaged = (

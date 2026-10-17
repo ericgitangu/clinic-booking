@@ -510,6 +510,7 @@ jobs:
           command: |
             echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
             echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            echo "export CRON_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
       - run:
           name: API and database (compose runs the migrations and the seed)
           command: docker compose up -d --build --wait

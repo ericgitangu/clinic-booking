@@ -1,4 +1,5 @@
 {
   "git": { "deploymentEnabled": false },
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [{ "path": "/cron/reminders", "schedule": "0 15 * * *" }]
 }

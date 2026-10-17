@@ -7,6 +7,10 @@ import "server-only";
 import { callApi, type Caller } from "@clinic/api/call";
 import {
   bookMineInternalMeAppointmentsPost,
+  claimRemindersInternalRemindersClaimPost,
+  emailsTodayInternalEmailsTodayGet,
+  markReminderSentInternalRemindersAppointmentIdSentPost,
+  recordEmailInternalEmailsRecordPost,
   cancelMineInternalMeAppointmentsAppointmentIdCancelPatch,
   doctorAvailabilityDoctorsDoctorIdAvailabilityGet,
   getDoctorDoctorsDoctorIdGet,
@@ -108,4 +112,58 @@ export const rescheduleMine = (caller: Caller, id: string, startsAt: string) =>
         body: { starts_at: startsAt },
       }),
     { caller },
+  );
+
+// --- email ---------------------------------------------------------------------------------------
+
+// Who the scheduled reminder run signs as. The API accepts this role and subject for the reminder
+// routes and for nothing else.
+export const SYSTEM_CALLER: Caller = {
+  sub: "system:reminders",
+  email: "reminders@ericgitangu.com",
+  role: "system",
+  emailVerified: true,
+};
+
+export const emailsToday = (caller: Caller) =>
+  callApi(
+    "emailsToday",
+    (client) => emailsTodayInternalEmailsTodayGet({ client }),
+    { caller },
+  );
+
+// Counts one email Resend accepted against the day's limit.
+export const recordEmail = (caller: Caller) =>
+  callApi(
+    "recordEmail",
+    (client) => recordEmailInternalEmailsRecordPost({ client }),
+    { caller },
+  );
+
+export const claimReminders = (limit: number, on?: string) =>
+  callApi(
+    "claimReminders",
+    (client) =>
+      claimRemindersInternalRemindersClaimPost({
+        client,
+        query: { limit, on },
+      }),
+    { caller: SYSTEM_CALLER },
+  );
+
+// Reports a reminder as sent, quoting the claim it was sent under: if the appointment was moved or
+// the claim replaced in the meantime the API marks nothing and answers sent: false.
+export const markReminderSent = (
+  appointmentId: string,
+  claim: { claimed_at: string; starts_at: string },
+) =>
+  callApi(
+    "markReminderSent",
+    (client) =>
+      markReminderSentInternalRemindersAppointmentIdSentPost({
+        client,
+        path: { appointment_id: appointmentId },
+        body: claim,
+      }),
+    { caller: SYSTEM_CALLER },
   );

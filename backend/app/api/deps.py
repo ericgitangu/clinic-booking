@@ -36,6 +36,9 @@ def get_clock() -> Clock:
 
 _log = logging.getLogger(APP_LOGGER)
 
+# Who the scheduled reminder run signs as.
+SYSTEM_SUB = "system:reminders"
+
 
 def _refuse(reason: str, status: str) -> None:
     """Record why an internal call was refused. ``reason`` is always one of a fixed set of short
@@ -83,6 +86,18 @@ async def require_verified_identity(
     principal = _verify(request, clock, await request.body())
     if not principal.email_verified:
         _refuse("email not verified", "FORBIDDEN")
+        raise Forbidden()
+    return principal
+
+
+async def require_system(
+    request: Request, clock: Clock = Depends(get_clock)
+) -> assertion.Principal:
+    """For the scheduled reminder run, which acts as no person: the assertion must be valid and
+    request-bound and carry the system role and subject the run uses."""
+    principal = _verify(request, clock, await request.body())
+    if principal.role != "system" or principal.sub != SYSTEM_SUB:
+        _refuse("not the system caller", "FORBIDDEN")
         raise Forbidden()
     return principal
 

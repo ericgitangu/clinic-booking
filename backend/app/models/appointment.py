@@ -33,3 +33,11 @@ class Appointment(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    # A reminder is claimed with a lease (reminder_claimed_at) and counted as sent only after the
+    # email provider accepted it (reminder_sent_at). Rescheduling clears both.
+    reminder_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

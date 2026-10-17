@@ -15,6 +15,7 @@ import {
 import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
 import { addDays, clinicDay } from "@/lib/clinic-time";
+import { acknowledge } from "@/lib/email/acknowledge";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
 import { patientName } from "@/lib/identity";
@@ -82,6 +83,14 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
+// The doctor's name and specialty for an email (a lookup that fails just leaves them out).
+async function doctorFacts(doctorId: string) {
+  const d = await api.getDoctor(doctorId);
+  return d.ok
+    ? { full_name: d.data.full_name, specialty: d.data.specialty }
+    : null;
+}
+
 async function signedIn(): Promise<Identity | null> {
   return getIdentity();
 }
@@ -121,6 +130,11 @@ export async function bookAppointment(
       doctorId: doctor,
     });
   }
+  await acknowledge("booked", booked.data, {
+    caller,
+    who,
+    doctor: await doctorFacts(booked.data.doctor_id),
+  });
   redirect(`/book/confirmed/${booked.data.id}`);
 }
 
@@ -144,6 +158,11 @@ export async function cancelAppointment(
     if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
     return failed(done);
   }
+  await acknowledge("cancelled", done.data, {
+    caller: callerFor(who),
+    who,
+    doctor: await doctorFacts(done.data.doctor_id),
+  });
   revalidatePath("/appointments");
   return { status: "done", message: "Appointment cancelled." };
 }
@@ -163,6 +182,8 @@ export async function rescheduleAppointment(
   if (blocked) return blocked;
 
   const caller = callerFor(who);
+  // The time it is moving from, for the email (a lookup that fails just leaves it out).
+  const before = await api.myAppointment(caller, id);
   const done = await api.rescheduleMine(caller, id, startsAt as string);
   if (!done.ok) {
     if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
@@ -180,6 +201,12 @@ export async function rescheduleAppointment(
       doctorId,
     });
   }
+  await acknowledge("rescheduled", done.data, {
+    caller,
+    who,
+    doctor: await doctorFacts(done.data.doctor_id),
+    previousStartsAt: before.ok ? before.data.starts_at : undefined,
+  });
   revalidatePath("/appointments");
   redirect("/appointments?rescheduled=1");
 }

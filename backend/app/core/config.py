@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 5
     BOOKING_MIN_LEAD_MINUTES: int = 60
     BOOKING_HORIZON_DAYS: int = 90
+    # The email provider's free plan allows 100 a day, shared by acknowledgements and reminders. A
+    # reminder run claims at most REMINDER_RUN_LIMIT, and never more than what is left of the day.
+    EMAIL_DAILY_LIMIT: int = 100
+    REMINDER_RUN_LIMIT: int = 50
+    # Kept free of reminders so acknowledgements sent later in the day always have room.
+    EMAIL_ACK_RESERVE: int = 20
+    REMINDER_LEASE_MINUTES: int = 15
     WEB_ORIGIN: str = "http://localhost:3000"
     PUBLIC_BASE_URL: str = "http://localhost:8080"
     LOG_LEVEL: str = "info"
