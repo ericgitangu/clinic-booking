@@ -161,12 +161,12 @@ vercel project add clinic-web --scope "$TEAM"
 
 1. Dashboard -> `clinic-web` -> Settings -> Security -> OIDC Federation: confirm the issuer
    mode is **Team** (dashboard-only toggle).
-2. Settings -> General -> Root Directory: leave **empty** (CI passes `--cwd web`). Also confirm Settings -> Functions -> Function Region is **US East (iad1)**; see the first-deploy check below.
+2. Settings -> General -> Root Directory: **`web`** (the pnpm workspace keeps dependencies in the root `node_modules`; building or deploying with `--cwd web` fails on missing files, so CI builds and deploys from the repo root). Set by API: `vercel api -X PATCH "/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID" -f rootDirectory=web`. Also confirm Settings -> Functions -> Function Region is **US East (iad1)**; see the first-deploy check below.
 3. Link and read the identifiers:
 
    ```bash
-   (cd web && vercel link --yes --project clinic-web --scope "$TEAM")
-   cat web/.vercel/project.json            # orgId and projectId; gitignored identifiers
+   vercel link --yes --project clinic-web --scope "$TEAM"   # from the repo root
+   cat .vercel/project.json                # orgId and projectId; gitignored identifiers
    ```
 
 4. Put `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` in the `vercel-prod` context.
@@ -174,7 +174,7 @@ vercel project add clinic-web --scope "$TEAM"
    unless the value arrives on stdin:
 
    ```bash
-   addenv { printf %s "$2" | vercel env add "$1" production --cwd web --scope "$TEAM"; }
+   addenv { printf %s "$2" | vercel env add "$1" production --scope "$TEAM"; }
    addenv API_URL "$RUN_APP_URL"
    addenv API_AUDIENCE clinic-api
    addenv GCP_PROJECT_NUMBER "$PROJECT_NUMBER"
@@ -182,13 +182,16 @@ vercel project add clinic-web --scope "$TEAM"
    addenv GCP_WORKLOAD_IDENTITY_POOL_ID vercel
    addenv GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID vercel
    addenv RATE_LIMIT_PER_MINUTE 120
-   vercel env ls production --cwd web --scope "$TEAM"     # all seven names listed
+   vercel env ls production --scope "$TEAM"     # all seven names listed
    ```
 
 6. Read the production URL (Project -> Domains, or `vercel project inspect`), then:
 
    ```bash
-   export WEB=https://sil-clinic-booking.vercel.app   # clinic-web.vercel.app is taken; claim this alias at the first deploy
+   export WEB=https://sil-clinic-booking.vercel.app   # clinic-web.vercel.app is taken
+   vercel api -X POST "/v10/projects/$VERCEL_PROJECT_ID/domains?teamId=$VERCEL_ORG_ID" -f name=sil-clinic-booking.vercel.app
+   # Adding it as a project domain (not just `vercel alias set`) is what makes it public: a plain
+   # alias on a *.vercel.app name sits behind Vercel's deployment protection and redirects to a login.
    ```
 
    - add `PUBLIC_BASE_URL=$WEB/api` and `WEB_ORIGIN=$WEB` to the `gcp-deploy` context;

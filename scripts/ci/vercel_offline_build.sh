@@ -9,7 +9,11 @@
 # are supplied to the separate deploy job (the only one holding the token) through
 # VERCEL_ORG_ID / VERCEL_PROJECT_ID.
 #
-# Output: web/.vercel/output (the Build Output API tree, no secrets).
+# Built from the repository root with the project's Root Directory set to web: the pnpm workspace
+# keeps dependencies in the root node_modules, so the function file map is relative to the root
+# and building or deploying with --cwd web fails on missing files.
+#
+# Output: .vercel/output at the repo root (the Build Output API tree, no secrets).
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -18,11 +22,11 @@ if [ -n "${VERCEL_TOKEN:-}" ]; then
   exit 1
 fi
 
-mkdir -p web/.vercel
-cat > web/.vercel/project.json <<'JSON'
-{"orgId":"team_offline_build","projectId":"prj_offline_build","settings":{"framework":"nextjs","buildCommand":null,"installCommand":null,"outputDirectory":null,"rootDirectory":null,"nodeVersion":"24.x"}}
+mkdir -p .vercel
+cat > .vercel/project.json <<'JSON'
+{"orgId":"team_offline_build","projectId":"prj_offline_build","settings":{"framework":"nextjs","buildCommand":null,"installCommand":null,"outputDirectory":null,"rootDirectory":"web","nodeVersion":"24.x"}}
 JSON
 
 VERCEL_TELEMETRY_DISABLED=1 npm_config_ignore_scripts=true \
-  npx --yes vercel@59.5.0 build --prod --cwd web
-test -d web/.vercel/output
+  npx --yes vercel@59.5.0 build --prod
+test -d .vercel/output
