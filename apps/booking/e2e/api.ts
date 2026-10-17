@@ -1,7 +1,6 @@
-// Finds bookable times through the API the app under test talks to (the stand-in by default, the
-// real API when E2E_API_URL is set), so the same scenarios run against both and never hard-code a
-// date: weekends and closed days simply have no slots and are skipped.
-export const API = process.env.E2E_API_URL ?? "http://127.0.0.1:3199";
+// Finds bookable times through the real API (docker compose), so scenarios never hard-code a date:
+// weekends and closed days simply have no slots and are skipped.
+export const API = process.env.E2E_API_URL ?? "http://127.0.0.1:8080";
 
 const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Nairobi" });
 const hm = new Intl.DateTimeFormat("en-GB", {

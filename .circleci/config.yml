@@ -95,7 +95,8 @@ jobs:
           name: Generated API client is fresh (regenerate from the contract, no diff allowed)
           command: |
             make gen-client
-            git diff --exit-code packages/api/src/generated
+            # status, not diff: a generated file that is not tracked yet counts as a change too
+            test -z "$(git status --porcelain packages/api/src/generated apps/booking/src/generated)" || { git status --porcelain packages/api/src/generated apps/booking/src/generated; exit 1; }
       - run:
           name: Repo hygiene self-test
           command: bash scripts/repo_hygiene_selftest.sh
@@ -493,8 +494,8 @@ jobs:
             - ~/.local/share/pnpm/store
 
   e2e-real:
-    # The same booking scenarios as web-e2e, but against the real API and database from
-    # docker-compose (migrations and seed included) instead of the in-memory stand-in.
+    # Every browser scenario, and the generated client, against the real API and database from
+    # docker-compose (migrations and seed included). There is no stand-in API.
     machine:
       image: ubuntu-2404:current
     resource_class: medium
@@ -522,30 +523,11 @@ jobs:
             REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts
             pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
-            E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e booking landing
+            E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e
       - run:
           name: API logs
           command: docker compose logs api | tail -80
           when: on_fail
-
-  web-e2e:
-    docker:
-      - image: mirror.gcr.io/cimg/node:24.14-browsers
-    resource_class: medium
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - run:
-          name: Skip when apps/, packages/ and contracts/ are untouched (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ contracts/ pnpm-lock.yaml pnpm-workspace.yaml package.json
-      - run:
-          name: Build the web app and run the mobile layout checks (Playwright's Chromium)
-          command: |
-            sudo npm install -g pnpm@12.5.1
-            pnpm install --frozen-lockfile --ignore-scripts
-            pnpm -C apps/booking build
-            pnpm -C apps/booking exec playwright install chromium
-            PW_BUNDLED=1 pnpm -C apps/booking test:e2e
 
   verify-release:
     docker:
@@ -745,7 +727,6 @@ workflows:
       - build-scan
       - dast
       - web-quality
-      - web-e2e
       - e2e-real
       - cost-static
 
@@ -764,7 +745,6 @@ workflows:
       - sca
       - build-scan
       - web-quality
-      - web-e2e
       - e2e-real
       - cost-static
       - build-scan-push:

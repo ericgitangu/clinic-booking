@@ -75,8 +75,9 @@ sec: ## Local security checks (SAST/DAST run in CI)
 openapi: ## Export the OpenAPI contract
 	$(BE) python -m scripts.export_openapi
 
-gen-client: ## Regenerate the TS types, zod schemas and SDK from contracts/openapi.json (packages/api/src/generated)
+gen-client: ## Regenerate the TS types, zod schemas, SDK and the public spec snapshot from contracts/openapi.json
 	pnpm -C packages/api gen
+	pnpm -C apps/booking snapshot
 
 verify: ## Verify live claims (URL=...)
 	uv run --project backend python scripts/verify_claims.py --base-url "$(URL)"
@@ -108,5 +109,6 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	  'INTERNAL_SIGNING_KEY, CLINIC_COOKIE_SECRET, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
-e2e: ## Playwright checks against a production build (apps/booking): sideways scroll and touch targets at 360, 768, 1280
+e2e: ## Playwright checks against the real API and database (docker compose, migrations and seed) and a production build
+	docker compose up -d --wait
 	cd apps/booking && pnpm build && pnpm test:e2e

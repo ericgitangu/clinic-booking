@@ -274,26 +274,101 @@ describe.skipIf(!REAL)("against the real API", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("flags a real response that is broken in transit as drift (the stood-in part)", async () => {
+  // The stood-in part, and the only one: the real server answers, then the body is damaged on the way
+  // back, because a correct server never sends a response that violates its own contract.
+  const damaged = (
+    mutate: (body: Record<string, unknown>) => Record<string, unknown>,
+  ) => {
+    const real = globalThis.fetch;
+    return vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const res = await real(input, init);
+        const body = (await res.json()) as Record<string, unknown>;
+        return new Response(
+          JSON.stringify(
+            Array.isArray(body) ? [{ broken: true }] : mutate(body),
+          ),
+          {
+            status: res.status,
+            headers: res.headers,
+          },
+        );
+      });
+  };
+
+  it("flags a real success response damaged in transit, for every kind of read", async () => {
     vi.spyOn(console, "error").mockImplementation(
       (m: string) => void logs.push(String(m)),
     );
-    const real = globalThis.fetch;
-    // The real server answers; only the body is damaged on the way back.
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const res = await real(input, init);
-      return new Response(
-        JSON.stringify({ ...(await res.json()), id: 12345 }),
-        { status: res.status, headers: res.headers },
-      );
-    });
+    damaged((b) => ({
+      ...b,
+      id: 12345,
+      items: "not a list",
+      slots: "none",
+      status: 42,
+    }));
+    const results = [
+      await callApi("listDoctors", (client) =>
+        sdk.listDoctorsDoctorsGet({ client }),
+      ),
+      await callApi("getDoctor", (client) =>
+        sdk.getDoctorDoctorsDoctorIdGet({
+          client,
+          path: { doctor_id: doctorId },
+        }),
+      ),
+      await callApi("availability", (client) =>
+        sdk.doctorAvailabilityDoctorsDoctorIdAvailabilityGet({
+          client,
+          path: { doctor_id: doctorId },
+          query: { date: day },
+        }),
+      ),
+      await callApi("ready", (client) => sdk.readyReadyGet({ client })),
+      await callApi("listProblems", (client) =>
+        sdk.listProblemsProblemsGet({ client }),
+      ),
+    ];
+    for (const r of results)
+      expect(r).toMatchObject({
+        ok: false,
+        kind: "contract_violation",
+        code: "CONTRACT_VIOLATION",
+      });
+    expect(logs.filter((l) => l.includes("contract_violation"))).toHaveLength(
+      results.length,
+    );
+    expect(logs.join("\n")).not.toContain("12345");
+  });
+
+  it("flags a real problem damaged in transit (a code the contract does not list)", async () => {
+    vi.spyOn(console, "error").mockImplementation(
+      (m: string) => void logs.push(String(m)),
+    );
+    damaged((b) => ({ ...b, code: "NOT_A_REAL_CODE" }));
     const r = await callApi("getDoctor", (client) =>
-      sdk.getDoctorDoctorsDoctorIdGet({
+      sdk.getDoctorDoctorsDoctorIdGet({ client, path: { doctor_id: ID_NONE } }),
+    );
+    expect(r).toMatchObject({ ok: false, kind: "contract_violation" });
+    expect(logs.join("\n")).toContain('"where":"problem"');
+  });
+
+  it("flags a real problem that lost a required field", async () => {
+    vi.spyOn(console, "error").mockImplementation(
+      (m: string) => void logs.push(String(m)),
+    );
+    damaged((b) => {
+      const rest = { ...b };
+      delete rest.request_id;
+      return rest;
+    });
+    const r = await callApi("getAppointment", (client) =>
+      sdk.getAppointmentAppointmentsAppointmentIdGet({
         client,
-        path: { doctor_id: doctorId },
+        path: { appointment_id: ID_NONE },
       }),
     );
     expect(r).toMatchObject({ ok: false, kind: "contract_violation" });
-    expect(logs.join("\n")).toContain("contract_violation");
   });
 });

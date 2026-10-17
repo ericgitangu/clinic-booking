@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { firstDoctor, hhmm, patientOf, pick } from "./api";
 
 // Each scenario takes its own day from pick(n), so scenarios can run in parallel. Run against the
-// stand-in API by default and against the real one in CI (E2E_API_URL), see playwright.config.ts.
+// real API and database (docker compose), see playwright.config.ts.
 
 // Next adds its own role=alert route announcer; ours are the ones inside the page.
 const alertOf = (page: Page) =>
