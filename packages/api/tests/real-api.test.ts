@@ -274,6 +274,182 @@ describe.skipIf(!REAL)("against the real API", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it("links a sign-in to one patient, and a patient reaches only their own appointments", async () => {
+    // Needs the same signing key the API was started with (the e2e-real job and make e2e set it).
+    expect(
+      process.env.INTERNAL_SIGNING_KEY,
+      "INTERNAL_SIGNING_KEY",
+    ).toBeTruthy();
+    const tag = Math.random().toString(36).slice(2, 10);
+    const alice = {
+      sub: `sub-${tag}-a`,
+      email: `a-${tag}@clinic.example`,
+      role: "patient",
+      emailVerified: true,
+    };
+    const bob = {
+      sub: `sub-${tag}-b`,
+      email: `b-${tag}@clinic.example`,
+      role: "patient",
+      emailVerified: true,
+    };
+
+    // Without an assertion the API refuses, and says so with a typed problem.
+    const anon = await callApi("myAppointments", (client) =>
+      sdk.myAppointmentsInternalMeAppointmentsGet({ client }),
+    );
+    expect(anon).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 401,
+      code: "UNAUTHENTICATED",
+    });
+
+    // An email Google has not verified is refused on every patient route, with a typed problem.
+    const unverified = {
+      ...alice,
+      sub: `${alice.sub}-u`,
+      emailVerified: false,
+    };
+    const refused = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Nope Person" },
+        }),
+      { caller: unverified },
+    );
+    expect(refused).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 403,
+      code: "FORBIDDEN",
+    });
+
+    const before = await callApi(
+      "myAppointments",
+      (client) => sdk.myAppointmentsInternalMeAppointmentsGet({ client }),
+      { caller: alice },
+    );
+    expect(before).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 404,
+      code: "PATIENT_NOT_FOUND",
+    });
+
+    const first = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Alice Real" },
+        }),
+      { caller: alice },
+    );
+    expect(first).toMatchObject({ ok: true, status: 201 });
+    expect(first.ok && first.data.created).toBe(true);
+    const again = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Alice Other Name" },
+        }),
+      { caller: alice },
+    );
+    expect(again).toMatchObject({ ok: true, status: 200 });
+    expect(again.ok && again.data.created).toBe(false);
+    expect(again.ok && first.ok && again.data.patient_id).toBe(
+      first.ok && first.data.patient_id,
+    );
+    await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Bob Real" },
+        }),
+      { caller: bob },
+    );
+
+    const booked = await callApi(
+      "bookMine",
+      (client) =>
+        sdk.bookMineInternalMeAppointmentsPost({
+          client,
+          body: { doctor_id: doctorId, starts_at: slots[1] },
+        }),
+      { caller: alice },
+    );
+    expect(booked).toMatchObject({ ok: true, status: 201 });
+    if (!booked.ok) return;
+    expect(first.ok && booked.data.patient_id).toBe(
+      first.ok && first.data.patient_id,
+    );
+
+    const mine = await callApi(
+      "myAppointments",
+      (client) => sdk.myAppointmentsInternalMeAppointmentsGet({ client }),
+      { caller: alice },
+    );
+    expect(mine.ok && mine.data.items.map((i) => i.id)).toContain(
+      booked.data.id,
+    );
+    const theirs = await callApi(
+      "myAppointments",
+      (client) => sdk.myAppointmentsInternalMeAppointmentsGet({ client }),
+      { caller: bob },
+    );
+    expect(theirs.ok && theirs.data.items).toEqual([]);
+
+    // Bob asks for Alice's appointment: not found, exactly as for an id that never existed.
+    const peek = await callApi(
+      "myAppointment",
+      (client) =>
+        sdk.myAppointmentInternalMeAppointmentsAppointmentIdGet({
+          client,
+          path: { appointment_id: booked.data.id },
+        }),
+      { caller: bob },
+    );
+    expect(peek).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 404,
+      code: "APPOINTMENT_NOT_FOUND",
+    });
+    const cancelOthers = await callApi(
+      "cancelMine",
+      (client) =>
+        sdk.cancelMineInternalMeAppointmentsAppointmentIdCancelPatch({
+          client,
+          path: { appointment_id: booked.data.id },
+          body: { reason: "not mine to cancel" },
+        }),
+      { caller: bob },
+    );
+    expect(cancelOthers).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 404,
+      code: "APPOINTMENT_NOT_FOUND",
+    });
+
+    const cancelled = await callApi(
+      "cancelMine",
+      (client) =>
+        sdk.cancelMineInternalMeAppointmentsAppointmentIdCancelPatch({
+          client,
+          path: { appointment_id: booked.data.id },
+          body: { reason: "real path cleanup" },
+        }),
+      { caller: alice },
+    );
+    expect(cancelled.ok && cancelled.data.status).toBe("cancelled");
+  });
+
   // The stood-in part, and the only one: the real server answers, then the body is damaged on the way
   // back, because a correct server never sends a response that violates its own contract.
   const damaged = (

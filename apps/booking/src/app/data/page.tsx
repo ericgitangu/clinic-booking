@@ -20,14 +20,14 @@ const ROWS = [
     "Until you ask for deletion, or the demo data is reset",
   ],
   [
-    "Phone number (optional)",
-    "So the clinic could reach you",
+    "Phone number (public API only)",
+    "Not collected by this site; the public API accepts one",
     "Neon database (aws-us-east-1)",
     "Same as above",
   ],
   [
     "Email address",
-    "Sign-in, and appointment emails once they are active",
+    "Matching your sign-in to your patient record, and appointment emails once they are active",
     "Neon database. Appointment emails through Resend are planned (not yet active)",
     "Same as above. Resend keeps sent-mail records under its own retention",
   ],

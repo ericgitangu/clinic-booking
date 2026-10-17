@@ -2,6 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { authOptions } from "@/lib/auth-options";
+import { identityPlugins } from "@/lib/auth-plugins";
 
 function need(name: string): string {
   const value = process.env[name];
@@ -18,7 +19,8 @@ function create() {
       googleClientId: need("GOOGLE_CLIENT_ID"),
       googleClientSecret: need("GOOGLE_CLIENT_SECRET"),
     }),
-    plugins: [nextCookies()],
+    // nextCookies stays last, as Better Auth asks.
+    plugins: [...identityPlugins(), nextCookies()],
   });
 }
 

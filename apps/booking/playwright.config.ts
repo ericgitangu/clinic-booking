@@ -29,8 +29,13 @@ export default defineConfig({
       // The human check is off for test runs only (see lib/human-check.ts); there is no Google here.
       E2E: "1",
       RECAPTCHA_ENFORCE: "false",
-      // A throwaway signing key for the remembered-patient cookie, only ever used by these tests.
-      CLINIC_COOKIE_SECRET: "e2e-only-secret-e2e-only-secret-e2e-only-secret",
+      // The same values the API was started with (make e2e and the e2e-real job generate them).
+      INTERNAL_SIGNING_KEY: process.env.INTERNAL_SIGNING_KEY ?? "",
+      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
+      BETTER_AUTH_URL: "http://localhost:3100",
+      // Present only so the auth instance can be built; the tests never complete a Google sign-in.
+      GOOGLE_CLIENT_ID: "e2e-google-client-id",
+      GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
     },
   },
 });

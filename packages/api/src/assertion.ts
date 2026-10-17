@@ -12,6 +12,8 @@ export interface AssertionClaims {
   sub: string;
   email: string;
   role: string;
+  /** Whether the sign-in provider verified the email. Left out of the claims when not given. */
+  emailVerified?: boolean;
   method: string;
   /** Path with query string, exactly as it is sent. */
   path: string;
@@ -48,6 +50,9 @@ export function signAssertion(claims: AssertionClaims, key: string): string {
       m: claims.method.toUpperCase(),
       p: claims.path,
       bh: createHash("sha256").update(claims.body, "utf8").digest("hex"),
+      ...(claims.emailVerified === undefined
+        ? {}
+        : { ev: claims.emailVerified }),
     }),
     "utf8",
   ).toString("base64url");

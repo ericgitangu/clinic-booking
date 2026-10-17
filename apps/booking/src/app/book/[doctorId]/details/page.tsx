@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { BookingForm } from "@/components/booking/booking-form";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
-import { readPatient } from "@/lib/patient-cookie";
+import { getIdentity } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Your details",
@@ -26,9 +27,9 @@ export default async function Details({
   if (!startsAt || !ISO.test(startsAt) || Number.isNaN(Date.parse(startsAt))) {
     redirect(`/book/${doctorId}`);
   }
-  const [doctor, patient] = await Promise.all([
+  const [doctor, who] = await Promise.all([
     api.getDoctor(doctorId),
-    readPatient(),
+    getIdentity(),
   ]);
   if (!doctor.ok && doctor.status < 500) notFound();
 
@@ -43,7 +44,7 @@ export default async function Details({
         </Link>
       </p>
       <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">
-        Your details
+        Confirm your visit
       </h1>
       <div className="mt-4 rounded-xl border border-border bg-card p-5">
         <p className="text-lg font-semibold">{formatWhen(startsAt)}</p>
@@ -57,11 +58,19 @@ export default async function Details({
         </p>
       </div>
       <div className="mt-8">
-        <BookingForm
-          doctorId={doctorId}
-          startsAt={startsAt}
-          rememberedName={patient?.name ?? null}
-        />
+        {who ? (
+          <BookingForm
+            doctorId={doctorId}
+            startsAt={startsAt}
+            name={who.name}
+          />
+        ) : (
+          <SignInPrompt
+            title="Sign in to book"
+            body="Your appointments belong to your Google account, so only you can see or change them."
+            returnTo={`/book/${doctorId}/details?starts_at=${encodeURIComponent(startsAt)}`}
+          />
+        )}
       </div>
     </section>
   );

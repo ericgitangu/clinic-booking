@@ -41,6 +41,9 @@ describe("problem copy", () => {
       /already|registered|exists/i,
     );
   });
+  it("tells someone who is not signed in to sign in", () => {
+    expect(describeProblem("UNAUTHENTICATED").message).toMatch(/sign in/i);
+  });
   it("treats an unknown code as a server problem", () => {
     expect(describeProblem("SOMETHING_NEW").severity).toBe("critical");
   });
