@@ -6,7 +6,8 @@
 #   promote.sh <tag>        e.g. promote.sh sha-1a2b3c4
 #
 # Writes /tmp/promoted/state ("promoted" | "skipped") and, when promoted,
-# /tmp/promoted/keep.json = {"revisions": [<new revision>, <revision that was live before>]}.
+# /tmp/promoted/keep.json = {"revisions": [<new>, <live before>], "current": <new>, "previous": <live before>}
+# (rollback.sh reads current and previous).
 # The previous live revision is read BEFORE traffic moves, so a skipped release in between can
 # never take its place.
 set -euo pipefail
@@ -38,6 +39,6 @@ if [ -z "$new_rev" ]; then
 fi
 
 jq -n --arg n "$new_rev" --arg p "$prev_rev" \
-  '{revisions: ([$n, $p] | map(select(length > 0)) | unique)}' > "$OUT/keep.json"
+  '{revisions: ([$n, $p] | map(select(length > 0)) | unique), current: $n, previous: $p}' > "$OUT/keep.json"
 echo promoted > "$OUT/state"
 echo "promoted $new_rev (previous live: ${prev_rev:-none})"
