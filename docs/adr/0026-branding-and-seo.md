@@ -22,11 +22,11 @@ A booking site that looks like a template and shares as a blank card does not re
 Option 2.
 
 - **Assets:** copy only what is used into `web/public`: the light logo, the dark logo and the mark.
-- **Icons:** Next.js file conventions. `app/favicon.ico`, `app/icon` and `app/apple-icon` are static files or `ImageResponse` routes (<https://nextjs.org/docs/app/api-reference/file-conventions/metadata/app-icons>, read 2026-10-17). They are generated from the mark and the PWA manifest icons use the same source.
+- **Icons:** Next.js file conventions: a static `app/favicon.ico`, plus `app/icon.tsx` and `app/apple-icon.tsx` as `ImageResponse` routes, with `generateImageMetadata` producing the 192 and 512 pixel icons the manifest needs (<https://nextjs.org/docs/app/api-reference/file-conventions/metadata/app-icons>, read 2026-10-17). They are generated from the mark and the PWA manifest icons use the same source.
 - **Share image:** `app/opengraph-image.tsx` with `ImageResponse` from `next/og`, rendered at build time. `images.unoptimized` stays on, so image optimization (5,000 transformations on Hobby) is never used.
-- **Metadata:** the Metadata API in the root layout (title template, description, `metadataBase` set to the production URL, Open Graph and Twitter cards), per-page titles, and a theme colour for light and dark.
+- **Metadata:** the Metadata API in the root layout (title template, description, `metadataBase` set to the production URL, Open Graph and Twitter cards), per-page titles, and the theme colour in the `viewport` export (light and dark values).
 - **Crawling:** `app/sitemap.ts` lists the public pages and `app/robots.ts` allows them and disallows `/admin`, `/auth` and `/cron`.
-- **Check:** Lighthouse on the deployed preview must score at least 90 for accessibility and SEO on the landing page and the booking page.
+- **Check:** Lighthouse on the deployed preview, signed out, for `/`, `/doctors` and one doctor page: at least 90 for accessibility and SEO on each. The signed-in pages (`/appointments`, `/admin`) are not run through Lighthouse; they get an automated accessibility check in the Playwright tests instead, because they need a session.
 
 ## Consequences
 

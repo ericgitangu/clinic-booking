@@ -37,22 +37,30 @@ Option 3.
   - `/auth/*` sign-in (Better Auth) and `/cron/*` for scheduled work. Neither is under `/api`, which belongs to the proxy.
 - **Errors:** every `ProblemCode` maps to human copy, exhaustively typed.
 - **PWA:** a Serwist app shell with a manifest and an offline page. Navigations, RSC requests, `/api/*`, `/admin/**` and `/auth/*` are `NetworkOnly`; nothing about appointments is ever cached, because that would contradict "must not be available to others".
-- **Theme:** `defaultTheme="system"`, a toggle on every page, no flash on load. Acceptance: a dark-mode hard reload shows no light flash.
+- **Theme:** `defaultTheme="system"`, a toggle on every page, no flash on load. The browser theme colour is set in the `viewport` export (`themeColor` for light and dark), not in `metadata`. Acceptance: a dark-mode hard reload shows no light flash.
 - **Branding, SEO and email:** [ADR-0026](0026-branding-and-seo.md) and [ADR-0025](0025-email-with-resend.md).
 - **Cost settings:** `web/vercel.json` pins `"regions": ["iad1"]`; `images: { unoptimized: true }`; the generated client's base URL is the same-origin `/api` proxy for browsers and the BFF's own IAM-authenticated calls for server code.
 
+### Caching
+
+- Every `/internal/me/*` fetch is `cache: "no-store"`, and no page that reads a session is cached or shared between users. `revalidate` does not apply to pages that read the session, so it is not used on them.
+- Admin data is session-independent once the admin check has passed, so only the data fetch is cached: a cached function keyed by `['admin-metrics', from, to, bucket]` with a 60-second lifetime and the tag `admin-metrics`, which the refresh button invalidates (`unstable_cache`, or `'use cache'` with `cacheLife`, whichever the pinned Next version documents when the slice is built). The session check runs outside the cached function, every time.
+
 ### Admin dashboard
 
-An admin-only page with recharts, built from `appointment_events`. The first version has no realtime: data is fetched on the server and revalidated (`revalidate` of 60 seconds plus a refresh button). The Go SSE gateway ([ADR-0021](0021-go-realtime-gateway.md)) is optional and comes after the dashboard.
+An admin-only page with recharts. The first version has no realtime: the server fetches and the refresh button invalidates the tag. The Go SSE gateway ([ADR-0021](0021-go-realtime-gateway.md)) is optional and comes after the dashboard.
 
-The dashboard needs aggregate endpoints that the public API does not have. They live under `/internal/admin/*`, are left out of the public OpenAPI document, require the BFF's signed admin assertion (ADR-0024), and are read-only:
+It needs aggregate endpoints that the public API does not have. They live under `/internal/admin/*`, are left out of the public OpenAPI document, require the BFF's signed assertion with `role = "admin"` ([ADR-0024](0024-google-sign-in-with-better-auth.md)), and are read-only. Two time axes are used on purpose: **activity** is bucketed by `appointment_events.occurred_at` (when someone booked, rescheduled or cancelled), **load** by `appointments.starts_at` (when the visit happens). Dates are clinic-local (`clinics.timezone`, Africa/Nairobi); `from` is inclusive, `to` exclusive.
 
-- `GET /internal/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&bucket=day|hour`
-  - Clinic-local dates (Africa/Nairobi); at most 90 days; `bucket=hour` at most 7 days. Anything else is a 422 problem.
-  - Response: `{ range, bucket, series: [{ bucket_start, booked, rescheduled, cancelled }], totals: { booked, rescheduled, cancelled, active }, per_doctor: [{ doctor_id, name, booked, cancelled, utilization }] }`.
-  - Built with one grouped query over `appointment_events` (`date_trunc` in the clinic time zone) plus the working-hours capacity for `utilization`. It reads an existing index-friendly column; no new table.
-- `GET /internal/admin/appointments?status=&doctor_id=&from=&to=&limit=&cursor=`: a keyset-paginated table for the dashboard.
-- `GET /internal/admin/appointments/{id}/lineage`: the ordered events of one appointment (booked, then any reschedules with the old and new slot, then cancelled), for the lineage view.
+- `GET /internal/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&bucket=day|hour`: `bucket=day` allows at most 90 days, `hour` at most 7, and anything else is a 422 problem. Response: `{ range, bucket, series: [{ bucket_start, booked, rescheduled, cancelled }], totals: { booked, rescheduled, cancelled, upcoming_active }, per_doctor: [{ doctor_id, name, booked_visits, cancelled_actions, capacity, utilization }] }`.
+  - **series** (activity, `appointment_events.occurred_at`):
+    `SELECT date_trunc(:bucket, e.occurred_at AT TIME ZONE c.timezone) AS bucket_start, count(*) FILTER (WHERE e.event_type = 'booked') AS booked, count(*) FILTER (WHERE e.event_type = 'rescheduled') AS rescheduled, count(*) FILTER (WHERE e.event_type = 'cancelled') AS cancelled FROM appointment_events e JOIN doctors d ON d.id = e.doctor_id JOIN clinics c ON c.id = d.clinic_id WHERE e.occurred_at >= :from_ts AND e.occurred_at < :to_ts GROUP BY 1 ORDER BY 1`. The totals for the three counts are the sums of the series.
+  - **upcoming_active** (load, `appointments`): `SELECT count(*) FROM appointments WHERE status = 'booked' AND starts_at >= now()`.
+  - **per_doctor** (load, `appointments.starts_at`): `booked_visits` is `count(*) FILTER (WHERE status = 'booked')` over `starts_at` in the range, `cancelled_actions` is the number of `cancelled` events in the range by `occurred_at`, and `capacity` is the working-hours slot count: for each clinic-local date in the range, `sum((end_time - start_time) / interval '30 minutes')` over `working_hours` rows of that doctor whose `weekday` equals `extract(isodow FROM date)`. `utilization = booked_visits / capacity`, or null when capacity is 0.
+- `GET /internal/admin/appointments?status=booked|cancelled|all&doctor_id=&from=&to=&limit=&cursor=`: `status` defaults to `all`; `limit` defaults to 25 and is at most 100 (above that is a 422). Order is `(starts_at DESC, id DESC)`. The cursor is `base64url` of `{"s": <starts_at ISO-8601 UTC>, "i": <appointment id>}`, and the page query is `WHERE (starts_at, id) < (:s, :i)`; a cursor that does not decode to that shape is a 422. The response is `{ items, next_cursor }` with `next_cursor` null on the last page.
+- `GET /internal/admin/appointments/{id}/lineage`: `SELECT id, event_type, from_starts_at, to_starts_at, occurred_at FROM appointment_events WHERE appointment_id = :id ORDER BY id`, returned as the ordered path booked, then each reschedule with the old and new slot, then cancelled. An unknown id is a 404 problem.
+
+**Indexes.** `uq_appt_doctor_slot_booked` on `appointments (doctor_id, starts_at) WHERE status = 'booked'` and `ix_events_doctor_id` already exist. The slice adds, in one expand-only migration: `ix_events_occurred_at` on `appointment_events (occurred_at)` for the series, `ix_events_appointment_id` on `(appointment_id, id)` for lineage, and `ix_appointments_starts_at` on `appointments (starts_at DESC, id DESC)` for the list and the load queries. At today's size (7 appointments, 19 events, 34 patients, read from production on 2026-10-17) every query is a trivial scan; the indexes are there so the cost stays flat as data accumulates, and they are a few kilobytes each.
 
 ## Consequences
 
@@ -72,7 +80,7 @@ If time runs out, drop slices in this order, last built first. Each is independe
 
 1. Emails and the reminder cron ([ADR-0025](0025-email-with-resend.md))
 2. The admin dashboard
-3. Google sign-in ([ADR-0024](0024-google-sign-in-with-better-auth.md)); without it the booking flow uses the demo patient picker with a "Demo mode" banner
+3. Google sign-in ([ADR-0024](0024-google-sign-in-with-better-auth.md)); without it the booking flow falls back to the demo patient picker with a "Demo mode" banner. Emails and the dashboard both depend on sign-in (the address and the role come from Google), which is why they are dropped before it
 4. The booking flow
 5. Design system, branding and SEO ([ADR-0026](0026-branding-and-seo.md)) last, because everything above builds on it
 

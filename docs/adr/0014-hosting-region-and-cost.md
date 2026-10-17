@@ -96,7 +96,7 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 | Vercel | Hobby | 0 |
 | CircleCI | Free credits (30,000 a month; budget 22,200 worst case) | 0 |
 | Artifact Registry | at most 2 versions per package, < 400 MB (free 0.5 GiB) | 0 |
-| Secret Manager | 2 secrets, 1 active version each (free: 6 active versions) | 0 |
+| Secret Manager | 3 secrets, 1 active version each (the two database URLs and the internal signing key; 4 during a rotation). The shared account's free versions are already used by other projects, so these bill at $0.06 each, inside the accepted total | about 0.18 (0.24 during a rotation) |
 | TF state bucket | us-east1, Always Free (5 GB-months) | 0 |
 | Cloud Run `clinic-realtime` (stretch S1) | Free tier in us-east4; 0.25 vCPU per stream; an open stream bills instance time while connected | 0 (deduced; measures one dashboard tab for 30 minutes) |
 | Secret Manager, stretch secrets | up to 2 more (realtime DB URL, stream ticket key); total 4 of 6 | 0 |

@@ -2,13 +2,13 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
-- Amended: 2026-10-16, admin-only OAuth (S3) and a UI bot check (S4) added as gated stretch; detail in [ADR-0022](0022-admin-auth-and-bot-protection.md)
+- Amended: 2026-10-16, admin-only OAuth (Google sign-in) and a UI bot check (bot check) added as gated stretch; detail in [ADR-0022](0022-admin-auth-and-bot-protection.md)
 
 ## Status
 
 **Amended 2026-10-17: patient and admin sign-in are now built at the web app's server side ([ADR-0024](0024-google-sign-in-with-better-auth.md)). The public REST API is still unauthenticated, as the brief specifies, so the IDOR there remains by design and is closed only in the UI path.**
 
-Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot protection at the API. Gated stretch: Google OAuth for the admin area only (S3) and Cloudflare Turnstile on the UI booking route (S4), both per ADR-0022.
+Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot protection at the API. Gated stretch: Google OAuth for the admin area only (Google sign-in) and Cloudflare Turnstile on the UI booking route (bot check), both per ADR-0022.
 
 ## Context
 
@@ -42,15 +42,15 @@ Option 1.
   - Start around 60 mutations/min per key.
   - Turn it off in tests with `RATE_LIMIT_ENABLED=false`.
   - Use per-instance memory first, then Upstash when there are more than 3 instances.
-- **Bot protection:** Cloudflare Turnstile verified in the Next server route that submits UI bookings, as stretch S4 (ADR-0022). Direct API calls stay unprotected; enforcement inside the API waits for API auth.
-- **Admin identity:** Google ID tokens verified in FastAPI against Google's JWKS with an email allowlist, for `/admin` only, as stretch S3 (ADR-0022). This reuses the future-auth rules above (pinned algorithms, issuer dispatch, cached JWKS with single-flight and cooldown, no trusted role claims) and adds no second database. Patient endpoints remain unauthenticated.
-- **Stream caps:** the only rate-style limit that is built is the gateway's per-IP and per-instance concurrent stream cap (stretch S1, ADR-0021). General rate limiting stays deferred.
+- **Bot protection:** Cloudflare Turnstile verified in the Next server route that submits UI bookings, as stretch the bot check (ADR-0022). Direct API calls stay unprotected; enforcement inside the API waits for API auth.
+- **Admin identity:** Google ID tokens verified in FastAPI against Google's JWKS with an email allowlist, for `/admin` only, as stretch sign-in (ADR-0022). This reuses the future-auth rules above (pinned algorithms, issuer dispatch, cached JWKS with single-flight and cooldown, no trusted role claims) and adds no second database. Patient endpoints remain unauthenticated.
+- **Stream caps:** the only rate-style limit that is built is the gateway's per-IP and per-instance concurrent stream cap (realtime gateway, ADR-0021). General rate limiting stays deferred.
 - **Booking cap:** none. A cap would lock reviewers out of shared demo patients and block the smoke test.
 
 ## Consequences
 
 - Good: the brief's endpoints work exactly as written for reviewers. No fragile cross-service dependency.
-- Bad: IDOR and an open write path, both stated rather than hidden. Turnstile on the UI route (if S4 ships) does not close for direct API callers.
+- Bad: IDOR and an open write path, both stated rather than hidden. Turnstile on the UI route (if the bot check ships) does not close for direct API callers.
 
 ## Assessment line
 
