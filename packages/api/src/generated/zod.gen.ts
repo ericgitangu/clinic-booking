@@ -106,6 +106,19 @@ export const zChangeRoleRequest = z.object({
 });
 
 /**
+ * ClaimedReminder
+ */
+export const zClaimedReminder = z.object({
+    appointment_id: z.uuid(),
+    claimed_at: z.iso.datetime({ offset: true }),
+    doctor_name: z.string(),
+    patient_email: z.string(),
+    patient_name: z.string(),
+    specialty: z.string(),
+    starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
  * Clinic
  */
 export const zClinic = z.object({
@@ -160,6 +173,16 @@ export const zAppointmentWithDoctor = z.object({
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
     updated_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * EmailBudget
+ */
+export const zEmailBudget = z.object({
+    daily_limit: z.int(),
+    day: z.iso.date(),
+    remaining: z.int(),
+    sent: z.int()
 });
 
 /**
@@ -304,6 +327,36 @@ export const zProblemEntry = z.object({
     slug: z.string(),
     status: z.int(),
     title: z.string()
+});
+
+/**
+ * ReminderBatch
+ *
+ * What one run may send now: the claimed appointments and the day's email budget.
+ */
+export const zReminderBatch = z.object({
+    daily_limit: z.int(),
+    date: z.iso.date(),
+    items: z.array(zClaimedReminder),
+    sent_today: z.int()
+});
+
+/**
+ * ReminderSent
+ */
+export const zReminderSent = z.object({
+    appointment_id: z.uuid(),
+    sent: z.boolean()
+});
+
+/**
+ * ReminderSentRequest
+ *
+ * What was claimed: marking sent only applies if the appointment is still that claim.
+ */
+export const zReminderSentRequest = z.object({
+    claimed_at: z.iso.datetime({ offset: true }),
+    starts_at: z.iso.datetime({ offset: true })
 });
 
 /**
@@ -594,6 +647,16 @@ export const zGetMetricsInternalAdminMetricsGetResponse = zMetrics;
  */
 export const zGetSessionInfoInternalAdminSessionGetResponse = zSessionInfo;
 
+/**
+ * Successful Response
+ */
+export const zRecordEmailInternalEmailsRecordPostResponse = zEmailBudget;
+
+/**
+ * Successful Response
+ */
+export const zEmailsTodayInternalEmailsTodayGetResponse = zEmailBudget;
+
 export const zMyAppointmentsInternalMeAppointmentsGetQuery = z.object({
     limit: z.int().gte(1).lte(100).optional().default(50)
 });
@@ -640,6 +703,27 @@ export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPa
  * Successful Response
  */
 export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = zAppointment;
+
+export const zClaimRemindersInternalRemindersClaimPostQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(50),
+    on: z.iso.date().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zClaimRemindersInternalRemindersClaimPostResponse = zReminderBatch;
+
+export const zMarkReminderSentInternalRemindersAppointmentIdSentPostBody = zReminderSentRequest;
+
+export const zMarkReminderSentInternalRemindersAppointmentIdSentPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zMarkReminderSentInternalRemindersAppointmentIdSentPostResponse = zReminderSent;
 
 export const zPostPatientPatientsPostBody = zPatientCreate;
 

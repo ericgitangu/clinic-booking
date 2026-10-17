@@ -53,10 +53,29 @@ function weekStart(n: number): string {
   return addDays(today(), firstTuesday + 7 * n);
 }
 
-export async function pick(n: number): Promise<Picked> {
-  const id = await firstDoctor();
+// A doctor by position in the API's list. Specs use different doctors where they can, so what one
+// books never takes a slot another one is counting on.
+const doctors: Promise<string[]> = getJson<{ items: { id: string }[] }>(
+  "/doctors",
+).then((d) => d.items.map((x) => x.id));
+export async function doctorAt(index: number): Promise<string> {
+  const ids = await doctors;
+  if (!ids[index]) throw new Error(`no doctor number ${index}`);
+  return ids[index];
+}
+
+// Scenario n gets its own calendar week for the doctor, so scenarios running in parallel never meet
+// on a day. With `dayOffset` (0 to 3, Tuesday to Friday) only that day of the week is used, for the
+// scenarios that need a date of their own because a reminder run claims everything on a date.
+export async function pick(
+  n: number,
+  opts: { doctor?: number; dayOffset?: number } = {},
+): Promise<Picked> {
+  const id = await doctorAt(opts.doctor ?? 0);
   const start = weekStart(n);
-  for (let i = 0; i < 4; i++) {
+  const offsets =
+    opts.dayOffset === undefined ? [0, 1, 2, 3] : [opts.dayOffset];
+  for (const i of offsets) {
     const day = addDays(start, i);
     const a = await getJson<{ slots: { starts_at: string }[] }>(
       `/doctors/${id}/availability?date=${day}`,

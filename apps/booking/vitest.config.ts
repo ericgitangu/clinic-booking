@@ -6,6 +6,13 @@ const ui = fileURLToPath(new URL("../../packages/ui/src", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: [
+      // The real package throws outside a server component; tests import server modules directly.
+      {
+        find: "server-only",
+        replacement: fileURLToPath(
+          new URL("./tests/support/server-only.ts", import.meta.url),
+        ),
+      },
       // Files inside @clinic/ui import each other by package name; map that to the source tree.
       {
         find: /^@clinic\/ui\/(components|lib)\/(.*)$/,

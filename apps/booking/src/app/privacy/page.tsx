@@ -54,8 +54,8 @@ export default function PrivacyPage() {
         Your name, email address and picture are stored in our database on Neon,
         and your sign-in session lives in a cookie on this site only. We never
         sell Google user data or share it with anyone for their own purposes.
-        When appointment emails go live, the only service that receives your
-        email address will be Resend, which delivers them for us.
+        The only service that receives your email address is Resend, which
+        delivers the appointment emails for us.
       </p>
       <h3>Retention and deletion</h3>
       <p>
@@ -102,10 +102,9 @@ export default function PrivacyPage() {
 
       <h2>Email</h2>
       <p>
-        Appointment emails are planned and not active yet. Once they are, when
-        you book, reschedule or cancel, and the day before an appointment, we
-        will send an email through Resend to the address on your account. The
-        email contains the appointment details.
+        When you book, reschedule or cancel, and the evening before an
+        appointment, we send an email through Resend to the address on your
+        account. The email contains the appointment details.
       </p>
 
       <h2>Where it lives</h2>

@@ -288,6 +288,40 @@ export type ChangeRoleRequest = {
 };
 
 /**
+ * ClaimedReminder
+ */
+export type ClaimedReminder = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Claimed At
+     */
+    claimed_at: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Patient Email
+     */
+    patient_email: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Specialty
+     */
+    specialty: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+};
+
+/**
  * Clinic
  */
 export type Clinic = {
@@ -400,6 +434,28 @@ export type DoctorRef = {
      * Specialty
      */
     specialty: string;
+};
+
+/**
+ * EmailBudget
+ */
+export type EmailBudget = {
+    /**
+     * Daily Limit
+     */
+    daily_limit: number;
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Remaining
+     */
+    remaining: number;
+    /**
+     * Sent
+     */
+    sent: number;
 };
 
 /**
@@ -649,6 +705,60 @@ export type ProblemEntry = {
      * Title
      */
     title: string;
+};
+
+/**
+ * ReminderBatch
+ *
+ * What one run may send now: the claimed appointments and the day's email budget.
+ */
+export type ReminderBatch = {
+    /**
+     * Daily Limit
+     */
+    daily_limit: number;
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Items
+     */
+    items: Array<ClaimedReminder>;
+    /**
+     * Sent Today
+     */
+    sent_today: number;
+};
+
+/**
+ * ReminderSent
+ */
+export type ReminderSent = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Sent
+     */
+    sent: boolean;
+};
+
+/**
+ * ReminderSentRequest
+ *
+ * What was claimed: marking sent only applies if the appointment is still that claim.
+ */
+export type ReminderSentRequest = {
+    /**
+     * Claimed At
+     */
+    claimed_at: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
 };
 
 /**
@@ -1451,6 +1561,60 @@ export type GetSessionInfoInternalAdminSessionGetResponses = {
 
 export type GetSessionInfoInternalAdminSessionGetResponse = GetSessionInfoInternalAdminSessionGetResponses[keyof GetSessionInfoInternalAdminSessionGetResponses];
 
+export type RecordEmailInternalEmailsRecordPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/emails/record';
+};
+
+export type RecordEmailInternalEmailsRecordPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type RecordEmailInternalEmailsRecordPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmailBudget;
+};
+
+export type RecordEmailInternalEmailsRecordPostResponse = RecordEmailInternalEmailsRecordPostResponses[keyof RecordEmailInternalEmailsRecordPostResponses];
+
+export type EmailsTodayInternalEmailsTodayGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/emails/today';
+};
+
+export type EmailsTodayInternalEmailsTodayGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type EmailsTodayInternalEmailsTodayGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmailBudget;
+};
+
+export type EmailsTodayInternalEmailsTodayGetResponse = EmailsTodayInternalEmailsTodayGetResponses[keyof EmailsTodayInternalEmailsTodayGetResponses];
+
 export type MyAppointmentsInternalMeAppointmentsGetData = {
     body?: never;
     path?: never;
@@ -1661,6 +1825,88 @@ export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResp
 };
 
 export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses[keyof RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses];
+
+export type ClaimRemindersInternalRemindersClaimPostData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * On
+         *
+         * Remind for this clinic-local date, not tomorrow (a rehearsal or a re-run).
+         */
+        on?: string | null;
+    };
+    url: '/internal/reminders/claim';
+};
+
+export type ClaimRemindersInternalRemindersClaimPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ClaimRemindersInternalRemindersClaimPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReminderBatch;
+};
+
+export type ClaimRemindersInternalRemindersClaimPostResponse = ClaimRemindersInternalRemindersClaimPostResponses[keyof ClaimRemindersInternalRemindersClaimPostResponses];
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostData = {
+    body: ReminderSentRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/reminders/{appointment_id}/sent';
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReminderSent;
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostResponse = MarkReminderSentInternalRemindersAppointmentIdSentPostResponses[keyof MarkReminderSentInternalRemindersAppointmentIdSentPostResponses];
 
 export type PostPatientPatientsPostData = {
     body: PatientCreate;

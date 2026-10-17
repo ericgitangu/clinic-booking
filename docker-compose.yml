@@ -47,7 +47,8 @@ services:
       # Comma-separated owner emails for the admin app; the same value as the app's ADMIN_EMAILS.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     ports:
-      - "8080:8080"
+      # Host port overridable (make e2e uses its own, so it never meets a developer's running stack).
+      - "${API_HOST_PORT:-8080}:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully

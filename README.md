@@ -152,6 +152,10 @@ stateDiagram-v2
 
 The booking UI is designed to poll availability every 15 s while the tab is visible, and to stop after 10 minutes without input, so an idle tab does not keep the database awake. Correctness never depends on this: a stale slot that loses the race gets `409 SLOT_TAKEN` and a refetch. A push channel for patients is deferred. Revisit with the SSE gateway (S1), or when polling load shows in Neon CU-hours ([ADR-0009](docs/adr/0009-realtime-polling-now-sse-later.md)).
 
+### 3.x Email and reminders
+
+Booking, moving and cancelling send the patient an email through Resend (from `reminders@ericgitangu.com`, replies to the engineer), and a daily Vercel cron at 15:00 UTC (18:00 in Nairobi, run any time in the following hour) emails a reminder for every appointment tomorrow. A reminder is claimed with a 15-minute lease, sent with an idempotency key, and marked sent only after Resend answered 2xx, so it is neither lost nor sent twice; the free plan's 100 emails a day are counted in the database and shared by both kinds. A failed email never fails a booking. Details and limits: [ADR-0025](docs/adr/0025-email-with-resend.md).
+
 ## 4. Key decisions & trade-offs
 
 Every entry reads: decision, what I weighed, why (4.1 to 4.4 are each tied to a line of the brief), what it costs, when I would revisit it.
@@ -246,7 +250,7 @@ The local race test and the production run agree: exactly one booking wins, and 
 
 ## 10. Operations, cost & security posture
 
-**Security note.** Signing in with Google and the reCAPTCHA check protect the web screens and the web app's own `/internal` routes: a patient reaches only their own appointments (the API answers 404 for anyone else's), and the patient is always derived from the account, never from the browser. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP, and patient-scoped reads there rely on unguessable UUIDs, so anyone who has an appointment or patient id can read or change it there. That is accepted debt, and it also means the phone-number check on patient creation (a duplicate phone returns `PATIENT_PHONE_EXISTS`) tells an API caller whether a number is registered. Review trigger: any real patient data, or a need to authenticate the public API (ADR-0012, ADR-0022, ADR-0024, ADR-0029).
+**Security note.** Signing in with Google and the reCAPTCHA check protect the web screens and the web app's own `/internal` routes: a patient reaches only their own appointments (the API answers 404 for anyone else's), and the patient is always derived from the account, never from the browser. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP, and patient-scoped reads there rely on unguessable UUIDs, so anyone who has an appointment or patient id can read or change it there. That is accepted debt, and it also means the phone-number check on patient creation (a duplicate phone returns `PATIENT_PHONE_EXISTS`) tells an API caller whether a number is registered. Review trigger: any real patient data, or a need to authenticate the public API (ADR-0012, ADR-0022, ADR-0024, ADR-0029). Email cannot be used to mail strangers or burn the daily limit through the public API: reminders and acknowledgements go only to patients with a linked, verified Google account (ADR-0025).
 
 **Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.28 a month there (accepted); Cloud Run compute and egress stay within the free tier.
 
