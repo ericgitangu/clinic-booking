@@ -6,7 +6,8 @@ import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { cn } from "@clinic/ui/lib/utils";
 import { FOOTER_COLUMNS } from "@/lib/footer";
 import { metadata, viewport } from "@/lib/metadata";
-import { FOOTER_NOTICE, NAV_LINKS, SITE } from "@/lib/site";
+import { getStaff } from "@/lib/session";
+import { ACCESS_LINK, FOOTER_NOTICE, NAV_LINKS, SITE } from "@/lib/site";
 
 const sans = Atkinson_Hyperlegible_Next({
   subsets: ["latin"],
@@ -18,14 +19,22 @@ const sans = Atkinson_Hyperlegible_Next({
 
 export { metadata, viewport };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  // A failed lookup must not break every page; the page itself reports it.
+  const staff = await getStaff().catch(() => null);
+  const navLinks =
+    staff?.role === "owner" ? [...NAV_LINKS, ACCESS_LINK] : [...NAV_LINKS];
   return (
     <html lang="en" suppressHydrationWarning className={cn(sans.variable)}>
       <body className="min-h-dvh font-sans antialiased">
         <ThemeProvider>
           <PageShell
             name={SITE.name}
-            navLinks={NAV_LINKS}
+            navLinks={navLinks}
             footerColumns={FOOTER_COLUMNS}
             footerNotice={FOOTER_NOTICE}
           >

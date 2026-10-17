@@ -43,6 +43,20 @@ describe("the real route handler", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("answers 404 for /internal in every spelling and sends nothing upstream", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    for (const segments of [
+      ["internal", "admin", "metrics"],
+      ["Internal", "admin", "metrics"],
+      ["INTERNAL", "admin", "access"],
+      ["internal"],
+    ]) {
+      const res = await call(segments);
+      expect(res.status, segments.join("/")).toBe(404);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("forwards a normal request to the API", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response('{"ok":true}', {

@@ -321,48 +321,6 @@
         "title": "DoctorRef",
         "type": "object"
       },
-      "ErrorItem": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Loc",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Msg",
-            "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": ["loc", "msg", "type"],
-        "title": "ErrorItem",
-        "type": "object"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
-        "type": "object"
-      },
       "Health": {
         "properties": {
           "status": {
@@ -474,65 +432,10 @@
         "title": "PatientCreate",
         "type": "object"
       },
-      "Problem": {
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/ProblemCode"
-          },
-          "detail": {
-            "title": "Detail",
-            "type": "string"
-          },
-          "errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ErrorItem"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Errors"
-          },
-          "instance": {
-            "title": "Instance",
-            "type": "string"
-          },
-          "request_id": {
-            "format": "uuid",
-            "title": "Request Id",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "integer"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "title",
-          "status",
-          "detail",
-          "instance",
-          "code",
-          "request_id"
-        ],
-        "title": "Problem",
-        "type": "object"
-      },
       "ProblemCode": {
         "enum": [
+          "UNAUTHENTICATED",
+          "FORBIDDEN",
           "VALIDATION_ERROR",
           "TIMEZONE_REQUIRED",
           "UNKNOWN_DOCTOR",
@@ -548,6 +451,9 @@
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
+          "ACCESS_EXISTS",
+          "OWNER_PROTECTED",
+          "ACCESS_NOT_FOUND",
           "DOCTOR_NOT_FOUND",
           "PATIENT_NOT_FOUND",
           "APPOINTMENT_NOT_FOUND",
@@ -614,42 +520,6 @@
         },
         "required": ["starts_at", "ends_at"],
         "title": "Slot",
-        "type": "object"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": ["loc", "msg", "type"],
-        "title": "ValidationError",
         "type": "object"
       },
       "WorkingWindow": {
