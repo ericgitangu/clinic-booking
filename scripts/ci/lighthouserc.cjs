@@ -7,12 +7,13 @@
 // representative run (the first CI run saw `/` at 0.72, 0.84 and 0.89 and passed that way).
 // `median` reports what a typical visit scores and never lets one run speak for the others.
 //
-// Measured locally on 2026-10-18 (Chrome, mobile preset, `next start` build, 6 runs per page):
-//   /       performance 94-100   /book  performance 90-100   /about performance 96-99
-//   /data   performance 96       accessibility, best practices and SEO were 100 on every run.
-// On CircleCI the same page `/` scored 0.72, 0.84 and 0.89 for performance (largest contentful paint
-// about 3.8 s), well under the laptop numbers, so CI is the authority and the local numbers only show
-// the page can reach the budget.
+// Measured on 2026-10-18, performance scores (accessibility, best practices and SEO were 100 on every
+// run, locally and in CI):
+//   laptop Chrome, 5 runs per page: /  94-95   /about 96   /book 96   /data 96-99
+//   CircleCI e2e-real (pipeline 113), 3 runs:   /  84, 72, 89 (LCP 3.8, 3.3, 2.4 s)
+//                                               /about 93-98   /book 90-97   /data 88-94
+// CI is noisier and slower than the laptop and is the authority. Median over those 3 CI runs: `/` 84
+// (under the 0.85 budget), /about 94, /book 93, /data 93.
 //
 // `/` performance is REPORT-ONLY (`warn`) until `/` passes 0.85 on the median of 5 CI runs; then
 // change its level to `error`. Every other assertion is a hard gate. The 0.85 budget is not lowered.
