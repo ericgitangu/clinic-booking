@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import * as openapiRoute from "@/app/openapi.json/route";
 import * as docsRoute from "@/app/docs/route";
@@ -28,7 +30,7 @@ describe("doc routes are static and never fetch upstream", () => {
     const spy = vi.spyOn(globalThis, "fetch");
     const res = await docsRoute.GET();
     const html = await res.text();
-    expect(html).toContain('url: "/openapi.json"');
+    expect(html).toContain("/docs-assets/swagger-init.js");
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
@@ -39,18 +41,30 @@ describe("doc routes are static and never fetch upstream", () => {
     }
   });
 
-  it("every CDN asset on the doc pages carries a SHA-384 integrity hash", async () => {
+  it("the doc pages load only from this origin and say so in a CSP", async () => {
     for (const route of [docsRoute, redocRoute]) {
-      const html = await (await route.GET()).text();
-      const tags =
-        html.match(
-          /<(?:script|link)[^>]+https:\/\/cdn\.jsdelivr\.net[^>]*>/g,
-        ) ?? [];
-      expect(tags.length).toBeGreaterThan(0);
-      for (const tag of tags) {
-        expect(tag).toMatch(/integrity="sha384-[A-Za-z0-9+/]{64}"/);
-        expect(tag).toContain('crossorigin="anonymous"');
-      }
+      const res = await route.GET();
+      const html = await res.text();
+      // No absolute URL in any src/href: the bundles are the pinned npm packages, copied to /docs-assets.
+      expect(html).not.toMatch(/(?:src|href)="(?:https?:)?\/\//);
+      const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map(
+        (m) => m[1],
+      );
+      expect(assets.length).toBeGreaterThan(0);
+      for (const a of assets) expect(a).toMatch(/^\/docs-assets\//);
+      const csp = res.headers.get("content-security-policy") ?? "";
+      expect(csp).not.toMatch(/https?:|\*/);
+      expect(csp).toContain("script-src 'self'");
+      expect(csp).not.toMatch(/script-src[^;]*unsafe-/);
     }
+  });
+
+  it("the Swagger starter is a committed file that keeps deep links on", () => {
+    const init = readFileSync(
+      resolve(__dirname, "../../public/docs-assets/swagger-init.js"),
+      "utf8",
+    );
+    expect(init).toContain("deepLinking: true");
+    expect(init).toContain('url: "/openapi.json"');
   });
 });

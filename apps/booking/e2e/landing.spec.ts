@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { expect, test } from "@playwright/test";
+import { type BrowserContext, expect, test } from "@playwright/test";
 import { API } from "./api";
 
 const hasTool = (name: string) => {
@@ -16,10 +16,25 @@ test("the status line shows the API's readiness", async ({ page }) => {
   await expect(page.getByTestId("api-status")).toContainText("API ready");
 });
 
+// Aborts every request that leaves this origin and records it, so a page that still reaches for a
+// CDN fails here whether or not the machine has internet.
+async function blockOffOrigin(context: BrowserContext): Promise<string[]> {
+  const offOrigin: string[] = [];
+  await context.route(
+    (url) => url.hostname !== "localhost" && url.hostname !== "127.0.0.1",
+    (route) => {
+      offOrigin.push(route.request().url());
+      return route.abort();
+    },
+  );
+  return offOrigin;
+}
+
 test("every evidence card opens its operation in Swagger", async ({
   page,
   context,
 }) => {
+  const offOrigin = await blockOffOrigin(context);
   await page.goto("/");
   const links = await page
     .locator('a[href^="/docs#/"]')
@@ -32,9 +47,22 @@ test("every evidence card opens its operation in Swagger", async ({
     await tab.goto(href);
     // Swagger UI marks the operation it deep-linked to as open.
     const op = tab.locator(`#operations-${tag}-${opId}`);
-    await expect(op, href).toHaveClass(/is-open/, { timeout: 30_000 });
+    await expect(op, href).toHaveClass(/is-open/);
     await tab.close();
   }
+  expect(offOrigin, "requests that left this origin").toEqual([]);
+});
+
+test("ReDoc renders the contract from this origin", async ({
+  page,
+  context,
+}) => {
+  const offOrigin = await blockOffOrigin(context);
+  await page.goto("/redoc");
+  await expect(
+    page.getByRole("heading", { name: "Clinic Booking API", level: 1 }),
+  ).toBeVisible();
+  expect(offOrigin, "requests that left this origin").toEqual([]);
 });
 
 test("the evidence cards link to screens that load", async ({
