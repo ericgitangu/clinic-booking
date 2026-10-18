@@ -46,6 +46,8 @@ services:
       PORT: "8080"
       # Empty (the default) leaves /internal/* closed; set a 32+ character key to use the admin app.
       INTERNAL_SIGNING_KEY: ${INTERNAL_SIGNING_KEY:-}
+      # Empty (the default) refuses the release smoke test's synthetic-patient call; must differ from the key above.
+      SMOKE_SIGNING_KEY: ${SMOKE_SIGNING_KEY:-}
       # Comma-separated owner emails for the admin app; the same value as the app's ADMIN_EMAILS.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # Empty (the default) means push is off and clients poll; set your own Ably app key to try live updates.

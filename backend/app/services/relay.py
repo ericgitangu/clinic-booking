@@ -54,12 +54,15 @@ _CURSOR = text(
 # One statement, so the horizon and the read agree. txid travels as text: asyncpg has no xid8 codec.
 _EVENTS = text(
     """
-    SELECT id, txid::text AS txid, doctor_id, event_type, from_starts_at, to_starts_at,
-           local_date, from_local_date, occurred_at
-    FROM appointment_events
-    WHERE txid < pg_snapshot_xmin(pg_current_snapshot())
-      AND (txid, id) > (CAST(:txid AS text)::xid8, CAST(:id AS bigint))
-    ORDER BY txid, id
+    SELECT e.id, e.txid::text AS txid, e.doctor_id, e.event_type, e.from_starts_at,
+           e.to_starts_at, e.local_date, e.from_local_date, e.occurred_at,
+           COALESCE(p.synthetic, false) AS synthetic
+    FROM appointment_events e
+    LEFT JOIN appointments a ON a.id = e.appointment_id
+    LEFT JOIN patients p ON p.id = a.patient_id
+    WHERE e.txid < pg_snapshot_xmin(pg_current_snapshot())
+      AND (e.txid, e.id) > (CAST(:txid AS text)::xid8, CAST(:id AS bigint))
+    ORDER BY e.txid, e.id
     LIMIT :limit
     """
 )
@@ -111,6 +114,7 @@ def _event(row: object) -> tuple[OutboxEvent, datetime]:
             to_starts_at=r["to_starts_at"],
             local_date=r["local_date"],
             from_local_date=r["from_local_date"],
+            synthetic=bool(r["synthetic"]),
         ),
         r["occurred_at"],
     )

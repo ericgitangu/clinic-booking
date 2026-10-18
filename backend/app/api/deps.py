@@ -73,6 +73,8 @@ _log = logging.getLogger(APP_LOGGER)
 
 # Who the scheduled reminder run signs as.
 SYSTEM_SUB = "system:reminders"
+# Who the release smoke test (scripts/verify_claims.py) signs as.
+SMOKE_SUB = "smoke:verify-claims"
 
 
 def _refuse(reason: str, status: str) -> None:
@@ -82,9 +84,11 @@ def _refuse(reason: str, status: str) -> None:
     _log.warning("internal call refused: %s", reason, extra={"code": status})
 
 
-def _verify(request: Request, clock: Clock, body: bytes) -> assertion.Principal:
+def _verify(
+    request: Request, clock: Clock, body: bytes, *, smoke: bool = False
+) -> assertion.Principal:
     settings: Settings = request.app.state.settings
-    secret = settings.INTERNAL_SIGNING_KEY
+    secret = settings.SMOKE_SIGNING_KEY if smoke else settings.INTERNAL_SIGNING_KEY
     if secret is None:
         _refuse("signing key not configured", "UNAUTHENTICATED")
         raise Unauthenticated()
@@ -133,6 +137,17 @@ async def require_system(
     principal = _verify(request, clock, await request.body())
     if principal.role != "system" or principal.sub != SYSTEM_SUB:
         _refuse("not the system caller", "FORBIDDEN")
+        raise Forbidden()
+    return principal
+
+
+async def require_smoke(request: Request, clock: Clock = Depends(get_clock)) -> assertion.Principal:
+    """For the release pipeline's smoke test only: the assertion must be signed with the separate
+    ``SMOKE_SIGNING_KEY`` (the web apps' key does not open this) and carry the smoke role and
+    subject. This is the only way to create a synthetic patient."""
+    principal = _verify(request, clock, await request.body(), smoke=True)
+    if principal.role != "smoke" or principal.sub != SMOKE_SUB:
+        _refuse("not the smoke caller", "FORBIDDEN")
         raise Forbidden()
     return principal
 

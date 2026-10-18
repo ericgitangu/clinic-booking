@@ -138,6 +138,8 @@ def test_the_first_relay_run_after_an_upgrade_publishes_only_the_new_event() -> 
         _alembic("upgrade", "0005")
         doctor = asyncio.run(_history_at_0005())
         _alembic("upgrade", "0006")
+        # The relay now reads patients.synthetic (0008); the cursor seed 0006 wrote is untouched.
+        _alembic("upgrade", "head")
         published, batches = asyncio.run(_first_trigger_after_upgrade(doctor))
         # One cancel event: a slot message and an admin message, in a single batch, on the first
         # trigger: none of the 250 older events came first.

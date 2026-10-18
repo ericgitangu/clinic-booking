@@ -4,16 +4,30 @@
 Creates its own patients, drives the real booking flow against --base-url, prints a PASS/FAIL
 table and exits non-zero on any FAIL. The same script runs in CI (with a CI-only invoker
 token via --header) and from a reviewer's laptop against the public URL.
+
+Synthetic patients. The booking flow writes real rows, so against production every run would show
+up in the admin dashboard. When SMOKE_SIGNING_KEY is in the environment the script creates its
+patients through the signed internal smoke endpoint, which stores them with synthetic = true; the
+admin views leave those out. CI passes --require-synthetic, so a pipeline without the key fails
+instead of quietly writing unmarked rows. Without the key (a reviewer's laptop) it uses the public
+POST /patients and says so: those rows are ordinary patients. The key is read from the environment
+only, never from argv.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import hmac
+import json
+import os
 import random
 import sys
+import time
 from datetime import datetime
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -57,9 +71,53 @@ def jbody(resp: httpx.Response) -> dict[str, Any]:
     return body if isinstance(body, dict) else {}
 
 
-def _new_patient(client: httpx.Client, n: int) -> str:
+SMOKE_ENV = "SMOKE_SIGNING_KEY"
+SMOKE_PATH = "/internal/smoke/patients"
+SMOKE_AUDIENCE = "clinic-api/internal"
+SMOKE_SUB = "smoke:verify-claims"
+SMOKE_TTL_SECONDS = 30
+
+
+def _b64(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def smoke_assertion(key: str, *, path: str, body: bytes, now: int | None = None) -> str:
+    """The ``X-Internal-Assertion`` value for the smoke endpoint: the wire format of
+    backend/app/core/assertion.py (``v1.<payload>.<mac>``, bound to method, path and body)."""
+    iat = int(time.time()) if now is None else now
+    claims = {
+        "aud": SMOKE_AUDIENCE,
+        "sub": SMOKE_SUB,
+        "email": "smoke@verify-claims.invalid",
+        "role": "smoke",
+        "iat": iat,
+        "exp": iat + SMOKE_TTL_SECONDS,
+        "m": "POST",
+        "p": path,
+        "bh": hashlib.sha256(body).hexdigest(),
+    }
+    canonical = json.dumps(claims, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    payload = _b64(canonical.encode("utf-8"))
+    mac = _b64(hmac.new(key.encode("utf-8"), payload.encode("ascii"), hashlib.sha256).digest())
+    return f"v1.{payload}.{mac}"
+
+
+def _new_patient(client: httpx.Client, n: int, smoke_key: str | None = None) -> str:
     ts = datetime.now(CLINIC_TZ).strftime("%Y%m%dT%H%M%S")
-    resp = client.post("/patients", json={"full_name": f"verify-claims {ts} {n}"})
+    name = {"full_name": f"verify-claims {ts} {n}"}
+    if smoke_key is None:
+        resp = client.post("/patients", json=name)
+    else:
+        body = json.dumps(name, separators=(",", ":")).encode("utf-8")
+        # The assertion binds the path as the server sees it, so include any prefix in the base URL.
+        prefix = urlsplit(str(client.base_url)).path.rstrip("/")
+        header = smoke_assertion(smoke_key, path=f"{prefix}{SMOKE_PATH}", body=body)
+        resp = client.post(
+            SMOKE_PATH,
+            content=body,
+            headers={"Content-Type": "application/json", "X-Internal-Assertion": header},
+        )
     resp.raise_for_status()
     return str(resp.json()["id"])
 
@@ -80,12 +138,12 @@ def _pick_slots(client: httpx.Client) -> tuple[str, str, str, str]:
     raise SystemExit("no doctor has >= 2 slots in the next 14 clinic-local days")
 
 
-def run(base_url: str, extra_headers: dict[str, str]) -> None:
+def run(base_url: str, extra_headers: dict[str, str], smoke_key: str | None = None) -> None:
     with httpx.Client(base_url=base_url, headers=extra_headers, timeout=30) as client:
         booked_id: str | None = None
         try:
-            p1 = _new_patient(client, 1)
-            p2 = _new_patient(client, 2)
+            p1 = _new_patient(client, 1, smoke_key)
+            p2 = _new_patient(client, 2, smoke_key)
 
             # Book a random free slot. Another run may take it first (409): pick again.
             did = day = s0 = s1 = ""
@@ -215,9 +273,24 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--header", action="append", default=[], help="repeatable 'Name: value'")
+    parser.add_argument(
+        "--require-synthetic",
+        action="store_true",
+        help=f"fail unless {SMOKE_ENV} is set, so no unmarked rows are written (CI)",
+    )
     args = parser.parse_args()
 
-    run(args.base_url.rstrip("/"), _headers(args.header))
+    smoke_key = os.environ.get(SMOKE_ENV) or None
+    if smoke_key is None:
+        if args.require_synthetic:
+            print(f"FAIL  {SMOKE_ENV} is not set; refusing to write unmarked rows", file=sys.stderr)
+            return 2
+        print(
+            f"note: {SMOKE_ENV} is not set, so the patients this run creates are ordinary "
+            "(not marked synthetic) and will show in the admin dashboard.",
+            file=sys.stderr,
+        )
+    run(args.base_url.rstrip("/"), _headers(args.header), smoke_key)
 
     width = max(len(label) for _, label in RESULTS)
     failed = 0

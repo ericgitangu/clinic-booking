@@ -65,6 +65,9 @@ class OutboxEvent:
     to_starts_at: datetime | None
     local_date: date
     from_local_date: date | None
+    # The appointment belongs to a synthetic (release smoke) patient. Its slot still changes for
+    # patients, so the patient messages go out; the admin feed does not hear about it.
+    synthetic: bool = False
 
     @property
     def cursor(self) -> str:
@@ -106,7 +109,8 @@ class UnknownEventType(DomainError):
 
 
 def messages_for(event: OutboxEvent) -> list[OutboundMessage]:
-    """All messages one outbox row produces: patient slot messages, then the admin message."""
+    """All messages one outbox row produces: patient slot messages, then the admin message (none for
+    a synthetic patient's appointment)."""
     out: list[OutboundMessage] = []
     if event.event_type == "booked" and event.to_starts_at is not None:
         out.append(_slot_message(event, "slot_taken", event.to_starts_at, event.local_date, 1))
@@ -122,6 +126,8 @@ def messages_for(event: OutboxEvent) -> list[OutboundMessage]:
         out.append(_slot_message(event, "slot_taken", event.to_starts_at, event.local_date, 1))
     else:
         raise UnknownEventType(f"cannot push event {event.cursor} of type {event.event_type!r}")
+    if event.synthetic:
+        return out
     out.append(
         OutboundMessage(
             channel=ADMIN_CHANNEL,
