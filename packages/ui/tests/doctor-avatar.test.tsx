@@ -25,28 +25,39 @@ const SEEDED = {
 describe("avatar map", () => {
   it("has an avatar for every seeded doctor id", () => {
     for (const id of Object.keys(SEEDED)) {
-      expect(doctorAvatarSrc(id), id).toMatch(/^data:image\/svg\+xml;base64,/);
+      expect(doctorAvatarSrc(id), id).toBe(`/doctors/${id}.svg`);
     }
     expect(Object.keys(DOCTOR_AVATARS).sort()).toEqual(
       Object.keys(SEEDED).sort(),
     );
   });
 
-  it("matches the committed svg files byte for byte", () => {
+  it("has one source file per id, and a byte-identical static copy in each app", () => {
     const dir = fileURLToPath(new URL("../assets/doctors/", import.meta.url));
-    const files = readdirSync(dir).filter((f) => f.endsWith(".svg"));
-    expect(files.map((f) => f.replace(".svg", "")).sort()).toEqual(
+    const files = readdirSync(dir).filter((f) =>
+      /\.(svg|webp|png|jpe?g|avif)$/.test(f),
+    );
+    expect(files.map((f) => f.replace(/\.[^.]+$/, "")).sort()).toEqual(
       Object.keys(DOCTOR_AVATARS).sort(),
     );
-    for (const f of files) {
-      const id = f.replace(".svg", "");
-      const encoded = DOCTOR_AVATARS[id]!.replace(
-        "data:image/svg+xml;base64,",
-        "",
+    for (const app of ["booking", "admin"]) {
+      const pub = fileURLToPath(
+        new URL(`../../../apps/${app}/public/doctors/`, import.meta.url),
       );
-      expect(Buffer.from(encoded, "base64").toString("utf8")).toBe(
-        readFileSync(dir + f, "utf8"),
-      );
+      expect(readdirSync(pub).sort(), app).toEqual([...files].sort());
+      for (const f of files) {
+        expect(
+          readFileSync(pub + f).equals(readFileSync(dir + f)),
+          `${app}/${f}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("never inlines image bytes", () => {
+    for (const src of Object.values(DOCTOR_AVATARS)) {
+      expect(src.startsWith("/doctors/")).toBe(true);
+      expect(src.length).toBeLessThan(60);
     }
   });
 
@@ -75,7 +86,7 @@ describe("DoctorAvatar", () => {
     expect(html).toContain('width="48"');
     expect(html).toContain('height="48"');
     expect(html).toContain("rounded-full");
-    expect(html).toContain("data:image/svg+xml;base64,");
+    expect(html).toContain(`src="/doctors/${id}.svg"`);
   });
 
   it("falls back to initials for an unknown id", () => {

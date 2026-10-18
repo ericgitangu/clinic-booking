@@ -38,6 +38,7 @@ export default async function MyAppointments({
   // Someone who has never booked has no patient record yet: that is an empty list, not an error.
   const never =
     !res.ok && res.kind === "problem" && res.code === "PATIENT_NOT_FOUND";
+  // The API lists only visits that have not happened yet; a past one is reached by its own link.
   const upcoming = res.ok
     ? res.data.items.filter((a) => a.status === "booked")
     : [];

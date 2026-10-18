@@ -3,7 +3,7 @@ import { SITE } from "@/lib/site";
 
 export const FOOTER_COLUMNS: readonly FooterColumn[] = [
   {
-    title: "Idyllic Clinic Booking",
+    title: "Idyllic Clinic Admin",
     links: [
       {
         label: "Patient site",

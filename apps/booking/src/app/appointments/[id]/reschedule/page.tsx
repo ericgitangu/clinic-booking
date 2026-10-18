@@ -60,6 +60,23 @@ export default async function Reschedule({
     );
   }
 
+  if (Date.parse(appt.data.starts_at) <= Date.now()) {
+    return (
+      <section className="py-10">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          Reschedule
+        </h1>
+        <p className="mt-4 text-base">
+          This visit has passed, so it cannot be moved.{" "}
+          <Link href="/appointments" className="underline underline-offset-4">
+            My appointments
+          </Link>
+          .
+        </p>
+      </section>
+    );
+  }
+
   const today = clinicDay(new Date());
   const day = isValidDay(date)
     ? date

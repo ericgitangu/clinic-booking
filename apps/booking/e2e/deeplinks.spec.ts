@@ -9,12 +9,14 @@ import {
 import { hhmm } from "./api";
 import { chip } from "./support/chips";
 import { farCell } from "./support/cells";
+import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // Deep links: a free time links to its details page, a taken or held time has no link, and each
 // appointment has its own page (booked, or cancelled with the time freed). Real stack. Instance
-// i = repeat * 8 + scenario owns calendar cell 40 + i (no other spec uses 40 to 99).
-const cellOf = (scenario: number, repeat: number) => 40 + repeat * 8 + scenario;
+// i = repeat * 10 + scenario owns calendar cell 40 + i (no other spec uses 40 to 99).
+const cellOf = (scenario: number, repeat: number) =>
+  40 + repeat * 10 + scenario;
 
 let nextIp = 0;
 const ip = () =>
@@ -336,4 +338,55 @@ test("the live-state line says how the grid is being kept current", async ({
     /Live: times update|Checking for changes/,
   );
   await visitor.close();
+});
+
+test("a booked visit whose time has passed is read-only", async ({
+  browser,
+}, testInfo) => {
+  const { doctorId, slots } = await farCell(
+    cellOf(8, testInfo.repeatEachIndex),
+  );
+  const me = await signedIn(browser);
+  const page = me.page;
+  await bookOn(page, doctorId, slots[1]);
+  const id = page.url().split("/").pop()!;
+
+  // The API refuses to book a past time, so the booking is made for a future one and then moved back
+  // in the database: this one row only, found by its own id, so no other test can see the change.
+  const moved = await withDb((db) =>
+    db.query(
+      `UPDATE appointments
+          SET starts_at = starts_at - interval '200 days',
+              ends_at = ends_at - interval '200 days'
+        WHERE id = $1`,
+      [id],
+    ),
+  );
+  expect(moved.rowCount).toBe(1);
+
+  await page.goto(`/appointments/${id}`);
+  await expect(
+    page.getByRole("heading", { name: "This visit has passed" }),
+  ).toBeVisible();
+  const note = page.getByTestId("passed-note");
+  await expect(note).toContainText("can no longer be moved or cancelled");
+  await expect(
+    note.getByRole("link", { name: "My appointments" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(
+    violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
+  ).toEqual([]);
+
+  // The reschedule address says the same instead of offering times.
+  await page.goto(`/appointments/${id}/reschedule`);
+  await expect(page.getByText("This visit has passed")).toBeVisible();
+  await expect(page.getByRole("radio")).toHaveCount(0);
+
+  await closeAll(me.context);
 });

@@ -136,6 +136,46 @@ test("a time another person books turns inactive on an open page without a reloa
   await ctx.close();
 });
 
+test("a time the person had picked on the reschedule page and someone else books says it was just taken", async ({
+  browser,
+}, testInfo) => {
+  // The doctor grid has no pick step any more (a free time is a link); the pick, and the words for
+  // losing it, live on the reschedule page.
+  const { doctorId, day, slots } = await ownCell(
+    cellOf(1, testInfo.repeatEachIndex),
+  );
+  const ctx = await context(browser);
+  await ctx.addCookies(await sessionCookies(newPerson()));
+  const page = await openPage(ctx);
+  await page.goto(
+    `/book/${doctorId}/details?starts_at=${encodeURIComponent(slots[0])}`,
+  );
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You are booked" }),
+  ).toBeVisible();
+  const id = page.url().split("/").pop();
+
+  await page.clock.install();
+  await page.goto(`/appointments/${id}/reschedule?date=${day}`);
+  await polling(page);
+  await page.getByText(hhmm(slots[1]), { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Move appointment" }),
+  ).toBeEnabled();
+
+  await bookAs(browser, doctorId, slots[1]);
+
+  await page.clock.runFor(POLL_MS + 1000);
+  await expect(
+    page.getByText(`${hhmm(slots[1])} was just taken`),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Move appointment" }),
+  ).toBeDisabled();
+  await ctx.close();
+});
+
 test("polling runs while the tab is visible, pauses when hidden and catches up on return", async ({
   browser,
 }) => {

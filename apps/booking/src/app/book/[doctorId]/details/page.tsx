@@ -31,6 +31,10 @@ export default async function Details({
   if (!startsAt || !ISO.test(startsAt) || Number.isNaN(Date.parse(startsAt))) {
     redirect(`/book/${doctorId}`);
   }
+  // A link to a time that has gone (an old bookmark, an email, a stale tab) goes to that day's times.
+  if (Date.parse(startsAt) <= Date.now()) {
+    redirect(`/book/${doctorId}?date=${clinicDay(startsAt)}`);
+  }
   const [doctor, who, own] = await Promise.all([
     api.getDoctor(doctorId),
     getIdentity(),

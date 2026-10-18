@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ProfileAvatar,
   initialsOf,
+  isGoogleAvatar,
 } from "@clinic/ui/components/account/profile-avatar";
 
 const URL_ = "https://lh3.googleusercontent.com/a/abc=s96-c";
@@ -49,4 +50,30 @@ describe("ProfileAvatar", () => {
       expect(html).toContain('aria-hidden="true"');
     },
   );
+});
+
+describe("isGoogleAvatar", () => {
+  it("accepts only https on exactly lh3.googleusercontent.com", () => {
+    expect(isGoogleAvatar(URL_)).toBe(true);
+    for (const bad of [
+      "http://lh3.googleusercontent.com/a/abc",
+      "https://lh3.googleusercontent.com.evil.example/a",
+      "https://evil.example/lh3.googleusercontent.com",
+      "https://user@lh3.googleusercontent.com/a",
+      "https://lh3.googleusercontent.com:8443/a",
+      "https://lh4.googleusercontent.com/a",
+      "data:image/png;base64,AAAA",
+      "javascript:alert(1)",
+      "not a url",
+    ])
+      expect(isGoogleAvatar(bad), bad).toBe(false);
+  });
+
+  it("shows initials for an image on another host", () => {
+    const html = renderToStaticMarkup(
+      <ProfileAvatar name="Pat Mwangi" image="https://evil.example/a.png" />,
+    );
+    expect(html).not.toContain("<img");
+    expect(html).toContain('data-initials="PM"');
+  });
 });

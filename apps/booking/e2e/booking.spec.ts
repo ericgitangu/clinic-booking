@@ -167,17 +167,20 @@ test("rescheduling moves the appointment to the new time", async ({
   await closeAll(context);
 });
 
-test("a time that has already passed is refused with a plain message", async ({
+test("a link to a time that has already passed lands on that day's times", async ({
   browser,
 }) => {
   const doctorId = await firstDoctor();
   const { context, page } = await signedIn(browser);
-  await confirmBooking(
-    page,
-    doctorId,
-    new Date(Date.now() - 86_400_000).toISOString(),
+  const past = new Date(Date.now() - 86_400_000);
+  await page.goto(details(doctorId, past.toISOString()));
+  await expect(page).toHaveURL(
+    new RegExp(`/book/${doctorId}\\?date=\\d{4}-\\d{2}-\\d{2}$`),
   );
-  await expect(alertOf(page)).toContainText("That time has already passed.");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toHaveCount(0);
   await closeAll(context);
 });
 

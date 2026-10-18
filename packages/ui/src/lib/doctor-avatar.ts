@@ -1,11 +1,17 @@
-import { DOCTOR_AVATAR_DATA } from "./doctor-avatar-data";
+import { DOCTOR_AVATAR_FILES } from "./doctor-avatar-data";
 
 // Avatars keyed by the seeded doctor id (backend/app/scripts/seed.py: uuid5 of "doctor:<key>").
-// The art is CC0 (DiceBear Lorelei, Lisa Wischofsky); see packages/ui/assets/doctors/README.md.
+// The art lives in packages/ui/assets/doctors/ and is served as a static file by each app (see
+// scripts/avatars/sync.mjs), never inlined into a JavaScript chunk. Art licence: assets/doctors/README.md.
 export const DOCTOR_AVATARS: Readonly<Record<string, string>> =
-  DOCTOR_AVATAR_DATA;
+  Object.fromEntries(
+    Object.entries(DOCTOR_AVATAR_FILES).map(([id, ext]) => [
+      id,
+      `/doctors/${id}.${ext}`,
+    ]),
+  );
 
-/** Self-hosted data URI for a doctor id, or null when there is no avatar for it. */
+/** Static URL (/doctors/<id>.<ext>) for a doctor id, or null when there is no avatar for it. */
 export function doctorAvatarSrc(doctorId: string): string | null {
   return Object.hasOwn(DOCTOR_AVATARS, doctorId)
     ? DOCTOR_AVATARS[doctorId]!

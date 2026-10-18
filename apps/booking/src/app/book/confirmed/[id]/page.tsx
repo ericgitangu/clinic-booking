@@ -34,6 +34,16 @@ export default async function Confirmed({
   // does not exist.
   const appt = await api.myAppointment(callerFor(who), id);
   if (!appt.ok) {
+    // The API refusing the session is a sign-in question, not a missing page.
+    if (appt.status === 401 || appt.status === 403) {
+      return (
+        <SignInPrompt
+          title="Sign in to see your booking"
+          body="Your session has ended. Sign in again with the Google account that booked."
+          returnTo={`/book/confirmed/${id}`}
+        />
+      );
+    }
     if (appt.status < 500) notFound();
     return (
       <p role="alert" className="py-10 text-base">

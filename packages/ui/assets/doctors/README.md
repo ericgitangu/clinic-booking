@@ -27,10 +27,12 @@ The generated SVGs carry the CC0 rights notice in their own metadata.
 
 ## How the apps use them
 
-The SVGs here are the source of truth. The generator also writes
-`packages/ui/src/lib/doctor-avatar-data.ts` (the same bytes as data URIs), which `DoctorAvatar` reads. That
-keeps the images self-hosted and identical in both apps with no public-dir copy, no CDN and no runtime
-generation. A unit test fails if the two drift apart.
+The files here (`<doctor id>.svg`, or `.webp`, `.png`, `.jpg`, `.avif`) are the source of truth.
+`node scripts/avatars/sync.mjs` copies them to `apps/booking/public/doctors/` and
+`apps/admin/public/doctors/` (served as `/doctors/<id>.<ext>`, so no image bytes are inlined into any
+JavaScript chunk) and writes the id to extension manifest `packages/ui/src/lib/doctor-avatar-data.ts`
+that `DoctorAvatar` reads. A unit test fails if the three drift apart. To swap the art for photos, drop
+`<id>.webp` files here (one extension per doctor), delete the old file, and run the sync.
 
 ## Regenerate
 
@@ -39,7 +41,7 @@ Every option is pinned per person in `scripts/avatars/generate.mjs`, so the outp
 ```sh
 cd scripts/avatars
 npm ci --ignore-scripts
-node generate.mjs                          # rewrites the SVGs and the data module
+node generate.mjs                          # rewrites the SVGs, then runs the sync
 node generate.mjs --preview /tmp/doctors.html   # optional contact sheet
 ```
 

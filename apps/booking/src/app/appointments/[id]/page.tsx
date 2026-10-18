@@ -34,6 +34,16 @@ export default async function AppointmentPage({
   // 404 for an appointment that is not this person's, the same as for one that does not exist.
   const res = await api.myAppointment(callerFor(who), id);
   if (!res.ok) {
+    // The API refusing the session is a sign-in question, not a missing page.
+    if (res.status === 401 || res.status === 403) {
+      return (
+        <SignInPrompt
+          title="Sign in to see your appointment"
+          body="Your session has ended. Sign in again with the Google account that booked."
+          returnTo={`/appointments/${id}`}
+        />
+      );
+    }
     if (res.status < 500) notFound();
     return (
       <p role="alert" className="py-10 text-base">
@@ -48,6 +58,8 @@ export default async function AppointmentPage({
   const when = formatWhen(a.starts_at);
   const cancelled = a.status === "cancelled";
   const future = Date.parse(a.starts_at) > Date.now();
+  // A booked visit whose time has gone is history: no way to move or cancel it.
+  const passed = !cancelled && !future;
 
   return (
     <section className="py-10">
@@ -57,7 +69,11 @@ export default async function AppointmentPage({
         </Link>
       </p>
       <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-        {cancelled ? "Appointment cancelled" : "Your appointment"}
+        {cancelled
+          ? "Appointment cancelled"
+          : passed
+            ? "This visit has passed"
+            : "Your appointment"}
       </h1>
       <div
         data-testid="appointment-card"
@@ -98,6 +114,25 @@ export default async function AppointmentPage({
               >
                 Book another time
               </Link>
+            </Button>
+          </div>
+        </div>
+      ) : passed ? (
+        <div data-testid="passed-note" className="mt-6 space-y-3 text-base">
+          <p>
+            This visit was on {when}. It can no longer be moved or cancelled.
+          </p>
+          <div className="pt-3 flex flex-wrap gap-3">
+            <Button asChild size="lg" className="h-12 px-6 text-base">
+              <Link href="/appointments">My appointments</Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 px-6 text-base"
+            >
+              <Link href={`/book/${a.doctor_id}`}>Book another visit</Link>
             </Button>
           </div>
         </div>
