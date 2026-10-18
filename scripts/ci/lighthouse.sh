@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 LH_DIR=scripts/ci/lighthouse   # holds the exact @lhci/cli version and its lockfile
-LH_WATCH="apps/ packages/ui/ scripts/ci/lighthouse scripts/ci/lighthouserc.cjs"
+LH_WATCH="${LH_WATCH:-apps/ packages/ui/ scripts/ci/lighthouse scripts/ci/lighthouse.sh scripts/ci/lighthouserc.cjs}"
 if [ "${CIRCLE_BRANCH:-main}" != main ]; then
   git fetch origin main --quiet 2>/dev/null || true
   if base="$(git merge-base origin/main HEAD 2>/dev/null)" \
@@ -42,7 +42,7 @@ fi
 [ -x "$CHROME_PATH" ] || { echo "no Chrome at $CHROME_PATH"; exit 1; }
 
 LOG="$(mktemp)"
-# LH_SERVER_CMD and LH_RUN_CMD exist so scripts/ci/test_ci_scripts.sh can drive this script with a
+# LH_SERVER_CMD, LH_RUN_CMD and LH_WATCH exist so scripts/ci/test_ci_scripts.sh can drive this script with a
 # fake server and a fake runner; in CI both are unset.
 (
   cd apps/booking
@@ -63,7 +63,18 @@ kill_tree() {
   for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child"; done
   kill "$pid" 2>/dev/null || true
 }
-trap 'kill_tree "$(cat "$LOG.pid" 2>/dev/null || echo "$SERVER")"; wait "$SERVER" 2>/dev/null || true; rm -f "$LOG.pid"' EXIT
+cleanup() {
+  # The script's own exit status first, before anything below can replace it. `set -e` is off here
+  # on purpose: `wait` on the server we just killed returns 143, and under errexit that would become
+  # the script's exit status and turn a failed Lighthouse run (or a good one) into 143.
+  local rc=$?
+  set +e
+  kill_tree "$(cat "$LOG.pid" 2>/dev/null || echo "$SERVER")"
+  wait "$SERVER" 2>/dev/null
+  rm -f "$LOG.pid"
+  exit "$rc"
+}
+trap cleanup EXIT
 
 for _ in $(seq 1 30); do
   curl -sf -o /dev/null "$LHCI_BASE_URL/about" && break
