@@ -1,4 +1,9 @@
-import { test as base, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 import { EMAIL, type Persona } from "./stack";
 import { sessionCookies } from "./test-auth";
 
@@ -24,9 +29,28 @@ export async function signIn(context: BrowserContext, email: string) {
 // a slow CI runner. Unset, nothing changes.
 const THROTTLE = Number(process.env.ADMIN_E2E_CPU_THROTTLE ?? 1);
 
+// A page that breaks its own Content-Security-Policy says so in the console. Every scenario runs with
+// the policy on, and any such message, in any page of the scenario's context, fails it.
+const CSP_MESSAGE =
+  /Content[- ]Security[- ]Policy|violates the following|Refused to (?:load|connect|execute|apply|frame)/i;
+
 export const test = base.extend<{
   as: (who: Persona | string) => Promise<Page>;
+  cspGuard: void;
 }>({
+  cspGuard: [
+    async ({ context }, use, testInfo) => {
+      const hits: string[] = [];
+      context.on("console", (m) => {
+        if (CSP_MESSAGE.test(m.text())) hits.push(m.text());
+      });
+      await use();
+      // A scenario that breaks the policy on purpose (to prove it blocks) says so with this annotation.
+      if (testInfo.annotations.some((a) => a.type === "csp-expected")) return;
+      expect(hits, "Content-Security-Policy violations").toEqual([]);
+    },
+    { auto: true },
+  ],
   page: async ({ page, context }, use) => {
     if (THROTTLE > 1) {
       const cdp = await context.newCDPSession(page);

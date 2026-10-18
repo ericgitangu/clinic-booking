@@ -309,3 +309,95 @@ test.describe("signed out, and the 404", () => {
     ).toHaveCount(4);
   });
 });
+
+// Loads a script, fetches a URL and loads an image from each host, in the page, and reports what the
+// policy let through. Violations are collected from the browser's own securitypolicyviolation event.
+async function probe(
+  page: Page,
+  hosts: { script?: string; connect?: string; img?: string },
+) {
+  return page.evaluate(async (h) => {
+    const violations: string[] = [];
+    document.addEventListener("securitypolicyviolation", (e) =>
+      violations.push(`${e.effectiveDirective} ${e.blockedURI}`),
+    );
+    const out: Record<string, string> = {};
+    if (h.script)
+      out.script = await new Promise<string>((done) => {
+        const s = document.createElement("script");
+        s.src = h.script!;
+        s.onload = () => done("loaded");
+        s.onerror = () => done("blocked");
+        document.head.append(s);
+      });
+    if (h.connect)
+      out.connect = await fetch(h.connect, { mode: "no-cors" }).then(
+        () => "loaded",
+        () => "blocked",
+      );
+    if (h.img)
+      out.img = await new Promise<string>((done) => {
+        const i = new Image();
+        i.onload = () => done("loaded");
+        i.onerror = () => done("blocked");
+        i.src = h.img!;
+      });
+    return { out, violations };
+  }, hosts);
+}
+
+const PIXEL = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test.describe("the Content-Security-Policy", () => {
+  test("is sent on pages, the 404 and the sign-in gate, with the directives that matter", async ({
+    as,
+    request,
+  }) => {
+    await as("owner");
+    for (const path of ["/", "/dashboard", "/no-such-page"]) {
+      const res = await request.get(path);
+      const csp = res.headers()["content-security-policy"];
+      expect(csp, path).toBeTruthy();
+      for (const d of [
+        "default-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+        "https://lh3.googleusercontent.com",
+        "https://accounts.google.com",
+      ])
+        expect(csp, `${path}: ${d}`).toContain(d);
+      expect(csp, path).not.toMatch(/script-src[^;]*\*/);
+      expect(csp, path).not.toContain("unsafe-eval");
+    }
+  });
+
+  test("lets Google profile pictures through and blocks any other host", async ({
+    page,
+  }, testInfo) => {
+    testInfo.annotations.push({ type: "csp-expected" });
+    await page.route("https://lh3.googleusercontent.com/**", (r) =>
+      r.fulfill({ contentType: "image/png", body: PIXEL }),
+    );
+    await page.goto("/");
+    const ok = await probe(page, {
+      img: "https://lh3.googleusercontent.com/a/x=s96-c",
+    });
+    expect(ok.out).toEqual({ img: "loaded" });
+    expect(ok.violations).toEqual([]);
+    const bad = await probe(page, {
+      script: "https://evil.example/x.js",
+      connect: "https://evil.example/collect",
+      img: "https://evil.example/p.png",
+    });
+    expect(bad.out).toEqual({
+      script: "blocked",
+      connect: "blocked",
+      img: "blocked",
+    });
+    expect(bad.violations).toHaveLength(3);
+  });
+});

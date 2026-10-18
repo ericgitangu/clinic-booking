@@ -3,7 +3,7 @@ import {
   test as base,
   type Browser,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { addDays, doctorAt, hhmm, slotsOn } from "./api";
 import { FROM, REPLY_TO } from "../src/lib/email/sender";
 import { ownDay } from "./support/own-day";

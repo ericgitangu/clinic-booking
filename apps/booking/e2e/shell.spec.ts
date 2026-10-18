@@ -5,7 +5,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { hhmm, pick, slotsOn } from "./api";
 import { newPerson, sessionCookies } from "./support/auth";
 
@@ -332,17 +332,23 @@ test.describe("anchors clear the sticky header", () => {
     const context = await browser.newContext({ viewport: PHONE });
     const page = await context.newPage();
     await page.goto("/privacy");
-    // Any heading with an id works as a target; take the last, so it needs a real scroll.
-    const id = await page.evaluate(() => {
-      const hs = [...document.querySelectorAll("main h2[id], main h3[id]")];
-      return hs.at(-1)?.id ?? null;
+    // Let the page finish hydrating first, or React replaces what is added below.
+    await page.waitForLoadState("networkidle");
+    // Add a target far down the page, so the jump needs a real scroll whatever the page holds.
+    await page.evaluate(() => {
+      const spacer = document.createElement("div");
+      spacer.style.height = "3000px";
+      const target = document.createElement("h2");
+      target.id = "shell-test-target";
+      target.textContent = "Target";
+      document.querySelector("main")!.append(spacer, target);
     });
-    test.skip(id === null, "the page has no headings with ids");
-    await page.evaluate((h) => (location.hash = h), id!);
+    await page.evaluate(() => (location.hash = "shell-test-target"));
     await page.waitForTimeout(300);
     const top = await page.evaluate(
-      (h) => document.getElementById(h)!.getBoundingClientRect().top,
-      id!,
+      () =>
+        document.getElementById("shell-test-target")!.getBoundingClientRect()
+          .top,
     );
     const header = (await page.getByRole("banner").boundingBox())!;
     expect(top).toBeGreaterThanOrEqual(header.height);
@@ -605,4 +611,146 @@ test.describe("the pinned Confirm bar and the sticky header", () => {
       });
     }
   }
+});
+
+// Loads a script, fetches a URL and loads an image from each host, in the page, and reports what the
+// policy let through. Violations are collected from the browser's own securitypolicyviolation event.
+async function probe(
+  page: Page,
+  hosts: { script?: string; connect?: string; img?: string },
+) {
+  return page.evaluate(async (h) => {
+    const violations: string[] = [];
+    document.addEventListener("securitypolicyviolation", (e) =>
+      violations.push(`${e.effectiveDirective} ${e.blockedURI}`),
+    );
+    const out: Record<string, string> = {};
+    if (h.script)
+      out.script = await new Promise<string>((done) => {
+        const s = document.createElement("script");
+        s.src = h.script!;
+        s.onload = () => done("loaded");
+        s.onerror = () => done("blocked");
+        document.head.append(s);
+      });
+    if (h.connect)
+      out.connect = await fetch(h.connect, { mode: "no-cors" }).then(
+        () => "loaded",
+        () => "blocked",
+      );
+    if (h.img)
+      out.img = await new Promise<string>((done) => {
+        const i = new Image();
+        i.onload = () => done("loaded");
+        i.onerror = () => done("blocked");
+        i.src = h.img!;
+      });
+    return { out, violations };
+  }, hosts);
+}
+
+const PIXEL = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test.describe("the Content-Security-Policy", () => {
+  test("is sent on pages, errors and the docs, with the directives that matter", async ({
+    request,
+  }) => {
+    for (const path of [
+      "/",
+      "/book",
+      "/privacy",
+      "/no-such-page",
+      "/docs-assets/docs-shell.js",
+    ]) {
+      const res = await request.get(path);
+      const all = res
+        .headersArray()
+        .filter((h) => h.name.toLowerCase() === "content-security-policy")
+        .map((h) => h.value);
+      expect(all.length, path).toBeGreaterThan(0);
+      const csp = all[0];
+      for (const d of [
+        "default-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+        "https://lh3.googleusercontent.com",
+        "https://www.google.com",
+        "https://www.gstatic.com",
+        "wss://realtime.ably.net",
+        "https://*.ably.net",
+      ])
+        expect(csp, `${path}: ${d}`).toContain(d);
+      expect(csp, path).not.toMatch(/script-src[^;]*\*/);
+      expect(csp, path).not.toContain("unsafe-eval");
+    }
+    // The two docs pages keep their own, stricter policy: nothing but this origin, scripts included.
+    for (const path of ["/docs", "/redoc"]) {
+      const docs = (await request.get(path))
+        .headersArray()
+        .filter((h) => h.name.toLowerCase() === "content-security-policy");
+      expect(docs, path).toHaveLength(1);
+      expect(docs[0].value, path).toContain("default-src 'none'");
+      expect(docs[0].value, path).toMatch(/script-src 'self'(;|$)/);
+    }
+  });
+
+  test("lets reCAPTCHA, Ably and Google profile pictures through, and blocks any other host", async ({
+    browser,
+  }, testInfo) => {
+    testInfo.annotations.push({ type: "csp-expected" });
+    const context = await browser.newContext();
+    await context.route("https://www.google.com/recaptcha/**", (r) =>
+      r.fulfill({ contentType: "text/javascript", body: "" }),
+    );
+    await context.route("https://www.gstatic.com/**", (r) =>
+      r.fulfill({ contentType: "image/png", body: PIXEL }),
+    );
+    await context.route("https://main.realtime.ably.net/**", (r) =>
+      r.fulfill({ contentType: "application/json", body: "{}" }),
+    );
+    await context.route("https://lh3.googleusercontent.com/**", (r) =>
+      r.fulfill({ contentType: "image/png", body: PIXEL }),
+    );
+    const page = await context.newPage();
+    await page.goto("/privacy");
+    const allowed = await probe(page, {
+      script: "https://www.google.com/recaptcha/enterprise.js?render=k",
+      connect: "https://main.realtime.ably.net/event-stream?channels=x",
+      img: "https://lh3.googleusercontent.com/a/x=s96-c",
+    });
+    expect(allowed.out).toEqual({
+      script: "loaded",
+      connect: "loaded",
+      img: "loaded",
+    });
+    expect(allowed.violations).toEqual([]);
+    const blocked = await probe(page, {
+      script: "https://evil.example/x.js",
+      connect: "https://evil.example/collect",
+      img: "https://evil.example/p.png",
+    });
+    expect(blocked.out).toEqual({
+      script: "blocked",
+      connect: "blocked",
+      img: "blocked",
+    });
+    expect(blocked.violations).toHaveLength(3);
+    await context.close();
+  });
+
+  test("keeps the docs pages working under it", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto("/docs");
+    await expect(page.getByRole("combobox", { name: "Servers" })).toBeVisible();
+    await page.goto("/redoc");
+    await expect(
+      page.getByRole("heading", { name: "appointments" }).first(),
+    ).toBeVisible();
+    await context.close();
+  });
 });

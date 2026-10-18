@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 import { hhmm, pick } from "./api";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";

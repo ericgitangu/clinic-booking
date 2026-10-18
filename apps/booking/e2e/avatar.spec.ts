@@ -5,7 +5,7 @@ import {
   type BrowserContext,
   type Locator,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // The header shows the person's Google profile picture, or their initials. Google's picture host

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // Better Auth rate-limits per client address (100 requests in 10 s by default) and every context

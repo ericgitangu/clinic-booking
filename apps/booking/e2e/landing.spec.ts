@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { type BrowserContext, expect, test } from "@playwright/test";
+import { type BrowserContext, expect, test } from "./support/csp-guard";
 import { API } from "./api";
 
 const hasTool = (name: string) => {
