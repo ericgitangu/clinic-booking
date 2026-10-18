@@ -188,7 +188,7 @@ To click through it instead, start the API with `make up` (or use production), t
 
 ## 3. System design
 
-This section is the shape of the system. Section 4 is why I chose it over the alternatives. Each decision links to its ADR in [`docs/adr/`](docs/adr/README.md).
+This section is the shape of the system. Section 4 is why I chose it over the alternatives. Each decision links to its ADR in [`docs/adr/`](docs/adr/README.md). The same choices in plain words are at <https://clinic.ericgitangu.com/decisions>.
 
 ### 3.1 Context and containers
 
