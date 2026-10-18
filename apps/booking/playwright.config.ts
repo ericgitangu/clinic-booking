@@ -45,6 +45,8 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         API_URL: process.env.E2E_API_URL ?? "http://127.0.0.1:8080",
+        // Turns on /e2e-shell/error, the page that throws on purpose (app/e2e-shell/error/page.tsx).
+        SHELL_E2E: "1",
         // The human check is off for test runs only (see lib/human-check.ts); there is no Google here.
         E2E: "1",
         RECAPTCHA_ENFORCE: "false",

@@ -274,3 +274,56 @@
 .grecaptcha-badge {
   visibility: hidden;
 }
+
+/* ---- App shell. Names starting with shell- belong to the shared layout in components/app-shell. ---- */
+:root {
+  /* The sticky header's height, without the safe-area inset (the header adds that on top). */
+  --shell-header-h: 3.5rem;
+  --shell-header-offset: calc(
+    var(--shell-header-h) + env(safe-area-inset-top, 0px)
+  );
+}
+
+/* An in-page link target (#section) must land below the sticky header, not under it. */
+html {
+  scroll-padding-top: calc(var(--shell-header-offset) + 0.75rem);
+}
+
+[id] {
+  scroll-margin-top: calc(var(--shell-header-offset) + 0.75rem);
+}
+
+/* A page with a pinned action bar (data-sticky-cta, e.g. "Continue") keeps focused fields and
+   in-page targets clear of it as well. */
+html:has([data-sticky-cta]) {
+  scroll-padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* One focus ring for every link, the same 3px halo the buttons draw, so a link inside a paragraph is
+   as easy to find with the keyboard as a button. Components that set their own ring keep it. */
+@layer base {
+  a:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--ring) 30%, transparent);
+  }
+}
+
+/* Once the page has scrolled, the header lifts off the content with a shadow. The surface itself is
+   always solid; nothing is blurred or see-through. */
+.shell-header[data-scrolled="true"] {
+  box-shadow: 0 6px 16px -12px color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell-header {
+    transition: box-shadow 160ms ease;
+  }
+}
+
+@media print {
+  .shell-header {
+    position: static;
+  }
+}
