@@ -10,3 +10,47 @@
 body:has([data-sticky-cta]) footer {
   padding-bottom: 7rem;
 }
+
+/* A free time answers the tap: it settles into place with a small press. The radio input is
+   visually hidden and its label is the .slot-chip-label span that follows it. */
+@keyframes slot-pick {
+  0% {
+    transform: scale(0.96);
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+input[name="slot"] + .slot-chip-label {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+input[name="slot"] + .slot-chip-label:active {
+  transform: scale(0.97);
+}
+
+input[name="slot"]:checked + .slot-chip-label {
+  animation: slot-pick 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[name="slot"] + .slot-chip-label {
+    transition: none;
+  }
+
+  input[name="slot"] + .slot-chip-label:active {
+    transform: none;
+  }
+
+  input[name="slot"]:checked + .slot-chip-label {
+    animation: none;
+  }
+}

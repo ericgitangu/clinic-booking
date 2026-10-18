@@ -11,7 +11,7 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
     title: "Clinic",
     links: [
       {
-        label: "Book an appointment",
+        label: "Book a visit",
         href: "/book",
         external: false,
         icon: "calendar",
@@ -59,12 +59,6 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
         href: "/about",
         external: false,
         icon: "briefcase",
-      },
-      {
-        label: "Data handling",
-        href: "/data",
-        external: false,
-        icon: "database",
       },
     ],
   },

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
+import { pageMetadata } from "@/lib/metadata";
 import { listDoctors } from "@/lib/api";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Book a visit",
   description: "Choose a doctor, pick a free time in Nairobi time, and book.",
-  alternates: { canonical: "/book" },
-};
+  path: "/book",
+});
 // The doctor list comes from the API, which is not reachable while the site is being built.
 export const dynamic = "force-dynamic";
 
