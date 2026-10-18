@@ -542,6 +542,15 @@
             "title": "Slots",
             "type": "array"
           },
+          "taken": {
+            "description": "Starts of this day's grid that are booked (clinic-local offset, like `slots`): the times the doctor works that overlap a booking. Starts only; nothing says who holds them. A time is in `slots` or in `taken`, never both.",
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Taken",
+            "type": "array"
+          },
           "timezone": {
             "title": "Timezone",
             "type": "string"
@@ -552,7 +561,8 @@
           "date",
           "timezone",
           "cursor",
-          "slots"
+          "slots",
+          "taken"
         ],
         "title": "Availability",
         "type": "object"

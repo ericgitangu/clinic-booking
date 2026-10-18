@@ -28,3 +28,10 @@ class Availability(BaseModel):
         ),
     )
     slots: list[Slot]
+    taken: list[datetime] = Field(
+        description=(
+            "Starts of this day's grid that are booked (clinic-local offset, like `slots`): the "
+            "times the doctor works that overlap a booking. Starts only; nothing says who holds "
+            "them. A time is in `slots` or in `taken`, never both."
+        )
+    )

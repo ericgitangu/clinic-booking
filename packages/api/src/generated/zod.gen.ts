@@ -402,6 +402,7 @@ export const zAvailability = z.object({
     doctor_id: z.uuid(),
     slot_minutes: z.literal(30).optional().default(30),
     slots: z.array(zSlot),
+    taken: z.array(z.iso.datetime({ offset: true })),
     timezone: z.string()
 });
 

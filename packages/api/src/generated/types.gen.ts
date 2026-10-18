@@ -320,6 +320,12 @@ export type Availability = {
      */
     slots: Array<Slot>;
     /**
+     * Taken
+     *
+     * Starts of this day's grid that are booked (clinic-local offset, like `slots`): the times the doctor works that overlap a booking. Starts only; nothing says who holds them. A time is in `slots` or in `taken`, never both.
+     */
+    taken: Array<string>;
+    /**
      * Timezone
      */
     timezone: string;
