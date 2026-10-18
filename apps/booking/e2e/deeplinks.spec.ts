@@ -227,6 +227,7 @@ test("someone else's appointment id is a 404, and a signed-out visitor is asked 
     .first()
     .getByRole("link", { name: new RegExp(hhmm(slots[4])) })
     .click();
+  await expect(owner.page).toHaveURL(/\/appointments\/[0-9a-f-]{36}$/);
   const path = new URL(owner.page.url()).pathname;
 
   const stranger = await signedIn(browser);
