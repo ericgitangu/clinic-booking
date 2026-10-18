@@ -8,8 +8,13 @@ import { newPerson, sessionCookies } from "./support/auth";
 // a request that slips through still gets plain words. The appointment is booked through the UI
 // for a far-off time, then moved into the window in the database, as nothing public can book it.
 
-async function bookedPerson(browser: import("@playwright/test").Browser) {
-  const { doctorId, slots } = await pick(11);
+// Each scenario uses a doctor of its own (2, 3, 4): the appointment is moved to the next half hour,
+// and one doctor cannot hold two bookings at the same time.
+async function bookedPerson(
+  browser: import("@playwright/test").Browser,
+  doctor: number,
+) {
+  const { doctorId, slots } = await pick(0, { doctor });
   const person = newPerson();
   const context = await browser.newContext();
   await context.addCookies(await sessionCookies(person));
@@ -25,7 +30,7 @@ async function bookedPerson(browser: import("@playwright/test").Browser) {
 }
 
 // The next :00 or :30 boundary that is 20 to 50 minutes away: on the grid, inside the window.
-async function moveIntoWindow(originalStart: string) {
+async function moveIntoWindow(originalStart: string, doctorId: string) {
   await withDb(async (db) => {
     await db.query(
       `UPDATE appointments
@@ -36,8 +41,8 @@ async function moveIntoWindow(originalStart: string) {
                           + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
                                  THEN interval '30 minutes' ELSE interval '0' END
                           + interval '30 minutes'
-        WHERE starts_at = $1::timestamptz AND status = 'booked'`,
-      [originalStart],
+        WHERE starts_at = $1::timestamptz AND doctor_id = $2 AND status = 'booked'`,
+      [originalStart, doctorId],
     );
   });
 }
@@ -45,8 +50,8 @@ async function moveIntoWindow(originalStart: string) {
 test("inside the last hour, cancel and reschedule are disabled and say why", async ({
   browser,
 }) => {
-  const { context, page, startsAt } = await bookedPerson(browser);
-  await moveIntoWindow(startsAt);
+  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 2);
+  await moveIntoWindow(startsAt, doctorId);
   await page.goto("/appointments");
   const cancel = page.getByRole("button", { name: "Cancel" });
   const reschedule = page.getByRole("button", { name: "Reschedule" });
@@ -65,13 +70,13 @@ test("inside the last hour, cancel and reschedule are disabled and say why", asy
 test("the reschedule page for a visit inside the last hour explains instead of offering times", async ({
   browser,
 }) => {
-  const { context, page, startsAt } = await bookedPerson(browser);
+  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 3);
   await page.goto("/appointments");
   const href = await page
     .getByRole("link", { name: "Reschedule" })
     .getAttribute("href");
   expect(href).toMatch(/\/appointments\/.+\/reschedule/);
-  await moveIntoWindow(startsAt);
+  await moveIntoWindow(startsAt, doctorId);
   await page.goto(href!);
   await expect(page.getByRole("status")).toContainText(
     /less than an hour.*contact the clinic/i,
@@ -85,12 +90,12 @@ test("the reschedule page for a visit inside the last hour explains instead of o
 test("a cancel that slips through the window is refused in plain words", async ({
   browser,
 }) => {
-  const { context, page, startsAt } = await bookedPerson(browser);
+  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 4);
   await page.goto("/appointments");
   await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByLabel("Why are you cancelling?").fill("Plans changed");
   // The page was rendered while the visit was still outside the hour; it enters the window now.
-  await moveIntoWindow(startsAt);
+  await moveIntoWindow(startsAt, doctorId);
   await page.getByRole("button", { name: "Cancel appointment" }).click();
   await expect(
     page.getByText(/less than an hour.*contact the clinic/i).first(),
