@@ -131,26 +131,20 @@ export async function bookAppointment(
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
-  // Refuse a time the patient already holds before the API is asked: the API would also refuse it,
-  // but only with a code; this says what happened and where to look. The API stays the final gate.
+  // A time the patient already holds gets the plain message below, but only once the API has said
+  // so. It used to be refused here, before the API was asked: a retry of the SAME attempt (same
+  // Idempotency-Key, e.g. a double submit or a lost response) then found the booking its first
+  // request had just made and was refused, when the API would have answered it with that booking.
+  // The API stays the final gate; this only chooses the words.
   const mine = await api.myAppointments(caller);
+  let held: { doctor_id: string; doctor: { full_name: string } } | undefined;
   if (mine.ok) {
-    const live = mine.data.items.filter(
-      (a) => a.status === "booked" && Date.parse(a.ends_at) > Date.now(),
+    held = mine.data.items.find(
+      (a) =>
+        a.status === "booked" &&
+        Date.parse(a.ends_at) > Date.now() &&
+        Date.parse(a.starts_at) === Date.parse(when),
     );
-    const held = live.find((a) => Date.parse(a.starts_at) === Date.parse(when));
-    if (held) {
-      return {
-        status: "error",
-        code: "PATIENT_DOUBLE_BOOKED",
-        severity: "warning",
-        message: heldMessage({
-          sameDoctor: held.doctor_id === doctor,
-          when: formatWhen(when),
-          doctor: held.doctor.full_name,
-        }),
-      };
-    }
   }
 
   // The form makes one key per booking attempt and sends the same one with every submit of that
@@ -162,6 +156,26 @@ export async function bookAppointment(
     keyFor(blank(fd.get("idempotency_key"))),
   );
   if (!booked.ok) {
+    // With the same doctor the database may name either index first (the doctor's slot or the
+    // patient's own time), so a SLOT_TAKEN for a time this patient holds with that doctor means
+    // they hold it themselves.
+    if (
+      held &&
+      booked.kind === "problem" &&
+      (booked.code === "PATIENT_DOUBLE_BOOKED" ||
+        (booked.code === "SLOT_TAKEN" && held.doctor_id === doctor))
+    ) {
+      return {
+        status: "error",
+        code: "PATIENT_DOUBLE_BOOKED",
+        severity: "warning",
+        message: heldMessage({
+          sameDoctor: held.doctor_id === doctor,
+          when: formatWhen(when),
+          doctor: held.doctor.full_name,
+        }),
+      };
+    }
     const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
     return failed(booked, {
       nextSlots: taken ? await nextFreeSlots(doctor, when) : undefined,
