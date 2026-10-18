@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI
 
 from app.api.routers import admin, appointments, doctors, health, me, patients, problems
+from app.core.clinic_zone import set_default_zone
 from app.core.config import Settings
 from app.core.cors import add_cors
 from app.core.logging import configure_logging
@@ -31,6 +32,8 @@ def create_app(settings: Settings) -> FastAPI:
         redoc_url="/redoc",
     )
     app.state.settings = settings
+    # Only for patient.created_at and access granted_at/revoked_at (they belong to no clinic).
+    set_default_zone(settings.DEFAULT_CLINIC_TZ)
 
     # Added innermost-first: unhandled-error -> CORS -> request-context (outermost, so it sets
     # the request id and logs every request, including a 500 turned into a response here).

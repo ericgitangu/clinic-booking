@@ -10,7 +10,10 @@ import { ZodError } from "zod";
 import { ASSERTION_HEADER, signAssertion } from "./assertion";
 import { createClient, createConfig, type Client } from "./generated/client";
 import type { ProblemCode } from "./generated/types.gen";
-import { zProblem } from "./generated/zod.gen";
+import {
+  zCreateAppointmentAppointmentsPostHeaders,
+  zProblem,
+} from "./generated/zod.gen";
 import { mintIdToken, minting_enabled } from "./proxy/gcp-id-token";
 import { logError } from "./proxy/log";
 
@@ -134,6 +137,13 @@ export async function callApi<D>(
       throwOnError: false,
       fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
         const req = new Request(input, init);
+        // The generated SDK builds an optional header schema but runs it against a Headers
+        // object, where it can never fail, so a malformed Idempotency-Key would reach the API.
+        // Check it here with the generated schema (both booking POSTs share the same rule); the
+        // ZodError surfaces as an invalid_request, before anything is signed or sent.
+        zCreateAppointmentAppointmentsPostHeaders.parse({
+          "Idempotency-Key": req.headers.get("idempotency-key") ?? undefined,
+        });
         if (opts.caller && signingKey) {
           // Signed over the request as it is about to be sent: method, path with query, body.
           const url = new URL(req.url);

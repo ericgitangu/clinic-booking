@@ -19,9 +19,10 @@ services:
       retries: 30
 
   migrate:
+    # No fixed image name: compose names the built image after the project (<project>-migrate,
+    # <project>-api), so two projects on one machine never share, or overwrite, each other's image.
     build:
       context: ./backend
-    image: clinic-api:local
     command: ["sh", "-c", "alembic upgrade head && python -m app.scripts.seed"]
     environment:
       # Owner role runs migrations and the seed.
@@ -34,7 +35,6 @@ services:
   api:
     build:
       context: ./backend
-    image: clinic-api:local
     environment:
       # Runtime role: SELECT/INSERT/UPDATE only.
       DATABASE_URL: postgresql+asyncpg://clinic_app:clinic_app_local@db:5432/clinic

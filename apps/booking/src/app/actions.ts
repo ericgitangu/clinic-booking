@@ -82,6 +82,16 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
+// The key must be 1-255 visible ASCII characters, as the API requires. A key that is missing or
+// malformed is replaced by a fresh one so the booking can still go ahead, but a fresh key is
+// unique to this one call: it cannot dedupe a double submit. Only the key the form sent can.
+const KEY_FORMAT = /^[\x21-\x7e]{1,255}$/;
+function keyFor(sent: string | undefined): string {
+  return sent !== undefined && KEY_FORMAT.test(sent)
+    ? sent
+    : crypto.randomUUID();
+}
+
 async function signedIn(): Promise<Identity | null> {
   return getIdentity();
 }
@@ -110,10 +120,14 @@ export async function bookAppointment(
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
-  const booked = await api.bookMine(caller, {
-    doctor_id: doctor,
-    starts_at: when,
-  });
+  // The form makes one key per booking attempt and sends the same one with every submit of that
+  // attempt, so two submits of one attempt (a double click, a retry after a lost response) reach
+  // the API with the same key and the second is answered with the booking the first made.
+  const booked = await api.bookMine(
+    caller,
+    { doctor_id: doctor, starts_at: when },
+    keyFor(blank(fd.get("idempotency_key"))),
+  );
   if (!booked.ok) {
     const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
     return failed(booked, {
