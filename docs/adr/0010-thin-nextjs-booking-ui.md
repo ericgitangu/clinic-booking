@@ -10,6 +10,8 @@
 
 Accepted. The web project is lean core because its proxy route handlers and landing page are the public URL ([ADR-0023](0023-zero-cost-edge-front-door.md)). The pages and features below are built as droppable slices in the order of the cut line at the end; dropping a slice never removes the proxy or the landing page.
 
+**Build status (2026-10-18, main 748d7d8): Partly shipped.** Shipped as two apps: the server-first booking flow, sign-in, the admin dashboard with its read-only `/internal/admin/*` endpoints and indexes, reCAPTCHA, the shell-only service worker with an offline page (#33), the 60 second cached admin metrics (#30) and live slot updates on the booking page over Ably with polling as the safety net (#44). Declared, not on main: emails and the reminder cron (PR #27, open). Paths and `/admin` routes in the body predate the split; see the amendment.
+
 ## Context
 
 The brief only requires the API, but its scenario is a patient flow: "sees free slots ... picks one, books it ... Patients can cancel." The engineer decided to ship the whole flow as a real product: a booking UI for signed-in patients, an admin dashboard, branding, and email.
@@ -41,7 +43,7 @@ Option 3.
 - **PWA:** a Serwist app shell with a manifest and an offline page. Navigations, RSC requests, `/api/*`, `/admin/**` and `/auth/*` are `NetworkOnly`; nothing about appointments is ever cached, because that would contradict "must not be available to others".
 - **Theme:** `defaultTheme="system"`, a toggle on every page, no flash on load. The browser theme colour is set in the `viewport` export (`themeColor` for light and dark), not in `metadata`. Acceptance: a dark-mode hard reload shows no light flash.
 - **Branding, SEO and email:** [ADR-0026](0026-branding-and-seo.md) and [ADR-0025](0025-email-with-resend.md).
-- **Cost settings:** `web/vercel.json` pins `"regions": ["iad1"]`; `images: { unoptimized: true }`; the generated client's base URL is the same-origin `/api` proxy for browsers and the BFF's own IAM-authenticated calls for server code.
+- **Cost settings:** `apps/booking/vercel.json` and `apps/admin/vercel.json` each pin `"regions": ["iad1"]`; `images: { unoptimized: true }`; the generated client's base URL is the same-origin `/api` proxy for browsers and the BFF's own IAM-authenticated calls for server code.
 
 ### Caching
 
@@ -63,6 +65,8 @@ It needs aggregate endpoints that the public API does not have. They live under 
 - `GET /internal/admin/appointments/{id}/lineage`: `SELECT id, event_type, from_starts_at, to_starts_at, occurred_at FROM appointment_events WHERE appointment_id = :id ORDER BY id`, returned as the ordered path booked, then each reschedule with the old and new slot, then cancelled. An unknown id is a 404 problem.
 
 **Indexes.** `uq_appt_doctor_slot_booked` on `appointments (doctor_id, starts_at) WHERE status = 'booked'` and `ix_events_doctor_id` already exist. The slice adds, in one expand-only migration: `ix_events_occurred_at` on `appointment_events (occurred_at)` for the series, `ix_events_appointment_id` on `(appointment_id, id)` for lineage, and `ix_appointments_starts_at` on `appointments (starts_at DESC, id DESC)` for the list and the load queries. At today's size (7 appointments, 19 events, 34 patients, read from production on 2026-10-17) every query is a trivial scan; the indexes are there so the cost stays flat as data accumulates, and they are a few kilobytes each.
+
+**Amendment (2026-10-18): paths and routes as built.** The text above was written for one `web/` app. As built there are two apps: the booking app in `apps/booking` (routes `/`, `/book`, `/appointments`, `/docs`, `/redoc`, `/openapi.json`, `/auth/*`) and the admin app in `apps/admin`, whose routes are `/dashboard` (metrics, with appointment history and lineage under `/dashboard/appointments`) and `/access` (staff roles, [ADR-0030](0030-staff-roles-and-access.md)), not `/admin`. Access to the admin app is decided by role rather than by one allowlisted address. Where the Routes list says `/admin`, read `/dashboard` and `/access`; where the PWA bullet lists `/admin/**` as `NetworkOnly`, a shell-only service worker (PR #33) precaches an offline page and sends everything else to the network, which meets the rule above. `/cron/*` is not built; it arrives with the emails slice.
 
 ## Consequences
 

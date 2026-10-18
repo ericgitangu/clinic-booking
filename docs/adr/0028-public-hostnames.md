@@ -8,6 +8,8 @@
 
 Accepted. Patients use `clinic.ericgitangu.com`; the admin uses `clinic-admin.ericgitangu.com`. The `sil-clinic-booking.vercel.app` alias stays during the cut-over and is then demoted to a redirect.
 
+**Build status (2026-10-18, main 748d7d8): Mostly shipped.** Both apps carry their hostnames in code, CI and the docs. Pending: demoting the `sil-clinic-booking.vercel.app` alias to a redirect. DNS, OAuth client and reCAPTCHA settings are outside the repository and unconfirmed here.
+
 ## Context
 
 - The site is on a generated `*.vercel.app` name today, which is wired into sign-in, reCAPTCHA, CI and the docs. With two apps ([ADR-0027](0027-two-apps-in-a-workspace.md)) each needs its own address, and the engineer wants them on the engineer's own domain.

@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (2026-10-18, main 748d7d8): Shipped.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place; migrations are 0001 to 0006 (0003 is `0003_staff_access`, 0005 adds idempotency keys, 0006 the realtime outbox, #39). The read-only realtime role is no longer needed (ADR-0031).
+
 ## Context
 
 - **Ordering.** Migrations run against the shared production database before the new revision is smoke-tested. A destructive migration would break the live revision even when the smoke test fails.
@@ -36,9 +38,13 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 - **Same model everywhere:** compose and CI create `clinic_app` from `backend/docker/initdb/01-roles.sql`, so tests run against the same privilege model as production. Stretch S1 adds `02-realtime-role.sql` for `clinic_realtime`, run by `backend-test` right after `01-roles.sql` and mounted into the `dast` compose stack; the PR is not mergeable until CI creates both roles. Parallel migration branches must end with one alembic head (`alembic heads | wc -l` → `1` in `backend-quality`).
 - **Migration safety:**
   - Migrations are expand-only.
-  - `scripts/migration_lint.sh` fails CI on `DROP TABLE|COLUMN`, `RENAME`, `SET NOT NULL` or `ALTER COLUMN ... TYPE`, unless the line carries `# contract-ok: <reason>`.
+  - `scripts/migration_lint.sh` scans only the `upgrade()` body, line by line, and fails CI on `DROP TABLE|COLUMN|CONSTRAINT|INDEX|TYPE|VIEW|FUNCTION|TRIGGER|SCHEMA|EXTENSION|SEQUENCE`, `ALTER COLUMN`, `DROP NOT NULL`, `DROP DEFAULT`, `RENAME`, `TRUNCATE`, `DELETE FROM`, and the Alembic calls `op.drop_*`, `op.alter_column` and `op.rename_*`, unless the line carries `# contract-ok` (give the reason after it). A destructive statement built in a helper, across lines or at runtime is not seen and needs a review by hand.
   - `migrations/env.py` takes `pg_advisory_lock(727001)`, so concurrent executions serialize.
 - **Seed:** `INSERT ... ON CONFLICT (id) DO UPDATE` only. It never deletes.
+
+**Amendment (2026-10-18): migrations as built.** The versions in `backend/migrations/versions/` are `0001_initial`, `0002_admin_indexes`, `0003_staff_access` and `0004_patient_accounts`. Migration `0003_event_cursor`, named in the stretch S1 bullet above, was only the S1 plan: S1 is not built, so there is no `0003_event_cursor`, no `clinic_realtime` role and no realtime secret. If S1 is built, its event-cursor migration takes the next free number after `0004`, not `0003`. The tolerance rule described for the S1 grants (skip with a `NOTICE` when the role is missing) is unchanged as a design.
+
+**Amendment (2026-10-18).** The read-only `clinic_realtime` role, its secret `clinic-database-url-realtime` and `02-realtime-role.sql` are no longer needed: realtime push is relayed from `clinic-api` to Ably ([ADR-0031](0031-realtime-push-via-ably-sse.md)), so there is no Go gateway to hold a database role. Option 4 and the S1 bullets above stay as the record. The relay's outbox is an expand-only migration, `0006_realtime_outbox`, shipped in PR #39.
 
 ## Consequences
 

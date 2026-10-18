@@ -24,7 +24,7 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0018](0018-testing-strategy.md) | Testing strategy and race-proof harness | Accepted | "basic test coverage of booking logic" |
 | [0019](0019-observability.md) | Observability | Accepted | "meaningful errors" (request_id) |
 | [0020](0020-git-hygiene-and-ai-disclosure.md) | Git hygiene and AI-usage disclosure | Accepted | Section 4 "Honesty matters" |
-| [0021](0021-go-realtime-gateway.md) | A Go SSE gateway for the admin realtime feed | Accepted (optional, after the admin dashboard) | Section 1 "components, key decisions, trade-offs" |
+| [0021](0021-go-realtime-gateway.md) | A Go SSE gateway for the admin realtime feed | Superseded by ADR-0031 (2026-10-18); was accepted (optional, after the admin dashboard) | Section 1 "components, key decisions, trade-offs" |
 | [0022](0022-admin-auth-and-bot-protection.md) | Admin OAuth and UI bot protection (original design) | Accepted (sign-in superseded by ADR-0024; the bot check stays cut) | "meaningful errors + correct HTTP status codes"; "book online" |
 | [0023](0023-zero-cost-edge-front-door.md) | Zero-cost edge: IAM-gated Cloud Run behind a Vercel front door in North America | Accepted, decided by the engineer 2026-10-16 (; one Vercel project `web`; amends 0010, 0014, 0016, 0022; implementation hardened by the hosting lock review) | "Deploy to any cloud, public URL" under the $0 rule |
 | [0024](0024-google-sign-in-with-better-auth.md) | Google sign-in for patients and admin, with Better Auth | Accepted, decided by the engineer 2026-10-17 | "Patients can cancel"; "must not be available to others" |
@@ -34,5 +34,46 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0028](0028-public-hostnames.md) | Public hostnames on ericgitangu.com | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
 | [0029](0029-booking-flow.md) | The booking flow: server actions, Google sign-in, one human check per action | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
 | [0030](0030-staff-roles-and-access.md) | Staff roles granted by email, enforced in the app and again in the API | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
+| [0031](0031-realtime-push-via-ably-sse.md) | Realtime push via Ably SSE | Accepted, decided by the engineer 2026-10-18; pending build | Section 1 "components, key decisions, trade-offs" |
+| [0032](0032-admin-live-feed-descoped.md) | The admin live feed is descoped for this submission | Accepted, decided by the engineer 2026-10-18 | Section 1 "key decisions, trade-offs" |
 
 **Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make lint` checks the markdown.
+
+## Build status
+
+Checked against `main` (748d7d8) on 2026-10-18 (read, not run). Words used: shipped, partly shipped, declared (decided, in an open PR), descoped, superseded. Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
+
+| ADR | Build status |
+|---|---|
+| 0001 | Shipped, Go module descoped |
+| 0002 | Shipped |
+| 0003 | Shipped |
+| 0004 | Shipped (#31) |
+| 0005 | Shipped (#31) |
+| 0006 | Shipped (#31) |
+| 0007 | Shipped |
+| 0008 | Shipped |
+| 0009 | Shipped for patients, admin feed descoped |
+| 0010 | Partly shipped |
+| 0011 | Shipped |
+| 0012 | Shipped in the web layer |
+| 0013 | Shipped (#31) |
+| 0014 | Mostly shipped |
+| 0015 | Shipped |
+| 0016 | Shipped, text amended |
+| 0017 | Shipped |
+| 0018 | Shipped, text amended |
+| 0019 | Shipped |
+| 0020 | Partly shipped |
+| 0021 | Superseded by ADR-0031; never built |
+| 0022 | Superseded in part |
+| 0023 | Shipped for the API |
+| 0024 | Shipped |
+| 0025 | Declared, not on main (PR #27, open) |
+| 0026 | Mostly shipped |
+| 0027 | Shipped |
+| 0028 | Mostly shipped |
+| 0029 | Shipped |
+| 0030 | Shipped |
+| 0031 | Shipped for patients |
+| 0032 | Descoped |

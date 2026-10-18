@@ -132,14 +132,14 @@ Expected: `0` (`make cost-check` the default-SA check asserts the same). UNVERIF
 
 ## 5. Cloud Run service and invoker bindings
 
-Needs the runtime and web/smoke service accounts from step 4.
+Needs the runtime and web/admin/smoke service accounts from step 4.
 
 ```bash
 DRY_RUN=1 bash infra/bootstrap.sh service invoker
 bash infra/bootstrap.sh service invoker
 ```
 
-`run.invoker` is granted to `clinic-web` and `clinic-smoke` only (never `allUsers`), on
+`run.invoker` is granted to `clinic-web`, `clinic-admin` and `clinic-smoke` only (never `allUsers`), on
 `clinic-api` and, if it exists, `clinic-realtime`. Capture the service URL:
 
 ```bash
@@ -161,7 +161,7 @@ vercel project add clinic-web --scope "$TEAM"
 
 1. Dashboard -> `clinic-web` -> Settings -> Security -> OIDC Federation: confirm the issuer
    mode is **Team** (dashboard-only toggle).
-2. Settings -> General -> Root Directory: **`web`** (the pnpm workspace keeps dependencies in the root `node_modules`; building or deploying with `--cwd web` fails on missing files, so CI builds and deploys from the repo root). Set by API: `vercel api -X PATCH "/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID" -f rootDirectory=web`. Also confirm Settings -> Functions -> Function Region is **US East (iad1)**; see the first-deploy check below.
+2. Settings -> General -> Root Directory: **`apps/booking`** (the pnpm workspace keeps dependencies in the root `node_modules`; building or deploying with `--cwd` fails on missing files, so CI builds and deploys from the repo root). Set by API: `vercel api -X PATCH "/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID" -f rootDirectory=apps/booking`. Also confirm Settings -> Functions -> Function Region is **US East (iad1)**; see the first-deploy check below.
 3. Link and read the identifiers:
 
    ```bash
@@ -194,6 +194,7 @@ vercel project add clinic-web --scope "$TEAM"
    # alias on a *.vercel.app name sits behind Vercel's deployment protection and redirects to a login.
    ```
 
+   - note (2026-10-18): the public hostnames are now `https://clinic.ericgitangu.com` (booking) and `https://clinic-admin.ericgitangu.com` (admin), per ADR-0028; the `sil-clinic-booking.vercel.app` name above is the cut-over alias. `scripts/ci/public-urls.env` holds the real values;
    - add `PUBLIC_BASE_URL=$WEB/api` and `WEB_ORIGIN=$WEB` to the `gcp-deploy` context;
    - write both URLs into `scripts/ci/public-urls.env` (`WEB=` and `RUN_APP_URL=`) and commit
      it **before the first push to `main`**. `smoke-public` fails fast while the placeholders
@@ -223,12 +224,11 @@ cd ../..
 It creates two budgets: `clinic-alerts-1usd` (alerts, on this project's gross spend, **not** the
 whole account: the account already bills about $5 a month for the other projects) and `clinic-run-spend-cap-3usd`
 (a **gross** $3 budget scoped to this project and Cloud Run, credits excluded). Neither the
-Terraform provider nor the CLI has any attribute that pauses or caps usage, so turning the
-second one into an enforced cap is a console action, and **whether this billing account can
-enforce it is UNVERIFIED**.
+Terraform provider nor the CLI has any attribute that pauses or caps usage, so the second one
+must be an enforced cap created in the console (verified possible on this account, 2026-10-18;
+see step 1 and the note below). Terraform now creates only the alerts budget.
 
-1. Console -> Billing -> Budgets & alerts -> `clinic-run-spend-cap-3usd`: enable the
-   usage-pausing / cap action if the console offers it for this account. Screenshot it.
+1. Console -> Billing -> Budgets & alerts: create a **Spend cap enforcement** budget named `clinic-run-spend-cap-3usd` ($3 gross, this project, Cloud Run, thresholds 0.5/0.8/1.0). An existing budget cannot be converted, and a spend cap allows one budget per project and service, so delete any alerts-only budget with the same project and service first. Screenshot the "Configured" status.
 2. Confirm both budgets exist:
 
    ```bash
@@ -238,7 +238,9 @@ enforce it is UNVERIFIED**.
    ```
 
    Expected: `clinic-alerts-1usd` and `clinic-run-spend-cap-3usd`.
-3. Record the budget id and the outcome here: `BUDGET_ID=<fill in>`; cap action: `<enabled | not offered>`.
+3. Record the budget id and the outcome here: `BUDGET_ID=bfd734ab-ef98-414a-8bb1-b6442c1dec94`; cap action: enabled (status "Configured", verified 2026-10-18).
+
+**History and result, 2026-10-18.** The Terraform-created budget showed "Spend cap status: Not applicable" (alerts-only; an existing budget cannot be converted, [guide](https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps)). With the user's approval it was deleted and recreated in the console as a spend cap under the same name; the console now shows "Configured". It is console-managed, not Terraform. An enforced cap resets monthly and is a last-resort backstop; the $0 mechanism is the free-tier arithmetic plus the realtime ticket budget.
 
 If the console does not offer a cap for this account, the remaining protection is
 `--max-instances 3`, IAM-only access, the egress alert and the free-tier arithmetic in the
@@ -247,7 +249,7 @@ cost proof. Say so in the README.
 ## 9. First release
 
 Push to `main`. The `release` workflow runs the verify jobs, builds and scans the image,
-migrates, deploys a tagged no-traffic revision, smokes it, promotes, ships the web project and
+migrates, deploys a tagged no-traffic revision, smokes it, promotes, ships the booking and admin apps and
 runs the public smoke. If the URLs in step 7 were guessed wrong, `smoke-public` is the job
 that goes red; fix `scripts/ci/public-urls.env` and push again.
 
@@ -259,7 +261,7 @@ release and write the observed result next to each.
 | Check | Command | Expected | If not |
 |---|---|---|---|
 | Vercel OIDC -> `generateIdToken` (direct federated, no impersonation hop) | `curl -s -o /dev/null -w '%{http_code}' "$WEB/api/health"` | `200` | `502` with `UPSTREAM_AUTH_FAILED`: read `vercel logs`; the proxy logs the STS or IAM status. Switch the role on `clinic-web` in `wif_vercel.tf` to `roles/iam.workloadIdentityUser`, re-apply, retry. |
-| Vercel functions run in `iad1` only | Vercel dashboard -> the first production deployment -> Functions: the region column | `iad1` (Washington, D.C.) for `/api/[...path]` | The release builds the output offline (`scripts/ci/vercel_offline_build.sh`, so no Vercel token is present during install or build). A local build of that output does **not** carry the `regions: ["iad1"]` pin from `web/vercel.json` (observed: no `iad1` anywhere in `.vercel/output`), and I could not prove here that a prebuilt deploy applies it. `iad1` is also Vercel's default function region. If the dashboard shows anything else, set Settings -> Functions -> Function Region to `iad1` and redeploy. |
+| Vercel functions run in `iad1` only | Vercel dashboard -> the first production deployment -> Functions: the region column | `iad1` (Washington, D.C.) for `/api/[...path]` | The release builds the output offline (`scripts/ci/vercel_offline_build.sh`, so no Vercel token is present during install or build). A local build of that output does **not** carry the `regions: ["iad1"]` pin from `apps/booking/vercel.json` (observed: no `iad1` anywhere in `.vercel/output`), and I could not prove here that a prebuilt deploy applies it. `iad1` is also Vercel's default function region. If the dashboard shows anything else, set Settings -> Functions -> Function Region to `iad1` and redeploy. |
 | Cloud Run is IAM-only | `curl -s -o /dev/null -w '%{http_code}' "$RUN_APP_URL/health"` | `403` | any `200`: stop, check `run.invoker` bindings for `allUsers`. |
 | WIF accepts only the deploy context | `test/wif-deny` branch, a job on context `oidc-probe` that attempts the token exchange | permission denied | the attribute condition in `wif.tf` is not enforcing the context claim. |
 | WIF accepts the deploy job | the first `ship-api` run | green login step | `Permission denied` at `gcp_login.sh`: compare the token's `oidc.circleci.com/*` claims with `local.circleci_attribute_condition`. |
@@ -289,7 +291,7 @@ gcloud recaptcha keys create --web --integration-type=score \
 gcloud recaptcha keys list --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
 ```
 
-The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `web/.env.local`. There is no secret: the BFF calls the API as `clinic-recaptcha` through the Vercel identity (ADR-0022).
+The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `apps/booking/.env.local`. There is no secret: the BFF calls the API as `clinic-recaptcha` through the Vercel identity (ADR-0022).
 
 ## Accepted risks
 

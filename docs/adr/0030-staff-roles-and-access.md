@@ -8,6 +8,8 @@
 
 Accepted. The admin app has three roles, held in a `staff_access` table and looked up on every request. The only configured identity is the owner.
 
+**Build status (2026-10-18, main 748d7d8): Shipped.** The admin app resolves a role (owner, admin, viewer) from `staff_access` on every request and the API checks it again per endpoint. The owner comes from `ADMIN_EMAILS`. There is no screen for the audit trail yet.
+
 ## Context
 
 - [ADR-0024](0024-google-sign-in-with-better-auth.md) allowed one admin email, compared in server code. The engineer wants to let other people in at different levels without a redeploy, and to take access away at once.

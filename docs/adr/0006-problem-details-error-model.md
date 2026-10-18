@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (2026-10-18, main 748d7d8): Shipped (#31).** The RFC 9457 model, the closed code catalogue and its exhaustiveness test are in, including the auth, access and idempotency codes.
+
 ## Context
 
 The brief asks for "meaningful errors + correct HTTP status codes". Clients need a stable, machine-readable code, not prose.
@@ -33,6 +35,8 @@ Option 2.
 
 | Code | Status | When |
 |---|---|---|
+| UNAUTHENTICATED | 401 | The internal assertion is missing, malformed, expired or does not match the request. |
+| FORBIDDEN | 403 | The internal assertion is valid but its role may not use this endpoint. |
 | VALIDATION_ERROR | 422 | schema or type errors, extra fields, bad UUID/date, non-string datetime |
 | TIMEZONE_REQUIRED | 422 | naive datetime (and nothing else wrong) |
 | UNKNOWN_DOCTOR / UNKNOWN_PATIENT | 422 | the body references a non-existent or inactive entity |
@@ -41,18 +45,23 @@ Option 2.
 | DATE_OUT_OF_RANGE | 422 | clinic-local date > today + 90 |
 | SLOT_MISALIGNED | 422 | off the 30-minute grid of a window, or seconds/µs ≠ 0 |
 | OUTSIDE_WORKING_HOURS | 422 | [start, start + 30 min) not inside a window |
-| IDEMPOTENCY_KEY_REUSED (T2) | 422 | same key, different payload |
+| IDEMPOTENCY_KEY_REUSED | 422 | The Idempotency-Key was already used with a different doctor or time. |
 | SLOT_TAKEN | 409 | `uq_appt_doctor_slot_booked` |
 | PATIENT_DOUBLE_BOOKED | 409 | `uq_appt_patient_slot_booked` |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | cancel or reschedule of a cancelled appointment |
 | APPOINTMENT_ALREADY_STARTED | 409 | cancel or reschedule when starts_at <= now |
 | PATIENT_PHONE_EXISTS | 409 | `uq_patients_phone` |
 | CONCURRENT_UPDATE | 409 | deadlock or serialization failure that persists after one retry |
-| IDEMPOTENCY_KEY_CONSUMED (T2) | 409 | key replayed after the appointment left `booked` |
+| IDEMPOTENCY_KEY_CONSUMED | 409 | The Idempotency-Key belongs to an appointment that is no longer booked. |
+| ACCESS_EXISTS | 409 | This email already has active access; change its role instead. |
+| OWNER_PROTECTED | 409 | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
 | DOCTOR_NOT_FOUND / PATIENT_NOT_FOUND / APPOINTMENT_NOT_FOUND / PROBLEM_NOT_FOUND / NOT_FOUND | 404 | path resource unknown |
 | METHOD_NOT_ALLOWED | 405 | Starlette |
+| ACCESS_NOT_FOUND | 404 | No active access for this email. |
 | DB_UNAVAILABLE | 503 | connection failure or pool timeout (+ `Retry-After: 2`) |
 | INTERNAL_ERROR | 500 | fallback; any `ck_*` violation lands here as a bug |
+
+**Amendment (2026-10-18): the table now lists the auth, access and idempotency codes.** Seven codes were added to the table above: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `ACCESS_EXISTS` (409), `OWNER_PROTECTED` (409), `ACCESS_NOT_FOUND` (404), and `IDEMPOTENCY_KEY_REUSED` and `IDEMPOTENCY_KEY_CONSUMED`, whose rows already existed. The "When" wording of these rows is copied from the detail column of `docs/api-errors.md` as merged in PR #31, which is the authority. For the two idempotency rows that replaces the shorter ADR wording ("same key, different payload"; "key replayed after the appointment left `booked`") and drops the "(T2)" tag; the statuses (422 and 409) are unchanged. All seven codes are on `main` (PR #31 added the idempotency ones).
 
 ## Consequences
 

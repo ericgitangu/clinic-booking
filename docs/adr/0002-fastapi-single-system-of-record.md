@@ -8,6 +8,8 @@
 
 Accepted
 
+**Build status (2026-10-18, main 748d7d8): Shipped.** FastAPI is the single system of record, layered as decided, with no `/v1` prefix and no Go in the repository. The optional Go gateway is superseded by ADR-0031 and will not be built.
+
 ## Context
 
 The brief allows FastAPI, DRF or Go. Most of the evaluation weight is on reasoning and tests. We considered a polyglot backend, adding a Go service, but a second runtime doubles CI, Docker, SAST (gosec, govulncheck) and the deploy surface. Splitting availability out from booking would also put the uniqueness invariant on the far side of a network boundary.

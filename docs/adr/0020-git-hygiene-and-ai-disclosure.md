@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (2026-10-18, main 748d7d8): Partly shipped.** Commits carry no tooling trailers. README section 11 and the `v1.0.0` tag are the engineer's and are tracked outside this ADR.
+
 ## Context
 
 The brief's Section 4 asks how AI was used and says "honesty matters more than the answer". We also want a clean history and a clean tree: no tooling trailers in commits, and no local tooling files in the repository.

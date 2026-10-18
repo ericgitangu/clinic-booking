@@ -11,7 +11,7 @@ because the machine's active account is a different one:
 ```bash
 export PROJECT=sil-clinic-booking
 export GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com
-export WEB=https://<clinic-web production domain>
+export WEB=https://clinic.ericgitangu.com   # the booking app (ADR-0028); the admin app is https://clinic-admin.ericgitangu.com
 export PUBLIC_API="$WEB/api"
 ```
 
@@ -53,10 +53,10 @@ Follow `docs/runbooks/base-image-cve.md`, then re-release.
 
 ## Automatic rollback
 
-After `ship-web`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
+After `ship-booking` and `ship-admin`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
 includes `/ready` through the public URL, for about 90 seconds of retries (cold starts). If it
 still fails, `rollback-api` (only the `gcp-deploy` context) runs `scripts/ci/rollback.sh`, then
-`rollback-web` (only the `vercel-prod` context) points production at the previous deployment by
+`rollback-booking` and `rollback-admin` (both the `rollback-app` job, only the `vercel-prod` context) point production at the previous deployment of each app by
 id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the release stays red.
 
 - `rollback.sh` reads `keep.json` from `promote.sh` and refuses (exit 2) when there is no previous
@@ -66,12 +66,12 @@ id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the 
   fails loudly.
 - Migrations are expand-only (`scripts/migration_lint.sh`), so the previous revision still runs
   against the migrated database. That is why a traffic move is a safe rollback.
-- `vercel rollback` turns off automatic alias assignment. `ship-web` therefore records the live
+- `vercel rollback` turns off automatic alias assignment. `ship-booking` and `ship-admin` therefore record the live
   deployment id first and, after every deploy, checks that the public alias serves the new
   deployment (promoting it if not).
 
 After any Vercel rollback, automatic alias assignment stays off until the next release. The next
-`ship-web` run restores it: its `ensure` step sees the public alias is not serving the new
+`ship-booking` / `ship-admin` run restores it: its `ensure` step sees the public alias is not serving the new
 deployment and promotes it, then fails the job if it still is not.
 
 Deploy markers (`circleci run release plan` / `update`) are recorded for `clinic-api`,

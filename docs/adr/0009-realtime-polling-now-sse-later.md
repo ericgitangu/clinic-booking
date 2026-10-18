@@ -7,6 +7,8 @@
 
 Accepted. This revision supersedes this ADR's own earlier decision to defer SSE entirely: patient polling is unchanged, and an admin-only SSE feed is stretch item S1, built only after Gate B.
 
+**Build status (2026-10-18, main 748d7d8): Shipped for patients; the admin feed is descoped.** Shipped: the 409 `SLOT_TAKEN` path, patient polling with TanStack Query (15 s, exponential backoff, `Retry-After`, a 10 minute idle stop, #33), server-side publishing through Ably (#39) and the booking page hook that subscribes to the push stream and polls every 60 s while it is live (#44). Descoped for this submission: the admin live feed, whose dashboard uses server revalidation (ADR-0032).
+
 ## Context
 
 - **What realtime would buy.** The database already guarantees correctness, so push would only improve UX: a competing patient would see a slot disappear before submitting, and clinic staff would see bookings land as they happen.
@@ -49,6 +51,8 @@ Accepted. This revision supersedes this ADR's own earlier decision to defer SSE 
 **Patient availability stream: still deferred.** If it is ever built, it goes through the same gateway as `GET /doctors/{id}/availability/stream?date=`, with `slot.taken` routed by `local_date` and `slot.freed` by `coalesce(from_local_date, local_date)`, under the same limits.
 
 **Rejected:** option 1 because streams on the API service share its concurrency with `POST /appointments` (the starvation risk above) and Python holds each idle stream more expensively than a goroutine; option 2 because it does not remove the need for the commit-safe cursor (NOTIFY is lost for anyone not connected, so reconnect catch-up still reads the table), it needs a trigger or a `pg_notify` call inside the booking transaction (which the stretch rules forbid touching), NOTIFY takes a global lock at commit that serializes committing writers, and LISTEN needs a dedicated session held open even with zero clients, which Neon's pooled endpoint does not support anyway. (The gateway does use a direct connection, but only while someone is watching; that is not the reason LISTEN loses); option 3 now, because a relay is unnecessary at 2 instances (it is the review trigger); option 6 because it adds a third-party account, keys and a data processor for a demo, and would still need our own commit-safe cursor to publish from.
+
+**Amendment (2026-10-18).** Patient push now arrives through Ably over SSE ([ADR-0031](0031-realtime-push-via-ably-sse.md)), replacing the Go gateway of ADR-0021. Polling stays as the safety net: 60 s while push is healthy, and 15 s with the existing backoff, `Retry-After` handling and idle stop while it is not. There is no CDN caching on `/api` (the 5 s CDN plan is dropped). State on main (748d7d8): the polling half shipped in PR #33 (15 s, backoff, `Retry-After`, a 10 minute idle stop, TanStack Query) and the server-side publishing in PR #39; the 60 s interval while push is healthy shipped with the booking hook (PR #44). Patient live push was observed on in production after release 748d7d8 ([evidence](../evidence/patient-live-push-production-2026-10-18.md)). The admin live feed is descoped for this submission and the dashboard keeps server revalidation, see [ADR-0032](0032-admin-live-feed-descoped.md).
 
 ## Consequences
 

@@ -7,6 +7,8 @@
 
 Accepted
 
+**Build status (2026-10-18, main 748d7d8): Shipped.** JSON logs with request ids and trace correlation, Server-Timing, pure ASGI middleware, hidden SQL parameters, redaction tests, and separate `/health` and `/ready` probes. The Go gateway paragraph is superseded by ADR-0031.
+
 ## Context
 
 Errors carry a `request_id`, and that id should lead straight to a log line. Logs must never contain PII: names, phones, emails, cancellation reasons, or SQL bound parameters.
