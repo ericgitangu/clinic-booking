@@ -11,6 +11,8 @@ export interface Identity {
   sub: string;
   email: string;
   name: string;
+  /** Google profile picture address, when the account has one. */
+  image: string | null;
 }
 
 export interface Staff extends Identity {
@@ -38,6 +40,7 @@ async function identity(): Promise<Identity | null> {
     sub,
     email: user.email.toLowerCase(),
     name: user.name || user.email,
+    image: user.image ?? null,
   };
 }
 
