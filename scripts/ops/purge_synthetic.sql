@@ -67,7 +67,7 @@ SELECT
      WHERE (p.full_name LIKE 'verify-claims %' OR p.full_name LIKE 'Release Gate Check%')
        AND EXISTS (SELECT 1 FROM patient_accounts pa WHERE pa.patient_id = p.id)) AS name_match_with_account,
   (SELECT count(*) FROM patients p
-     WHERE p.synthetic
+     WHERE (to_jsonb(p) ->> 'synthetic')::boolean IS TRUE  -- column may not exist yet (pre-0008)
        AND NOT (p.full_name LIKE 'verify-claims %' OR p.full_name LIKE 'Release Gate Check%')) AS synthetic_other_name;
 
 \echo == whole table counts, before ==
