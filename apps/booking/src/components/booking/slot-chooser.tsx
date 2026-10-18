@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   startTransition,
+  useCallback,
   useActionState,
   useEffect,
   useMemo,
@@ -18,7 +19,7 @@ import { NextSlots } from "@/components/booking/next-slots";
 import { SlotRadios } from "@/components/booking/slot-radios";
 import { StickyCta } from "@/components/booking/sticky-cta";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
-import { useLiveSlots } from "@/components/booking/use-live-slots";
+import { useLiveAvailability } from "@/components/booking/use-live-availability";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
 import { useOwnBooked } from "@/lib/own-bookings";
 import { buildChips, type Chip, type OwnBooking } from "@/lib/slot-chips";
@@ -39,9 +40,10 @@ function lostPickText(chips: readonly Chip[], pick: string): string {
     return `${t} is already your visit. Pick another time.`;
   // "Just taken" is only said when the API has confirmed it; a time that merely left the list is
   // "no longer available" (it could be a booking, a cancelled day, a doctor's change).
-  return now === "just-taken" || now === "booked"
-    ? `${t} was just taken. Pick another time.`
-    : `${t} is no longer available. Pick another time.`;
+  // The API lists the time as booked, or said so with a 409, or a slot_taken event arrived.
+  if (now === "just-taken" || now === "booked")
+    return `${t} was just taken. Pick another time.`;
+  return `${t} is no longer available. Pick another time.`;
 }
 
 // The two status lines are always on the page, and only their text changes, so a screen reader
@@ -50,18 +52,24 @@ function LiveNotice({
   lost,
   idle,
   armed,
+  stream,
   failing,
   onResume,
 }: {
   lost: string;
   idle: boolean;
   armed: boolean;
+  stream: string;
   failing: boolean;
   onResume: () => void;
 }) {
   return (
     <>
-      <span hidden data-polling={armed ? "armed" : "pending"} />
+      <span
+        hidden
+        data-polling={armed ? "armed" : "pending"}
+        data-stream={stream}
+      />
       <p
         role="status"
         aria-live="polite"
@@ -101,11 +109,12 @@ export function SlotChooser(props: Props) {
   const { availability } = props;
   const day = availability.date;
   const doctorId = availability.doctor_id;
-  const live = useLiveSlots(availability);
+  const live = useLiveAvailability(availability);
   const own = useOwnBooked(props.own);
 
-  // Every free time this grid has shown, so one that disappears stays in its place as "Just taken"
-  // instead of vanishing and moving the others. Updated while rendering, only when there is
+  // Every free time this grid has shown, so one that disappears stays in its place (as "Booked"
+  // when the response lists it as taken, "Just taken" when confirmed, otherwise "No longer
+  // available") instead of vanishing and moving the others. Updated while rendering, only when there is
   // something new to add (the documented pattern for state derived from props).
   const [seen, setSeen] = useState<string[]>(() =>
     availability.slots.map((s) => s.starts_at),
@@ -113,8 +122,6 @@ export function SlotChooser(props: Props) {
   const unseen = live.slots.filter((s) => !seen.includes(s.starts_at));
   if (unseen.length > 0) setSeen([...seen, ...unseen.map((s) => s.starts_at)]);
 
-  // Times the API has said, with a 409, someone else holds. Only these are called "Just taken".
-  const [confirmedTaken, setConfirmedTaken] = useState<string[]>([]);
   const attempted = useRef("");
 
   const chips = useMemo(
@@ -126,9 +133,9 @@ export function SlotChooser(props: Props) {
         taken: live.taken,
         own,
         seen,
-        confirmedTaken,
+        confirmedTaken: live.justTaken,
       }),
-    [doctorId, day, live.slots, live.taken, own, seen, confirmedTaken],
+    [doctorId, day, live.slots, live.taken, own, seen, live.justTaken],
   );
 
   const [selected, setSelected] = useState("");
@@ -140,10 +147,11 @@ export function SlotChooser(props: Props) {
     setLost(lostPickText(chips, selected));
     setSelected("");
   }
-  const choose = (v: string) => {
+  // Stable, so the memoised grid is not re-rendered by every unrelated render of this component.
+  const choose = useCallback((v: string) => {
     setLost("");
     setSelected(v);
-  };
+  }, []);
 
   const [state, formAction, pending] = useActionState(
     rescheduleAppointment,
@@ -153,19 +161,18 @@ export function SlotChooser(props: Props) {
   useActionFeedback(state);
   // Losing the race on submit means the list is stale: refetch it now rather than wait for the poll.
   const lostRace = state.status === "error" && state.code === "SLOT_TAKEN";
-  const { refresh } = live;
+  const { markTaken } = live;
   useEffect(() => {
-    if (!lostRace) return;
-    const t = attempted.current;
-    if (t) setConfirmedTaken((c) => (c.includes(t) ? c : [...c, t]));
-    void refresh();
-  }, [lostRace, refresh]);
+    // RULE 3: the API's 409 is the confirmation. Patch the grid at once, then refetch once.
+    if (lostRace && attempted.current) markTaken(attempted.current);
+  }, [lostRace, markTaken]);
 
   const notice = (
     <LiveNotice
       lost={lost}
       idle={live.idle}
       armed={live.armed}
+      stream={live.stream}
       failing={live.failing}
       onResume={live.resume}
     />
