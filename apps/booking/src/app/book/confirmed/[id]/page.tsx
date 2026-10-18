@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@clinic/ui/components/ui/button";
@@ -47,9 +48,17 @@ export default async function Confirmed({
         doctorId={appt.data.doctor_id}
         startsAt={appt.data.starts_at}
       />
-      <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-        You are booked
-      </h1>
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className="success-badge flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+        >
+          <Check className="size-6" strokeWidth={3} />
+        </span>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+          You are booked
+        </h1>
+      </div>
       <div className="mt-6 rounded-xl border border-border bg-card p-5">
         <p className="text-xl font-semibold">
           {formatWhen(appt.data.starts_at)}

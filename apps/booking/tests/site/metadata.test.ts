@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The sitemap asks the API for doctors; this file only checks the fixed pages (the doctor cases
+// are in sitemap.test.ts), so the API answers "down" here.
+vi.mock("@/lib/api", () => ({
+  listDoctors: async () => ({ ok: false, kind: "unavailable" }),
+}));
+
 import manifest from "@/app/manifest";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
@@ -29,8 +36,8 @@ describe("search and sharing metadata", () => {
     expect("themeColor" in metadata).toBe(false);
   });
 
-  it("lists the public pages in the sitemap", () => {
-    const urls = sitemap().map((e) => e.url);
+  it("lists the public pages in the sitemap", async () => {
+    const urls = (await sitemap()).map((e) => e.url);
     expect(urls).toContain(SITE.url);
     expect(urls).toContain(`${SITE.url}/docs`);
     for (const p of ["/privacy", "/terms", "/openapi.json"])
@@ -46,13 +53,17 @@ describe("search and sharing metadata", () => {
     expect(r.sitemap).toBe(`${SITE.url}/sitemap.xml`);
   });
 
-  it("declares an installable app with 192 and 512 pixel icons", () => {
+  it("declares an installable app with 192, 512 and maskable icons", () => {
     const m = manifest();
     expect(m).toMatchObject({
       start_url: "/",
       display: "standalone",
       name: SITE.name,
     });
-    expect(m.icons?.map((i) => i.sizes)).toEqual(["192x192", "512x512"]);
+    expect(m.icons?.map((i) => i.sizes)).toEqual([
+      "192x192",
+      "512x512",
+      "512x512",
+    ]);
   });
 });

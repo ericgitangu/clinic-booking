@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/layout/legal-page";
+import { pageMetadata } from "@/lib/metadata";
 import { CONTACT_EMAIL } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Data handling",
   description:
     "What this demo collects, why, where it is stored and how long it is kept.",
-  alternates: { canonical: "/data" },
-};
+  path: "/data",
+});
 export const dynamic = "force-static";
 
 const LINK = "text-primary underline underline-offset-4";

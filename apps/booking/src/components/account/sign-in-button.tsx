@@ -25,7 +25,7 @@ export function SignInButton({
     });
     if (res.error) {
       setBusy(false);
-      notify.error("Could not start Google sign-in. Try again.");
+      notify.error("We could not start Google sign-in. Try again.");
     }
   }
 

@@ -18,7 +18,7 @@ export function StaffBar({
   async function signOut() {
     const res = await authClient.signOut();
     if (res.error) {
-      notify.error("Could not sign out. Try again.");
+      notify.error("We could not sign you out. Try again.");
       return;
     }
     notify.success("Signed out.");

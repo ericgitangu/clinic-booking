@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { CalendarCheck, GitBranch, Play } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
+import { Ripples } from "@clinic/ui/components/brand/ripples";
 import { Button } from "@clinic/ui/components/ui/button";
 import { Separator } from "@clinic/ui/components/ui/separator";
 import { CopyBlock } from "@/components/landing/copy-block";
@@ -16,7 +18,14 @@ import {
   STEPS,
   TILES,
 } from "@/lib/evidence";
+import { pageMetadata } from "@/lib/metadata";
 import { SITE } from "@/lib/site";
+
+export const metadata: Metadata = pageMetadata({
+  title: SITE.name,
+  description: SITE.description,
+  path: "/",
+});
 
 // The page reads the API's readiness on every request (that call is cached for 30 seconds).
 export const dynamic = "force-dynamic";
@@ -41,7 +50,7 @@ export default function Home() {
             <Button asChild size="lg" className="h-12 px-5 text-base">
               <Link href="/book">
                 <CalendarCheck aria-hidden />
-                Book an appointment
+                Book a visit
               </Link>
             </Button>
             <Button
@@ -69,10 +78,10 @@ export default function Home() {
           </div>
         </div>
         <div className="flex justify-center md:justify-end">
-          <div className="flex size-56 items-center justify-center rounded-full bg-accent sm:size-72 dark:bg-[#eef5fb]">
+          <div className="relative flex size-56 items-center justify-center rounded-full bg-accent sm:size-72 dark:bg-[#eef5fb]">
+            <Ripples />
             <LotusMark
               size={240}
-              priority
               className="lotus-settle size-40 sm:size-52 dark:bg-transparent dark:p-0"
             />
           </div>

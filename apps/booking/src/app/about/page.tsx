@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/layout/legal-page";
+import { pageMetadata } from "@/lib/metadata";
 import { SITE } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Business case",
   description: `Why ${SITE.name} exists, who it serves and what this demo proves.`,
-  alternates: { canonical: "/about" },
-};
+  path: "/about",
+});
 export const dynamic = "force-static";
 
 const LINK = "text-primary underline underline-offset-4";
