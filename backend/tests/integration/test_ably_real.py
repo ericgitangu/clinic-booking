@@ -9,6 +9,15 @@ What the service really does (observed by these tests, not assumed):
 - the JWT is accepted as a raw ``Authorization: Bearer`` value on the event-stream endpoint;
 - a refused or expired token does NOT give an HTTP error status: the stream opens with 200 and its
   first frame is ``event: error`` with a JSON body ``{"code": ..., "statusCode": ...}``.
+
+Two things keep these tests independent of timing and of other runs:
+- The service drops a second publish of the same message id on a channel within two minutes. The
+  admin channel name is fixed by the token, so every message here carries an id unique to this run
+  (``RUN``); a fixed id made a test fail when two pipelines ran at once (job 2700 lost to job 2693,
+  which started 11 seconds earlier and published the same id).
+- The stream sends no frame on connect, so "attached" cannot be observed directly. ``_attached``
+  publishes numbered probes until one comes back, and only then is the real message published.
+  Messages that are not this run's are ignored (other pipelines share the CI app and admin channel).
 """
 
 from __future__ import annotations
@@ -43,6 +52,7 @@ pytestmark = [
 
 Frame = tuple[str, str]  # (event name, data)
 WAIT = 15.0
+RUN = uuid.uuid4().hex[:12]  # in every message id, so no other run or earlier test can collide
 
 
 class Stream:
@@ -118,6 +128,33 @@ def _message(channel: str, mid: str) -> OutboundMessage:
     return OutboundMessage(channel=channel, id=mid, name="slot_taken", data={"seq": mid})
 
 
+def _mid(label: str) -> str:
+    return f"{RUN}-{label}"
+
+
+async def _attached(stream: Stream, publisher: AblyPublisher, channel: str) -> None:
+    """Return once this stream has received a probe published on its channel."""
+    for attempt in range(10):
+        await publisher.publish([_message(channel, _mid(f"probe-{attempt}"))])
+        try:
+            while True:
+                got = await stream.next_message(within=1.5)
+                if str(got["id"]).startswith(f"{RUN}-probe-"):
+                    return
+        except TimeoutError:
+            continue
+    raise AssertionError("no probe came back in 15 seconds: the stream never attached")
+
+
+async def _next_with_id(stream: Stream, wanted: str, within: float = WAIT) -> dict[str, object]:
+    """The next message with this id; messages with other ids (other runs, probes) are skipped."""
+    async with asyncio.timeout(within):
+        while True:
+            got = await stream.next_message(within=within)
+            if got["id"] == wanted:
+                return got
+
+
 def _channel() -> str:
     return patient_channel(uuid.uuid4(), SystemClock().now().date())
 
@@ -142,11 +179,11 @@ async def test_a_published_message_reaches_a_subscribe_only_stream_with_its_id()
     publisher = AblyPublisher(KEY, REST)
     async with Stream(_token(channel), channel) as stream:
         assert stream.status == 200
-        await asyncio.sleep(2)  # attached
-        await publisher.publish([_message(channel, "9001.1.1")])
-        got = await stream.next_message()
-    assert got["name"] == "slot_taken" and got["id"] == "9001.1.1"
-    assert json.loads(str(got["data"])) == {"seq": "9001.1.1"}
+        await _attached(stream, publisher, channel)
+        await publisher.publish([_message(channel, _mid("one"))])
+        got = await _next_with_id(stream, _mid("one"))
+    assert got["name"] == "slot_taken"
+    assert json.loads(str(got["data"])) == {"seq": _mid("one")}
 
 
 async def test_the_same_id_published_twice_inside_the_window_is_delivered_once() -> None:
@@ -154,13 +191,12 @@ async def test_the_same_id_published_twice_inside_the_window_is_delivered_once()
     publisher = AblyPublisher(KEY, REST)
     async with Stream(_token(channel), channel) as stream:
         assert stream.status == 200
-        await asyncio.sleep(2)
-        await publisher.publish([_message(channel, "9002.1.1")])
-        await publisher.publish([_message(channel, "9002.1.1")])  # a relay retry
-        first = await stream.next_message()
-        assert first["id"] == "9002.1.1"
-        with pytest.raises(TimeoutError):
-            await stream.next_message(within=5.0)
+        await _attached(stream, publisher, channel)
+        await publisher.publish([_message(channel, _mid("twice"))])
+        await publisher.publish([_message(channel, _mid("twice"))])  # a relay retry
+        await _next_with_id(stream, _mid("twice"))
+        with pytest.raises(TimeoutError):  # a second delivery of the same id would arrive here
+            await _next_with_id(stream, _mid("twice"), within=5.0)
 
 
 async def test_a_patient_token_is_refused_on_the_admin_channel() -> None:
@@ -182,7 +218,7 @@ async def test_the_admin_token_reads_the_admin_channel() -> None:
     publisher = AblyPublisher(KEY, REST)
     async with Stream(token, ADMIN_CHANNEL) as stream:
         assert stream.status == 200
-        await asyncio.sleep(2)
-        await publisher.publish([_message(ADMIN_CHANNEL, "9003.1")])
-        got = await stream.next_message()
-    assert got["id"] == "9003.1"
+        await _attached(stream, publisher, ADMIN_CHANNEL)
+        await publisher.publish([_message(ADMIN_CHANNEL, _mid("admin"))])
+        got = await _next_with_id(stream, _mid("admin"))
+    assert got["id"] == _mid("admin")
