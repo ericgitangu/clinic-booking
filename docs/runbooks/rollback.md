@@ -94,3 +94,14 @@ the values) of the project's production variables and refuses the ship if any na
 `scripts/ci/required_env.txt` is absent. If one slips through anyway, the sign-in routes answer a
 503 "Sign-in is not configured" page and log one `auth_not_configured` line naming the missing
 variables, so the fix is to add them in Vercel and redeploy; no rollback is needed for that alone.
+
+## Kill switch (daily egress alert)
+
+`bash scripts/ops/kill_switch.sh` is a dry run: it reads the IAM policies of `clinic-api` and
+`clinic-realtime` and prints which `roles/run.invoker` bindings it would remove. `--apply` records
+the prior policy to `~/.clinic-kill-switch/state.json` first, then removes the `clinic-web` and
+`clinic-admin` bindings from both services, so every request becomes an unbilled IAM denial after
+the propagation delay (`clinic-smoke` is left alone). `bash scripts/ops/kill_switch.sh --restore --apply`
+re-adds exactly the bindings it removed and checks the invoker members match the recorded policy.
+It only acts on `sil-clinic-booking` in `us-east4` and refuses anything else; a missing
+`clinic-realtime` is skipped.

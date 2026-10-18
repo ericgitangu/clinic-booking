@@ -1,0 +1,9 @@
+{
+  "name": "@clinic/lighthouse-ci",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned Lighthouse CI runner for scripts/ci/lighthouse.sh. Its own lockfile so the app workspaces and their audit are untouched.",
+  "dependencies": {
+    "@lhci/cli": "0.15.1"
+  }
+}
