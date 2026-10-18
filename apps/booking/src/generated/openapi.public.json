@@ -203,6 +203,12 @@
       },
       "Availability": {
         "properties": {
+          "cursor": {
+            "description": "\"<txid>.<id>\" read before the slots, in the same moment: every pushed event at or before it is already reflected in `slots`. Accept a newer response only if its cursor is not older than the one you hold.",
+            "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+            "title": "Cursor",
+            "type": "string"
+          },
           "date": {
             "title": "Date",
             "type": "string"
@@ -230,7 +236,7 @@
             "type": "string"
           }
         },
-        "required": ["doctor_id", "date", "timezone", "slots"],
+        "required": ["doctor_id", "date", "timezone", "cursor", "slots"],
         "title": "Availability",
         "type": "object"
       },
@@ -443,6 +449,24 @@
         "title": "PatientCreate",
         "type": "object"
       },
+      "PatientTokenRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          }
+        },
+        "required": ["doctor_id", "date"],
+        "title": "PatientTokenRequest",
+        "type": "object"
+      },
       "ProblemCode": {
         "enum": [
           "UNAUTHENTICATED",
@@ -463,6 +487,7 @@
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
+          "RATE_LIMITED",
           "IDEMPOTENCY_KEY_CONSUMED",
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
@@ -473,6 +498,7 @@
           "PROBLEM_NOT_FOUND",
           "NOT_FOUND",
           "METHOD_NOT_ALLOWED",
+          "REALTIME_UNAVAILABLE",
           "DB_UNAVAILABLE",
           "INTERNAL_ERROR"
         ],
@@ -503,6 +529,42 @@
         },
         "required": ["code", "slug", "title", "status", "description"],
         "title": "ProblemEntry",
+        "type": "object"
+      },
+      "RealtimeToken": {
+        "description": "A short-lived subscribe-only credential for one channel (a signed JWT).",
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "stream_url": {
+            "description": "Open this URL with `Authorization: Bearer <token>`.",
+            "title": "Stream Url",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "ttl_seconds": {
+            "title": "Ttl Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "channel",
+          "stream_url",
+          "expires_at",
+          "ttl_seconds"
+        ],
+        "title": "RealtimeToken",
         "type": "object"
       },
       "RescheduleRequest": {
@@ -900,6 +962,9 @@
             },
             "description": "Successful Response"
           },
+          "304": {
+            "description": "The slots have not changed since the ETag in If-None-Match"
+          },
           "404": {
             "content": {
               "application/problem+json": {}
@@ -1119,6 +1184,66 @@
         },
         "summary": "Ready",
         "tags": ["health"]
+      }
+    },
+    "/realtime/token/patient": {
+      "post": {
+        "description": "A five-minute, subscribe-only token for one doctor's slots on one day.",
+        "operationId": "patient_token_realtime_token_patient_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeToken"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Patient Token",
+        "tags": ["realtime"]
       }
     }
   },

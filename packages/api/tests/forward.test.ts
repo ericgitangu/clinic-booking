@@ -342,6 +342,32 @@ describe("buildTarget refuses any path the URL parser would rewrite", () => {
   });
 });
 
+describe("conditional requests pass through", () => {
+  it("forwards If-None-Match and returns a 304 with its ETag", async () => {
+    const cap: Captured = {};
+    const upstream = new Response(null, {
+      status: 304,
+      headers: { etag: 'W/"abc"' },
+    });
+    const res = await forward(
+      new Request(
+        "https://web.example/api/doctors/d/availability?date=2026-10-26",
+        {
+          headers: { "if-none-match": 'W/"abc"' },
+        },
+      ),
+      {
+        baseUrl: "https://api.example.run.app",
+        upstreamPath: "/doctors/d/availability",
+        fetchImpl: mockFetch(cap, upstream),
+      },
+    );
+    expect((cap.init!.headers as Headers).get("if-none-match")).toBe('W/"abc"');
+    expect(res.status).toBe(304);
+    expect(res.headers.get("etag")).toBe('W/"abc"');
+  });
+});
+
 describe("response headers are allowlisted", () => {
   it("drops platform and cookie headers, keeps the documented ones", async () => {
     const upstream = new Response("ok", {
@@ -353,6 +379,7 @@ describe("response headers are allowlisted", () => {
         "x-request-id": "rid",
         "server-timing": "app;dur=1",
         "idempotent-replayed": "true",
+        etag: 'W/"abc"',
         "set-cookie": "a=b",
         server: "Google Frontend",
         "x-cloud-trace-context": "abc/1",
@@ -372,6 +399,7 @@ describe("response headers are allowlisted", () => {
       "x-request-id",
       "server-timing",
       "idempotent-replayed",
+      "etag",
     ]) {
       expect(res.headers.has(kept), kept).toBe(true);
     }

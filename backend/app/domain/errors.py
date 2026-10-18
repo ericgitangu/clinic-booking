@@ -130,6 +130,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "A deadlock or serialization failure persisted after one retry.",
     ),
     ErrorSpec(
+        "RATE_LIMITED",
+        429,
+        "Rate limited",
+        "Too many requests from this address. Wait for Retry-After seconds and try again.",
+    ),
+    ErrorSpec(
         "IDEMPOTENCY_KEY_CONSUMED",
         409,
         "Idempotency key consumed",
@@ -157,6 +163,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "METHOD_NOT_ALLOWED", 405, "Method not allowed", "The method is not allowed on this path."
     ),
     ErrorSpec(
+        "REALTIME_UNAVAILABLE",
+        503,
+        "Realtime unavailable",
+        "Live updates are off (not configured, or this month's publish budget is spent). Poll.",
+    ),
+    ErrorSpec(
         "DB_UNAVAILABLE",
         503,
         "Database unavailable",
@@ -178,6 +190,9 @@ class DomainError(Exception):
     catalogue."""
 
     code: str = "INTERNAL_ERROR"
+
+    # Seconds for a Retry-After header, set by errors that ask the caller to wait.
+    retry_after: int | None = None
 
     def __init__(self, detail: str | None = None) -> None:
         spec = CATALOGUE_BY_CODE[self.code]
@@ -285,3 +300,15 @@ class IdempotencyKeyReused(DomainError):
 
 class IdempotencyKeyConsumed(DomainError):
     code = "IDEMPOTENCY_KEY_CONSUMED"
+
+
+class RateLimited(DomainError):
+    code = "RATE_LIMITED"
+
+    def __init__(self, retry_after: int, detail: str | None = None) -> None:
+        super().__init__(detail)
+        self.retry_after = retry_after
+
+
+class RealtimeUnavailable(DomainError):
+    code = "REALTIME_UNAVAILABLE"

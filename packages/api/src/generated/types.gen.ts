@@ -135,6 +135,44 @@ export type AdminAppointmentPage = {
 };
 
 /**
+ * AdminEvent
+ *
+ * A booking changed, for the staff dashboard. No appointment or patient identifiers.
+ */
+export type AdminEvent = {
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Event Type
+     */
+    event_type: 'booked' | 'rescheduled' | 'cancelled';
+    /**
+     * From Local Date
+     */
+    from_local_date: string | null;
+    /**
+     * From Starts At
+     */
+    from_starts_at: string | null;
+    /**
+     * Local Date
+     */
+    local_date: string;
+    /**
+     * Seq
+     *
+     * "<txid>.<id>" of the event.
+     */
+    seq: string;
+    /**
+     * To Starts At
+     */
+    to_starts_at: string | null;
+};
+
+/**
  * Appointment
  *
  * An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone.
@@ -259,6 +297,12 @@ export type AppointmentWithDoctor = {
  * Availability
  */
 export type Availability = {
+    /**
+     * Cursor
+     *
+     * "<txid>.<id>" read before the slots, in the same moment: every pushed event at or before it is already reflected in `slots`. Accept a newer response only if its cursor is not older than the one you hold.
+     */
+    cursor: string;
     /**
      * Date
      */
@@ -603,6 +647,20 @@ export type PatientCreate = {
 };
 
 /**
+ * PatientTokenRequest
+ */
+export type PatientTokenRequest = {
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+};
+
+/**
  * Problem
  */
 export type Problem = {
@@ -640,7 +698,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -663,6 +721,36 @@ export type ProblemEntry = {
      * Title
      */
     title: string;
+};
+
+/**
+ * RealtimeToken
+ *
+ * A short-lived subscribe-only credential for one channel (a signed JWT).
+ */
+export type RealtimeToken = {
+    /**
+     * Channel
+     */
+    channel: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Stream Url
+     *
+     * Open this URL with `Authorization: Bearer <token>`.
+     */
+    stream_url: string;
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Ttl Seconds
+     */
+    ttl_seconds: number;
 };
 
 /**
@@ -723,6 +811,40 @@ export type Slot = {
     ends_at: string;
     /**
      * Starts At
+     */
+    starts_at: string;
+};
+
+/**
+ * SlotEvent
+ *
+ * A time of one doctor on one clinic-local day was taken or became free again.
+ */
+export type SlotEvent = {
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Kind
+     */
+    kind: 'slot_taken' | 'slot_freed';
+    /**
+     * Local Date
+     *
+     * Clinic-local date of the slot (the channel's date).
+     */
+    local_date: string;
+    /**
+     * Seq
+     *
+     * "<txid>.<id>.<part>": apply a message only if it sorts after the last one applied and its (txid, id) is after the cursor of the availability response in use.
+     */
+    seq: string;
+    /**
+     * Starts At
+     *
+     * The slot's start as a UTC instant (…Z).
      */
     starts_at: string;
 };
@@ -1694,6 +1816,37 @@ export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResp
 
 export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses[keyof RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses];
 
+export type AdminTokenInternalRealtimeTokenAdminPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/realtime/token/admin';
+};
+
+export type AdminTokenInternalRealtimeTokenAdminPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    503: unknown;
+};
+
+export type AdminTokenInternalRealtimeTokenAdminPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RealtimeToken;
+};
+
+export type AdminTokenInternalRealtimeTokenAdminPostResponse = AdminTokenInternalRealtimeTokenAdminPostResponses[keyof AdminTokenInternalRealtimeTokenAdminPostResponses];
+
 export type PostPatientPatientsPostData = {
     body: PatientCreate;
     path?: never;
@@ -1830,3 +1983,42 @@ export type ReadyReadyGetResponses = {
 };
 
 export type ReadyReadyGetResponse = ReadyReadyGetResponses[keyof ReadyReadyGetResponses];
+
+export type PatientTokenRealtimeTokenPatientPostData = {
+    body: PatientTokenRequest;
+    path?: never;
+    query?: never;
+    url: '/realtime/token/patient';
+};
+
+export type PatientTokenRealtimeTokenPatientPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    429: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    503: unknown;
+};
+
+export type PatientTokenRealtimeTokenPatientPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RealtimeToken;
+};
+
+export type PatientTokenRealtimeTokenPatientPostResponse = PatientTokenRealtimeTokenPatientPostResponses[keyof PatientTokenRealtimeTokenPatientPostResponses];

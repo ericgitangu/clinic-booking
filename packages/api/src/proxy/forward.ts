@@ -10,6 +10,7 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "accept-language",
   "x-request-id",
   "idempotency-key",
+  "if-none-match",
 ]);
 
 // Only these upstream response headers reach the browser. Copying the rest would leak the
@@ -24,6 +25,7 @@ const FORWARDED_RESPONSE_HEADERS = new Set([
   "x-request-id",
   "server-timing",
   "idempotent-replayed",
+  "etag",
 ]);
 
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PATCH", "OPTIONS"]);

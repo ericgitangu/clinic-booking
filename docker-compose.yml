@@ -46,6 +46,8 @@ services:
       INTERNAL_SIGNING_KEY: ${INTERNAL_SIGNING_KEY:-}
       # Comma-separated owner emails for the admin app; the same value as the app's ADMIN_EMAILS.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Empty (the default) means push is off and clients poll; set your own Ably app key to try live updates.
+      ABLY_API_KEY: ${ABLY_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:

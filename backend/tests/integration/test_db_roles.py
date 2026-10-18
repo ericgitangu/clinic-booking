@@ -94,3 +94,18 @@ async def test_app_role_cannot_rewrite_or_erase_an_audit_row(
             await app_conn.execute("DELETE FROM staff_access_audit")
     finally:
         await tx.rollback()
+
+
+async def test_realtime_tables_keep_the_app_role_least_privileged(
+    owner_conn: asyncpg.Connection,
+) -> None:
+    none = {"DELETE": False, "TRUNCATE": False}
+    cursor = await _privileges(owner_conn, "event_relay_cursor")
+    assert cursor == {"SELECT": True, "INSERT": False, "UPDATE": True, **none}
+    for table in ("realtime_publish_budget", "realtime_token_cap"):
+        assert await _privileges(owner_conn, table) == {
+            "SELECT": True,
+            "INSERT": True,
+            "UPDATE": True,
+            **none,
+        }

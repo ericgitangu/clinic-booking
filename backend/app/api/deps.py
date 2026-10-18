@@ -18,6 +18,8 @@ from app.domain.errors import Forbidden, Unauthenticated
 from app.domain.idempotency import KEY_PATTERN
 from app.schemas.access import Role
 from app.services import access
+from app.services.publish_budget import PublishBudget
+from app.services.relay import Relay
 
 
 def get_settings(request: Request) -> Settings:
@@ -48,6 +50,18 @@ IdempotencyKey = Annotated[
         ),
     ),
 ]
+
+
+def get_relay(request: Request) -> Relay:
+    """The outbox relay for this app, built on first use (it needs the database engine)."""
+    state = request.app.state
+    if getattr(state, "relay", None) is None:
+        settings: Settings = state.settings
+        sessionmaker = get_sessionmaker(settings)
+        budget = PublishBudget(sessionmaker, settings.REALTIME_PUBLISH_CAP_PER_MONTH)
+        state.relay = Relay(sessionmaker, state.publisher, budget, settings)
+    relay: Relay = state.relay
+    return relay
 
 
 def get_clock() -> Clock:
