@@ -7,7 +7,7 @@
 
 Accepted. Patients get an email when they book, reschedule or cancel, and a reminder the evening before.
 
-**Build status (2026-10-18, main 4aef3b8): Declared, not on main (PR #27, open).** Nothing here is live. Booking acknowledgements, the evening-before reminder, the claim and sent endpoints, the migration and the cron are in PR #27 and go live when it merges.
+**Build status (2026-10-18, main 748d7d8): Declared, not on main (PR #27, open).** Nothing here is live. Booking acknowledgements, the evening-before reminder, the claim and sent endpoints, the migration and the cron are in PR #27 and go live when it merges.
 
 ## Context
 

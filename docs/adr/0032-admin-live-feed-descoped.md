@@ -8,7 +8,7 @@
 
 Accepted, decided by the engineer 2026-10-18.
 
-**Build status (2026-10-18, main 4aef3b8): Descoped.** The admin dashboard uses server revalidation and the refresh button, as the first version of ADR-0010 specified. The `admin:events` channel is defined in the event contract (PR #39, open) but nothing in the admin app subscribes to it.
+**Build status (2026-10-18, main 748d7d8): Descoped.** The admin dashboard uses server revalidation and the refresh button, as the first version of ADR-0010 specified. The `admin:events` channel is defined in the event contract (PR #39, open) but nothing in the admin app subscribes to it.
 
 ## Context
 

@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped.** FastAPI serves REST with OpenAPI 3.1 and the docs routes are public through the front door. No tRPC, GraphQL or gRPC was introduced. The Go gateway paragraph is superseded by ADR-0031.
+**Build status (2026-10-18, main 748d7d8): Shipped.** FastAPI serves REST with OpenAPI 3.1 and the docs routes are public through the front door. No tRPC, GraphQL or gRPC was introduced. The Go gateway paragraph is superseded by ADR-0031.
 
 ## Context
 

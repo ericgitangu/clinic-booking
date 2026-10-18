@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped (#31).** Slots come from a pure function whose slot length is a parameter and which drops a candidate that overlaps a booked interval. The public API always uses the fixed 30-minute slot; the public `slot_minutes` parameter was removed.
+**Build status (2026-10-18, main 748d7d8): Shipped (#31).** Slots come from a pure function whose slot length is a parameter and which drops a candidate that overlaps a booked interval. The public API always uses the fixed 30-minute slot; the public `slot_minutes` parameter was removed.
 
 ## Context
 

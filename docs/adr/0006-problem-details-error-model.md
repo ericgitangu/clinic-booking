@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped (#31).** The RFC 9457 model, the closed code catalogue and its exhaustiveness test are in, including the auth, access and idempotency codes.
+**Build status (2026-10-18, main 748d7d8): Shipped (#31).** The RFC 9457 model, the closed code catalogue and its exhaustiveness test are in, including the auth, access and idempotency codes.
 
 ## Context
 

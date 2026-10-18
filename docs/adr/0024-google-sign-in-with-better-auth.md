@@ -10,7 +10,7 @@
 
 Accepted. Patients and the admin sign in with Google, and the web app's server side (the BFF) is the only place that checks the session. The public REST API stays exactly as the brief specifies: no authentication, working from Swagger.
 
-**Build status (2026-10-18, main 4aef3b8): Shipped.** Better Auth with stateless cookie sessions, patient account linking, `/internal/me` and signed internal assertions. Roles are resolved on every request from the `ADMIN_EMAILS` owner list plus API-managed access. Each app has its own instance (ADR-0027).
+**Build status (2026-10-18, main 748d7d8): Shipped.** Better Auth with stateless cookie sessions, patient account linking, `/internal/me` and signed internal assertions. Roles are resolved on every request from the `ADMIN_EMAILS` owner list plus API-managed access. Each app has its own instance (ADR-0027).
 
 ## Context
 

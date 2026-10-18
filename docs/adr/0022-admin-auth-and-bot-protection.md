@@ -12,7 +12,7 @@ Accepted, with two changes of mind that supersede the original design below:
 
 Patient authentication of the public REST API remains out of scope ([ADR-0012](0012-identity-and-abuse-controls-deferred.md)).
 
-**Build status (2026-10-18, main 4aef3b8): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. The stream ticket is superseded by Ably tokens (ADR-0031).
+**Build status (2026-10-18, main 748d7d8): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. The stream ticket is superseded by Ably tokens (ADR-0031).
 
 ## Context
 

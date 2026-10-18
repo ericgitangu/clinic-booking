@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped (#31).** UTC storage, the injected clock, the ruff time bans and the Berlin DST tests are in. Each response renders in its own doctor's clinic zone, with `DEFAULT_CLINIC_TZ` only where there is no clinic; the hard-coded Nairobi zone is gone.
+**Build status (2026-10-18, main 748d7d8): Shipped (#31).** UTC storage, the injected clock, the ruff time bans and the Berlin DST tests are in. Each response renders in its own doctor's clinic zone, with `DEFAULT_CLINIC_TZ` only where there is no clinic; the hard-coded Nairobi zone is gone.
 
 ## Context
 

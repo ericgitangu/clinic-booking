@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place; migrations are 0001 to 0006 (0003 is `0003_staff_access`, 0005 adds idempotency keys, 0006 the realtime outbox, #39). The read-only realtime role is no longer needed (ADR-0031).
+**Build status (2026-10-18, main 748d7d8): Shipped.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place; migrations are 0001 to 0006 (0003 is `0003_staff_access`, 0005 adds idempotency keys, 0006 the realtime outbox, #39). The read-only realtime role is no longer needed (ADR-0031).
 
 ## Context
 

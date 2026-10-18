@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Mostly shipped.** Cloud Run, Artifact Registry and the budgets are in us-east4 behind an IAM-gated front door, with `cost_check.sh` guarding the limits. The web tier is two Vercel apps. The $3 Cloud Run spend cap is Configured and console-managed (since 2026-10-18); the Neon settings are external. The realtime Cloud Run service is superseded by ADR-0031. The Ably key secret exists; the free-tier proof from measured usage is pending.
+**Build status (2026-10-18, main 748d7d8): Mostly shipped.** Cloud Run, Artifact Registry and the budgets are in us-east4 behind an IAM-gated front door, with `cost_check.sh` guarding the limits. The web tier is two Vercel apps. The $3 Cloud Run spend cap is Configured and console-managed (since 2026-10-18); the Neon settings are external. The realtime Cloud Run service is superseded by ADR-0031. The Ably key secret exists; the free-tier proof from measured usage is pending.
 
 ## Context
 
@@ -119,7 +119,7 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 
 **Amendment (2026-10-18): realtime push adds a secret.** [ADR-0031](0031-realtime-push-via-ably-sse.md) adds the Secret Manager secret `clinic-ably-api-key`, making four secrets (the two database URLs, the internal signing key and the Ably key). The approved cost ceiling moves from about $0.28 to about $0.34 a month (one more version at $0.06, deduced from the same list price as the 0.18 line). The Ably free package (200 concurrent connections, 6M messages a month, per Ably's pricing pages) is a free-tier claim not yet proven on this project: the proof is pending measured usage. Ably documents what happens at the connection and channel caps but not at the monthly message cap, so the message volume is bounded by us (a publish cap, an 80% stats alarm and no payment method on the account, engineer-verified 2026-10-18; see ADR-0031), not by an assumed provider limit. The Cloud Run spend cap stays a last-resort backstop, not the $0 mechanism. The realtime Cloud Run service and its ticket budget in the text above are superseded by ADR-0031 and will not be built.
 
-**Update, same day (2026-10-18): the secret and the account exist.** The secret `clinic-ably-api-key` now exists with one enabled version, and the Ably account is on the Free package with no payment method (evidence: [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md)). The heading above says "pending build" because it was written first; the relay and the token endpoints that use the secret shipped in PR #39; the booking page hook is PR #44 (open). The free-tier proof from measured usage is still pending.
+**Update, same day (2026-10-18): the secret and the account exist.** The secret `clinic-ably-api-key` now exists with one enabled version, and the Ably account is on the Free package with no payment method (evidence: [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md)). The heading above says "pending build" because it was written first; the relay and the token endpoints that use the secret shipped in PR #39; the booking page subscription in PR #44. The free-tier proof from measured usage is still pending.
 
 ## Consequences
 

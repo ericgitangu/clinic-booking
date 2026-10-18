@@ -7,7 +7,7 @@
 
 Accepted (T2, second item cut)
 
-**Build status (2026-10-18, main 4aef3b8): Shipped (#31).** The key and fingerprint are columns on `appointments` (migration 0005), with replay, `IDEMPOTENCY_KEY_REUSED` and `IDEMPOTENCY_KEY_CONSUMED`, and a race test.
+**Build status (2026-10-18, main 748d7d8): Shipped (#31).** The key and fingerprint are columns on `appointments` (migration 0005), with replay, `IDEMPOTENCY_KEY_REUSED` and `IDEMPOTENCY_KEY_CONSUMED`, and a race test.
 
 ## Context
 

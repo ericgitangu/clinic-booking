@@ -41,7 +41,7 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 
 ## Build status
 
-Checked against `main` (4aef3b8) on 2026-10-18 (read, not run). Words used: shipped, partly shipped, declared (decided, in an open PR), descoped, superseded. Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
+Checked against `main` (748d7d8) on 2026-10-18 (read, not run). Words used: shipped, partly shipped, declared (decided, in an open PR), descoped, superseded. Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
 
 | ADR | Build status |
 |---|---|
@@ -53,7 +53,7 @@ Checked against `main` (4aef3b8) on 2026-10-18 (read, not run). Words used: ship
 | 0006 | Shipped (#31) |
 | 0007 | Shipped |
 | 0008 | Shipped |
-| 0009 | Partly shipped |
+| 0009 | Shipped for patients, admin feed descoped |
 | 0010 | Partly shipped |
 | 0011 | Shipped |
 | 0012 | Shipped in the web layer |
@@ -75,5 +75,5 @@ Checked against `main` (4aef3b8) on 2026-10-18 (read, not run). Words used: ship
 | 0028 | Mostly shipped |
 | 0029 | Shipped |
 | 0030 | Shipped |
-| 0031 | Mostly shipped, hook declared (#44) |
+| 0031 | Shipped for patients |
 | 0032 | Descoped |

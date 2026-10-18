@@ -9,7 +9,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 4aef3b8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime lane is superseded by ADR-0031. Pending: the saved WIF deny-proof logs.
+**Build status (2026-10-18, main 748d7d8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime lane is superseded by ADR-0031. Pending: the saved WIF deny-proof logs.
 
 ## Context
 
