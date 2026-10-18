@@ -74,7 +74,7 @@ Accepted
 | Cloud Run spend-cap budget, $3 gross, project + Cloud Run service | hard (platform; enforcement "isn't instant"; status "Configured" verified 2026-10-18, console-managed) | Pauses new Cloud Run usage before gross compute reaches the $4.32 Tier 1 CPU discount, so net compute stays $0 |
 | No `allUsers` invoker, no `--allow-unauthenticated`, no `--no-invoker-iam-check`; the booking app's proxy and the apps' server calls only (ADR-0023, ADR-0027) | hard (IAM) | Billed egress to non-North-America clients; denied requests are not billed |
 | Neon Free, Vercel Hobby, CircleCI Free with no card | hard (plan) | They pause or block at their limits and cannot bill |
-| Artifact Registry 2 versions per package + `sizeBytes` < 400 MB assert | configuration | Storage past 0.5 GiB |
+| Artifact Registry 2 versions per package + `sizeBytes` < 450 MB assert (raised from 400 MB, amendment 2026-10-18) | configuration | Storage past 0.5 GiB |
 | Destroy, never disable, old secret versions; ≤ 6 active asserted | configuration | Secret versions past 6 |
 | State bucket in us-east1, lifecycle, soft delete off | configuration | Storage billed outside the Always Free regions |
 | Daily egress alert policy (free until at least 2027-09-01; delete or re-audit before 2027-08-01) + kill switch | detection + manual stop | Egress past 1 GiB under a flood |
@@ -97,7 +97,7 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 | Neon | Free | 0 |
 | Vercel | Hobby | 0 |
 | CircleCI | Free credits (30,000 a month; budget 22,200 worst case) | 0 |
-| Artifact Registry | at most 2 versions per package, < 400 MB (free 0.5 GiB) | 0 |
+| Artifact Registry | at most 2 versions per package, < 450 MB (free 0.5 GiB; amendment 2026-10-18) | 0 |
 | Secret Manager | 3 secrets, 1 active version each (the two database URLs and `clinic-internal-signing-key`, now wired to `clinic-api` with `--set-secrets` and managed in Terraform; 4 versions during a rotation). The shared account's free versions are already used by other projects, so these bill at $0.06 each, inside the accepted total | about 0.18 (0.24 during a rotation) |
 | TF state bucket | us-east1, Always Free (5 GB-months) | 0 |
 | Cloud Run `clinic-realtime` (stretch S1) | Free tier in us-east4; 0.25 vCPU per stream; an open stream bills instance time while connected | 0 (deduced; measures one dashboard tab for 30 minutes) |
@@ -139,3 +139,7 @@ The remaining non-capped surfaces (Artifact Registry, Secret Manager, Cloud Stor
 More than 10 instances means the Neon pooler with `statement_cache_size=0`, tested first. Real Kenyan data means an African-region database. Any Billing report line above $0.00, a Free Tier savings line approaching its limit, or Google changing a free tier (30 days' notice) means re-running the the cost analysis in ADR-0014 proof before the next deploy. Cloud Monitoring alerting charges start no sooner than 2027-09-01 at $0.35 per metric reference a month (cloud.google.com/stackdriver/pricing, verified by the cost verifier 2026-10-16): before 2027-08-01, delete the egress alert policy and its notification channel, or re-run the cost proof in ADR-0014 with that line.
 
 **Amendment, 2026-10-17: the internal signing key reaches the API.** `clinic-internal-signing-key` already existed in Secret Manager with one version; Terraform now adopts it (an `import` block, removed after the first apply) and grants `clinic-api-runtime` `roles/secretmanager.secretAccessor` on that one secret. `ship-api` passes it as `INTERNAL_SIGNING_KEY` and sets `ADMIN_EMAILS`. The secret count stays at 3 (the table above already counted it), so Secret Manager remains about $0.18 a month, $0.24 during a rotation (3 versions at $0.06; 4 while the old one is destroyed), and the accepted total with Artifact Registry stays about $0.28 to $0.34 a month. Nothing new is always-on and no value is in state.
+
+**Amendment, 2026-10-18: the Artifact Registry size bound goes from 400 MB to 450 MB.** This is a bound raise, not a fix of the size. Artifact Registry reports the repository `clinic` at 417.198 MB (repository `sizeBytes`, updated 2026-10-18 18:30:57 UTC), while the version list holds only two images of about 64.1 MB each (`sha-3f41e81`, `sha-36c4cb1`). About 290 MB is unexplained; the likely cause is a size that lags behind the pruning, but that is unconfirmed. The image itself is already close to minimal. Arithmetic: Artifact Registry storage costs $0.10 per GB-month, so 0.05 GB more is about $0.005 a month, and the total stays about $0.34 a month, inside the approved ceiling. 450 MB is still under the 0.5 GiB (536.9 MB) free allowance this project would otherwise exceed. `scripts/cost_check.sh` keeps the bound in the single constant `AR_SIZE_BOUND_BYTES`, with selftest cases just under and just over it.
+
+Review trigger for this bound: if the repository `sizeBytes` still reads far above the sum of the kept images after the next prune, investigate stale blobs instead of raising the bound again. A reproducible build (a deterministic virtual-environment layer) would also stop each release adding about 20 MB of layers that cannot be deduplicated.
