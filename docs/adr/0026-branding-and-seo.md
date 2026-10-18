@@ -9,7 +9,7 @@
 
 Accepted. The site carries the Idyllic brand and is set up so a link to it previews properly and a crawler can read it.
 
-**Build status (2026-10-18, main a2d1117): Mostly shipped.** In `apps/booking`: brand assets, generated icons and share image, metadata, sitemap and robots. The admin app has its own icons, share card and manifest (#30) and is not indexed. Declared, not on main: the Lighthouse step (PR #32, open). Pending: the light logo file.
+**Build status (2026-10-18, main 4aef3b8): Mostly shipped.** In `apps/booking`: brand assets, generated icons and share image, metadata, sitemap, robots and the production polish (#38). The admin app has its own icons, share card and manifest (#30) and is not indexed. The Lighthouse budgets run in CI (#32); the `/` performance rule is a warning (#42). Pending: the light logo file.
 
 ## Context
 

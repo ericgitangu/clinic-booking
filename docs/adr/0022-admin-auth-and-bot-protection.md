@@ -12,7 +12,7 @@ Accepted, with two changes of mind that supersede the original design below:
 
 Patient authentication of the public REST API remains out of scope ([ADR-0012](0012-identity-and-abuse-controls-deferred.md)).
 
-**Build status (2026-10-18, main a2d1117): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. The stream ticket is superseded by Ably tokens (ADR-0031).
+**Build status (2026-10-18, main 4aef3b8): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. The stream ticket is superseded by Ably tokens (ADR-0031).
 
 ## Context
 
@@ -58,7 +58,7 @@ Patient authentication of the public REST API remains out of scope ([ADR-0012](0
 - **Direct API calls are not bot-protected.** Swagger, curl and scripts bypass the check by design, so reviewers keep working. Option 8 is the real fix and needs API auth first; until then a bot can call the API directly.
 - **Option 6 rejected** for the reasons in Context: v3 is score-only and needs a threshold tuned on traffic we do not have, and it carries Google's tracking and a consent burden for patients. Single-use tokens are not a difference: both providers have them.
 
-**Amendment (2026-10-18), pending build.** The stream tickets in this ADR (the HMAC `POST /admin/stream-ticket` and the Go gateway's check, with the monthly connected-seconds budget) are replaced by short-lived subscribe-only Ably tokens ([ADR-0031](0031-realtime-push-via-ably-sse.md)): the admin token is minted behind the admin role check, the patient token is same-origin and rate limited. There is no gateway left to check a ticket.
+**Amendment (2026-10-18).** The stream tickets in this ADR (the HMAC `POST /admin/stream-ticket` and the Go gateway's check, with the monthly connected-seconds budget) are replaced by short-lived subscribe-only Ably tokens ([ADR-0031](0031-realtime-push-via-ably-sse.md)): the admin token is minted behind the admin role check, the patient token is same-origin and rate limited. There is no gateway left to check a ticket.
 
 ## Consequences
 

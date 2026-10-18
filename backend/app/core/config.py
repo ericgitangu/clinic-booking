@@ -17,6 +17,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _BANNED_DSN_PARAMS = ("sslmode", "channel_binding")
 _MIN_SIGNING_KEY_CHARS = 32
 
+# Hard ceiling on publishes to the push service per calendar month, enforced by this API (table
+# realtime_publish_budget), so the free-tier bound does not rest on how the push service behaves
+# when its own cap is reached. Each publish is delivered to every connected subscriber, and the
+# service caps connections at 200 (that cap is refused by the service), so one publish costs at
+# most 1 + 200 messages: 25,000 x (1 + 200) = 5,025,000, below the 6,000,000 messages a month of
+# the free package. Raising it past this value is refused at start-up; the independent monitor
+# in CI asserts the same arithmetic.
+REALTIME_PUBLISH_CAP_CEILING = 25_000
+ABLY_FREE_MONTHLY_MESSAGES = 6_000_000
+ABLY_FREE_CONNECTIONS = 200
+
 
 class Settings(BaseSettings):
     """Runtime configuration. Immutable after construction."""
@@ -48,6 +59,36 @@ class Settings(BaseSettings):
     # Comma-separated owner emails. An owner is always `owner`, needs no staff_access row and can
     # never be granted, changed or revoked through the API. Must match the admin app's variable.
     ADMIN_EMAILS: str = ""
+
+    # Push service (Ably). Unset means "push disabled, polling only": a real configuration state,
+    # not a failure. The key is a secret and is never logged.
+    ABLY_API_KEY: SecretStr | None = None
+    ABLY_REST_URL: str = "https://main.realtime.ably.net"
+    ABLY_STREAM_URL: str = "https://main.realtime.ably.net/event-stream"
+    REALTIME_PUBLISH_CAP_PER_MONTH: int = REALTIME_PUBLISH_CAP_CEILING
+    # The relay runs inline after a committing write; it must never hold the response for long.
+    REALTIME_RELAY_TIMEOUT_SECONDS: float = 2.0
+    # An event older than this is not pushed (clients' safety-net poll covers it): after a long
+    # outage or a period with push disabled the backlog is dropped, not replayed.
+    REALTIME_MAX_EVENT_AGE_SECONDS: int = 600
+    REALTIME_TOKEN_PER_MINUTE: int = 10
+    REALTIME_TOKEN_DAILY_CAP: int = 500
+
+    @field_validator("ABLY_API_KEY", mode="before")
+    @classmethod
+    def _empty_key_is_unset(cls, value: object) -> object:
+        return None if value is None or (isinstance(value, str) and value.strip() == "") else value
+
+    @field_validator("REALTIME_PUBLISH_CAP_PER_MONTH")
+    @classmethod
+    def _cap_within_ceiling(cls, value: int) -> int:
+        if not 0 <= value <= REALTIME_PUBLISH_CAP_CEILING:
+            raise ValueError(
+                "REALTIME_PUBLISH_CAP_PER_MONTH must be between 0 and "
+                f"{REALTIME_PUBLISH_CAP_CEILING}"
+                " (the free-tier message arithmetic is recorded in app/core/config.py)."
+            )
+        return value
 
     @field_validator("INTERNAL_SIGNING_KEY", mode="before")
     @classmethod

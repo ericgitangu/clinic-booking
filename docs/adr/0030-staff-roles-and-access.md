@@ -8,7 +8,7 @@
 
 Accepted. The admin app has three roles, held in a `staff_access` table and looked up on every request. The only configured identity is the owner.
 
-**Build status (2026-10-18, main a2d1117): Shipped.** The admin app resolves a role (owner, admin, viewer) from `staff_access` on every request and the API checks it again per endpoint. The owner comes from `ADMIN_EMAILS`. There is no screen for the audit trail yet.
+**Build status (2026-10-18, main 4aef3b8): Shipped.** The admin app resolves a role (owner, admin, viewer) from `staff_access` on every request and the API checks it again per endpoint. The owner comes from `ADMIN_EMAILS`. There is no screen for the audit trail yet.
 
 ## Context
 

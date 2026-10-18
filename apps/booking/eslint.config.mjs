@@ -4,7 +4,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: [".next/**", "node_modules/**", "src/generated/**"] },
+  {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "src/generated/**",
+      "public/docs-assets/swagger-ui/**",
+      "public/docs-assets/redoc/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

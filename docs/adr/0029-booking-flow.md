@@ -8,7 +8,7 @@
 
 Accepted. The booking screens live in `apps/booking`; the browser never talks to Cloud Run for them. Amended 2026-10-18: patients sign in with Google (ADR-0024) and the interim cookie is gone.
 
-**Build status (2026-10-18, main a2d1117): Shipped.** Server components read and server actions write, with Google sign-in, per-action reCAPTCHA and the real-API e2e job.
+**Build status (2026-10-18, main 4aef3b8): Shipped.** Server components read and server actions write, with Google sign-in, per-action reCAPTCHA and the real-API e2e job.
 
 ## Context
 

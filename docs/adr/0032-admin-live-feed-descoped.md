@@ -8,7 +8,7 @@
 
 Accepted, decided by the engineer 2026-10-18.
 
-**Build status (2026-10-18, main a2d1117): Descoped.** The admin dashboard uses server revalidation and the refresh button, as the first version of ADR-0010 specified. The `admin:events` channel is defined in the event contract (PR #39, open) but nothing in the admin app subscribes to it.
+**Build status (2026-10-18, main 4aef3b8): Descoped.** The admin dashboard uses server revalidation and the refresh button, as the first version of ADR-0010 specified. The `admin:events` channel is defined in the event contract (PR #39, open) but nothing in the admin app subscribes to it.
 
 ## Context
 
@@ -25,7 +25,7 @@ ADR-0009 and ADR-0031 give the admin dashboard a live feed: the server publishes
 Option 2. The reason is time and budget, not capability: the Ably channel and the token endpoint for admins can serve it, and nothing in the design blocks adding it later.
 
 - The admin dashboard keeps its cached metrics (60 seconds, refreshed by the button) from PR #30.
-- The server may still publish admin events once PR #39 merges. They cost messages against the Ably budget (ADR-0031) and nothing consumes them, so I will count that in the usage check and can turn the admin publish off if it matters.
+- The server may still publish admin events now that PR #39 has merged. They cost messages against the Ably budget (ADR-0031) and nothing consumes them, so I will count that in the usage check and can turn the admin publish off if it matters.
 - Option 3 is rejected: a polling loop in the dashboard would keep the database awake for a feature I am not building.
 
 ## Consequences

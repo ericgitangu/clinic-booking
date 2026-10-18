@@ -7,7 +7,7 @@
 
 Accepted (the ZAP job is third in the cut order). Amended 2026-10-16: Go gates for stretch S1.
 
-**Build status (2026-10-18, main a2d1117): Mostly shipped.** SAST, SCA, secrets, container and IaC scans, schemathesis and a ZAP API scan run in CI. ZAP runs on pull requests only, not on the release workflow; the prod ZAP baseline is in PR #32 (open). The Go scanners are not applicable after ADR-0031.
+**Build status (2026-10-18, main 4aef3b8): Shipped.** SAST, SCA, secrets, container and IaC scans, schemathesis and the ZAP API scan run in CI; the ZAP API scan runs on pull requests, and a ZAP baseline against the public URL (`zap-prod`) runs on the release workflow (#32), though it has not yet run on a release (see ADR-0016). The Go scanners are not applicable after ADR-0031.
 
 ## Context
 

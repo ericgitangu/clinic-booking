@@ -7,7 +7,7 @@
 
 Accepted (built with the UI)
 
-**Build status (2026-10-18, main a2d1117): Shipped.** The contract is exported to `contracts/openapi.json` and generated into `packages/api` with hey-api 0.99.0 as types, zod, an SDK and TanStack Query options (#23, #33), with CI freshness checks. The event schemas under `contracts/events/` arrive with PR #39 (open).
+**Build status (2026-10-18, main 4aef3b8): Shipped.** The contract is exported to `contracts/openapi.json` and generated into `packages/api` with hey-api 0.99.0 as types, zod, an SDK and TanStack Query options (#23, #33), with CI freshness checks. The event schemas under `contracts/events/` and their generated types shipped with #39.
 
 ## Context
 

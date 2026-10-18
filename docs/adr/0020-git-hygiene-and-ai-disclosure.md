@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main a2d1117): Partly shipped.** Commits carry no tooling trailers. README section 11 and the `v1.0.0` tag are the engineer's and are tracked outside this ADR.
+**Build status (2026-10-18, main 4aef3b8): Partly shipped.** Commits carry no tooling trailers. README section 11 and the `v1.0.0` tag are the engineer's and are tracked outside this ADR.
 
 ## Context
 

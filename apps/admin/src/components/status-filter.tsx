@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@clinic/ui/components/ui/select";
-import { vibrate } from "@clinic/ui/lib/haptics";
+import { haptic } from "@clinic/ui/lib/haptics";
 import { STATUSES, type StatusFilterValue } from "@/lib/filters";
 
 const LABEL: Record<StatusFilterValue, string> = {
@@ -23,7 +23,7 @@ export function StatusFilter({ status }: { status: StatusFilterValue }) {
   const params = useSearchParams();
 
   function choose(value: string) {
-    vibrate("info");
+    haptic("info");
     const next = new URLSearchParams(params.toString());
     next.set("status", value);
     next.delete("cursor");

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import (
     IdempotencyKey,
     get_clock,
+    get_relay,
     get_session,
     get_settings,
     require_verified_identity,
@@ -41,6 +42,7 @@ from app.schemas.appointment import (
 )
 from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
 from app.services import booking
+from app.services.relay import Relay
 
 router = APIRouter(
     prefix="/internal",
@@ -194,6 +196,7 @@ async def book_mine(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     patient_id = await _linked_patient(session, who)
@@ -206,6 +209,7 @@ async def book_mine(
         starts_at=body.starts_at,
         idempotency_key=idempotency_key,
     )
+    await relay.run(clock)
     if booked.replayed:
         response.headers[REPLAYED_HEADER] = "true"
     return _to_schema(booked.appointment)
@@ -223,11 +227,13 @@ async def cancel_mine(
     who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     patient_id = await _linked_patient(session, who)
     await _own(session, patient_id, appointment_id)
     appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    await relay.run(clock)
     return _to_schema(appt)
 
 
@@ -244,6 +250,7 @@ async def reschedule_mine(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     patient_id = await _linked_patient(session, who)
@@ -251,4 +258,5 @@ async def reschedule_mine(
     appt = await booking.reschedule(
         session, clock, settings, appointment_id=appointment_id, new_starts_at=body.starts_at
     )
+    await relay.run(clock)
     return _to_schema(appt)

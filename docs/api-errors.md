@@ -12,6 +12,7 @@ current state; may succeed later or in another state.
 |---|---|---|---|---|
 | UNAUTHENTICATED | 401 | unauthenticated | Unauthenticated | The internal assertion is missing, malformed, expired or does not match the request. |
 | FORBIDDEN | 403 | forbidden | Forbidden | The internal assertion is valid but its role may not use this endpoint. |
+| CLIENT_ADDRESS_UNKNOWN | 400 | client-address-unknown | Client address unknown | The request carries no usable client address, so it cannot be rate limited. Retry. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
 | TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | The datetime is naive (and nothing else is wrong). |
 | UNKNOWN_DOCTOR | 422 | unknown-doctor | Unknown doctor | The body references a non-existent or inactive doctor. |
@@ -28,6 +29,7 @@ current state; may succeed later or in another state.
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
+| RATE_LIMITED | 429 | rate-limited | Rate limited | Too many requests from this address. Wait for Retry-After seconds and try again. |
 | IDEMPOTENCY_KEY_CONSUMED | 409 | idempotency-key-consumed | Idempotency key consumed | The Idempotency-Key belongs to an appointment that is no longer booked. |
 | ACCESS_EXISTS | 409 | access-exists | Access exists | This email already has active access; change its role instead. |
 | OWNER_PROTECTED | 409 | owner-protected | Owner protected | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
@@ -38,6 +40,7 @@ current state; may succeed later or in another state.
 | PROBLEM_NOT_FOUND | 404 | problem-not-found | Problem not found | No such problem slug. |
 | NOT_FOUND | 404 | not-found | Not found | The path resource does not exist. |
 | METHOD_NOT_ALLOWED | 405 | method-not-allowed | Method not allowed | The method is not allowed on this path. |
+| REALTIME_UNAVAILABLE | 503 | realtime-unavailable | Realtime unavailable | Live updates are off (not configured, or this month's publish budget is spent). Poll. |
 | DB_UNAVAILABLE | 503 | db-unavailable | Database unavailable | Connection failure or pool timeout. Retry after a short delay. |
 | INTERNAL_ERROR | 500 | internal-error | Internal error | An unexpected error. Any ck_* violation lands here as a bug. |
 
@@ -47,6 +50,11 @@ time replays the booking with `Idempotent-Replayed: true`; a different doctor or
 `IDEMPOTENCY_KEY_REUSED`; a key whose appointment has left `booked` is
 `IDEMPOTENCY_KEY_CONSUMED`. A malformed key (not 1-255 visible ASCII characters) is
 `VALIDATION_ERROR`.
+
+Realtime tokens (`POST /realtime/token/patient`, `POST /internal/realtime/token/admin`): `CLIENT_ADDRESS_UNKNOWN`
+(400) when the proxy supplied no usable `x-client-ip` (the API never guesses one from the socket); `RATE_LIMITED` (429, with
+`Retry-After`) when an address uses too many tokens in a minute or a day; `REALTIME_UNAVAILABLE` (503) when push is not
+configured or the month's publish budget is spent, so the client polls.
 
 Every code the API can emit is in this table: `tests/unit/test_error_catalogue.py` checks the
 domain error classes, the codes named in the handlers, the `ProblemCode` enum in the contract

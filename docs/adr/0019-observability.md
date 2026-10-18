@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main a2d1117): Shipped.** JSON logs with request ids and trace correlation, Server-Timing, pure ASGI middleware, hidden SQL parameters, redaction tests, and separate `/health` and `/ready` probes. The Go gateway paragraph is superseded by ADR-0031.
+**Build status (2026-10-18, main 4aef3b8): Shipped.** JSON logs with request ids and trace correlation, Server-Timing, pure ASGI middleware, hidden SQL parameters, redaction tests, and separate `/health` and `/ready` probes. The Go gateway paragraph is superseded by ADR-0031.
 
 ## Context
 

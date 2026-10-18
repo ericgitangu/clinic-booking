@@ -41,11 +41,11 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 
 ## Build status
 
-Checked against `main` (a2d1117) on 2026-10-18 (read, not run). Words used: shipped, partly shipped, declared (decided, in an open PR), descoped, superseded. Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
+Checked against `main` (4aef3b8) on 2026-10-18 (read, not run). Words used: shipped, partly shipped, declared (decided, in an open PR), descoped, superseded. Each ADR also carries a "Build status" line under its Status. "Accepted" above means decided, not necessarily built.
 
 | ADR | Build status |
 |---|---|
-| 0001 | Shipped, with the stretch Go module descoped |
+| 0001 | Shipped, Go module descoped |
 | 0002 | Shipped |
 | 0003 | Shipped |
 | 0004 | Shipped (#31) |
@@ -61,7 +61,7 @@ Checked against `main` (a2d1117) on 2026-10-18 (read, not run). Words used: ship
 | 0014 | Mostly shipped |
 | 0015 | Shipped |
 | 0016 | Shipped, text amended |
-| 0017 | Mostly shipped |
+| 0017 | Shipped |
 | 0018 | Shipped, text amended |
 | 0019 | Shipped |
 | 0020 | Partly shipped |
@@ -75,5 +75,5 @@ Checked against `main` (a2d1117) on 2026-10-18 (read, not run). Words used: ship
 | 0028 | Mostly shipped |
 | 0029 | Shipped |
 | 0030 | Shipped |
-| 0031 | Declared, not on main |
+| 0031 | Mostly shipped, hook declared (#44) |
 | 0032 | Descoped |

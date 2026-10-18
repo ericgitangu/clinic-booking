@@ -26,6 +26,8 @@ trustPolicyExclude:
 allowBuilds:
   '@swc/core': false
   esbuild: false
+  # redoc's analytics postinstall; nothing the build needs.
+  '@scarf/scarf': false
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/env@16.4.2'

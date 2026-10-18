@@ -10,7 +10,7 @@
 
 Accepted. Lean core: no patient auth, no rate limiting, no booking cap, no bot protection at the API. Gated stretch: Google OAuth for the admin area only (Google sign-in) and Cloudflare Turnstile on the UI booking route (bot check), both per ADR-0022.
 
-**Build status (2026-10-18, main a2d1117): Shipped in the web layer.** The public API stays unauthenticated by design. Sign-in, roles, reCAPTCHA (not Turnstile) and per-minute rate limiting are built in the web layer, and FastAPI trusts the signed assertion rather than verifying Google tokens. Not built: a `current_principal` dependency on the public routes.
+**Build status (2026-10-18, main 4aef3b8): Shipped in the web layer.** The public API stays unauthenticated by design. Sign-in, roles, reCAPTCHA (not Turnstile) and per-minute rate limiting are built in the web layer, and FastAPI trusts the signed assertion rather than verifying Google tokens. Not built: a `current_principal` dependency on the public routes.
 
 ## Context
 

@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main a2d1117): Shipped, with the stretch Go module descoped.** The workspace is `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` ([#19](https://github.com/ericgitangu/clinic-booking/pull/19)), driven by the Makefile and root hygiene tooling. There is no Go module and no `services/realtime/`; the Go gateway is superseded by ADR-0031. `contracts/events/` arrives with PR #39 (open).
+**Build status (2026-10-18, main 4aef3b8): Shipped, with the stretch Go module descoped.** The workspace is `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` (#19), driven by the Makefile and root hygiene tooling. There is no Go module and no `services/realtime/`; the Go gateway is superseded by ADR-0031. `contracts/events/` exists as the Ably event contract (#39).
 
 ## Context
 

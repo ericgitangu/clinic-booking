@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main a2d1117): Shipped.** Both partial unique indexes, the duration and alignment CHECKs and the SQLSTATE to 409 mapping are in migration 0001 and covered by tests. The Neon `btree_gist` check is resolved (verified 2026-10-18): the extension is available but not installed, and the built indexes do not need it.
+**Build status (2026-10-18, main 4aef3b8): Shipped.** Both partial unique indexes, the duration and alignment CHECKs and the SQLSTATE to 409 mapping are in migration 0001 and covered by tests. The Neon `btree_gist` check is resolved (verified 2026-10-18): the extension is available but not installed, and the built indexes do not need it.
 
 ## Context
 

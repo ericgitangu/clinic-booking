@@ -1,0 +1,26 @@
+# Settings for the Lighthouse CI runner only (this directory is its own pnpm root). Same supply
+# chain policy as the repository root; the exceptions below are specific to @lhci/cli 0.15.1.
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+minimumReleaseAge: 1440 # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
+# TECH DEBT: semver 5.7.2 and 6.3.1 are old releases that the policy reads as a trust downgrade
+# against an earlier release; excluded by exact version, not audited line by line. Real fix: drop
+# this file when @lhci/cli ships a release on current dependencies.
+trustPolicyExclude:
+  - semver@5.7.2
+  - semver@6.3.1
+# Patched versions exist for these three transitive advisories, so they are forced (checked with
+# `pnpm audit` on 2026-10-18).
+overrides:
+  tmp: '>=0.2.6'
+  basic-ftp: '>=6.2.1'
+  uuid: '>=11.1.1'
+# TECH DEBT, dated 2026-10-18: extract-zip (<=2.0.1, no patched release) has two high advisories,
+# GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3, both about malicious zip archives. It is reached only
+# through puppeteer-core's browser downloader, which Lighthouse CI never calls here: it is given a
+# local Chrome through CHROME_PATH and downloads nothing. Risk: low while that stays true. Real fix:
+# a Lighthouse CI release without puppeteer-core 22, then delete these two ignores.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-jmr9-qjv8-65gv
+    - GHSA-7pqw-9j4j-h8q3

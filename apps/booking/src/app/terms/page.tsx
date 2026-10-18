@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/layout/legal-page";
+import { pageMetadata } from "@/lib/metadata";
 import { CONTACT_EMAIL } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms",
-  alternates: { canonical: "/terms" },
-};
+  description:
+    "The terms for using this demonstration booking system: what it is, and what it is not.",
+  path: "/terms",
+});
 export const dynamic = "force-static";
 
 export default function TermsPage() {
