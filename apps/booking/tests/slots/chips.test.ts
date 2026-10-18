@@ -76,7 +76,7 @@ describe("buildChips", () => {
     expect(chips.map((c) => c.starts_at)).toEqual([at("09:00")]);
   });
 
-  it("keeps a time that disappeared as an inactive Just taken chip, in place", () => {
+  it("keeps a time that left the list, for whatever reason, in place as No longer available", () => {
     const chips = buildChips({
       ...base,
       seen: [at("08:00"), at("08:30"), at("09:00")],
@@ -84,13 +84,34 @@ describe("buildChips", () => {
     });
     expect(chips.map((c) => [c.starts_at, c.state])).toEqual([
       [at("08:00"), "free"],
-      [at("08:30"), "just-taken"],
+      [at("08:30"), "gone"],
       [at("09:00"), "free"],
     ]);
-    expect(chips[1].label).toBe("Just taken");
+    expect(chips[1].label).toBe("No longer available");
   });
 
-  it("does not call the patient's own new booking Just taken", () => {
+  it("says Just taken only for a time confirmed taken (a 409 or a slot_taken event)", () => {
+    const chips = buildChips({
+      ...base,
+      seen: [at("08:00"), at("08:30"), at("09:00")],
+      slots: free("08:00", "09:00"),
+      confirmedTaken: [at("08:30")],
+    });
+    expect(chips[1]).toMatchObject({
+      state: "just-taken",
+      label: "Just taken",
+    });
+    // A confirmed time that is somehow free again is free: the live list wins.
+    const again = buildChips({
+      ...base,
+      seen: [],
+      slots: free("08:30"),
+      confirmedTaken: [at("08:30")],
+    });
+    expect(again[0].state).toBe("free");
+  });
+
+  it("does not call the patient's own new booking taken or gone", () => {
     const chips = buildChips({
       ...base,
       seen: [at("08:00")],

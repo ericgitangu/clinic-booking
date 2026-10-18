@@ -16,7 +16,8 @@ export type ChipState =
   | "yours" // the patient's own visit with this doctor
   | "yours-elsewhere" // the patient has a visit with another doctor at this time
   | "booked" // taken by someone, when the response says so (optional `taken` list)
-  | "just-taken"; // was free when the page opened or last refreshed, is gone now
+  | "gone" // was on the grid, is not in the latest list, and we do not know why
+  | "just-taken"; // confirmed taken: the API answered 409 SLOT_TAKEN, or a slot_taken event arrived
 
 export type Chip = {
   starts_at: string;
@@ -54,6 +55,7 @@ const LABEL: Record<Exclude<ChipState, "free">, string> = {
   yours: "Your visit",
   "yours-elsewhere": "You have another visit",
   booked: "Booked",
+  gone: "No longer available",
   "just-taken": "Just taken",
 };
 
@@ -68,6 +70,8 @@ export function buildChips(input: {
   own: readonly OwnBooking[];
   /** Every free time this grid has shown so far in this visit. */
   seen: readonly string[];
+  /** Times confirmed taken by someone else (a 409 SLOT_TAKEN or a slot_taken event). */
+  confirmedTaken?: readonly string[];
 }): Chip[] {
   const chips = new Map<number, Chip>();
   const put = (iso: string, state: ChipState) =>
@@ -78,7 +82,8 @@ export function buildChips(input: {
     });
 
   // Earlier facts first; later ones win, so the order below is the order of importance.
-  for (const iso of input.seen) put(iso, "just-taken");
+  for (const iso of input.seen) put(iso, "gone");
+  for (const iso of input.confirmedTaken ?? []) put(iso, "just-taken");
   for (const iso of input.taken ?? []) put(iso, "booked");
   for (const s of input.slots) {
     const held = heldAt(input.own, s.starts_at);

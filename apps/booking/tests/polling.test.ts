@@ -4,7 +4,6 @@ import {
   MAX_BACKOFF_MS,
   MAX_RETRY_AFTER_MS,
   POLL_MS,
-  pickWasTaken,
   parseRetryAfter,
   pollInterval,
 } from "@/lib/polling";
@@ -57,13 +56,5 @@ describe("patient polling", () => {
         MAX_RETRY_AFTER_MS,
       );
     });
-  });
-
-  it("calls a pick taken only when it was set and has left the list", () => {
-    const slots = [{ starts_at: "a" }, { starts_at: "b" }];
-    expect(pickWasTaken("", slots)).toBe(false);
-    expect(pickWasTaken("a", slots)).toBe(false);
-    expect(pickWasTaken("c", slots)).toBe(true);
-    expect(pickWasTaken("a", [])).toBe(true);
   });
 });

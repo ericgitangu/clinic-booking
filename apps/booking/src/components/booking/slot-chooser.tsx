@@ -6,6 +6,7 @@ import {
   useActionState,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { Availability } from "@clinic/api/generated";
@@ -34,9 +35,13 @@ function lostPickText(chips: readonly Chip[], pick: string): string {
   if (!pick) return "";
   const t = formatTime(pick);
   const now = chips.find((c) => c.starts_at === pick)?.state;
-  return now === "yours" || now === "yours-elsewhere"
-    ? `${t} is already your visit. Pick another time.`
-    : `${t} was just taken. Pick another time.`;
+  if (now === "yours" || now === "yours-elsewhere")
+    return `${t} is already your visit. Pick another time.`;
+  // "Just taken" is only said when the API has confirmed it; a time that merely left the list is
+  // "no longer available" (it could be a booking, a cancelled day, a doctor's change).
+  return now === "just-taken" || now === "booked"
+    ? `${t} was just taken. Pick another time.`
+    : `${t} is no longer available. Pick another time.`;
 }
 
 // The two status lines are always on the page, and only their text changes, so a screen reader
@@ -108,6 +113,10 @@ export function SlotChooser(props: Props) {
   const unseen = live.slots.filter((s) => !seen.includes(s.starts_at));
   if (unseen.length > 0) setSeen([...seen, ...unseen.map((s) => s.starts_at)]);
 
+  // Times the API has said, with a 409, someone else holds. Only these are called "Just taken".
+  const [confirmedTaken, setConfirmedTaken] = useState<string[]>([]);
+  const attempted = useRef("");
+
   const chips = useMemo(
     () =>
       buildChips({
@@ -117,8 +126,9 @@ export function SlotChooser(props: Props) {
         taken: live.taken,
         own,
         seen,
+        confirmedTaken,
       }),
-    [doctorId, day, live.slots, live.taken, own, seen],
+    [doctorId, day, live.slots, live.taken, own, seen, confirmedTaken],
   );
 
   const [selected, setSelected] = useState("");
@@ -145,7 +155,10 @@ export function SlotChooser(props: Props) {
   const lostRace = state.status === "error" && state.code === "SLOT_TAKEN";
   const { refresh } = live;
   useEffect(() => {
-    if (lostRace) void refresh();
+    if (!lostRace) return;
+    const t = attempted.current;
+    if (t) setConfirmedTaken((c) => (c.includes(t) ? c : [...c, t]));
+    void refresh();
   }, [lostRace, refresh]);
 
   const notice = (
@@ -204,6 +217,7 @@ export function SlotChooser(props: Props) {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         fd.set("starts_at", selected);
+        attempted.current = selected;
         fd.set("recaptcha_token", await getToken().catch(() => ""));
         startTransition(() => formAction(fd));
       }}

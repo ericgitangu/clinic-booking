@@ -15,7 +15,7 @@ import { IDLE_MS } from "../src/lib/polling";
 // words, not only the database. Real stack: this build, the real API and Postgres. Instance
 // i = repeat * SCENARIOS + scenario owns calendar cell i (support/cells.ts), so repeats and workers
 // never share a day. Cross-doctor checks use a time late in the day that no other test books.
-const SCENARIOS = 9;
+const SCENARIOS = 10;
 const cellOf = (scenario: number, repeat: number) =>
   repeat * SCENARIOS + scenario;
 
@@ -138,7 +138,7 @@ test("the confirm step refuses a time the patient already holds, before the API 
   await closeAll(a.context);
 });
 
-test("a time someone else takes stays in place as an inactive Just taken chip", async ({
+test("a time someone else takes stays in place as an inactive No longer available chip", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await farCell(
@@ -163,7 +163,7 @@ test("a time someone else takes stays in place as an inactive Just taken chip", 
   await page.clock.runFor(16_000);
   const gone = chip(page, slots[1]);
   await expect(gone).toBeDisabled();
-  await expect(gone).toHaveAccessibleName(/Just taken/);
+  await expect(gone).toHaveAccessibleName(/No longer available/);
   expect(await order()).toEqual(before); // nothing moved under a finger
   await closeAll(viewer, other.context);
 });
@@ -294,4 +294,31 @@ test("when polling has paused the page says so in the words the hint uses", asyn
   ).toBeVisible();
   await expect(page.getByTestId("refresh-hint")).not.toContainText("try again");
   await ctx.close();
+});
+
+test("losing the race on a move (a confirmed 409) shows that time as Just taken, in place", async ({
+  browser,
+}, testInfo) => {
+  const { doctorId, day, slots } = await farCell(
+    cellOf(9, testInfo.repeatEachIndex),
+  );
+  const me = await signedIn(browser);
+  await bookOn(me.page, doctorId, slots[1]);
+  const id = me.page.url().split("/").pop();
+  await me.page.goto(`/appointments/${id}/reschedule?date=${day}`);
+  await armed(me.page);
+  await chip(me.page, slots[3]).check({ force: true });
+
+  // Someone else takes that time after this page loaded, before the move is sent.
+  const other = await signedIn(browser);
+  await bookOn(other.page, doctorId, slots[3]);
+
+  await me.page.getByRole("button", { name: "Move appointment" }).click();
+  await expect(
+    me.page.locator('[role="alert"]:not(#__next-route-announcer__)'),
+  ).toContainText("That time was just taken.");
+  const lost = chip(me.page, slots[3]);
+  await expect(lost).toBeDisabled();
+  await expect(lost).toHaveAccessibleName(/Just taken/);
+  await closeAll(me.context, other.context);
 });

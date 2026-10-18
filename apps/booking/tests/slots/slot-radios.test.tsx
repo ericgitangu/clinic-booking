@@ -14,6 +14,7 @@ const chips: Chip[] = [
   },
   { starts_at: at("09:30"), state: "just-taken", label: "Just taken" },
   { starts_at: at("10:00"), state: "booked", label: "Booked" },
+  { starts_at: at("10:30"), state: "gone", label: "No longer available" },
 ];
 
 const html = renderToStaticMarkup(
@@ -32,7 +33,7 @@ describe("SlotRadios", () => {
     expect(free).toContain("checked");
   });
 
-  it.each(["08:00", "09:00", "09:30", "10:00"])(
+  it.each(["08:00", "09:00", "09:30", "10:00", "10:30"])(
     "%s is a disabled radio with aria-disabled, so it cannot be selected or focused",
     (t) => {
       const input = inputFor(t);
@@ -47,6 +48,7 @@ describe("SlotRadios", () => {
       "You have another visit",
       "Just taken",
       "Booked",
+      "No longer available",
     ])
       expect(html).toContain(label);
   });

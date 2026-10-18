@@ -125,7 +125,7 @@ test("a time another person books turns inactive on an open page without a reloa
   // It stays in its place, inactive, instead of vanishing and shifting the others.
   await expect(
     page.getByRole("radio", {
-      name: new RegExp(`^${hhmm(slots[0])}.*Just taken`),
+      name: new RegExp(`^${hhmm(slots[0])}.*No longer available`),
     }),
   ).toBeDisabled();
   await expect(kept).toBeVisible();
@@ -137,7 +137,7 @@ test("a time another person books turns inactive on an open page without a reloa
   await ctx.close();
 });
 
-test("a time the person had picked and someone else books says it was just taken", async ({
+test("a time the person had picked and someone else books says it is no longer available", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await ownCell(
@@ -155,7 +155,7 @@ test("a time the person had picked and someone else books says it was just taken
 
   await page.clock.runFor(POLL_MS + 1000);
   await expect(
-    page.getByText(`${hhmm(slots[1])} was just taken`),
+    page.getByText(`${hhmm(slots[1])} is no longer available`),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
   await ctx.close();
