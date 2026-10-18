@@ -1,47 +1,39 @@
 "use client";
 
-import { Laptop, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useState } from "react";
 import { Button } from "@clinic/ui/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@clinic/ui/components/ui/dropdown-menu";
+
+const load = () =>
+  import("@clinic/ui/components/layout/theme-menu").then((m) => m.ThemeMenu);
+
+// The menu (and the dropdown code behind it) is about 35 KB that nothing on screen needs until
+// someone taps. This button looks and reads the same, warms the code on hover, focus or touch, and
+// swaps in the real menu, already open, on the tap.
+function Trigger({ onOpen }: { onOpen?: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-11"
+      aria-label="Display settings"
+      aria-haspopup="menu"
+      aria-expanded={false}
+      onClick={onOpen}
+      onPointerEnter={() => void load()}
+      onFocus={() => void load()}
+      onTouchStart={() => void load()}
+    >
+      <Sun className="size-5 dark:hidden" aria-hidden />
+      <Moon className="hidden size-5 dark:block" aria-hidden />
+    </Button>
+  );
+}
+
+const ThemeMenu = dynamic(load, { ssr: false, loading: () => <Trigger /> });
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-11"
-          aria-label="Change colour theme"
-        >
-          <Sun className="size-5 dark:hidden" aria-hidden />
-          <Moon className="hidden size-5 dark:block" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup
-          value={theme ?? "system"}
-          onValueChange={setTheme}
-        >
-          <DropdownMenuRadioItem value="light">
-            <Sun className="size-4" aria-hidden /> Light
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">
-            <Moon className="size-4" aria-hidden /> Dark
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system">
-            <Laptop className="size-4" aria-hidden /> Match my device
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const [open, setOpen] = useState(false);
+  return open ? <ThemeMenu /> : <Trigger onOpen={() => setOpen(true)} />;
 }

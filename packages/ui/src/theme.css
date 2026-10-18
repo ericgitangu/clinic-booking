@@ -129,9 +129,110 @@
   animation: lotus-settle 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Ripples on the landing hero: two thin rings widen and fade behind the mark, like a lotus on still
+   water. Only transform and opacity change, so it runs on the GPU and moves nothing around it. The
+   rings are absolutely positioned, so they cannot shift the layout. The component pauses them while the tab is hidden (data-paused); reduced motion removes them. */
+@keyframes ripple {
+  from {
+    opacity: 0.55;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+.ripples > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--ring);
+  opacity: 0;
+  animation: ripple 9s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.ripples > span:nth-child(2) {
+  animation-delay: 4.5s;
+}
+
+.ripples[data-paused="true"] > span {
+  animation-play-state: paused;
+}
+
+/* A page arrives with a thin line sweeping across the top. It is its own fixed element, so it
+   moves nothing on the page: no geometry changes, no text fades, and a pinned bar stays put. */
+@keyframes route-sweep {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  70% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+.route-sweep {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 2px;
+  pointer-events: none;
+  background: var(--ring);
+  transform-origin: left;
+  animation: route-sweep 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The confirmation tick draws itself once. */
+@keyframes tick-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes tick-pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.success-badge {
+  animation: tick-pop 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.success-badge path {
+  stroke-dasharray: 24;
+  animation: tick-draw 380ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .lotus-settle {
+  .lotus-settle,
+  .route-sweep,
+  .success-badge,
+  .success-badge path {
     animation: none;
+  }
+
+  .route-sweep {
+    display: none;
+  }
+
+  .ripples {
+    display: none;
   }
 }
 
@@ -147,6 +248,15 @@
   select,
   textarea {
     font-size: max(16px, 1rem);
+  }
+
+  /* A link inside a sentence is 21px tall. Padding that the same margin takes back makes its touch
+     target 44px without moving the text. Utilities override this, so a link that sets its own
+     padding keeps it. */
+  main p a {
+    display: inline-block;
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
   }
 
   * {

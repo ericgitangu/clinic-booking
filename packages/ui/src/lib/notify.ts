@@ -1,28 +1,43 @@
-import { toast, type ExternalToast } from "sonner";
-import { vibrate } from "@clinic/ui/lib/haptics";
+import type { ExternalToast } from "sonner";
+import { haptic } from "@clinic/ui/lib/haptics";
+import {
+  requestToaster,
+  whenToasterMounted,
+} from "@clinic/ui/lib/toaster-gate";
+
+type Toast = typeof import("sonner").toast;
+
+// The toast code is loaded when the first toast is raised (or when the page is idle), not with the
+// page. The buzz is immediate, since it belongs to the tap that caused it.
+function show(run: (toast: Toast) => unknown) {
+  requestToaster();
+  whenToasterMounted(() => {
+    void import("sonner").then((m) => run(m.toast));
+  });
+}
 
 // The one place results become a toast. Each call also buzzes by severity, so no page decides
 // that on its own. `critical` is a booking that failed or a server error: it shows as an error
 // toast that stays until dismissed.
 export const notify = {
   success: (message: string, data?: ExternalToast) => {
-    vibrate("success");
-    return toast.success(message, data);
+    haptic("success");
+    show((t) => t.success(message, data));
   },
   info: (message: string, data?: ExternalToast) => {
-    vibrate("info");
-    return toast.info(message, data);
+    haptic("info");
+    show((t) => t.info(message, data));
   },
   warning: (message: string, data?: ExternalToast) => {
-    vibrate("warning");
-    return toast.warning(message, data);
+    haptic("warning");
+    show((t) => t.warning(message, data));
   },
   error: (message: string, data?: ExternalToast) => {
-    vibrate("error");
-    return toast.error(message, data);
+    haptic("error");
+    show((t) => t.error(message, data));
   },
   critical: (message: string, data?: ExternalToast) => {
-    vibrate("critical");
-    return toast.error(message, { duration: Infinity, ...data });
+    haptic("critical");
+    show((t) => t.error(message, { duration: Infinity, ...data }));
   },
 };

@@ -1,6 +1,8 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { useEffect } from "react";
+import { markToasterMounted } from "@clinic/ui/lib/toaster-gate";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
   CircleCheckIcon,
@@ -12,6 +14,8 @@ import {
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
+  // Sonner subscribes in its own effect, which runs before this one: from here on a toast is shown.
+  useEffect(() => markToasterMounted(), []);
 
   return (
     <Sonner
