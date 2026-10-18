@@ -174,9 +174,14 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
+          "timezone",
           "id",
           "doctor_id",
           "doctor_name",
@@ -220,6 +225,7 @@
         "type": "object"
       },
       "Appointment": {
+        "description": "An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone.",
         "properties": {
           "cancellation_reason": {
             "anyOf": [
@@ -282,6 +288,10 @@
             "title": "Status",
             "type": "string"
           },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -289,6 +299,7 @@
           }
         },
         "required": [
+          "timezone",
           "id",
           "doctor_id",
           "patient_id",
@@ -396,6 +407,10 @@
             "title": "Status",
             "type": "string"
           },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -403,6 +418,7 @@
           }
         },
         "required": [
+          "timezone",
           "id",
           "doctor_id",
           "patient_id",
@@ -1062,12 +1078,14 @@
           "DATE_OUT_OF_RANGE",
           "SLOT_MISALIGNED",
           "OUTSIDE_WORKING_HOURS",
+          "IDEMPOTENCY_KEY_REUSED",
           "SLOT_TAKEN",
           "PATIENT_DOUBLE_BOOKED",
           "APPOINTMENT_ALREADY_CANCELLED",
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
+          "IDEMPOTENCY_KEY_CONSUMED",
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
           "ACCESS_NOT_FOUND",
@@ -1137,6 +1155,7 @@
             "type": "integer"
           },
           "bucket_start": {
+            "description": "Start of the bucket as ISO 8601 local time without an offset, in the zone of the clinic each event belongs to (not an instant). With clinics in different zones, events fall in the bucket of their own clinic's local day or hour, so a series merges the same local hour or day of every clinic.",
             "title": "Bucket Start",
             "type": "string"
           },
@@ -1310,6 +1329,29 @@
     "/appointments": {
       "post": {
         "operationId": "create_appointment_appointments_post",
+        "parameters": [
+          {
+            "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "pattern": "^[\\x21-\\x7e]{1,255}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1329,7 +1371,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Created, or the earlier booking replayed for the same Idempotency-Key",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when this response replays an earlier booking.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "409": {
             "content": {
@@ -2290,6 +2343,7 @@
     },
     "/internal/admin/metrics": {
       "get": {
+        "description": "Activity series, totals and per-doctor load for the clinic-local days `[from, to)`. Each event or visit is placed by the zone of its own doctor's clinic. `bucket_start` is clinic-local wall-clock time, not an instant, so with clinics in different zones the series merges the same local day (or hour) of every clinic.",
         "operationId": "get_metrics_internal_admin_metrics_get",
         "parameters": [
           {
@@ -2447,6 +2501,29 @@
       },
       "post": {
         "operationId": "book_mine_internal_me_appointments_post",
+        "parameters": [
+          {
+            "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "pattern": "^[\\x21-\\x7e]{1,255}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2466,7 +2543,18 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Created, or the earlier booking replayed for the same Idempotency-Key",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` when this response replays an earlier booking.",
+                "schema": {
+                  "enum": [
+                    "true"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {

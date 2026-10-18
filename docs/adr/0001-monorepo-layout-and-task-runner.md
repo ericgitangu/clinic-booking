@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Stale in places.** Built: the Makefile entry point and the root git-hygiene tooling. The workspace is now `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` rather than a single `web/`. Pending: the Go module and `contracts/events/` (stretch S1).
+**Build status (2026-10-18, main a2d1117): Shipped, with the stretch Go module descoped.** The workspace is `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` ([#19](https://github.com/ericgitangu/clinic-booking/pull/19)), driven by the Makefile and root hygiene tooling. There is no Go module and no `services/realtime/`; the Go gateway is superseded by ADR-0031. `contracts/events/` arrives with PR #39 (open).
 
 ## Context
 

@@ -1,0 +1,64 @@
+# ADR-0031: Realtime push via Ably SSE
+
+- Date: 2026-10-18
+- Deciders: engineering, decided by the engineer
+- Supersedes: [ADR-0021](0021-go-realtime-gateway.md)
+- Amends: [ADR-0009](0009-realtime-polling-now-sse-later.md)
+
+## Status
+
+Accepted, decided by the engineer 2026-10-18; the server side is in PR #39 (open), the booking hook is a later PR.
+
+**Build status (2026-10-18, main a2d1117): Declared, not on main.** The server side (outbox relay, publish budget, token endpoints, availability cursor, event contract) is in PR #39 (open); the booking hook that consumes it is a later PR. The Ably account, the secret `clinic-ably-api-key`, the CI contexts and the no-payment-method evidence exist (see `docs/evidence/`). Until the hook merges, polling is the only freshness mechanism on the booking page.
+
+## Context
+
+Problem. A patient looking at free slots should see another patient's booking within seconds, and the admin dashboard should update without a manual refresh. Today the booking UI polls ([ADR-0009](0009-realtime-polling-now-sse-later.md)), and the Go SSE gateway of [ADR-0021](0021-go-realtime-gateway.md) was never built. The constraints are the same as before: total cost must stay at $0 on free tiers, no always-on resource ([ADR-0014](0014-hosting-region-and-cost.md)), no CDN caching of `/api` ([ADR-0023](0023-zero-cost-edge-front-door.md)), and the stream must carry no personal data. Correctness never depends on push: a stale slot that loses the race gets `409 SLOT_TAKEN` and a refetch.
+
+The engineer decided on 2026-10-18 to use a managed pub/sub provider, and the Ably free package over plain SSE. The figures below were read on 2026-10-18 from the providers' official pages; anything not found on those pages is marked unverified.
+
+## Considered options
+
+| Option | Free-tier figure, cited | Verdict |
+|---|---|---|
+| **Ably, SSE** | Free package: "200 concurrent connections", "6,000,000" messages per month, 200 concurrent channels, 500 messages per second, and "you don't need to provide a credit card" (<https://ably.com/docs/platform/pricing/free>, and the Free column of <https://ably.com/pricing>, which shows "200 concurrent connections" and "6M messages / month"). A message published to N subscribers counts as N+1 (<https://ably.com/docs/platform/pricing>: "if a user sends (publishes) a message and 10 users receive it (subscribed) that counts as 11 messages"). Behaviour at the limits is on <https://ably.com/docs/platform/pricing/limits> (read 2026-10-18) and is quoted under the Decision. That the SSE endpoint accepts `Authorization: Bearer <jwt>` was **observed against the live service in CI** (see "What the service really does" under the Decision). | Chosen |
+| Cloudflare Durable Objects over WSS | Workers Free: 100,000 requests per day, 13,000 GB-s duration per day, a 20:1 ratio for incoming WebSocket messages, SQLite-backed objects only; daily limits reset at 00:00 UTC and operations fail after a limit is hit (<https://developers.cloudflare.com/durable-objects/platform/pricing/>). | Held in reserve: the move if Ably's terms change (see the review trigger). Needs a Cloudflare account, a Worker and our own fan-out code. |
+| Go on Cloud Run, SSE | Cloud Run's request-based free tier of 180,000 vCPU-seconds a month is recorded in [ADR-0014](0014-hosting-region-and-cost.md) from the 2026-10-16 audit of <https://cloud.google.com/run/pricing>; **not re-verified on 2026-10-18** (the page fetch returned a truncated page). An open stream bills instance time, which is why ADR-0014 needed a ticket budget. | Rejected: ADR-0021, never built; it is the option with a compute cost and an operational surface of our own. |
+| Vercel function SSE | Hobby: maximum function duration "300s (5 minutes) default and max" (<https://vercel.com/docs/limits>). A stream per viewer holds a function open and counts against Hobby's allowances; the allowance figures were not re-read on 2026-10-18 (**unverified**). | Rejected: bounded at 5 minutes per connection and billed per open viewer. |
+| Upstash | Redis Free: "500K commands per month" and 250 MB of data (<https://upstash.com/pricing/redis>). Max concurrent connections and any browser-facing SSE feature are not stated on that page (**unverified**). | Rejected: Redis is not a browser fan-out service; a relay would still be ours to build. |
+| Pusher Channels | Sandbox: 100 concurrent connections and 200k messages per day (<https://pusher.com/channels/pricing/>). Whether a card is required is not stated on the page (**unverified**). | Rejected: half the connections of Ably's free package, and a WebSocket-first product. |
+| Supabase Realtime | Free plan: 200 concurrent connections, 100 messages per second, 100 channel joins per second (<https://supabase.com/docs/guides/realtime/limits>); no monthly message quota is stated on that page (**unverified**). | Rejected: ties push to a second backend platform we do not otherwise use. |
+
+## Decision
+
+Ably, over plain SSE, for patients and admins. Server-side only keys; the browser holds a short-lived subscribe-only token. The design (decided 2026-10-18):
+
+- **One-way, non-PII events.** The patient channel `slots:{doctor_id}:{date}` carries `slot_taken` and `slot_freed` with only `doctor_id`, `local_date`, `starts_at`, `kind` and `seq`. No appointment id, no patient data. The admin channel `admin:events` carries the dashboard events without personal data. A reschedule is a freed plus a taken.
+- **Outbox relay.** A relay reads `appointment_events` after a commit-safe cursor and batch-publishes to Ably with the message id `<txid>.<id>`, advancing the cursor only after a 2xx response (at-least-once; the id deduplicates). It runs synchronously after each committing write, with a short timeout, before the response is sent.
+- **Tokens.** Minted by `clinic-api` with the Ably key, through the Vercel proxy only: subscribe-only on one channel, five-minute TTL for patients; the admin token sits behind the admin role check ([ADR-0030](0030-staff-roles-and-access.md)).
+- **Secret.** The Ably server key lives in a new Secret Manager secret `clinic-ably-api-key`, created by the engineer; agents never handle it. If it is unset the code runs with "push disabled, polling only", logged once.
+- **Polling stays.** As the safety net: 60 s while push is healthy, 15 s with the existing backoff and idle stop while it is not ([ADR-0009](0009-realtime-polling-now-sse-later.md)). No CDN caching on `/api`.
+- **Limits and how we bound them.** Connections and channels fail closed per Ably's limits page; the monthly message cap's behaviour is undocumented, so we bound it ourselves: a 25,000/month publish cap with fan-out <= 200 gives <= 5.0M < 6M, an 80% stats alarm, and no payment method on the account (engineer-verified 2026-10-18; evidence in [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md); it was pending the engineer's check at Ably signup until then). What the page says, read from <https://ably.com/docs/platform/pricing/limits> on 2026-10-18: for connection and channel caps, usage in excess of the limit "will be restricted until existing resources are removed"; message and bandwidth limits "are enforced separately"; and "Ably will contact you to let you know that you need to upgrade your package". The page says nothing about rejecting messages at the monthly cap and nothing about a payment method, so neither is assumed.
+- **Publish budget.** The API publishes at most 25,000 messages a month (a durable counter in the database). Each publish is delivered to at most 200 subscribers (the free connection limit), and Ably counts a publish plus each delivery, so 25,000 x (1 + 200) = 5,025,000, about 5.0M and below the 6M monthly allowance. This is the bound I own, because the provider documents nothing at the monthly cap. When the budget is spent the token endpoint answers `503 REALTIME_UNAVAILABLE` and the page polls.
+- **What the service really does (observed against the live service in CI, recorded in `contracts/events/README.md` on PR #39).** A JWT works as a raw `Authorization: Bearer <jwt>` value on the event-stream endpoint. A refused or expired token does not give an HTTP error status: the stream opens with `200` and its first frame is `event: error`, with code 40142 (token expired) or 40160 (the token may not read this channel). Codes 40140 to 40149 mean mint a new token; 40160 means do not retry and poll. The same message id was delivered once within the dedupe window, which is what makes the at-least-once relay safe; I got that last point from the CI run, and it is not written in the README on PR #39.
+- **Evidence.** The account is on the Free package with no payment method, and the keys, secret and CI contexts exist: [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md).
+- **Admin feed.** Descoped for this submission, see [ADR-0032](0032-admin-live-feed-descoped.md); the admin channel is defined but nothing subscribes to it.
+- **Not needed:** WebSockets (SSE fits one-way slot events), a Go service, a read-only database role ([ADR-0015](0015-database-roles-and-migrations.md)) and stream tickets ([ADR-0022](0022-admin-auth-and-bot-protection.md)).
+
+## Consequences
+
+- Good: no always-on resource and no compute of ours on the push path; the free package asks for no card at signup (<https://ably.com/docs/platform/pricing/free>).
+- Good: a failure of push degrades to polling, which already works.
+- Bad (a new data processor): Ably sees slot events. They are non-PII by design (doctor, local date, start time, kind, sequence). README section 10 lists it.
+- Bad (token in the URL), no longer applies: I expected to fall back to an `accessToken` query parameter if the header was unsupported. The live CI tests show `Authorization: Bearer` works, so the token stays out of URLs and logs. The mitigations (five-minute TTL, one subscribe-only channel, non-PII events) remain.
+- Bad (relay-trigger debt): there is no always-on worker. An event that is blocked behind a concurrent open transaction waits for the next trigger (the next write or admin metrics request). The 60 s safety-net poll covers the UI. The real fix is a scheduled or always-on relay, which costs money or a platform we have avoided; not taken.
+- Bad: messages are counted per delivery (N+1 per publish), so the monthly figure grows with viewers, not just with bookings. The cost check ([ADR-0016](0016-cicd-circleci-keyless-deploy.md)) is to read Ably's usage and warn at 50 percent of the free allowance. The free-tier proof stays pending measured usage.
+- Bad: the cost ceiling rises from about $0.28 to about $0.34 a month for the extra secret ([ADR-0014](0014-hosting-region-and-cost.md)).
+
+## Assessment line
+
+Section 1 "components, key decisions, trade-offs": push for slot freshness without an always-on service.
+
+## Review trigger
+
+More than 150 peak concurrent connections, more than 3,000,000 messages in a month, or any change to Ably's free terms (limits, card requirement, enforcement at the limit): move to Cloudflare Durable Objects over WSS.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@clinic/ui/components/ui/button";
+import { RememberBooking } from "@/components/booking/remember-booking";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
@@ -42,6 +43,10 @@ export default async function Confirmed({
   return (
     <section className="py-10">
       <ToastOnMount message="Appointment booked." />
+      <RememberBooking
+        doctorId={appt.data.doctor_id}
+        startsAt={appt.data.starts_at}
+      />
       <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
         You are booked
       </h1>

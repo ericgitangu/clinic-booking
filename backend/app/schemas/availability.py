@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
 
-from app.schemas.common import ClinicDatetime
-
 
 class Slot(BaseModel):
-    starts_at: ClinicDatetime
-    ends_at: ClinicDatetime
+    starts_at: datetime
+    ends_at: datetime
 
 
 class Availability(BaseModel):

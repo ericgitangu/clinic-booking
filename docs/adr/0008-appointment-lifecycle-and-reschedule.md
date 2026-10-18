@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built.** Reschedule is an in-place UPDATE under a row lock, with one jittered retry on deadlock or serialization failure and a 409 `CONCURRENT_UPDATE` after that. Race and deadlock tests cover it.
+**Build status (2026-10-18, main a2d1117): Shipped.** Reschedule is an in-place UPDATE under a row lock, with one jittered retry on deadlock or serialization failure and a 409 `CONCURRENT_UPDATE` after that. Race and deadlock tests cover it.
 
 ## Context
 

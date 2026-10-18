@@ -7,7 +7,7 @@
 
 Accepted (built with the UI)
 
-**Build status (audit 2026-10-17): Built, text stale.** The contract is exported to `contracts/openapi.json` and generated into `packages/api` with hey-api 0.99.0 as types, zod and an SDK, with a CI freshness check. Not generated: TanStack Query hooks and the SSE event schema. The `.gitattributes` generated path in the body is out of date.
+**Build status (2026-10-18, main a2d1117): Shipped.** The contract is exported to `contracts/openapi.json` and generated into `packages/api` with hey-api 0.99.0 as types, zod, an SDK and TanStack Query options (#23, #33), with CI freshness checks. The event schemas under `contracts/events/` arrive with PR #39 (open).
 
 ## Context
 
@@ -30,7 +30,7 @@ Option 2.
 - **Drift gate:** CI runs it in two places: `backend-quality` runs `make openapi` and `git diff --exit-code contracts/openapi.json`, and `lint` runs `make gen-client` and fails if `git status --porcelain packages/api/src/generated apps/booking/src/generated` shows any change (untracked files count).
 - **Hand-written zod** is allowed only for form-only fields, with one stretch exception: the SSE event v1 schema (`web/src/lib/event-schema.ts`, stretch S1). The event is not part of the OpenAPI document; its source of truth is `contracts/events/appointment-event.v1.schema.json`, and a vitest validates every `examples` entry of that file with the zod schema.
 
-**Amendment (2026-10-18): what is configured today.** `packages/api/openapi-ts.config.ts` enables `@hey-api/typescript`, `zod` (with `dates: { offset: true }`, because the API sends `+03:00` offsets), `@hey-api/client-fetch` and `@hey-api/sdk` (validator on). The `@tanstack/react-query` plugin listed above is **not configured yet**; adding it is planned and in progress in a separate change, and this ADR does not claim it has landed. The SSE event schema and `contracts/events/` belong to stretch S1, which is not built. One known path mismatch outside the docs: `.gitattributes` still marks `apps/booking/src/api/generated/**` as generated, while the generated code lives in `packages/api/src/generated`; that file is not covered by this change.
+**Amendment (2026-10-18): what is configured today.** `packages/api/openapi-ts.config.ts` enables `@hey-api/typescript`, `zod` (with `dates: { offset: true }`, because the API sends `+03:00` offsets), `@hey-api/client-fetch` and `@hey-api/sdk` (validator on). The `@tanstack/react-query` plugin listed above is configured as of PR #33 (it generates the query options the booking page uses). The SSE event schema and `contracts/events/` belong to stretch S1, which is not built. One known path mismatch outside the docs: `.gitattributes` still marks `apps/booking/src/api/generated/**` as generated, while the generated code lives in `packages/api/src/generated`; that file is not covered by this change.
 
 ## Consequences
 

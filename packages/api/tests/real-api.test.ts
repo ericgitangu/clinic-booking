@@ -27,6 +27,17 @@ describe.skipIf(!REAL)("against the real API", () => {
   let slots: string[] = [];
   let day = "";
   const logs: string[] = [];
+  // Appointments a test made on behalf of a signed-in caller, cancelled after the test whatever
+  // its outcome.
+  const held: {
+    caller: {
+      sub: string;
+      email: string;
+      role: string;
+      emailVerified: boolean;
+    };
+    id: string;
+  }[] = [];
 
   beforeAll(async () => {
     process.env.API_URL = REAL;
@@ -44,9 +55,22 @@ describe.skipIf(!REAL)("against the real API", () => {
     expect(slots.length, "a day with free times").toBeGreaterThanOrEqual(4);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
     logs.length = 0;
+    for (const { caller, id } of held.splice(0)) {
+      const done = await callApi(
+        "cancelMine",
+        (client) =>
+          sdk.cancelMineInternalMeAppointmentsAppointmentIdCancelPatch({
+            client,
+            path: { appointment_id: id },
+            body: { reason: "test cleanup" },
+          }),
+        { caller },
+      );
+      expect(done.ok && done.data.status, "cleanup cancel").toBe("cancelled");
+    }
   });
 
   it("accepts every real read response", async () => {
@@ -116,6 +140,94 @@ describe.skipIf(!REAL)("against the real API", () => {
       status: 422,
       code: "DATE_OUT_OF_RANGE",
     });
+  });
+
+  it("sends the Idempotency-Key to the API: a retry returns the same appointment, a different time is refused", async () => {
+    expect(
+      process.env.INTERNAL_SIGNING_KEY,
+      "INTERNAL_SIGNING_KEY",
+    ).toBeTruthy();
+    const suffix = Math.random().toString(36).slice(2, 10);
+    const caller = {
+      sub: `idem-${suffix}`,
+      email: `idem-${suffix}@example.test`,
+      role: "patient",
+      emailVerified: true,
+    };
+    const linked = await callApi(
+      "linkAccount",
+      (client) =>
+        sdk.linkAccountInternalAccountsLinkPost({
+          client,
+          body: { full_name: "Idempotent Person" },
+        }),
+      { caller },
+    );
+    expect(linked.ok).toBe(true);
+
+    const key = `real-${suffix}`;
+    const book = (startsAt: string, idempotencyKey: string) =>
+      callApi(
+        "bookMine",
+        (client) =>
+          sdk.bookMineInternalMeAppointmentsPost({
+            client,
+            body: { doctor_id: doctorId, starts_at: startsAt },
+            headers: { "Idempotency-Key": idempotencyKey },
+          }),
+        { caller },
+      );
+
+    const first = await book(slots[1], key);
+    // Registered for cleanup before anything is asserted, so a failed assertion below cannot leave
+    // the time booked for the tests that follow (afterEach cancels it).
+    if (first.ok) held.push({ caller, id: first.data.id });
+    expect(first).toMatchObject({ ok: true, status: 201 });
+    if (!first.ok) return;
+
+    // The response was "lost": the same attempt is sent again with the same key.
+    const replay = await book(slots[1], key);
+    expect(replay).toMatchObject({ ok: true, status: 201 });
+    expect(replay.ok && replay.data.id).toBe(first.data.id);
+
+    // Without the key the same request is a conflict with the patient's own booking, which is
+    // what the key prevents.
+    const keyless = await callApi(
+      "bookMine",
+      (client) =>
+        sdk.bookMineInternalMeAppointmentsPost({
+          client,
+          body: { doctor_id: doctorId, starts_at: slots[1] },
+        }),
+      { caller },
+    );
+    expect(keyless).toMatchObject({ ok: false, kind: "problem", status: 409 });
+
+    // The same key for a different time is a different request.
+    const reused = await book(slots[3], key);
+    expect(reused).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 422,
+      code: "IDEMPOTENCY_KEY_REUSED",
+    });
+
+    // A malformed key is refused by the client before any call: `invalid_request` is produced only
+    // when the generated schema rejects the request and there is no response at all (a key that
+    // reached the API would come back as a `problem`).
+    for (const bad of ["", "has space", "tab\there", "x".repeat(256)]) {
+      const malformed = await book(slots[1], bad);
+      expect(malformed).toMatchObject({
+        ok: false,
+        kind: "invalid_request",
+        status: 422,
+      });
+      expect(
+        malformed.ok === false &&
+          malformed.kind === "invalid_request" &&
+          malformed.issues.map((i) => i.field),
+      ).toContain("Idempotency-Key");
+    }
   });
 
   it("books, refuses a double booking, cancels, refuses a second cancel and a reschedule of a cancelled one", async () => {

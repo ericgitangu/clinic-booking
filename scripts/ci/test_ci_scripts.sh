@@ -314,6 +314,138 @@ bash "$HERE/skip_unless_changed.sh" backend/ >/dev/null 2>&1
 expect "skip: fails CLOSED (runs the job) when main cannot be fetched" "$([ -f "$FX/agent" ] && echo halted || echo ran)" ran
 git remote set-url origin "$WORK/origin.git"
 
+# =========================================================================================
+# vercel_env_check.sh: names only, per app and environment; a gap refuses the ship.
+# =========================================================================================
+cat > "$WORK/bin/vercel" <<'FAKE'
+#!/usr/bin/env bash
+[ "${1:-}" = "api" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
+[ -f "$FX/denied" ] && { echo "Error: Not authorized" >&2; exit 1; }
+case "${2:-}" in *until=*) f="$FX/env_json_2" ;; *) f="$FX/env_json" ;; esac
+cat "$f"
+exit "$(cat "$FX/rc" 2>/dev/null || echo 0)"
+FAKE
+chmod +x "$WORK/bin/vercel"
+# env_table <target> [hidden] <name...>: a Vercel env API body with a value that must never leak.
+env_table() {
+  local target="$1" hidden="$2"; shift 2
+  # OUT picks the page file (default page 1); NEXT, when set, is this page's pagination.next.
+  python3 - "$target" "$hidden" "${NEXT:-}" "$@" <<'PY' > "${OUT:-$FX/env_json}"
+import json, sys
+target, hidden, nxt, names = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4:]
+t = ["production", "preview", "development"] if target == "all" else [target]
+body = {"envs": [{"key": n, "target": t, "type": "plain", "value": "SECRET-VALUE-MUST-NOT-LEAK"} for n in names], "hiddenProductionEnvCount": hidden}
+if nxt:
+    body["pagination"] = {"count": len(names), "next": int(nxt)}
+print("Vercel CLI 59.5.0\n" + json.dumps(body))
+PY
+}
+ALL="BETTER_AUTH_URL BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL API_AUDIENCE GCP_PROJECT_NUMBER GCP_SERVICE_ACCOUNT_EMAIL GCP_WORKLOAD_IDENTITY_POOL_ID GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID ADMIN_EMAILS"
+
+new_fx env_ok
+env_table production 0 $ALL OTHER
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: passes when every name is set for production" "$rc" 0
+expect "env check: never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_missing
+env_table production 0 BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: refuses when a name is missing" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names the missing variable" "$(grep -c 'BETTER_AUTH_URL' <<<"$out")" 1
+expect "env check: a failure never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_none
+env_table production 0
+bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
+expect "env check: refuses an empty project (the 2026-10 admin outage)" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_wrong_target
+env_table preview 0 $ALL
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: a Preview-only value does not satisfy production" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_all_envs
+env_table all 0 $ALL
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: All Environments counts" "$rc" 0
+
+new_fx env_hidden
+env_table production 2 $ALL
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: fails closed when variables are hidden from the token" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: says how many are hidden" "$(grep -c '2 production variables are hidden' <<<"$out")" 1
+
+new_fx env_garbage
+printf 'Error: something odd\n' > "$FX/env_json"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: unreadable response fails closed" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: unreadable response says what the CLI said" "$(grep -c 'something odd' <<<"$out")" 1
+
+new_fx env_err_body
+printf '%s\n' '{"error":{"code":"forbidden","message":"Not authorized for this project"},"envs":[{"key":"X","value":"SECRET-VALUE-MUST-NOT-LEAK"}]}' > "$FX/env_json"
+echo 1 > "$FX/rc"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: an API error prints code and message only" "$(grep -c 'forbidden: Not authorized for this project' <<<"$out")" 1
+expect "env check: a value-bearing error body never leaks" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+expect "env check: an API error body fails closed" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_err_plain
+printf '%s\n' 'something went wrong with SECRET-VALUE-MUST-NOT-LEAK in the body' > "$FX/env_json"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: non-JSON output is reported by size, never echoed" "$(grep -c 'unreadable response (' <<<"$out")" 1
+expect "env check: non-JSON output never leaks" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_rc
+env_table production 0 $ALL
+echo 1 > "$FX/rc"
+bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
+expect "env check: a non-zero CLI exit means cannot verify even when the body parses" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+new_fx env_pages_ok
+FIRST="${ALL%% GCP_SERVICE_ACCOUNT_EMAIL*}"; SECOND="GCP_SERVICE_ACCOUNT_EMAIL ${ALL#*GCP_SERVICE_ACCOUNT_EMAIL }"
+NEXT=111 env_table production 0 $FIRST
+OUT="$FX/env_json_2" env_table production 0 $SECOND
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: names split over two pages are merged" "$rc" 0
+
+new_fx env_pages_missing
+NEXT=111 env_table production 0 $FIRST
+OUT="$FX/env_json_2" env_table production 0 GCP_SERVICE_ACCOUNT_EMAIL
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: a name missing from every page still refuses" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names a variable that is on neither page" "$(grep -c 'ADMIN_EMAILS' <<<"$out")" 1
+
+new_fx env_malformed
+printf '%s\n' '{"envs":[{"target":["production"],"value":"SECRET-VALUE-MUST-NOT-LEAK"}],"hiddenProductionEnvCount":0}' > "$FX/env_json"
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: a record without a key is rejected with a clear message" "$(grep -c 'malformed variable record' <<<"$out")" 1
+expect "env check: a malformed record never leaks or tracebacks" "$(grep -cE 'SECRET-VALUE-MUST-NOT-LEAK|Traceback' <<<"$out")" 0
+
+new_fx env_noproject
+out="$(env -u VERCEL_PROJECT_ID bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: a missing VERCEL_PROJECT_ID is a clear failure" "$([ "$rc" -ne 0 ] && grep -c 'set VERCEL_PROJECT_ID' <<<"$out")" 1
+
+new_fx env_denied
+touch "$FX/denied"
+out="$(bash "$HERE/vercel_env_check.sh" booking production 2>&1)"; rc=$?
+expect "env check: fails closed when the listing is refused" "$([ "$rc" -ne 0 ] && echo refused)" refused
+
+# =========================================================================================
+# not_configured_smoke.sh: refuses to run an app whose directory holds an .env file, because
+# `next start` would load it and the test would report a false FAIL. Never moves the file.
+# =========================================================================================
+new_fx smoke_env
+mkdir -p "$WORK/smoke/admin" "$WORK/smoke/booking"
+: > "$WORK/smoke/admin/.env.local"        # a fixture in a temp dir, not a real env file
+: > "$WORK/smoke/booking/.env.production"
+out="$(APPS_DIR="$WORK/smoke" bash "$HERE/not_configured_smoke.sh" 2>&1)"; rc=$?
+expect "smoke: refuses (non-zero) when apps hold .env files" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "smoke: names the admin file to move aside" "$(grep -c 'admin/.env.local exists' <<<"$out")" 1
+expect "smoke: names the booking file to move aside" "$(grep -c 'booking/.env.production exists' <<<"$out")" 1
+expect "smoke: leaves the developer's files in place" "$([ -e "$WORK/smoke/admin/.env.local" ] && [ -e "$WORK/smoke/booking/.env.production" ] && echo kept)" kept
+expect "smoke: does not start a server for a refused app" "$(grep -c 'did not start' <<<"$out")" 0
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

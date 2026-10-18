@@ -41,7 +41,19 @@ async def test_check_constraints_present(owner_conn: asyncpg.Connection) -> None
         "ck_appt_duration",
         "ck_appt_alignment",
         "ck_appt_cancel_consistency",
+        "ck_appt_idempotency_key",
+        "ck_appt_idempotency_pair",
         "ck_wh_order",
         "ck_wh_align",
     ):
         assert expected in names, f"missing check constraint {expected}"
+
+
+async def test_idempotency_key_index_is_partial_and_per_patient(
+    owner_conn: asyncpg.Connection,
+) -> None:
+    ddl = await _indexdef(owner_conn, "uq_appt_patient_idempotency_key")
+    assert ddl is not None
+    assert "UNIQUE" in ddl
+    assert "(patient_id, idempotency_key)" in ddl
+    assert "idempotency_key IS NOT NULL" in ddl

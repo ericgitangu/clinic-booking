@@ -87,12 +87,21 @@ Prometheus-compatible or a custom HTTP POST); it is not turned on here.
 
 `scripts/ci/vercel_prod.sh` stops with "the Vercel token was refused (403)" when `VERCEL_TOKEN` cannot read the deployment behind a host. Both apps use the `vercel-prod` context, so the token must be a team-scoped token that can see **both** projects (`clinic-web` and `clinic-admin`). The ship and rollback jobs print `Vercel target: app=… project=… team=…` first, so the logs show which project id the job used. To fix a refused token, create a new team-scoped token and update `VERCEL_TOKEN` in the context.
 
-## Kill switch (being added)
+## A web app that is missing settings
 
-For a runaway-cost or abuse event when a rollback is not the right tool, a kill switch script is being added by a separate change: `scripts/ops/kill_switch.sh`. It does not exist in the repository at this commit, so nothing below can be run yet. The planned interface:
+Before `ship-booking` and `ship-admin` deploy, `scripts/ci/vercel_env_check.sh` lists the names (never
+the values) of the project's production variables and refuses the ship if any name in
+`scripts/ci/required_env.txt` is absent. If one slips through anyway, the sign-in routes answer a
+503 "Sign-in is not configured" page and log one `auth_not_configured` line naming the missing
+variables, so the fix is to add them in Vercel and redeploy; no rollback is needed for that alone.
 
-- `--dry-run`: print what would change, change nothing.
-- `--apply`: take the API (and with it the apps' public path) offline.
-- `--restore`: undo `--apply` and bring the service back.
+## Kill switch (daily egress alert)
 
-Run `--dry-run` first and read its output. The exact flags, what `--apply` touches and the verification steps will be written here once the script has merged; until then the manual tools are the traffic move in the API section above, and in the Google Cloud console, removing the `run.invoker` binding for `clinic-web` and `clinic-admin`.
+`bash scripts/ops/kill_switch.sh` is a dry run: it reads the IAM policies of `clinic-api` and
+`clinic-realtime` and prints which `roles/run.invoker` bindings it would remove. `--apply` records
+the prior policy to `~/.clinic-kill-switch/state.json` first, then removes the `clinic-web` and
+`clinic-admin` bindings from both services, so every request becomes an unbilled IAM denial after
+the propagation delay (`clinic-smoke` is left alone). `bash scripts/ops/kill_switch.sh --restore --apply`
+re-adds exactly the bindings it removed and checks the invoker members match the recorded policy.
+It only acts on `sil-clinic-booking` in `us-east4` and refuses anything else; a missing
+`clinic-realtime` is skipped.

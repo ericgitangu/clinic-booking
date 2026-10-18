@@ -8,7 +8,7 @@
 
 Accepted. Patients use `clinic.ericgitangu.com`; the admin uses `clinic-admin.ericgitangu.com`. The `sil-clinic-booking.vercel.app` alias stays during the cut-over and is then demoted to a redirect.
 
-**Build status (audit 2026-10-17): Mostly built.** Both apps carry their new hostnames in code, CI and the README. Pending: demoting the `sil-clinic-booking.vercel.app` alias to a redirect. DNS, OAuth client and reCAPTCHA settings are outside the repository and unconfirmed here.
+**Build status (2026-10-18, main a2d1117): Mostly shipped.** Both apps carry their hostnames in code, CI and the docs. Pending: demoting the `sil-clinic-booking.vercel.app` alias to a redirect. DNS, OAuth client and reCAPTCHA settings are outside the repository and unconfirmed here.
 
 ## Context
 

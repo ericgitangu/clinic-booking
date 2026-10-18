@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built.** FastAPI is the single system of record, layered as decided, with no `/v1` prefix and no Go in the repository. Pending: the optional read-only Go gateway (S1, ADR-0021).
+**Build status (2026-10-18, main a2d1117): Shipped.** FastAPI is the single system of record, layered as decided, with no `/v1` prefix and no Go in the repository. The optional Go gateway is superseded by ADR-0031 and will not be built.
 
 ## Context
 

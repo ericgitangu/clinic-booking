@@ -14,7 +14,8 @@ import {
 } from "@clinic/api/generated/zod.gen";
 import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
-import { addDays, clinicDay } from "@/lib/clinic-time";
+import { addDays, clinicDay, formatWhen } from "@/lib/clinic-time";
+import { heldMessage } from "@/lib/held";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
 import { patientName } from "@/lib/identity";
@@ -82,6 +83,16 @@ async function nextFreeSlots(
   return out.slice(0, 6);
 }
 
+// The key must be 1-255 visible ASCII characters, as the API requires. A key that is missing or
+// malformed is replaced by a fresh one so the booking can still go ahead, but a fresh key is
+// unique to this one call: it cannot dedupe a double submit. Only the key the form sent can.
+const KEY_FORMAT = /^[\x21-\x7e]{1,255}$/;
+function keyFor(sent: string | undefined): string {
+  return sent !== undefined && KEY_FORMAT.test(sent)
+    ? sent
+    : crypto.randomUUID();
+}
+
 async function signedIn(): Promise<Identity | null> {
   return getIdentity();
 }
@@ -110,10 +121,36 @@ export async function bookAppointment(
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
-  const booked = await api.bookMine(caller, {
-    doctor_id: doctor,
-    starts_at: when,
-  });
+  // Refuse a time the patient already holds before the API is asked: the API would also refuse it,
+  // but only with a code; this says what happened and where to look. The API stays the final gate.
+  const mine = await api.myAppointments(caller);
+  if (mine.ok) {
+    const live = mine.data.items.filter(
+      (a) => a.status === "booked" && Date.parse(a.ends_at) > Date.now(),
+    );
+    const held = live.find((a) => Date.parse(a.starts_at) === Date.parse(when));
+    if (held) {
+      return {
+        status: "error",
+        code: "PATIENT_DOUBLE_BOOKED",
+        severity: "warning",
+        message: heldMessage({
+          sameDoctor: held.doctor_id === doctor,
+          when: formatWhen(when),
+          doctor: held.doctor.full_name,
+        }),
+      };
+    }
+  }
+
+  // The form makes one key per booking attempt and sends the same one with every submit of that
+  // attempt, so two submits of one attempt (a double click, a retry after a lost response) reach
+  // the API with the same key and the second is answered with the booking the first made.
+  const booked = await api.bookMine(
+    caller,
+    { doctor_id: doctor, starts_at: when },
+    keyFor(blank(fd.get("idempotency_key"))),
+  );
   if (!booked.ok) {
     const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
     return failed(booked, {

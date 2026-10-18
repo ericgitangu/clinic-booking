@@ -9,7 +9,7 @@ import base64
 import binascii
 import json
 import uuid
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +29,6 @@ from app.schemas.admin import (
     SeriesPoint,
     Totals,
 )
-from app.schemas.common import CLINIC_TZ
 
 MAX_DAYS = {"day": 90, "hour": 7}
 DEFAULT_LIMIT = 25
@@ -40,17 +39,8 @@ class InvalidAdminQuery(DomainError):
     code = "VALIDATION_ERROR"
 
 
-async def _zone(session: AsyncSession) -> ZoneInfo:
-    name = await repo.clinic_timezone(session)
-    return ZoneInfo(name) if name else CLINIC_TZ
-
-
-def _bounds(zone: ZoneInfo, start: date, end: date) -> tuple[datetime, datetime]:
-    """Clinic-local midnight of both dates as UTC instants."""
-    return (
-        datetime.combine(start, time.min, zone).astimezone(UTC),
-        datetime.combine(end, time.min, zone).astimezone(UTC),
-    )
+def _in_zone(value: datetime | None, zone: str) -> datetime | None:
+    return value.astimezone(ZoneInfo(zone)) if value is not None else None
 
 
 def encode_cursor(starts_at: datetime, appointment_id: uuid.UUID) -> str:
@@ -86,16 +76,13 @@ async def metrics(
     if (end - start).days > MAX_DAYS[bucket]:
         raise InvalidAdminQuery(f"bucket={bucket} allows at most {MAX_DAYS[bucket]} days")
 
-    zone = await _zone(session)
-    from_ts, to_ts = _bounds(zone, start, end)
-
-    rows = await repo.series(session, bucket=bucket, from_ts=from_ts, to_ts=to_ts)
+    rows = await repo.series(session, bucket=bucket, from_day=start, to_day=end)
     series = [SeriesPoint(**{**r, "bucket_start": r["bucket_start"].isoformat()}) for r in rows]
     upcoming = await repo.upcoming_active(session, now=clock.now())
 
     doctors = await repo.doctors(session)
-    visits = await repo.visits_by_doctor(session, from_ts=from_ts, to_ts=to_ts)
-    cancels = await repo.cancel_actions_by_doctor(session, from_ts=from_ts, to_ts=to_ts)
+    visits = await repo.visits_by_doctor(session, from_day=start, to_day=end)
+    cancels = await repo.cancel_actions_by_doctor(session, from_day=start, to_day=end)
     capacity = await repo.capacity_by_doctor(session, from_date=start, to_date=end)
 
     per_doctor: list[DoctorLoad] = []
@@ -144,16 +131,13 @@ async def appointments(
     if start is not None and end is not None and end <= start:
         raise InvalidAdminQuery("'to' must be after 'from'")
     after = decode_cursor(cursor) if cursor else None
-    zone = await _zone(session)
-    from_ts = _bounds(zone, start, start)[0] if start else None
-    to_ts = _bounds(zone, end, end)[0] if end else None
 
     rows = await repo.appointments_page(
         session,
         status=status,
         doctor_id=doctor_id,
-        from_ts=from_ts,
-        to_ts=to_ts,
+        from_day=start,
+        to_day=end,
         after=after,
         limit=limit,
     )
@@ -167,6 +151,15 @@ async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
     if not await repo.appointment_exists(session, appointment_id):
         raise AppointmentNotFound()
     rows = await repo.lineage(session, appointment_id)
-    return Lineage(
-        appointment_id=appointment_id, events=[LineageEvent.model_validate(r) for r in rows]
-    )
+    # Each event is rendered in the zone of its doctor's clinic (the query joined it in).
+    events = [
+        LineageEvent(
+            id=r["id"],
+            event_type=r["event_type"],
+            from_starts_at=_in_zone(r["from_starts_at"], r["timezone"]),
+            to_starts_at=_in_zone(r["to_starts_at"], r["timezone"]),
+            occurred_at=r["occurred_at"].astimezone(ZoneInfo(r["timezone"])),
+        )
+        for r in rows
+    ]
+    return Lineage(appointment_id=appointment_id, events=events)

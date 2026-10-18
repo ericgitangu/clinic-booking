@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built, catalogue incomplete.** The RFC 9457 model, the closed code catalogue and its test are in. Auth and access codes (401, 403 and the access errors) exist beyond the table here. The two idempotency codes are being added in PR #31 (not merged yet), together with ADR-0013.
+**Build status (2026-10-18, main a2d1117): Shipped (#31).** The RFC 9457 model, the closed code catalogue and its exhaustiveness test are in, including the auth, access and idempotency codes.
 
 ## Context
 
@@ -61,7 +61,7 @@ Option 2.
 | DB_UNAVAILABLE | 503 | connection failure or pool timeout (+ `Retry-After: 2`) |
 | INTERNAL_ERROR | 500 | fallback; any `ck_*` violation lands here as a bug |
 
-**Amendment (2026-10-18): the table now lists the auth, access and idempotency codes.** Seven codes were added to the table above: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `ACCESS_EXISTS` (409), `OWNER_PROTECTED` (409), `ACCESS_NOT_FOUND` (404), and `IDEMPOTENCY_KEY_REUSED` and `IDEMPOTENCY_KEY_CONSUMED`, whose rows already existed. The "When" wording of these rows is copied from the detail column of `docs/api-errors.md` as written in PR #31 (not merged yet), which is the authority. For the two idempotency rows that replaces the shorter ADR wording ("same key, different payload"; "key replayed after the appointment left `booked`") and drops the "(T2)" tag; the statuses (422 and 409) are unchanged. The auth and access codes exist on `main` already; the idempotency codes are being added in PR #31.
+**Amendment (2026-10-18): the table now lists the auth, access and idempotency codes.** Seven codes were added to the table above: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `ACCESS_EXISTS` (409), `OWNER_PROTECTED` (409), `ACCESS_NOT_FOUND` (404), and `IDEMPOTENCY_KEY_REUSED` and `IDEMPOTENCY_KEY_CONSUMED`, whose rows already existed. The "When" wording of these rows is copied from the detail column of `docs/api-errors.md` as merged in PR #31, which is the authority. For the two idempotency rows that replaces the shorter ADR wording ("same key, different payload"; "key replayed after the appointment left `booked`") and drops the "(T2)" tag; the statuses (422 and 409) are unchanged. All seven codes are on `main` (PR #31 added the idempotency ones).
 
 ## Consequences
 

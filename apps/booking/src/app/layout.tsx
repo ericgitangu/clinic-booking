@@ -4,6 +4,7 @@ import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { SessionMenu } from "@/components/account/session-menu";
+import { Providers } from "@/components/pwa/providers";
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { FOOTER_COLUMNS } from "@/lib/footer-links";
 import { metadata, viewport } from "@/lib/metadata";
@@ -28,15 +29,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning className={cn(sans.variable)}>
       <body className="min-h-dvh font-sans antialiased">
         <ThemeProvider>
-          <PageShell
-            name={SITE.name}
-            navLinks={NAV_LINKS}
-            footerColumns={FOOTER_COLUMNS}
-            footerNotice={FOOTER_NOTICE}
-            headerTrailing={<SessionMenu />}
-          >
-            {children}
-          </PageShell>
+          <Providers>
+            <PageShell
+              name={SITE.name}
+              navLinks={NAV_LINKS}
+              footerColumns={FOOTER_COLUMNS}
+              footerNotice={FOOTER_NOTICE}
+              headerTrailing={<SessionMenu />}
+            >
+              {children}
+            </PageShell>
+          </Providers>
         </ThemeProvider>
       </body>
     </html>

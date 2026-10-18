@@ -21,12 +21,14 @@ current state; may succeed later or in another state.
 | DATE_OUT_OF_RANGE | 422 | date-out-of-range | Date out of range | The clinic-local date is beyond the booking horizon. |
 | SLOT_MISALIGNED | 422 | slot-misaligned | Slot misaligned | Off the 30-minute grid of a window, or seconds/microseconds are non-zero. |
 | OUTSIDE_WORKING_HOURS | 422 | outside-working-hours | Outside working hours | [start, start + 30 min) is not inside a working window. |
+| IDEMPOTENCY_KEY_REUSED | 422 | idempotency-key-reused | Idempotency key reused | The Idempotency-Key was already used with a different doctor or time. |
 | SLOT_TAKEN | 409 | slot-taken | Slot taken | Another booking holds this doctor slot (uq_appt_doctor_slot_booked). |
 | PATIENT_DOUBLE_BOOKED | 409 | patient-double-booked | Patient double-booked | The patient already has a booking at this time (uq_appt_patient_slot_booked). |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | appointment-already-cancelled | Appointment already cancelled | Cancel or reschedule of an already-cancelled appointment. |
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
+| IDEMPOTENCY_KEY_CONSUMED | 409 | idempotency-key-consumed | Idempotency key consumed | The Idempotency-Key belongs to an appointment that is no longer booked. |
 | ACCESS_EXISTS | 409 | access-exists | Access exists | This email already has active access; change its role instead. |
 | OWNER_PROTECTED | 409 | owner-protected | Owner protected | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
 | ACCESS_NOT_FOUND | 404 | access-not-found | Access not found | No active access for this email. |
@@ -39,5 +41,14 @@ current state; may succeed later or in another state.
 | DB_UNAVAILABLE | 503 | db-unavailable | Database unavailable | Connection failure or pool timeout. Retry after a short delay. |
 | INTERNAL_ERROR | 500 | internal-error | Internal error | An unexpected error. Any ck_* violation lands here as a bug. |
 
-T2 codes (`IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_KEY_CONSUMED`) are added by.
+Idempotency (ADR-0013): `Idempotency-Key` is read on `POST /appointments` and
+`POST /internal/me/appointments`, scoped to the patient. The same key with the same doctor and
+time replays the booking with `Idempotent-Replayed: true`; a different doctor or time is
+`IDEMPOTENCY_KEY_REUSED`; a key whose appointment has left `booked` is
+`IDEMPOTENCY_KEY_CONSUMED`. A malformed key (not 1-255 visible ASCII characters) is
+`VALIDATION_ERROR`.
+
+Every code the API can emit is in this table: `tests/unit/test_error_catalogue.py` checks the
+domain error classes, the codes named in the handlers, the `ProblemCode` enum in the contract
+and this file against `CATALOGUE`.
 Stretch codes are added by their owning feature.

@@ -12,7 +12,7 @@ Accepted, with two changes of mind that supersede the original design below:
 
 Patient authentication of the public REST API remains out of scope ([ADR-0012](0012-identity-and-abuse-controls-deferred.md)).
 
-**Build status (audit 2026-10-17): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. Pending: the stream ticket, with the realtime gateway.
+**Build status (2026-10-18, main a2d1117): Superseded in part.** Google sign-in is built under ADR-0024 and the reCAPTCHA check runs in the booking server actions for book, reschedule and cancel. The Auth.js, Google JWKS and Turnstile designs were not built and stay as the record. The stream ticket is superseded by Ably tokens (ADR-0031).
 
 ## Context
 
@@ -57,6 +57,8 @@ Patient authentication of the public REST API remains out of scope ([ADR-0012](0
 - The booking dialog renders the Turnstile widget (`action: "book"`) and posts to the same-origin route `POST /ui/appointments` (moved off `/api/*`, which is the proxy's) (Vercel region `iad1`, near the API in us-east4; amended by the $0 audit, because Hobby allows a single function region and the API moved to North America). The route forwards through the proxy's in-process helper `call-api.ts` (it used to read `API_BASE_URL` = the front-door URL), never to `*.run.app` without an ID token. The route verifies the token with `siteverify` (3 s timeout, fail closed) and checks the returned `hostname` and `action`, then forwards the original body and `Idempotency-Key` to the API and returns the API's response unchanged.
 - **Direct API calls are not bot-protected.** Swagger, curl and scripts bypass the check by design, so reviewers keep working. Option 8 is the real fix and needs API auth first; until then a bot can call the API directly.
 - **Option 6 rejected** for the reasons in Context: v3 is score-only and needs a threshold tuned on traffic we do not have, and it carries Google's tracking and a consent burden for patients. Single-use tokens are not a difference: both providers have them.
+
+**Amendment (2026-10-18), pending build.** The stream tickets in this ADR (the HMAC `POST /admin/stream-ticket` and the Go gateway's check, with the monthly connected-seconds budget) are replaced by short-lived subscribe-only Ably tokens ([ADR-0031](0031-realtime-push-via-ably-sse.md)): the admin token is minted behind the admin role check, the patient token is same-origin and rate limited. There is no gateway left to check a ticket.
 
 ## Consequences
 

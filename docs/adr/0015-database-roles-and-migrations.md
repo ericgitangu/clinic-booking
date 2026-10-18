@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built, S1 pending.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place. Migration 0003 is `0003_staff_access`, not `0003_event_cursor`. Pending: the read-only realtime role (S1).
+**Build status (2026-10-18, main a2d1117): Shipped.** The owner and app role split, grant-only migration, expand-only lint and advisory lock are in place; migrations are 0001 to 0005 (0003 is `0003_staff_access`). The read-only realtime role is no longer needed (ADR-0031). The outbox migration `0006_realtime_outbox` is in PR #39 (open).
 
 ## Context
 
@@ -43,6 +43,8 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 - **Seed:** `INSERT ... ON CONFLICT (id) DO UPDATE` only. It never deletes.
 
 **Amendment (2026-10-18): migrations as built.** The versions in `backend/migrations/versions/` are `0001_initial`, `0002_admin_indexes`, `0003_staff_access` and `0004_patient_accounts`. Migration `0003_event_cursor`, named in the stretch S1 bullet above, was only the S1 plan: S1 is not built, so there is no `0003_event_cursor`, no `clinic_realtime` role and no realtime secret. If S1 is built, its event-cursor migration takes the next free number after `0004`, not `0003`. The tolerance rule described for the S1 grants (skip with a `NOTICE` when the role is missing) is unchanged as a design.
+
+**Amendment (2026-10-18), pending build.** The read-only `clinic_realtime` role, its secret `clinic-database-url-realtime` and `02-realtime-role.sql` are no longer needed: realtime push is relayed from `clinic-api` to Ably ([ADR-0031](0031-realtime-push-via-ably-sse.md)), so there is no Go gateway to hold a database role. Option 4 and the S1 bullets above stay as the record. The relay's outbox is an expand-only migration, `0006_realtime_outbox`, in PR #39 (open).
 
 ## Consequences
 

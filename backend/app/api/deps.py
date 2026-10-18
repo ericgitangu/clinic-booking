@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import assertion
@@ -14,6 +15,7 @@ from app.core.config import Settings
 from app.core.logging import APP_LOGGER
 from app.db.session import get_sessionmaker
 from app.domain.errors import Forbidden, Unauthenticated
+from app.domain.idempotency import KEY_PATTERN
 from app.schemas.access import Role
 from app.services import access
 
@@ -27,6 +29,25 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     sessionmaker = get_sessionmaker(request.app.state.settings)
     async with sessionmaker() as session:
         yield session
+
+
+# 1-255 visible ASCII characters. A malformed key is refused as VALIDATION_ERROR before
+# any work, the same as every other bad input at the boundary.
+IdempotencyKey = Annotated[
+    str | None,
+    Header(
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=255,
+        pattern=KEY_PATTERN,
+        description=(
+            "Chosen by the client once per booking attempt and reused on a retry. The same key "
+            "with the same doctor and time returns the original booking with "
+            "`Idempotent-Replayed: true`; with a different doctor or time it is "
+            "IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED."
+        ),
+    ),
+]
 
 
 def get_clock() -> Clock:

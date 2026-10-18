@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built.** Slots come from a pure function over working hours, booked starts and a lead time. Slot length is a module constant, not a parameter as the text shows; being changed in PR #31 (not merged yet).
+**Build status (2026-10-18, main a2d1117): Shipped (#31).** Slots come from a pure function whose slot length is a parameter and which drops a candidate that overlaps a booked interval. The public API always uses the fixed 30-minute slot; the public `slot_minutes` parameter was removed.
 
 ## Context
 
@@ -33,7 +33,7 @@ Option 1.
 - Good: at most 48 iterations per request.
 - Bad: uniqueness has to come from the appointments constraint (ADR-0003). There is no slot row to lock.
 
-**Amendment (2026-10-18), pending the merge of PR #31.**
+**Amendment (2026-10-18), shipped in PR #31.**
 
 - The slot length is a parameter of the pure domain function, and the function filters candidate slots against booked **intervals** by overlap, not by exact start.
 - The public API always uses the brief's fixed 30-minute slot: the same constant the booking path and the database checks use.

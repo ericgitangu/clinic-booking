@@ -7,7 +7,7 @@
 
 Accepted
 
-**Build status (audit 2026-10-17): Built, text stale.** The unit, integration, race and naive-control suites run on real Postgres in CI, and Playwright now runs in the `e2e-real` job. Pending: the idempotent replay race case (needs ADR-0013), a separate 95 percent domain coverage gate, and all stretch-feature tests.
+**Build status (2026-10-18, main a2d1117): Shipped, text amended.** The unit, integration, race and naive-control suites run on real Postgres in CI, the idempotent replay race case is in (#31), and Playwright runs in the `e2e-real` job. Pending: a separate 95 percent domain coverage gate. The Go and gateway tests are not applicable after ADR-0031.
 
 ## Context
 

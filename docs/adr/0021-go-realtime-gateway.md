@@ -9,7 +9,9 @@
 
 Accepted (gated realtime gateway; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
-**Build status (audit 2026-10-17): Not built.** Optional and not built. The admin dashboard uses server revalidation, as the amendment says. Only the `appointment_events` table and the proxy's realtime audience and timeout plumbing exist. The Go service, its role, CI lane, ship job and event contract are pending.
+**Build status (2026-10-18, main a2d1117): Superseded by ADR-0031; never built.** The Go service, its role, CI lane, ship job and event contract do not exist and will not be built. The admin dashboard uses server revalidation.
+
+**Superseded (2026-10-18) by [ADR-0031](0031-realtime-push-via-ably-sse.md).** The engineer decided to use Ably over SSE for patients and admins instead of a Go gateway on Cloud Run. This ADR is not built and will not be built; the text below stays as the record of what was considered.
 
 ## Context
 

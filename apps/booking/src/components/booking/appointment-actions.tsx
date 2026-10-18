@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { Button } from "@clinic/ui/components/ui/button";
 import {
@@ -17,10 +18,19 @@ import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { cancelAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
+import { forgetBooked } from "@/lib/own-bookings";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
 
-export function AppointmentActions({ id, when }: { id: string; when: string }) {
+export function AppointmentActions({
+  id,
+  when,
+  startsAt,
+}: {
+  id: string;
+  when: string;
+  startsAt: string;
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(
     cancelAppointment,
@@ -28,7 +38,12 @@ export function AppointmentActions({ id, when }: { id: string; when: string }) {
   );
   const getToken = useRecaptcha("cancel");
   const router = useRouter();
-  useActionFeedback(state, () => setOpen(false));
+  const qc = useQueryClient();
+  // Cancelled: that time is free again, so the grid must stop showing it as the patient's own.
+  useActionFeedback(state, () => {
+    setOpen(false);
+    forgetBooked(qc, startsAt);
+  });
   // Another tab already cancelled it: the toast says so, then the list catches up.
   useEffect(() => {
     if (

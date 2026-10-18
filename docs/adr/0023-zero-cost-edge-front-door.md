@@ -10,7 +10,7 @@
 
 Accepted, decided by the engineer 2026-10-16: Vercel hosts the frontend and GCP hosts the backend (option 1), with one simplification adopted now: a single Vercel project, the Next.js app in `web/`, carries the front door as route handlers (Decision). (Superseded by the decision. Option 2 remains the documented fallback only if cannot mint an ID token; see Review trigger.) The hosting lock review hardened the implementation inside this decision without re-opening it: static doc routes, exact token-exchange calls, a Vercel bootstrap step, `Location` rewriting, header rules and a credential-free public smoke.
 
-**Build status (audit 2026-10-17): Built for the API.** IAM-gated Cloud Run in us-east4 behind Vercel proxies that mint ID tokens through OIDC federation. There are two Vercel projects (booking, admin), not one. Pending: the realtime parts and the scripted kill switch in the runbook. Unverified: SSE flushing through the proxy and the latency figures.
+**Build status (2026-10-18, main a2d1117): Shipped for the API.** IAM-gated Cloud Run in us-east4 behind Vercel proxies that mint ID tokens through OIDC federation, with two Vercel projects. The scripted kill switch is in PR #32 (open). The SSE-through-proxy question is moot: push goes from the browser to Ably (ADR-0031). Unverified: the latency figures.
 
 ## Context
 
@@ -69,6 +69,8 @@ done
 **Superseded design (first $0 draft, kept for the record).** A separate route-handler-only Vercel project `clinic-frontdoor` in `frontdoor/`, with the catch-all `frontdoor/src/app/[[...path]]/route.ts`, its own `vercel.json`, service account `clinic-frontdoor@`, WIF condition `project:clinic-frontdoor` and CI jobs `frontdoor-quality` / `ship-frontdoor`. Merged into `web/` by the engineer's decision (rename map).
 
 **Amendment (2026-10-18): paths and job names as built.** The front door is the booking app (`apps/booking`, Vercel project `clinic-web`) since [ADR-0027](0027-two-apps-in-a-workspace.md): the proxy route is `apps/booking/src/app/api/[...path]/route.ts` with its logic in `packages/api/src/proxy/`, `/docs`, `/redoc` and `/openapi.json` are under `apps/booking/src/app/`, and `vercel.json` exists per app (`apps/booking/vercel.json`, `apps/admin/vercel.json`). It is deployed by `ship-booking`, not `ship-web`; the admin app (`clinic-admin`) is a second project that calls the API with its own service account. Where this ADR says `web/` or "the single Vercel project", read the booking app; the original text stays as the record.
+
+**Amendment (2026-10-18), pending build.** For push, the browser connects to Ably directly, not through the proxy ([ADR-0031](0031-realtime-push-via-ably-sse.md)). The traffic is non-PII slot events and it does not touch Cloud Run, so it adds no Cloud Run egress. `/api` is still uncached and the front door is otherwise unchanged. Only the token requests pass through the proxy.
 
 ## Consequences
 

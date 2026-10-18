@@ -5,12 +5,24 @@ import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
 import { clinicDay, formatDayLong, isValidDay } from "@/lib/clinic-time";
+import { ownBooked } from "@/lib/own";
 import { describeProblem } from "@/lib/problems";
 
-export const metadata: Metadata = {
-  title: "Pick a time",
-  robots: { index: false },
-};
+// Doctor pages are listed in the sitemap, so they are indexable. The canonical address drops the
+// ?date= choice; the share card (title, description) is inherited from the root layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ doctorId: string }>;
+}): Promise<Metadata> {
+  const { doctorId } = await params;
+  const path = `/book/${doctorId}`;
+  return {
+    title: "Pick a time",
+    alternates: { canonical: path },
+    openGraph: { url: path },
+  };
+}
 export const dynamic = "force-dynamic";
 
 export default async function PickTime({
@@ -25,9 +37,10 @@ export default async function PickTime({
   const today = clinicDay(new Date());
   const day = isValidDay(date) ? date : today;
 
-  const [doctor, avail] = await Promise.all([
+  const [doctor, avail, own] = await Promise.all([
     api.getDoctor(doctorId),
     api.getAvailability(doctorId, day),
+    ownBooked(),
   ]);
   if (
     !doctor.ok &&
@@ -74,9 +87,11 @@ export default async function PickTime({
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="details"
             doctorId={doctorId}
-            slots={avail.data.slots}
+            availability={avail.data}
+            own={own}
           />
         ) : (
           <p
