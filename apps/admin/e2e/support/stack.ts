@@ -4,7 +4,8 @@
 // The one stand-in is Google's own sign-in (an external service on the network): see test-auth.ts.
 import { signAssertion } from "@clinic/api/assertion";
 
-export const BASE_URL = "http://localhost:3101";
+// The same port the Playwright config serves the build on.
+export const BASE_URL = `http://localhost:${process.env.ADMIN_E2E_PORT ?? 3101}`;
 
 function need(name: string): string {
   const value = process.env[name];
