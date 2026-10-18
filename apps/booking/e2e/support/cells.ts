@@ -66,3 +66,73 @@ export async function ownCell(i: number): Promise<Picked> {
   }
   return { doctorId, day, slots: a.slots.map((s) => s.starts_at) };
 }
+
+// A cell for scenarios that can use any doctor except the first: doctors 1 to 4 on a working day of
+// weeks 0 to 8 (the shared helpers take only the first doctor in those weeks, so nothing else
+// writes here). Cells are ordered by week, day, doctor; instance i takes cell i. Plenty of them:
+// about 140.
+export async function farCell(i: number): Promise<Picked> {
+  const { items } = await getJson<{ items: { id: string }[] }>("/doctors");
+  const doctors = await Promise.all(
+    items.slice(1).map((d) => getJson<Doctor>(`/doctors/${d.id}`)),
+  );
+  const first = firstTuesdayOffset();
+  const cells: { doctorId: string; day: string }[] = [];
+  for (let week = 0; week < CELL_WEEK; week++) {
+    for (let offset = 0; offset < 5; offset++) {
+      const day = addDays(today(), first + 7 * week - 1 + offset);
+      for (const d of doctors) {
+        if (
+          d.working_hours.some(
+            (w) =>
+              w.weekday === offset + 1 &&
+              hours(w.end_time) - hours(w.start_time) >= MIN_HOURS,
+          )
+        )
+          cells.push({ doctorId: d.id, day });
+      }
+    }
+  }
+  if (i >= cells.length) {
+    throw new Error(`cell ${i} does not exist: there are ${cells.length}`);
+  }
+  const { doctorId, day } = cells[i];
+  const slots = await freeTimes(doctorId, day);
+  if (slots.length < 6) {
+    throw new Error(`cell ${i}: only ${slots.length} free times on ${day}`);
+  }
+  return { doctorId, day, slots };
+}
+
+export async function freeTimes(
+  doctorId: string,
+  day: string,
+): Promise<string[]> {
+  const a = await getJson<{ slots: { starts_at: string }[] }>(
+    `/doctors/${doctorId}/availability?date=${day}`,
+  );
+  return a.slots.map((s) => s.starts_at);
+}
+
+/**
+ * A time late in the day that this doctor and another doctor (not the first) are both free, and
+ * that other doctor. Late, because every test books from the start of a day, so nobody else's
+ * booking can take it.
+ */
+export async function sharedLateTime(
+  day: string,
+  doctorId: string,
+  mine: readonly string[],
+): Promise<{ other: string; startsAt: string }> {
+  const { items } = await getJson<{ items: { id: string }[] }>("/doctors");
+  for (const d of items.slice(1)) {
+    if (d.id === doctorId) continue;
+    const theirs = new Set(await freeTimes(d.id, day));
+    const common = mine.slice(4).filter((t) => theirs.has(t));
+    if (common.length > 0)
+      return { other: d.id, startsAt: common[common.length - 1] };
+  }
+  throw new Error(
+    `no other doctor shares a late free time with ${doctorId} on ${day}`,
+  );
+}

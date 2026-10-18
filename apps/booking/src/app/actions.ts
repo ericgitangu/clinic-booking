@@ -14,7 +14,8 @@ import {
 } from "@clinic/api/generated/zod.gen";
 import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
-import { addDays, clinicDay } from "@/lib/clinic-time";
+import { addDays, clinicDay, formatWhen } from "@/lib/clinic-time";
+import { heldMessage } from "@/lib/held";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
 import { patientName } from "@/lib/identity";
@@ -119,6 +120,28 @@ export async function bookAppointment(
   // Idempotent: makes the patient the first time this person books, finds it every time after.
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
+
+  // Refuse a time the patient already holds before the API is asked: the API would also refuse it,
+  // but only with a code; this says what happened and where to look. The API stays the final gate.
+  const mine = await api.myAppointments(caller);
+  if (mine.ok) {
+    const live = mine.data.items.filter(
+      (a) => a.status === "booked" && Date.parse(a.ends_at) > Date.now(),
+    );
+    const held = live.find((a) => Date.parse(a.starts_at) === Date.parse(when));
+    if (held) {
+      return {
+        status: "error",
+        code: "PATIENT_DOUBLE_BOOKED",
+        severity: "warning",
+        message: heldMessage({
+          sameDoctor: held.doctor_id === doctor,
+          when: formatWhen(when),
+          doctor: held.doctor.full_name,
+        }),
+      };
+    }
+  }
 
   // The form makes one key per booking attempt and sends the same one with every submit of that
   // attempt, so two submits of one attempt (a double click, a retry after a lost response) reach
