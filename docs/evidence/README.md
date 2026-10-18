@@ -10,6 +10,8 @@ real run. Never present one as the other.
 | File | Backs | Source |
 |---|---|---|
 | `spend-cap-2026-10-18.md` | ADR-0014 spend cap is configured (read by `cost_check.sh` C11) | console observation |
+| `ably-no-payment-method-2026-10-18.md` | ADR-0031 no payment method on the Ably account | dashboard observation, Ably docs |
+| `patient-live-push-production-2026-10-18.md` | ADR-0031 and ADR-0009 patient live push is on in production | gatekeeper observation, release 748d7d8 |
 | `iam-deny-proof.md` | ADR-0016 "saved WIF-deny and context-deny logs", ADR-0023 no public Cloud Run | CircleCI artifacts of `deny_probe.sh` |
 
 ## Redaction rules
