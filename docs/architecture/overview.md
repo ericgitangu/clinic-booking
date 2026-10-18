@@ -70,7 +70,7 @@ Reading it:
 | Idempotency keys, shell-only PWA, 15 second polling | Running | ADRs 0013, 0010, 0009 |
 | Resend email and reminders | Declared: PR 27 is open | [ADR-0025](../adr/0025-email-with-resend.md) |
 | Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | ADR-0031 (in PR 29) |
-| Browser subscription to the Ably channel | Declared: PR 44 is open; pages poll until it merges | ADR-0031 |
+| Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | ADR-0031 |
 | Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | ADRs 0007, 0026, 0017 |
 | Go SSE gateway and the admin live feed | Descoped (PR 37 closed) | [ADR-0021](../adr/0021-go-realtime-gateway.md) |
 
@@ -135,7 +135,7 @@ sequenceDiagram
   end
 ```
 
-Push is an optimisation, not the source of truth. The relay runs synchronously after each committing write with a short timeout, because Cloud Run throttles CPU once the response is sent; an event stuck behind an open transaction waits for the next trigger, and the polling loop covers the gap. After three failed publishes the relay stops for a minute. A reload or a poll always shows the database's answer, and a stale click that loses the race still gets `409 SLOT_TAKEN`. Steps 1 to 5 (the relay) and 6 to 7 (the token endpoint) are running (`backend/app/services/relay.py`, `realtime_tokens.py`, `contracts/events/README.md`). The browser subscribing and applying messages, steps 8 to 10, is PR 44, which is open, so today the pages poll.
+Push is an optimisation, not the source of truth. The relay runs synchronously after each committing write with a short timeout, because Cloud Run throttles CPU once the response is sent; an event stuck behind an open transaction waits for the next trigger, and the polling loop covers the gap. After three failed publishes the relay stops for a minute. A reload or a poll always shows the database's answer, and a stale click that loses the race still gets `409 SLOT_TAKEN`. Steps 1 to 5 (the relay) and 6 to 7 (the token endpoint) are running (`backend/app/services/relay.py`, `realtime_tokens.py`, `contracts/events/README.md`). The browser subscribing and applying messages, steps 8 to 10, shipped in PR 44. With the push host blocked the page shows `data-stream=polling` and converges within 15 s, and a refused token leaves polling running. The admin live feed is descoped: the relay can publish admin events, and no admin screen reads them.
 
 ## 5. The release pipeline
 
