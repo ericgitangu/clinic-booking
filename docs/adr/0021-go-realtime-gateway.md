@@ -9,9 +9,17 @@
 
 Accepted (gated realtime gateway; built only after Gate B, cut last of the stretch items). It amends ADR-0002 (Go is now allowed for one read-only job, never in the write path) and implements the admin half of ADR-0009.
 
-**Build status (2026-10-18, main 748d7d8): Superseded by ADR-0031; never built.** The Go service, its role, CI lane, ship job and event contract do not exist and will not be built. The admin dashboard uses server revalidation.
+**Build status (2026-10-19): Built (PR 71).** The Go service `services/realtime`, its read-only role (migration `0014_realtime_reader_role`), the `go-quality` CI lane, the `ship-realtime` job and the event contract exist, and the admin dashboard has a live-feed panel that streams from it.
 
-**Superseded (2026-10-18) by [ADR-0031](0031-realtime-push-via-ably-sse.md).** The engineer decided to use Ably over SSE for patients and admins instead of a Go gateway on Cloud Run. This ADR is not built and will not be built; the text below stays as the record of what was considered.
+**Reinstated (2026-10-19).** On 2026-10-18 this ADR was marked superseded by [ADR-0031](0031-realtime-push-via-ably-sse.md) (Ably for everyone) without the engineer's sign-off. The engineer reversed that on 2026-10-19. Ably stays for patient slot events, which carry no personal data. The staff feed carries patient names and cancellation reasons, so it stays inside Google Cloud.
+
+**As built, where it differs from the Decision below:**
+
+- *Who may connect.* Cloud Run admits only the admin app's service account (and the release smoke); the request carries the same signed staff assertion the API checks, verified in Go, and the role in it is re-read from `staff_access` on connect and every 30 s. There is no stream ticket and no monthly budget table.
+- *Shapes.* Owners and admins get the staff shape (`contracts/events/staff-event.v1.schema.json`), viewers the minimised `admin-event.v1` shape. The viewer's query never selects a personal column.
+- *Scaling.* `--min-instances 0 --max-instances 2 --concurrency 1 --cpu 0.25 --memory 256Mi --timeout 900`. Cloud Run requires concurrency 1 below 1 vCPU, so there are at most two live staff streams; a third client gets 429 with `Retry-After` and the dashboard refreshes every 30 s instead.
+- *Lifetimes.* The server closes a stream at 290 s (Vercel Hobby caps the admin app's route at 300 s) and after 240 s without an event; the browser resumes from the last event id, and lets go of the stream after 5 minutes in a hidden tab.
+- *Cost.* About 900 vCPU-seconds per connected hour at 0.25 vCPU (deduced); the measured figure is recorded by `scripts/ops/measure_realtime_cost.sh` after the first deploy.
 
 ## Context
 

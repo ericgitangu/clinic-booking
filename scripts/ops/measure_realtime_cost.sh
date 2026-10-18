@@ -6,6 +6,7 @@
 #   bash scripts/ops/measure_realtime_cost.sh --judge CONNECTED_SECONDS VCPU_SECONDS
 #                                                             only the judgement (no cloud), for tests
 #   bash scripts/ops/measure_realtime_cost.sh --readme-line   the sentence the README carries, from the evidence file
+#   bash scripts/ops/measure_realtime_cost.sh --update-readme  put that sentence into README.md (between the realtime-cost markers)
 #
 # The run is deliberately small and billable: SESSIONS x HOLD_SECONDS of one 0.25 vCPU instance
 # (default 3 x 120 s = 360 connected seconds = about 90 vCPU-seconds). Everything it reads is
@@ -60,8 +61,23 @@ readme_line() {
 case "${1:-}" in
   --judge) judge "${2:?connected seconds}" "${3:?vcpu seconds}"; exit $? ;;
   --readme-line) readme_line; exit 0 ;;
+  --update-readme)
+    # Rewrites the text between the realtime-cost markers in README.md from the evidence file.
+    README="${README:-$ROOT/README.md}"
+    line="$(readme_line)"
+    python3 - "$README" "$line" <<'PY'
+import re, sys
+path, line = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8").read()
+new, n = re.subn(r"(<!-- realtime-cost:start -->).*?(<!-- realtime-cost:end -->)",
+                 lambda m: m.group(1) + line + m.group(2), text, flags=re.S)
+if n != 1:
+    sys.exit("README.md must contain exactly one realtime-cost marker pair")
+open(path, "w", encoding="utf-8").write(new)
+PY
+    exit $? ;;
   "") ;;
-  *) echo "usage: $0 [--judge CONNECTED VCPU | --readme-line]" >&2; exit 2 ;;
+  *) echo "usage: $0 [--judge CONNECTED VCPU | --readme-line | --update-readme]" >&2; exit 2 ;;
 esac
 
 for need in gcloud jq curl python3; do command -v "$need" >/dev/null || { echo "FAIL: $need is required" >&2; exit 2; }; done

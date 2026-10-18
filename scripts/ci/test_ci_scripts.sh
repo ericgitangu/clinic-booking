@@ -1005,6 +1005,12 @@ expect "measure: the README line is a placeholder until measured" "$(EVIDENCE="$
 echo '{"measured_at":"2026-10-20T10:00:00Z","connected_seconds":360,"vcpu_seconds_per_connected_hour":912,"budget":1100,"hours_of_shared_headroom":23.7}' > "$WORK/ev.json"
 expect "measure: the README line is generated from the evidence file" "$(EVIDENCE="$WORK/ev.json" bash "$MEASURE" --readme-line | grep -c '912 vCPU-seconds per connected hour')" 1
 
+mkdir -p "$WORK/rm"; printf 'before <!-- realtime-cost:start -->old<!-- realtime-cost:end --> after\n' > "$WORK/rm/README.md"
+README="$WORK/rm/README.md" EVIDENCE="$WORK/ev.json" bash "$MEASURE" --update-readme
+expect "measure: --update-readme rewrites only the text between the markers" "$(grep -c 'before <!-- realtime-cost:start -->Measured on the deployed service.*912 vCPU-seconds.*<!-- realtime-cost:end --> after' "$WORK/rm/README.md")" 1
+printf 'no markers here\n' > "$WORK/rm/none.md"
+expect "measure: --update-readme refuses a README without the markers" "$(README="$WORK/rm/none.md" EVIDENCE="$WORK/ev.json" bash "$MEASURE" --update-readme >/dev/null 2>&1; echo $?)" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

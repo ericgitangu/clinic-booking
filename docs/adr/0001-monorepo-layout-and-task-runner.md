@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 748d7d8): Shipped, with the stretch Go module descoped.** The workspace is `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` (#19), driven by the Makefile and root hygiene tooling. There is no Go module and no `services/realtime/`; the Go gateway is superseded by ADR-0031. `contracts/events/` exists as the Ably event contract (#39).
+**Build status (2026-10-19): Shipped, and the stretch Go module is built (PR 71).** The workspace is `apps/booking`, `apps/admin`, `packages/ui` and `packages/api` (#19), driven by the Makefile and root hygiene tooling. `services/realtime/` is the Go module of the live-feed gateway (ADR-0021, reinstated by the engineer on 2026-10-19; it was marked superseded on 2026-10-18). `contracts/events/` exists as the Ably event contract (#39).
 
 ## Context
 

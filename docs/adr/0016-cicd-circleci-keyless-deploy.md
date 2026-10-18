@@ -9,7 +9,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 748d7d8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime lane is superseded by ADR-0031. Pending: the saved WIF deny-proof logs.
+**Build status (2026-10-18, main 748d7d8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime lane is built (PR 71) after being marked superseded on 2026-10-18. Pending: the saved WIF deny-proof logs.
 
 ## Context
 
@@ -78,7 +78,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 4. If `CIRCLE_SHA1` is no longer the head of `origin/main`, skip promotion.
 5. Otherwise `update-traffic --to-tags sha-<7>=100`, and prune tags beyond the last 2 (amended: Artifact Registry keeps 2 versions per package, so a third tag could point at a deleted image), then delete Artifact Registry versions beyond the newest 2.
 
-> **Superseded (2026-10-18) by [ADR-0031](0031-realtime-push-via-ably-sse.md).** The Go realtime lane below (`realtime-quality`, `realtime-test`, `realtime-sec`, `build-scan-push-realtime`, `ship-realtime`, the `clinic-realtime` service and its bootstrap, IAM and smoke) will not be built; realtime push goes through Ably instead. The text stays as the record.
+> **Reinstated (2026-10-19).** The Go realtime lane below was marked superseded on 2026-10-18 and is built in PR 71 under these job names: `go-quality` (gofmt, vet, staticcheck, golangci-lint, gosec, govulncheck, race tests against the real database and API), `build-scan-push-realtime`, `ship-realtime` (tagged no-traffic revision, smoke, promote, live check, rollback) and `rollback-realtime`. The `clinic-realtime` service is deployed by `gcloud run deploy` like `clinic-api`, not by Terraform; its invoker bindings (the admin app and the smoke identity only) come from `infra/bootstrap.sh invoker`.
 
 **Stretch S1 additions (only if S1 ships).**
 

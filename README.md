@@ -169,6 +169,27 @@ stateDiagram-v2
 - The clock is injected through a FastAPI dependency. Business SQL never calls `now()`; the current instant is a bind parameter. Ruff bans `datetime.now`, `utcnow` and friends outside `core/clock.py`, so a test pins time with a fake clock and passes on any weekday.
 - Nairobi has no DST, so DST tests run in `Europe/Berlin` ([ADR-0005](docs/adr/0005-time-and-timezone-model.md)).
 
+### 3.7 The live feed: a Go service beside FastAPI
+
+<!-- DRAFT for the engineer to edit in his own words; the same reasoning is the "Go" entry on /decisions. -->
+
+```mermaid
+flowchart LR
+  B([Staff browser]) -->|HTTPS, session cookie| AD[admin app on Vercel<br/>/live/stream signs the staff assertion]
+  AD -->|Google ID token, IAM-only| G[clinic-realtime: Go on Cloud Run us-east4<br/>0 to 2 instances, concurrency 1]
+  G -->|SELECT only, role clinic_realtime| D[(PostgreSQL 17: Neon)]
+  A[clinic-api: FastAPI] -->|every write| D
+```
+
+`services/realtime` is a small Go service that streams the booking log to the staff dashboard over server-sent events. It only reads. Its database role has `SELECT` on a few columns and nothing else (migration `0014`, tested with a real login), and no line of the Go code sends a write. Every write still goes through FastAPI, so the booking rules and the double-booking guarantee live in one codebase with one test suite.
+
+- **Why a second language.** The brief allows FastAPI or Go. I kept all the rules in FastAPI and used Go for the one job it suits best: many long-lived, mostly idle connections with a small memory footprint. The cost is a second runtime to build, scan and deploy: a CI lane (`go-quality`), an image scan, and a `ship-realtime` job with a smoke test and a rollback.
+- **Why not Ably for staff too.** Patient events say only that a time was taken or freed. The model forbids any other field and a test fails if a field name hints at a person (`backend/app/schemas/events.py`, `backend/tests/unit/test_realtime_domain.py`), so a third-party pub/sub is fine for them. Staff events carry the patient's name and a cancellation reason. That is health-adjacent personal data, so it stays inside our Google Cloud boundary: Go reads Postgres directly and streams to the IAM-protected admin app. A viewer gets the same events without the name, the reason or the appointment id; that is tested on the wire and in the browser.
+- **What I gave up.** Cloud Run bills an instance while a stream is open. Below 1 vCPU Cloud Run allows one request per instance at a time ([the CPU limits page](https://docs.cloud.google.com/run/docs/configuring/services/cpu)), so the service scales from zero to at most two instances on demand and back to zero when idle. That means at most two live staff streams. A third client sees "Live feed busy, refreshing every 30 s" and the dashboard falls back to refreshing. One connected hour at 0.25 vCPU is about 900 vCPU-seconds (0.25 x 3,600, deduced) against roughly 21,619 vCPU-seconds of shared free-tier headroom. The server closes every stream itself (at 290 s because Vercel Hobby caps the admin route at 300 s, and after four quiet minutes), and the browser lets go of its stream after five minutes in a hidden tab.
+- **Measured cost.** <!-- realtime-cost:start -->Measured cost of one connected hour: to be measured after the first deploy.<!-- realtime-cost:end --> (`bash scripts/ops/measure_realtime_cost.sh` holds a few streams, reads Cloud Monitoring and rewrites this line; it fails above 1,100 vCPU-seconds per connected hour.)
+- **When I would revisit.** More than two staff viewing at once, or more than one clinic. Then each connection should not hold an instance, and the gateway would move to pooled pub/sub inside Google Cloud (Pub/Sub or Redis).
+- **How this was decided.** I first designed the Go gateway. The realtime design then moved everything to Ably and the gateway was marked superseded, which I had not signed off. On 2026-10-19 I reversed that, because the staff view needs names and those should not leave Google Cloud.
+
 ## 4. Key decisions & trade-offs
 
 ### 4.1 The headline decisions
