@@ -1,7 +1,7 @@
 """the clinic is called Idyllic Clinic: rename the seeded clinic's name where it is stored
 
 Revision ID: 0011
-Revises: 0010
+Revises: 0014
 Create Date: 2026-10-19
 
 A data migration, no schema change: ``clinics.name`` is the only column that holds the clinic's
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0011"
-down_revision = "0010"
+down_revision = "0014"
 branch_labels = None
 depends_on = None
 
