@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { formatTime } from "@/lib/clinic-time";
 import type { Chip } from "@/lib/slot-chips";
 
@@ -15,8 +15,16 @@ export const SlotRadios = memo(function SlotRadios({
   value: string;
   onChange: (v: string) => void;
 }) {
+  // How many times this grid has rendered, written to the DOM after each commit (no state, so it
+  // causes no render). The render-count tests read it: a poll that changes nothing must not move it.
+  const field = useRef<HTMLFieldSetElement>(null);
+  const renders = useRef(0);
+  useEffect(() => {
+    renders.current += 1;
+    field.current?.setAttribute("data-renders", String(renders.current));
+  });
   return (
-    <fieldset>
+    <fieldset ref={field}>
       <legend className="sr-only">Times</legend>
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
         {chips.map((c) => {

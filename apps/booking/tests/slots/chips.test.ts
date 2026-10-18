@@ -136,6 +136,21 @@ describe("buildChips", () => {
   });
 });
 
+describe("Just taken wins over Booked", () => {
+  it("shows a time confirmed taken as Just taken even though the response now lists it as taken", () => {
+    const chips = buildChips({
+      ...base,
+      slots: free("09:00"),
+      taken: [at("08:00")],
+      confirmedTaken: [at("08:00")],
+    });
+    expect(chips[0]).toMatchObject({
+      state: "just-taken",
+      label: "Just taken",
+    });
+  });
+});
+
 describe("own booking bookkeeping", () => {
   const a: OwnBooking = { starts_at: at("08:00"), doctor_id: DOC };
   it("adds a booking once and removes it by time", () => {
