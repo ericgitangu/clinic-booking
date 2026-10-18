@@ -825,7 +825,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -1119,7 +1119,7 @@ export type CreateAppointmentAppointmentsPostErrors = {
      */
     409: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including BOOKING_TOO_SOON
      */
     422: unknown;
     /**
@@ -1187,7 +1187,7 @@ export type CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors = {
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**
@@ -1223,7 +1223,7 @@ export type RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors 
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**
@@ -1609,7 +1609,7 @@ export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErr
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**
@@ -1693,7 +1693,7 @@ export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedule
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**
@@ -2020,7 +2020,7 @@ export type CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors = {
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**
@@ -2064,7 +2064,7 @@ export type RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErro
      */
     404: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including CHANGE_TOO_LATE
      */
     409: unknown;
     /**

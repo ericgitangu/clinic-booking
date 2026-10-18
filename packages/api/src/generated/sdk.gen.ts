@@ -23,6 +23,8 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * Create Appointment
+ *
+ * Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const createAppointmentAppointmentsPost = <ThrowOnError extends boolean = false>(options: Options<CreateAppointmentAppointmentsPostData, ThrowOnError>): RequestResult<CreateAppointmentAppointmentsPostResponses, CreateAppointmentAppointmentsPostErrors, ThrowOnError> => (options.client ?? client).post<CreateAppointmentAppointmentsPostResponses, CreateAppointmentAppointmentsPostErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -56,6 +58,8 @@ export const getAppointmentAppointmentsAppointmentIdGet = <ThrowOnError extends 
 
 /**
  * Cancel Appointment
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const cancelAppointmentAppointmentsAppointmentIdCancelPatch = <ThrowOnError extends boolean = false>(options: Options<CancelAppointmentAppointmentsAppointmentIdCancelPatchData, ThrowOnError>): RequestResult<CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError> => (options.client ?? client).patch<CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -74,6 +78,8 @@ export const cancelAppointmentAppointmentsAppointmentIdCancelPatch = <ThrowOnErr
 
 /**
  * Reschedule Appointment
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch = <ThrowOnError extends boolean = false>(options: Options<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, ThrowOnError>): RequestResult<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError> => (options.client ?? client).patch<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -120,6 +126,8 @@ export const getDoctorDoctorsDoctorIdGet = <ThrowOnError extends boolean = false
 
 /**
  * Doctor Availability
+ *
+ * Slots starting within 60 minutes are never offered.
  */
 export const doctorAvailabilityDoctorsDoctorIdAvailabilityGet = <ThrowOnError extends boolean = false>(options: Options<DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, ThrowOnError>): RequestResult<DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, ThrowOnError> => (options.client ?? client).get<DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -250,6 +258,8 @@ export const listAppointmentsInternalAdminAppointmentsGet = <ThrowOnError extend
 
 /**
  * Cancel For Patient
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch = <ThrowOnError extends boolean = false>(options: Options<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, ThrowOnError>): RequestResult<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError> => (options.client ?? client).patch<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -282,6 +292,8 @@ export const getLineageInternalAdminAppointmentsAppointmentIdLineageGet = <Throw
 
 /**
  * Reschedule For Patient
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch = <ThrowOnError extends boolean = false>(options: Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, ThrowOnError>): RequestResult<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError> => (options.client ?? client).patch<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -429,6 +441,8 @@ export const myAppointmentInternalMeAppointmentsAppointmentIdGet = <ThrowOnError
 
 /**
  * Cancel Mine
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const cancelMineInternalMeAppointmentsAppointmentIdCancelPatch = <ThrowOnError extends boolean = false>(options: Options<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, ThrowOnError>): RequestResult<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError> => (options.client ?? client).patch<CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -447,6 +461,8 @@ export const cancelMineInternalMeAppointmentsAppointmentIdCancelPatch = <ThrowOn
 
 /**
  * Reschedule Mine
+ *
+ * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch = <ThrowOnError extends boolean = false>(options: Options<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, ThrowOnError>): RequestResult<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError> => (options.client ?? client).patch<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({

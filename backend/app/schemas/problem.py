@@ -29,6 +29,7 @@ class ProblemCode(enum.StrEnum):
     SLOT_TAKEN = "SLOT_TAKEN"
     PATIENT_DOUBLE_BOOKED = "PATIENT_DOUBLE_BOOKED"
     APPOINTMENT_ALREADY_CANCELLED = "APPOINTMENT_ALREADY_CANCELLED"
+    CHANGE_TOO_LATE = "CHANGE_TOO_LATE"
     APPOINTMENT_ALREADY_STARTED = "APPOINTMENT_ALREADY_STARTED"
     PATIENT_PHONE_EXISTS = "PATIENT_PHONE_EXISTS"
     CONCURRENT_UPDATE = "CONCURRENT_UPDATE"
@@ -84,6 +85,54 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, object]]:
             "content": {"application/problem+json": {}},
         }
         for status in statuses
+    }
+
+
+def problem_with_example(
+    status: int, code: str, title: str, detail: str, instance: str
+) -> dict[int | str, dict[str, object]]:
+    """One error response that carries a worked ``application/problem+json`` example, so the
+    generated documentation shows the exact body a client will see for ``code``."""
+    slug = code.lower().replace("_", "-")
+    return {
+        status: {
+            "model": Problem,
+            "description": f"Problem (RFC 9457), including {code}",
+            "content": {
+                "application/problem+json": {
+                    "examples": {
+                        code: {
+                            "summary": code,
+                            "value": {
+                                "type": f"/problems/{slug}",
+                                "title": title,
+                                "status": status,
+                                "detail": detail,
+                                "instance": instance,
+                                "code": code,
+                                "request_id": "00000000-0000-4000-8000-000000000000",
+                            },
+                        }
+                    }
+                }
+            },
+        }
+    }
+
+
+def change_too_late_responses(instance: str) -> dict[int | str, dict[str, object]]:
+    """404/422 plus a 409 that documents CHANGE_TOO_LATE with a worked example (cancel and
+    reschedule, public and internal)."""
+    return {
+        **problem_responses(404, 422),
+        **problem_with_example(
+            409,
+            "CHANGE_TOO_LATE",
+            "Change too late",
+            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
+            "lead time (60 minutes).",
+            instance,
+        ),
     }
 
 

@@ -118,6 +118,15 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "Cancel or reschedule of an already-cancelled appointment.",
     ),
     ErrorSpec(
+        "CHANGE_TOO_LATE",
+        409,
+        "Change too late",
+        (
+            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
+            "lead time (60 minutes)."
+        ),
+    ),
+    ErrorSpec(
         "APPOINTMENT_ALREADY_STARTED",
         409,
         "Appointment already started",
@@ -266,6 +275,10 @@ class ConcurrentUpdate(DomainError):
 
 class AppointmentAlreadyCancelled(DomainError):
     code = "APPOINTMENT_ALREADY_CANCELLED"
+
+
+class ChangeTooLate(DomainError):
+    code = "CHANGE_TOO_LATE"
 
 
 class AppointmentAlreadyStarted(DomainError):
