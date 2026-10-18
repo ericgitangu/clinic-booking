@@ -32,6 +32,7 @@ import {
   id = "projects/sil-clinic-booking/secrets/clinic-internal-signing-key"
 }
 
+# Imported via PR 70; apply pending.
 # The smoke test's own signing key. It signs one call, /internal/smoke/patients, which creates a
 # patient the admin views ignore, and nothing else, so a leak cannot forge an admin or patient
 # assertion. The container was first created by gcloud, outside Terraform, and is adopted here
