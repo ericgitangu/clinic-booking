@@ -50,8 +50,14 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # Empty (the default) means push is off and clients poll; set your own Ably app key to try live updates.
       ABLY_API_KEY: ${ABLY_API_KEY:-}
+      # The email allowances (Resend free plan: 100 a day, 3,000 a month). Overridable so the
+      # end-to-end runs, which send an email per booking, are not limited by the day's counter.
+      EMAIL_DAILY_LIMIT: ${EMAIL_DAILY_LIMIT:-100}
+      EMAIL_MONTHLY_LIMIT: ${EMAIL_MONTHLY_LIMIT:-3000}
+      EMAIL_ACK_RESERVE: ${EMAIL_ACK_RESERVE:-20}
     ports:
-      - "8080:8080"
+      # Host port overridable (make e2e uses its own, so it never meets a developer's running stack).
+      - "${API_HOST_PORT:-8080}:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
