@@ -105,3 +105,7 @@ the propagation delay (`clinic-smoke` is left alone). `bash scripts/ops/kill_swi
 re-adds exactly the bindings it removed and checks the invoker members match the recorded policy.
 It only acts on `sil-clinic-booking` in `us-east4` and refuses anything else; a missing
 `clinic-realtime` is skipped.
+
+## Vercel tokens: one per project
+
+The `vercel-prod` context holds two project-scoped tokens: `VERCEL_TOKEN` (`clinic-web`, the booking app) and `VERCEL_ADMIN_TOKEN` (`clinic-admin`). Each app's `ship-` and `rollback-` job picks its own with `scripts/ci/select_vercel_token.sh`, so a booking job never uses the admin token and the reverse. If an admin job stops with "VERCEL_ADMIN_TOKEN is not set", add a `clinic-admin` scoped token to the `vercel-prod` context under that name; nothing was deployed or rolled back. If a Vercel step answers 403, check that the job's token is scoped to the project that job is about.
