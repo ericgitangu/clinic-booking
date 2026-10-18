@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { RememberBooking } from "@/components/booking/remember-booking";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
 import * as api from "@/lib/api";
@@ -59,18 +60,29 @@ export default async function Confirmed({
           You are booked
         </h1>
       </div>
-      <div className="mt-6 rounded-xl border border-border bg-card p-5">
-        <p className="text-xl font-semibold">
-          {formatWhen(appt.data.starts_at)}
-        </p>
+      <div className="mt-6 flex items-start gap-4 rounded-xl border border-border bg-card p-5">
         {doctor.ok ? (
-          <p className="mt-1 text-base text-muted-foreground">
-            {doctor.data.full_name}, {doctor.data.specialty}
-          </p>
+          <span aria-hidden="true">
+            <DoctorAvatar
+              doctorId={appt.data.doctor_id}
+              name={doctor.data.full_name}
+              size={56}
+            />
+          </span>
         ) : null}
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nairobi time, 30 minutes.
-        </p>
+        <div>
+          <p className="text-xl font-semibold">
+            {formatWhen(appt.data.starts_at)}
+          </p>
+          {doctor.ok ? (
+            <p className="mt-1 text-base text-muted-foreground">
+              {doctor.data.full_name}, {doctor.data.specialty}
+            </p>
+          ) : null}
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nairobi time, 30 minutes.
+          </p>
+        </div>
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
         <Button asChild size="lg" className="h-12 px-6 text-base">

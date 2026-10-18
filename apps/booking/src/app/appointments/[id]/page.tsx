@@ -1,0 +1,109 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
+import { SignInPrompt } from "@/components/account/sign-in-prompt";
+import { AppointmentActions } from "@/components/booking/appointment-actions";
+import * as api from "@/lib/api";
+import { clinicDay, formatWhen } from "@/lib/clinic-time";
+import { callerFor, getIdentity } from "@/lib/session";
+
+export const metadata: Metadata = {
+  title: "Appointment",
+  robots: { index: false },
+};
+export const dynamic = "force-dynamic";
+
+export default async function AppointmentPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const who = await getIdentity();
+  if (!who) {
+    return (
+      <SignInPrompt
+        title="Sign in to see your appointment"
+        body="Appointments belong to the Google account that booked them, so only you can see or change them."
+        returnTo={`/appointments/${id}`}
+      />
+    );
+  }
+  // 404 for an appointment that is not this person's, the same as for one that does not exist.
+  const res = await api.myAppointment(callerFor(who), id);
+  if (!res.ok) {
+    if (res.status < 500) notFound();
+    return (
+      <p role="alert" className="py-10 text-base">
+        We could not load this appointment just now. Reload the page in a
+        moment.
+      </p>
+    );
+  }
+  const a = res.data;
+  const doc = await api.getDoctor(a.doctor_id);
+  const doctorName = doc.ok ? doc.data.full_name : "Your doctor";
+  const when = formatWhen(a.starts_at);
+  const cancelled = a.status === "cancelled";
+  const future = Date.parse(a.starts_at) > Date.now();
+
+  return (
+    <section className="py-10">
+      <p className="text-base">
+        <Link href="/appointments" className="underline underline-offset-4">
+          My appointments
+        </Link>
+      </p>
+      <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+        {cancelled ? "Appointment cancelled" : "Your appointment"}
+      </h1>
+      <div
+        data-testid="appointment-card"
+        data-status={a.status}
+        className="mt-6 flex items-start gap-4 rounded-xl border border-border bg-card p-5"
+      >
+        <span aria-hidden="true">
+          <DoctorAvatar doctorId={a.doctor_id} name={doctorName} size={56} />
+        </span>
+        <div>
+          <p className="text-xl font-semibold">{when}</p>
+          <p className="mt-1 text-base text-muted-foreground">
+            {doc.ok
+              ? `${doc.data.full_name}, ${doc.data.specialty}`
+              : doctorName}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nairobi time, 30 minutes.
+          </p>
+        </div>
+      </div>
+      {cancelled ? (
+        <div data-testid="cancelled-note" className="mt-6 space-y-3 text-base">
+          <p>
+            {future
+              ? `This appointment was cancelled. ${when} is free again, and anyone can book it.`
+              : "This appointment was cancelled."}
+          </p>
+          {a.cancellation_reason ? (
+            <p className="text-muted-foreground">
+              Reason you gave: {a.cancellation_reason}
+            </p>
+          ) : null}
+          <div className="pt-3">
+            <Button asChild size="lg" className="h-12 px-6 text-base">
+              <Link
+                href={`/book/${a.doctor_id}?date=${clinicDay(a.starts_at)}`}
+              >
+                Book another time
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <AppointmentActions id={a.id} when={when} startsAt={a.starts_at} />
+      )}
+    </section>
+  );
+}

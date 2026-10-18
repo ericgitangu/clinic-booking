@@ -123,41 +123,16 @@ test("a time another person books turns inactive on an open page without a reloa
 
   await page.clock.runFor(POLL_MS + 1000);
   // It stays in its place, inactive, instead of vanishing and shifting the others.
-  await expect(
-    page.getByRole("radio", {
-      name: new RegExp(`^${hhmm(slots[0])}.*Booked`),
-    }),
-  ).toBeDisabled();
+  const gone = page.locator(`li[data-time="${hhmm(slots[0])}"]`);
+  await expect(gone).toHaveAttribute("data-state", "booked");
+  await expect(gone).toContainText("Booked");
+  await expect(gone.getByRole("link")).toHaveCount(0);
   await expect(kept).toBeVisible();
   expect(
     await page.evaluate(
       () => (window as unknown as { __noReload?: boolean }).__noReload,
     ),
   ).toBe(true);
-  await ctx.close();
-});
-
-test("a time the person had picked and someone else books says it was just taken", async ({
-  browser,
-}, testInfo) => {
-  const { doctorId, day, slots } = await ownCell(
-    cellOf(1, testInfo.repeatEachIndex),
-  );
-  const ctx = await context(browser);
-  const page = await openPage(ctx);
-  await page.clock.install();
-  await page.goto(`/book/${doctorId}?date=${day}`);
-  await polling(page);
-  await page.getByText(hhmm(slots[1]), { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Continue" })).toBeVisible();
-
-  await bookAs(browser, doctorId, slots[1]);
-
-  await page.clock.runFor(POLL_MS + 1000);
-  await expect(
-    page.getByText(`${hhmm(slots[1])} was just taken`),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
   await ctx.close();
 });
 

@@ -21,8 +21,8 @@ export default function TermsPage() {
 
       <h2>What this is</h2>
       <p>
-        Idyllic Clinic Booking lets you see a doctor&rsquo;s free slots and
-        book, reschedule or cancel a visit. The doctors, the clinic and the
+        Idyllic Clinic lets you see a doctor&rsquo;s free slots and book,
+        reschedule or cancel a visit. The doctors, the clinic and the
         appointments are not real, and no medical service is provided.
       </p>
 

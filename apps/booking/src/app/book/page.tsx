@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { pageMetadata } from "@/lib/metadata";
 import { listDoctors } from "@/lib/api";
 
@@ -38,15 +39,22 @@ export default async function BookPage() {
               key={d.id}
               className="flex flex-col rounded-xl border border-border bg-card p-5"
             >
-              <h2 className="font-heading text-xl font-semibold">
-                {d.full_name}
-              </h2>
-              <p className="mt-1 text-base text-muted-foreground">
-                {d.specialty}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {d.clinic.name}
-              </p>
+              <div className="flex items-center gap-4">
+                <span aria-hidden="true">
+                  <DoctorAvatar doctorId={d.id} name={d.full_name} size={56} />
+                </span>
+                <div>
+                  <h2 className="font-heading text-xl font-semibold">
+                    {d.full_name}
+                  </h2>
+                  <p className="mt-1 text-base text-muted-foreground">
+                    {d.specialty}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {d.clinic.name}
+                  </p>
+                </div>
+              </div>
               <Button asChild size="lg" className="mt-5 h-12 text-base">
                 <Link href={`/book/${d.id}`}>See free times</Link>
               </Button>

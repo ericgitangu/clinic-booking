@@ -63,8 +63,7 @@ test("books a visit from the doctor list to the confirmation", async ({
   ).toBeVisible();
   await page.locator(`a[href="/book/${doctorId}"]`).click();
   await page.goto(`/book/${doctorId}?date=${day}`);
-  await page.getByText(hhmm(slots[0]), { exact: true }).click();
-  await page.getByRole("link", { name: "Continue" }).click();
+  await page.getByRole("link", { name: `${hhmm(slots[0])} free` }).click();
   await expect(page).toHaveURL(/\/details\?starts_at=/);
   await expect(page.getByText(`Booking as ${person.name}`)).toBeVisible();
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -76,16 +75,6 @@ test("books a visit from the doctor list to the confirmation", async ({
   await expect(page.getByText(`Signed in as ${person.name}.`)).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   await closeAll(context);
-});
-
-test("the continue button stays disabled until a time is picked", async ({
-  page,
-}) => {
-  const { doctorId, day, slots } = await pick(1);
-  await page.goto(`/book/${doctorId}?date=${day}`);
-  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
-  await page.getByText(hhmm(slots[1]), { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Continue" })).toBeVisible();
 });
 
 test("a double booking says the time was just taken and offers the next free times", async ({

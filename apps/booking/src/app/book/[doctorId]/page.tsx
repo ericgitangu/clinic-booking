@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
@@ -52,7 +53,7 @@ export default async function PickTime({
   }
 
   return (
-    <section className="pb-28 pt-8">
+    <section className="pb-12 pt-8">
       <p className="text-base">
         <Link href="/book" className="underline underline-offset-4">
           All doctors
@@ -60,12 +61,23 @@ export default async function PickTime({
       </p>
       {doctor.ok ? (
         <>
-          <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">
-            {doctor.data.full_name}
-          </h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            {doctor.data.specialty}. Times are Nairobi time.
-          </p>
+          <div className="mt-3 flex items-center gap-4">
+            <span aria-hidden="true">
+              <DoctorAvatar
+                doctorId={doctor.data.id}
+                name={doctor.data.full_name}
+                size={64}
+              />
+            </span>
+            <div>
+              <h1 className="font-heading text-3xl font-semibold tracking-tight">
+                {doctor.data.full_name}
+              </h1>
+              <p className="mt-1 text-base text-muted-foreground">
+                {doctor.data.specialty}. Times are Nairobi time.
+              </p>
+            </div>
+          </div>
         </>
       ) : (
         <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">

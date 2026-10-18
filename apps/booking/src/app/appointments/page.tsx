@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
@@ -72,12 +73,26 @@ export default async function MyAppointments({
                   key={a.id}
                   className="rounded-xl border border-border bg-card p-5"
                 >
-                  <p className="text-lg font-semibold">
-                    {formatWhen(a.starts_at)}
-                  </p>
-                  <p className="mt-1 text-base text-muted-foreground">
-                    {a.doctor.full_name}, {a.doctor.specialty}
-                  </p>
+                  <Link
+                    href={`/appointments/${a.id}`}
+                    className="flex items-start gap-4 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                  >
+                    <span aria-hidden="true">
+                      <DoctorAvatar
+                        doctorId={a.doctor_id}
+                        name={a.doctor.full_name}
+                        size={48}
+                      />
+                    </span>
+                    <span>
+                      <span className="block text-lg font-semibold underline-offset-4 hover:underline">
+                        {formatWhen(a.starts_at)}
+                      </span>
+                      <span className="mt-1 block text-base text-muted-foreground">
+                        {a.doctor.full_name}, {a.doctor.specialty}
+                      </span>
+                    </span>
+                  </Link>
                   <AppointmentActions
                     id={a.id}
                     when={formatWhen(a.starts_at)}

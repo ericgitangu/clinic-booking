@@ -5,7 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { hhmm } from "./api";
+import { chip, FREE, INACTIVE } from "./support/chips";
 import { farCell } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";
 
@@ -30,8 +30,6 @@ const ip = () =>
 const grid = (doctorId: string, day: string) => `/book/${doctorId}?date=${day}`;
 const details = (doctorId: string, startsAt: string) =>
   `/book/${doctorId}/details?starts_at=${encodeURIComponent(startsAt)}`;
-const chip = (page: Page, startsAt: string) =>
-  page.getByRole("radio", { name: new RegExp(`^${hhmm(startsAt)}`) });
 const marker = (page: Page) => page.locator("[data-stream]");
 
 // Each context announces its own client address to the app's /api proxy, as the edge would. Only
@@ -108,14 +106,14 @@ test("(a) a time another person books turns inactive in under two seconds, by pu
   await a.page.goto(grid(doctorId, day));
   await expect(marker(a.page)).toHaveAttribute("data-stream", "live");
   await expect.poll(() => calls.length).toBe(1); // the one refetch after connecting
-  await expect(chip(a.page, slots[1])).toBeEnabled();
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", FREE);
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
 
   const gone = chip(a.page, slots[1]);
-  await expect(gone).toBeDisabled({ timeout: 2000 });
-  await expect(gone).toHaveAccessibleName(/Just taken/);
+  await expect(gone).toHaveAttribute("data-state", INACTIVE, { timeout: 2000 });
+  await expect(gone).toContainText(/Just taken/);
   expect(calls).toHaveLength(1); // no poll was needed
   await closeAll(a.context, b.context);
 });
@@ -134,11 +132,15 @@ test("(b) a cancellation frees the time after one refetch", async ({
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toBeDisabled({ timeout: 2000 });
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE, {
+    timeout: 2000,
+  });
   const before = calls.length;
 
   await cancelFirst(b.page);
-  await expect(chip(a.page, slots[1])).toBeEnabled({ timeout: 3000 });
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", FREE, {
+    timeout: 3000,
+  });
   expect(calls.length - before).toBe(1); // one refetch, not a poll
   await closeAll(a.context, b.context);
 });
@@ -160,7 +162,7 @@ test("(c) with the push service unreachable the page says polling and still conv
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
   await a.page.clock.runFor(16_000); // one 15 s poll
-  await expect(chip(a.page, slots[1])).toBeDisabled();
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
   await closeAll(a.context, b.context);
 });
 
@@ -194,7 +196,7 @@ test("(d) a rate-limited token endpoint is refused, and the page keeps polling",
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
   await a.page.clock.runFor(16_000);
-  await expect(chip(a.page, slots[1])).toBeDisabled();
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
   await closeAll(a.context, b.context);
 });
 
@@ -224,7 +226,7 @@ test("(f) an unchanged poll renders the grid zero times, one event renders it on
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toBeDisabled();
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
   expect(await renders()).toBe(settled + 1);
   await closeAll(a.context, b.context);
 });
@@ -246,7 +248,7 @@ test("(g) the same message delivered twice changes the page once", async ({
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toBeDisabled();
+  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
   const after = Number(await field.getAttribute("data-renders"));
 
   const channel = `slots:${doctorId}:${day}`;

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   startTransition,
   useCallback,
@@ -16,6 +15,7 @@ import { rescheduleAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
 import { clinicDay, formatTime } from "@/lib/clinic-time";
 import { NextSlots } from "@/components/booking/next-slots";
+import { SlotLinks } from "@/components/booking/slot-links";
 import { SlotRadios } from "@/components/booking/slot-radios";
 import { StickyCta } from "@/components/booking/sticky-cta";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
@@ -186,33 +186,14 @@ export function SlotChooser(props: Props) {
   );
 
   if (props.mode === "details") {
-    const href = selected
-      ? `/book/${props.doctorId}/details?starts_at=${encodeURIComponent(selected)}`
-      : "";
+    // No selection step here: a free time is a link to its details page.
     return (
       <>
         {notice}
         {anyFree ? null : none}
         {chips.length > 0 ? (
-          <SlotRadios chips={chips} value={selected} onChange={choose} />
+          <SlotLinks chips={chips} doctorId={props.doctorId} />
         ) : null}
-        <StickyCta
-          hint={
-            selected
-              ? `You picked ${formatTime(selected)}.`
-              : "Pick a time to continue."
-          }
-        >
-          {selected ? (
-            <Button asChild size="lg" className="h-12 w-full text-base">
-              <Link href={href}>Continue</Link>
-            </Button>
-          ) : (
-            <Button size="lg" className="h-12 w-full text-base" disabled>
-              Continue
-            </Button>
-          )}
-        </StickyCta>
       </>
     );
   }
