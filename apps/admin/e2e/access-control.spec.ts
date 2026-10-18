@@ -1,7 +1,7 @@
 // Who can open what, against the real app, API and database. Each person is signed in with a
 // cookie that Better Auth produced and the app decoded; the role comes from the real staff_access
 // table through the real API, and the API checks it again on every call.
-import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
+import { BASE_URL, EMAIL, internal, OWNER, publicApi } from "./support/stack";
 import { expect, seeded, test } from "./support/fixtures";
 
 const PAGES = ["/dashboard", "/access"] as const;
@@ -44,12 +44,12 @@ test.describe("signed out", () => {
       {
         name: "better-auth.session_token",
         value: FORGED_SESSION_TOKEN,
-        url: "http://localhost:3101",
+        url: BASE_URL,
       },
       {
         name: "better-auth.session_data",
         value: FORGED_SESSION_DATA,
-        url: "http://localhost:3101",
+        url: BASE_URL,
       },
     ]);
     await page.goto("/dashboard");
