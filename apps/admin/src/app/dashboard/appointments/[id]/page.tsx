@@ -71,6 +71,7 @@ export default async function AppointmentPage({
             appointmentId={appt.id}
             doctorId={appt.doctor_id}
             today={localDate(new Date())}
+            startsAt={appt.starts_at}
           />
         )}
 

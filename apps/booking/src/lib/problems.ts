@@ -33,6 +33,11 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "This appointment is already cancelled.",
     severity: "warning",
   },
+  CHANGE_TOO_LATE: {
+    message:
+      "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.",
+    severity: "warning",
+  },
   APPOINTMENT_ALREADY_STARTED: {
     message:
       "This appointment has already started, so it can no longer be changed.",

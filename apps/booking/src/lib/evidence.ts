@@ -62,6 +62,7 @@ export const REQUIRED: Evidence[] = [
       "Cancels an appointment. A reason of 3 to 500 characters is required.",
     errors: [
       { status: 409, code: "APPOINTMENT_ALREADY_CANCELLED" },
+      { status: 409, code: "CHANGE_TOO_LATE" },
       { status: 409, code: "APPOINTMENT_ALREADY_STARTED" },
       { status: 404, code: "APPOINTMENT_NOT_FOUND" },
     ],
@@ -78,6 +79,7 @@ export const REQUIRED: Evidence[] = [
     errors: [
       { status: 409, code: "SLOT_TAKEN" },
       { status: 409, code: "APPOINTMENT_ALREADY_CANCELLED" },
+      { status: 409, code: "CHANGE_TOO_LATE" },
       { status: 422, code: "BOOKING_TOO_SOON" },
     ],
     screen: MINE,

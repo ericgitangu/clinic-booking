@@ -18,6 +18,7 @@ import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { cancelAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
+import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
 import { forgetBooked } from "@/lib/own-bookings";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
@@ -32,6 +33,16 @@ export function AppointmentActions({
   startsAt: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [locked, setLocked] = useState(() =>
+    insideChangeWindow(startsAt, Date.now()),
+  );
+  // The window opens while the page is on screen: look again every 30 seconds.
+  useEffect(() => {
+    const tick = () => setLocked(insideChangeWindow(startsAt, Date.now()));
+    tick();
+    const timer = setInterval(tick, 30_000);
+    return () => clearInterval(timer);
+  }, [startsAt]);
   const [state, formAction, pending] = useActionState(
     cancelAppointment,
     initialState,
@@ -56,6 +67,35 @@ export function AppointmentActions({
   }, [state, router]);
   const reasonError =
     state.status === "error" ? state.fieldErrors?.reason : undefined;
+
+  if (locked) {
+    const note = `change-note-${id}`;
+    return (
+      <div className="mt-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="h-11 px-4 text-base"
+            disabled
+            aria-describedby={note}
+          >
+            Reschedule
+          </Button>
+          <Button
+            variant="outline"
+            className="h-11 px-4 text-base"
+            disabled
+            aria-describedby={note}
+          >
+            Cancel
+          </Button>
+        </div>
+        <p id={note} className="mt-2 text-base text-muted-foreground">
+          {CHANGE_WINDOW_NOTE}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">

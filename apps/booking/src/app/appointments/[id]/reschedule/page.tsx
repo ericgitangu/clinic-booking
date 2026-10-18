@@ -10,6 +10,7 @@ import {
   formatWhen,
   isValidDay,
 } from "@/lib/clinic-time";
+import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
 import { ownBooked } from "@/lib/own";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -55,6 +56,22 @@ export default async function Reschedule({
             Book a new one
           </Link>
           .
+        </p>
+      </section>
+    );
+  }
+
+  if (insideChangeWindow(appt.data.starts_at, Date.now())) {
+    return (
+      <section className="py-10">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          Reschedule
+        </h1>
+        <p role="status" className="mt-4 text-base">
+          {CHANGE_WINDOW_NOTE}{" "}
+          <Link href="/appointments" className="underline underline-offset-4">
+            My appointments
+          </Link>
         </p>
       </section>
     );

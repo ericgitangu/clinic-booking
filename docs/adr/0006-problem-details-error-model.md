@@ -49,6 +49,7 @@ Option 2.
 | SLOT_TAKEN | 409 | `uq_appt_doctor_slot_booked` |
 | PATIENT_DOUBLE_BOOKED | 409 | `uq_appt_patient_slot_booked` |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | cancel or reschedule of a cancelled appointment |
+| CHANGE_TOO_LATE | 409 | cancel, or reschedule from, an appointment starting in under 60 minutes (ADR-0008 amendment) |
 | APPOINTMENT_ALREADY_STARTED | 409 | cancel or reschedule when starts_at <= now |
 | PATIENT_PHONE_EXISTS | 409 | `uq_patients_phone` |
 | CONCURRENT_UPDATE | 409 | deadlock or serialization failure that persists after one retry |

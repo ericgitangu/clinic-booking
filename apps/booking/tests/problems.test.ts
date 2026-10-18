@@ -28,3 +28,11 @@ describe("problem copy", () => {
     );
   });
 });
+
+describe("the one-hour rule on changes", () => {
+  it("says in plain words that a visit inside the hour cannot be changed", () => {
+    const { message } = describeProblem("CHANGE_TOO_LATE");
+    expect(message).toMatch(/less than an hour/i);
+    expect(message).toMatch(/contact the clinic/i);
+  });
+});

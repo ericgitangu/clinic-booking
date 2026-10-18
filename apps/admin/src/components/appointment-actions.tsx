@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CalendarClockIcon, XIcon } from "lucide-react";
 import {
   AlertDialog,
@@ -41,6 +41,7 @@ import {
   rescheduleAppointment,
   type ActionResult,
 } from "@/lib/actions";
+import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
 import { formatTime } from "@/lib/clinic-time";
 
 function report(result: ActionResult): boolean {
@@ -55,11 +56,52 @@ export function AppointmentActions({
   appointmentId,
   doctorId,
   today,
+  startsAt,
 }: {
   appointmentId: string;
   doctorId: string;
   today: string;
+  startsAt: string;
 }) {
+  const [locked, setLocked] = useState(() =>
+    insideChangeWindow(startsAt, Date.now()),
+  );
+  // The window can open while the page is on screen: look again every 30 seconds.
+  useEffect(() => {
+    const tick = () => setLocked(insideChangeWindow(startsAt, Date.now()));
+    tick();
+    const timer = setInterval(tick, 30_000);
+    return () => clearInterval(timer);
+  }, [startsAt]);
+
+  if (locked) {
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            variant="outline"
+            className="min-h-11"
+            disabled
+            aria-describedby="change-note"
+          >
+            <CalendarClockIcon aria-hidden /> Reschedule
+          </Button>
+          <Button
+            variant="destructive"
+            className="min-h-11"
+            disabled
+            aria-describedby="change-note"
+          >
+            <XIcon aria-hidden /> Cancel appointment
+          </Button>
+        </div>
+        <p id="change-note" className="text-muted-foreground">
+          {CHANGE_WINDOW_NOTE}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row">
       <RescheduleDialog
