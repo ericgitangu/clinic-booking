@@ -34,13 +34,30 @@ import {
 
 # The smoke test's own signing key. It signs one call, /internal/smoke/patients, which creates a
 # patient the admin views ignore, and nothing else, so a leak cannot forge an admin or patient
-# assertion. The container is created here; the value is added by hand, never by Terraform:
+# assertion. The container was first created by gcloud, outside Terraform, and is adopted here
+# by the import blocks below; the value is added by hand, never by Terraform:
 #   openssl rand -hex 32 | tr -d '\n' | gcloud secrets versions add clinic-smoke-signing-key \
 #     --project sil-clinic-booking --data-file=-
+# Remove the import blocks after the first apply that has adopted them.
 resource "google_secret_manager_secret" "smoke_signing_key" {
   secret_id = "clinic-smoke-signing-key"
   replication {
     auto {}
   }
   depends_on = [google_project_service.enabled]
+}
+
+import {
+  to = google_secret_manager_secret.smoke_signing_key
+  id = "projects/sil-clinic-booking/secrets/clinic-smoke-signing-key"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.runtime_smoke_key
+  id = "projects/sil-clinic-booking/secrets/clinic-smoke-signing-key roles/secretmanager.secretAccessor serviceAccount:clinic-api-runtime@sil-clinic-booking.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.deployer_smoke_key
+  id = "projects/sil-clinic-booking/secrets/clinic-smoke-signing-key roles/secretmanager.secretAccessor serviceAccount:circleci-deployer@sil-clinic-booking.iam.gserviceaccount.com"
 }
