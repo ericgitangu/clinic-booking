@@ -808,6 +808,64 @@ done
 other="$(grep -rE 'run (deploy|services update|services replace)' "$HERE" "$HERE/../../.circleci/config.yml" 2>/dev/null | grep -v 'test_ci_scripts.sh' | grep -c 'clinic-api')"
 expect "deploy: no other script redeploys or updates clinic-api (the secrets list cannot be dropped)" "$other" 1
 
+# =========================================================================================
+# select_vercel_token.sh: one token per Vercel project. The values below are test strings.
+# =========================================================================================
+vt_run() { # <app> <env assignments...> ; leaves exit code in $rc, the sourced result in $VT_OUT
+  local app="$1"; shift
+  VT_ENV="$WORK/vt.bashenv"; : > "$VT_ENV"
+  env -u VERCEL_TOKEN -u VERCEL_ADMIN_TOKEN BASH_ENV="$VT_ENV" "$@" bash "$HERE/select_vercel_token.sh" "$app" >"$WORK/vt.out" 2>&1; rc=$?
+  VT_OUT="$(env -u VERCEL_TOKEN -u VERCEL_ADMIN_TOKEN "$@" bash -c "source '$VT_ENV'; echo \"token=\${VERCEL_TOKEN-unset} admin=\${VERCEL_ADMIN_TOKEN-unset}\"")"
+}
+vt_run admin VERCEL_TOKEN=booking-secret-value VERCEL_ADMIN_TOKEN=admin-secret-value
+expect "vercel token: an admin job uses the admin token as VERCEL_TOKEN and hides the admin variable" \
+  "$rc:$VT_OUT" "0:token=admin-secret-value admin=unset"
+expect "vercel token: ...and never prints a token value" "$(grep -c 'secret-value' "$WORK/vt.out")" 0
+vt_run booking VERCEL_TOKEN=booking-secret-value VERCEL_ADMIN_TOKEN=admin-secret-value
+expect "vercel token: a booking job keeps its own token and the admin token is gone from its environment" \
+  "$rc:$VT_OUT" "0:token=booking-secret-value admin=unset"
+expect "vercel token: ...and never prints a token value (booking)" "$(grep -c 'secret-value' "$WORK/vt.out")" 0
+vt_run admin VERCEL_TOKEN=booking-secret-value
+expect "vercel token: an admin job without VERCEL_ADMIN_TOKEN stops with exit 1" "$rc" 1
+expect "vercel token: ...and says what to add and where, naming no value" \
+  "$(grep -c 'VERCEL_ADMIN_TOKEN is not set' "$WORK/vt.out")$(grep -c 'vercel-prod context' "$WORK/vt.out")$(grep -c 'secret-value' "$WORK/vt.out")" 110
+expect "vercel token: ...and it did not fall back to the booking token" "$(cat "$VT_ENV")" ""
+vt_run booking VERCEL_ADMIN_TOKEN=admin-secret-value
+expect "vercel token: a booking job without VERCEL_TOKEN stops with exit 1" "$rc" 1
+vt_run other VERCEL_TOKEN=x
+expect "vercel token: an unknown app is a usage error (exit 2)" "$rc" 2
+# the CI config wires it: both per-app jobs choose the token first, before anything that could use one
+python3 - "$HERE/../../.circleci/config.yml" > "$WORK/vt.cfg" <<'PY'
+import re, sys
+s = open(sys.argv[1]).read()
+for job in ("ship-app", "rollback-app"):
+    body = s[s.index("\n  %s:\n" % job):]
+    body = body[1:body.index("\n  ", body.index("steps:")+1) if False else len(body)]
+    nxt = re.search(r"\n  [a-z][a-z0-9-]*:\n", body[3:])
+    body = body[: nxt.start() + 3] if nxt else body
+    i_sel = body.find("select_vercel_token.sh")
+    uses = [m.start() for m in re.finditer(r"vercel_prod\.sh|vercel deploy|vercel_env_check\.sh|VERCEL_APP=", body)]
+    print(job, "selected" if i_sel >= 0 else "MISSING", "first" if i_sel >= 0 and all(i_sel < u for u in uses) else "NOT-FIRST")
+PY
+expect "vercel token: ship-app chooses the token before it deploys or reads the project" "$(grep -c '^ship-app selected first' "$WORK/vt.cfg")" 1
+expect "vercel token: rollback-app chooses the token before it rolls back" "$(grep -c '^rollback-app selected first' "$WORK/vt.cfg")" 1
+expect "vercel token: no job outside those two names VERCEL_ADMIN_TOKEN" \
+  "$(grep -c 'VERCEL_ADMIN_TOKEN' "$HERE/../../.circleci/config.yml")" 0
+
+# lighthouse.sh fetches main with an explicit refspec, so a shallow clone still gets origin/main
+mkdir -p "$WORK/fakegit"
+real_git="$(command -v git)"
+cat > "$WORK/fakegit/git" <<FAKE
+#!/usr/bin/env bash
+[ "\$1" = fetch ] && echo "\$*" >> "$WORK/fakegit/fetch.log"
+exec "$real_git" "\$@"
+FAKE
+chmod +x "$WORK/fakegit/git"; : > "$WORK/fakegit/fetch.log"
+PATH="$WORK/fakegit:$PATH" CIRCLE_BRANCH=feature LH_WATCH=no/such/path LH_PORT=$LHP LH_CHROME_PATH=/bin/sh \
+  LHCI_OUTPUT_DIR="$WORK/lh-out.fetch" bash "$HERE/lighthouse.sh" >/dev/null 2>&1
+expect "lighthouse: fetches main with an explicit refspec (works in a shallow clone)" \
+  "$(grep -c 'fetch origin main:refs/remotes/origin/main' "$WORK/fakegit/fetch.log")" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

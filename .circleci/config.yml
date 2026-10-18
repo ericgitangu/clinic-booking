@@ -434,6 +434,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Choose this app's Vercel token (the admin app has its own project and token)
+          command: bash scripts/ci/select_vercel_token.sh "<< parameters.app >>"
+      - run:
           name: Select the Vercel project for this app (the context holds the booking project's id)
           command: |
             echo 'export VERCEL_APP="<< parameters.app >>"' >> "$BASH_ENV"
@@ -715,6 +718,9 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - run:
+          name: Choose this app's Vercel token (the admin app has its own project and token)
+          command: bash scripts/ci/select_vercel_token.sh "<< parameters.app >>"
       - run:
           name: Select the Vercel project for this app (the context holds the booking project's id)
           command: |
