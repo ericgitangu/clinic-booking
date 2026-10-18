@@ -7,7 +7,12 @@ import {
   type Page,
 } from "@playwright/test";
 import { hhmm } from "./api";
-import { chip } from "./support/chips";
+import {
+  chip,
+  expectDesignedFocusRing,
+  expectFree,
+  expectInactive,
+} from "./support/chips";
 import { farCell } from "./support/cells";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
@@ -63,19 +68,16 @@ test("a free time is a real link to its details page, reachable and activated by
     name: `${hhmm(slots[2])} free, book this time`,
   });
   await expect(link).toHaveAttribute("href", details(doctorId, slots[2]));
-  // Not nested in anything interactive, and not a radio.
-  await expect(
-    chip(page, slots[2]).locator("a a, a button, input"),
-  ).toHaveCount(0);
+  // A link, not a radio or a button, and nothing interactive inside it or around it.
   await expect(page.getByRole("radio")).toHaveCount(0);
+  await expect(link.getByRole("button")).toHaveCount(0);
+  await expect(link.getByRole("link")).toHaveCount(0);
 
-  // Keyboard: Tab reaches it (nothing before it on the grid is a tab stop for taken times), the
-  // focus ring shows, and Enter follows it.
+  // Keyboard: Tab reaches it, it shows the designed focus ring, and Enter follows it.
+  await page.keyboard.press("Tab");
   await link.focus();
   await expect(link).toBeFocused();
-  expect(
-    await link.evaluate((el) => getComputedStyle(el).outlineStyle),
-  ).not.toBe("none");
+  await expectDesignedFocusRing(link);
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(
     new RegExp(`/book/${doctorId}/details\\?starts_at=`),
@@ -100,28 +102,20 @@ test("tab order on the grid visits free times only, in time order", async ({
   });
   const page = await visitor.newPage();
   await page.goto(grid(doctorId, day));
-  await expect(chip(page, slots[1])).toHaveAttribute("data-state", "booked");
+  await expectInactive(page, slots[1], /Booked/);
 
-  const links = page.locator("li[data-time] a");
-  const times = await page
-    .locator("li[data-state='free']")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-time")));
-  expect(times).not.toContain(hhmm(slots[1]));
-  expect(await links.count()).toBe(times.length);
-
+  // Tab visits the free times only (the booked one is skipped), in time order.
+  const links = page.getByRole("link", { name: / free, book this time$/ });
+  const count = await links.count();
+  expect(count).toBeGreaterThan(3);
+  await expect(
+    page.getByRole("link", { name: new RegExp(`^${hhmm(slots[1])}`) }),
+  ).toHaveCount(0);
   await links.first().focus();
-  const visited: (string | null)[] = [];
-  for (let i = 0; i < times.length; i++) {
-    visited.push(
-      await page.evaluate(
-        () =>
-          document.activeElement?.closest("li")?.getAttribute("data-time") ??
-          null,
-      ),
-    );
+  for (let i = 0; i < count; i++) {
+    await expect(links.nth(i)).toBeFocused();
     await page.keyboard.press("Tab");
   }
-  expect(visited).toEqual(times);
   await closeAll(other.context, visitor);
 });
 
@@ -137,20 +131,9 @@ test("a time someone else booked and a time I hold have no link", async ({
   await bookOn(me.page, doctorId, slots[2]);
 
   await me.page.goto(grid(doctorId, day));
-  const taken = chip(me.page, slots[1]);
-  await expect(taken).toHaveAttribute("data-state", "booked");
-  await expect(taken).toContainText("Booked");
-  await expect(taken.getByRole("link")).toHaveCount(0);
-  const held = chip(me.page, slots[2]);
-  await expect(held).toHaveAttribute("data-state", "yours");
-  await expect(held).toContainText("Your visit");
-  await expect(held.getByRole("link")).toHaveCount(0);
-  await expect(
-    me.page.getByRole("link", { name: new RegExp(`^${hhmm(slots[1])}`) }),
-  ).toHaveCount(0);
-  await expect(
-    me.page.getByRole("link", { name: new RegExp(`^${hhmm(slots[3])} free`) }),
-  ).toHaveCount(1);
+  await expectInactive(me.page, slots[1], /Booked/);
+  await expectInactive(me.page, slots[2], /Your visit/);
+  await expectFree(me.page, slots[3]);
 
   const { violations } = await new AxeBuilder({ page: me.page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -182,9 +165,7 @@ test("each appointment card links to its page; cancelling shows the cancelled vi
   await expect(
     page.getByRole("heading", { name: "Your appointment" }),
   ).toBeVisible();
-  await expect(page.getByTestId("appointment-card")).toContainText(
-    hhmm(slots[3]),
-  );
+  await expect(page.getByText(new RegExp(hhmm(slots[3])))).toBeVisible();
   await expect(page.getByRole("link", { name: "Reschedule" })).toBeVisible();
 
   const id = page.url().split("/").pop();
@@ -195,22 +176,18 @@ test("each appointment card links to its page; cancelling shows the cancelled vi
   await expect(
     page.getByRole("heading", { name: "Appointment cancelled" }),
   ).toBeVisible();
-  const note = page.getByTestId("cancelled-note");
-  await expect(note).toContainText("is free again");
-  await expect(note).toContainText("Plans changed");
+  await expect(page.getByText(/is free again/)).toBeVisible();
+  await expect(page.getByText("Reason you gave: Plans changed")).toBeVisible();
   await expect(page.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
 
   // The same address, opened afresh, still says so.
   await page.goto(`/appointments/${id}`);
-  await expect(page.getByTestId("cancelled-note")).toContainText(
-    "is free again",
-  );
+  await expect(page.getByText(/is free again/)).toBeVisible();
 
   // And the grid offers the time as a link again.
   await page.goto(grid(doctorId, day));
-  await expect(chip(page, slots[3])).toHaveAttribute("data-state", "free");
-  await expect(chip(page, slots[3]).getByRole("link")).toHaveCount(1);
+  await expectFree(page, slots[3]);
   await closeAll(me.context);
 });
 
@@ -237,7 +214,9 @@ test("someone else's appointment id is a 404, and a signed-out visitor is asked 
   await expect(
     stranger.page.getByRole("heading", { name: "We could not find that page" }),
   ).toBeVisible();
-  await expect(stranger.page.getByTestId("appointment-card")).toHaveCount(0);
+  await expect(
+    stranger.page.getByRole("heading", { name: "Your appointment" }),
+  ).toHaveCount(0);
 
   const anon = await browser.newContext();
   const anonPage = await anon.newPage();
@@ -295,11 +274,15 @@ test("arrow keys move between free times and between days; ? opens the shortcut 
   await page.keyboard.press("ArrowLeft");
   await expect(first).toBeFocused();
   await page.keyboard.press("End");
-  await expect(page.locator("li[data-time] a").last()).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: / free, book this time$/ }).last(),
+  ).toBeFocused();
   await page.keyboard.press("Home");
   await expect(first).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.locator("li[data-time] a").nth(3)).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: / free, book this time$/ }).nth(3),
+  ).toBeFocused();
 
   const days = page
     .getByRole("navigation", { name: "Pick a day" })
@@ -334,9 +317,11 @@ test("the live-state line says how the grid is being kept current", async ({
     "data-polling",
     "armed",
   );
-  await expect(page.getByTestId("live-state")).toContainText(
-    /Live: times update|Checking for changes/,
-  );
+  await expect(
+    page.getByText(
+      /Live: times update as they change|Checking for changes every few seconds/,
+    ),
+  ).toBeVisible();
   await visitor.close();
 });
 
@@ -368,10 +353,14 @@ test("a booked visit whose time has passed is read-only", async ({
   await expect(
     page.getByRole("heading", { name: "This visit has passed" }),
   ).toBeVisible();
-  const note = page.getByTestId("passed-note");
-  await expect(note).toContainText("can no longer be moved or cancelled");
   await expect(
-    note.getByRole("link", { name: "My appointments" }),
+    page.getByText("can no longer be moved or cancelled"),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("main")
+      .getByRole("link", { name: "My appointments" })
+      .last(),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
@@ -440,4 +429,33 @@ test("the photo disclosure is on the doctor list and in each portrait's descript
     "href",
     /README\.md#doctor-portraits-ai-generated$|#doctor-portraits-ai-generated$/,
   );
+});
+
+test("a link to a time someone else has taken lands on that day's times with a notice", async ({
+  browser,
+}, testInfo) => {
+  const { doctorId, slots } = await farCell(
+    cellOf(9, testInfo.repeatEachIndex),
+  );
+  const other = await signedIn(browser);
+  await bookOn(other.page, doctorId, slots[1]);
+
+  const visitor = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
+  const page = await visitor.newPage();
+  await page.goto(details(doctorId, slots[1]));
+  await expect(
+    page.getByRole("heading", { name: "Confirm your visit" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("status").filter({ hasText: "no longer free" }),
+  ).toHaveText("That time is no longer free. Pick another time.");
+  await expectInactive(page, slots[1], /Booked/);
+  await expectFree(page, slots[2]);
+  // The notice is spoken as a status, and the free times are still links.
+  await expect(
+    page.getByRole("link", { name: new RegExp(`^${hhmm(slots[2])} free`) }),
+  ).toHaveAttribute("href", details(doctorId, slots[2]));
+  await closeAll(other.context, visitor);
 });

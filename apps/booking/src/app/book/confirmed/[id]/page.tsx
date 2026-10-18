@@ -6,6 +6,7 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { RememberBooking } from "@/components/booking/remember-booking";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
+import { needsSignIn } from "@/lib/auth-failure";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
@@ -35,7 +36,7 @@ export default async function Confirmed({
   const appt = await api.myAppointment(callerFor(who), id);
   if (!appt.ok) {
     // The API refusing the session is a sign-in question, not a missing page.
-    if (appt.status === 401 || appt.status === 403) {
+    if (needsSignIn(appt)) {
       return (
         <SignInPrompt
           title="Sign in to see your booking"

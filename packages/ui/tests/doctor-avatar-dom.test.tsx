@@ -55,4 +55,30 @@ describe("DoctorAvatar (stateful)", () => {
       "/doctors/412e6793-68f2-5c62-832d-cb7839acae9d-256.webp",
     );
   });
+
+  it("has an explicit size on the image and on the initials fallback, so nothing shifts", () => {
+    const { rerender } = render(
+      <DoctorAvatar doctorId={ID} name={NAME} size={56} />,
+    );
+    const img = screen.getByRole("img", { name: NAME });
+    expect(img.getAttribute("width")).toBe("56");
+    expect(img.getAttribute("height")).toBe("56");
+
+    rerender(
+      <DoctorAvatar doctorId="unknown" name="Dr. Zed Quinn" size={40} />,
+    );
+    const fallback = screen.getByRole("img", { name: "Dr. Zed Quinn" });
+    expect(fallback.tagName).toBe("SPAN");
+    expect(fallback.textContent).toBe("ZQ");
+    expect(fallback).toHaveProperty("style.width", "40px");
+    expect(fallback).toHaveProperty("style.height", "40px");
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("keeps the doctor's name as the alt text and the disclosure as the description", () => {
+    render(<DoctorAvatar doctorId={ID} name={NAME} />);
+    const img = screen.getByRole("img", { name: NAME });
+    expect(img.getAttribute("alt")).toBe(NAME);
+    expect(img.getAttribute("title")).toMatch(/AI-generated portrait/);
+  });
 });

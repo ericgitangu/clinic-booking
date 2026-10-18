@@ -175,26 +175,32 @@ test("a link to a time that has already passed lands on that day's times", async
   const past = new Date(Date.now() - 86_400_000);
   await page.goto(details(doctorId, past.toISOString()));
   await expect(page).toHaveURL(
-    new RegExp(`/book/${doctorId}\\?date=\\d{4}-\\d{2}-\\d{2}$`),
+    new RegExp(`/book/${doctorId}\\?date=\\d{4}-\\d{2}-\\d{2}&notice=past$`),
   );
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "already passed" }),
+  ).toHaveText("That time has already passed. Pick another time.");
   await expect(
     page.getByRole("button", { name: "Confirm booking" }),
   ).toHaveCount(0);
   await closeAll(context);
 });
 
-test("a time less than an hour away is refused with a plain message", async ({
+test("a time less than an hour away is not offered: its link lands on the day's times with a notice", async ({
   browser,
 }) => {
   const doctorId = await firstDoctor();
   const { context, page } = await signedIn(browser);
-  await confirmBooking(
-    page,
-    doctorId,
-    new Date(Date.now() + 30 * 60_000).toISOString(),
+  await page.goto(
+    details(doctorId, new Date(Date.now() + 30 * 60_000).toISOString()),
   );
-  await expect(alertOf(page)).toContainText("at least an hour");
+  await expect(
+    page.getByRole("status").filter({ hasText: "no longer free" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toHaveCount(0);
   await closeAll(context);
 });
 

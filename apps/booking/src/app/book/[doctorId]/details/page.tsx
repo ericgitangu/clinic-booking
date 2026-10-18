@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { BookingForm } from "@/components/booking/booking-form";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
 import { heldMessage } from "@/lib/held";
 import { ownBooked } from "@/lib/own";
-import { heldAt } from "@/lib/slot-chips";
+import { heldAt, sameInstant } from "@/lib/slot-chips";
 import { getIdentity } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -32,16 +33,26 @@ export default async function Details({
     redirect(`/book/${doctorId}`);
   }
   // A link to a time that has gone (an old bookmark, an email, a stale tab) goes to that day's times.
-  if (Date.parse(startsAt) <= Date.now()) {
-    redirect(`/book/${doctorId}?date=${clinicDay(startsAt)}`);
-  }
-  const [doctor, who, own] = await Promise.all([
+  const dayView = (notice: "past" | "taken") =>
+    `/book/${doctorId}?date=${clinicDay(startsAt)}&notice=${notice}`;
+  if (Date.parse(startsAt) <= Date.now()) redirect(dayView("past"));
+  const [doctor, who, own, avail] = await Promise.all([
     api.getDoctor(doctorId),
     getIdentity(),
     ownBooked(),
+    api.getAvailability(doctorId, clinicDay(startsAt)),
   ]);
   // Already holds this time (with this doctor or another)? Do not offer a booking at all.
   const held = who ? heldAt(own, startsAt) : undefined;
+  // Not free any more (someone else took it, or the doctor's day changed): back to the day's times
+  // with a notice. If the list cannot be read, carry on; the API still refuses a taken time.
+  if (
+    !held &&
+    avail.ok &&
+    !avail.data.slots.some((s) => sameInstant(s.starts_at, startsAt))
+  ) {
+    redirect(dayView("taken"));
+  }
   if (!doctor.ok && doctor.status < 500) notFound();
 
   return (
@@ -57,16 +68,25 @@ export default async function Details({
       <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">
         Confirm your visit
       </h1>
-      <div className="mt-4 rounded-xl border border-border bg-card p-5">
-        <p className="text-lg font-semibold">{formatWhen(startsAt)}</p>
+      <div className="mt-4 flex items-start gap-4 rounded-xl border border-border bg-card p-5">
         {doctor.ok ? (
-          <p className="mt-1 text-base text-muted-foreground">
-            {doctor.data.full_name}, {doctor.data.specialty}
-          </p>
+          <DoctorAvatar
+            doctorId={doctor.data.id}
+            name={doctor.data.full_name}
+            size={56}
+          />
         ) : null}
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nairobi time, 30 minutes.
-        </p>
+        <div>
+          <p className="text-lg font-semibold">{formatWhen(startsAt)}</p>
+          {doctor.ok ? (
+            <p className="mt-1 text-base text-muted-foreground">
+              {doctor.data.full_name}, {doctor.data.specialty}
+            </p>
+          ) : null}
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nairobi time, 30 minutes.
+          </p>
+        </div>
       </div>
       <div className="mt-8">
         {held ? (

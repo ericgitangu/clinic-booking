@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { cn } from "@clinic/ui/lib/utils";
 import {
   ILLUSTRATION_DISCLOSURE,
@@ -20,6 +20,7 @@ type ViewProps = {
   /** Said on hover and as the image's description, not part of the alt text. */
   title?: string;
   onError?: () => void;
+  imgRef?: Ref<HTMLImageElement>;
   className?: string;
 };
 
@@ -32,6 +33,7 @@ export function DoctorAvatarView({
   srcSet,
   title,
   onError,
+  imgRef,
   className,
 }: ViewProps) {
   const box = { width: size, height: size };
@@ -55,6 +57,7 @@ export function DoctorAvatarView({
   return (
     // Plain img: the source is an inline data URI, so next/image has nothing to optimise.
     <img
+      ref={imgRef}
       src={src}
       srcSet={srcSet}
       alt={name}
@@ -103,11 +106,23 @@ export function DoctorAvatar({
           onError: () => setFailure({ id: doctorId, level: "svg" }),
         }
       : { src: null };
+  // The server-rendered <img> may fail before React has attached onError (the event is not
+  // replayed), so on mount and whenever the source changes, an image that has already failed moves
+  // the chain on. A failed image is complete with no width.
+  const imgRef = useRef<HTMLImageElement>(null);
+  const onError = "onError" in props ? props.onError : undefined;
+  const current = props.src;
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el && el.complete && el.naturalWidth === 0) onError?.();
+    // onError is a fresh closure each render; the source is what identifies the attempt.
+  }, [current]);
   return (
     <DoctorAvatarView
       name={name}
       size={size}
       className={className}
+      imgRef={imgRef}
       {...props}
     />
   );

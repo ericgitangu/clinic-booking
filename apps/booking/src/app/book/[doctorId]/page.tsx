@@ -31,10 +31,10 @@ export default async function PickTime({
   searchParams,
 }: {
   params: Promise<{ doctorId: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; notice?: string }>;
 }) {
   const { doctorId } = await params;
-  const { date } = await searchParams;
+  const { date, notice } = await searchParams;
   const today = clinicDay(new Date());
   const day = isValidDay(date) ? date : today;
 
@@ -90,6 +90,17 @@ export default async function PickTime({
           basePath={`/book/${doctorId}`}
         />
       </div>
+
+      {notice === "past" || notice === "taken" ? (
+        <p
+          role="status"
+          className="mt-6 rounded-lg border border-border bg-muted p-4 text-base font-semibold"
+        >
+          {notice === "past"
+            ? "That time has already passed. Pick another time."
+            : "That time is no longer free. Pick another time."}
+        </p>
+      ) : null}
 
       <h2 className="mt-8 font-heading text-xl font-semibold">
         {formatDayLong(day)}

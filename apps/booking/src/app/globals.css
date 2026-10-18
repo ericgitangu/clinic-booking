@@ -6,6 +6,12 @@
 /* Tailwind scans the shared package for the classes its components use. */
 @source "../../../../packages/ui/src";
 
+/* Times and dates line up: tabular figures everywhere in the booking app. (The font draws its zero
+   with a slash by design; it has no unslashed alternate to switch to.) */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
 /* A pinned call-to-action must not cover the end of the footer when the page is scrolled to the bottom. */
 body:has([data-sticky-cta]) footer {
   padding-bottom: 7rem;

@@ -17,6 +17,7 @@ import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
 import { addDays, clinicDay, formatWhen } from "@/lib/clinic-time";
 import { acknowledge } from "@/lib/email/acknowledge";
+import { needsSignIn } from "@/lib/auth-failure";
 import { heldMessage } from "@/lib/held";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
@@ -49,6 +50,8 @@ function failed(
   extra: Partial<Extract<ActionState, { status: "error" }>> = {},
 ): ActionState {
   if (f.kind === "invalid_request") return invalid(f.issues);
+  // The API refused the session: the person signs in again, whatever the action was.
+  if (needsSignIn(f)) return error("UNAUTHENTICATED");
   return error(f.code, extra);
 }
 

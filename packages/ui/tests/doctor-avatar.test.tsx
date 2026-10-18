@@ -1,18 +1,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { isValidElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import {
-  DoctorAvatar,
-  DoctorAvatarView,
-} from "../src/components/doctor-avatar";
 import {
   DOCTOR_AVATARS,
   doctorAvatarSrc,
   doctorInitials,
   doctorPhoto,
-  PORTRAIT_DISCLOSURE,
 } from "../src/lib/doctor-avatar";
 
 // The seed is the truth: backend/app/scripts/seed.py (uuid5 of "doctor:<key>").
@@ -94,52 +87,5 @@ describe("doctorInitials", () => {
     expect(doctorInitials("Dr. Achieng Otieno")).toBe("AO");
     expect(doctorInitials("Esther")).toBe("E");
     expect(doctorInitials("")).toBe("?");
-  });
-});
-
-describe("DoctorAvatar", () => {
-  const [id, name] = Object.entries(SEEDED)[0]!;
-
-  it("renders the img with the doctor's name as alt and explicit size", () => {
-    const html = renderToStaticMarkup(
-      <DoctorAvatar doctorId={id} name={name} size={48} />,
-    );
-    expect(html).toContain(`alt="${name}"`);
-    expect(html).toContain('width="48"');
-    expect(html).toContain('height="48"');
-    expect(html).toContain("rounded-full");
-    expect(html).toContain(`src="/doctors/${id}-256.webp"`);
-    expect(html).toContain(
-      `srcSet="/doctors/${id}-256.webp 1x, /doctors/${id}-512.webp 2x"`,
-    );
-    // The disclosure is the image's description (title), not part of the alt text.
-    expect(html).toContain(`title="${PORTRAIT_DISCLOSURE}"`);
-  });
-
-  it("falls back to initials for an unknown id", () => {
-    const html = renderToStaticMarkup(
-      <DoctorAvatar doctorId="unknown" name="Dr. Zed Quinn" size={40} />,
-    );
-    expect(html).not.toContain("<img");
-    expect(html).toContain('aria-label="Dr. Zed Quinn"');
-    expect(html).toContain(">ZQ<");
-    expect(html).toContain("width:40px");
-  });
-
-  it("view swaps to initials once the image has failed, and the img reports errors", () => {
-    const ok = DoctorAvatarView({
-      name,
-      size: 40,
-      src: doctorPhoto(id)!.src,
-      onError: () => {},
-    });
-    expect(
-      isValidElement(ok) && typeof (ok.props as { onError?: unknown }).onError,
-    ).toBe("function");
-    const failed = renderToStaticMarkup(
-      <DoctorAvatarView name={name} size={40} src={null} />,
-    );
-    expect(failed).not.toContain("<img");
-    expect(failed).toContain(">AO<");
   });
 });

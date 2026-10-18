@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DateStrip } from "@/components/booking/date-strip";
 import { SlotChooser } from "@/components/booking/slot-chooser";
+import { needsSignIn } from "@/lib/auth-failure";
 import * as api from "@/lib/api";
 import {
   clinicDay,
@@ -41,7 +42,18 @@ export default async function Reschedule({
   }
   // 404 for an appointment that is not this person's, the same as for one that does not exist.
   const appt = await api.myAppointment(callerFor(who), id);
-  if (!appt.ok) notFound();
+  if (!appt.ok) {
+    if (needsSignIn(appt)) {
+      return (
+        <SignInPrompt
+          title="Sign in to reschedule"
+          body="Your session has ended. Sign in again with the Google account that booked."
+          returnTo={`/appointments/${id}/reschedule`}
+        />
+      );
+    }
+    notFound();
+  }
 
   if (appt.data.status === "cancelled") {
     return (

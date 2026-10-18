@@ -5,7 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { chip, FREE, INACTIVE } from "./support/chips";
+import { expectFree, expectInactive } from "./support/chips";
 import { farCell } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";
 
@@ -106,14 +106,12 @@ test("(a) a time another person books turns inactive in under two seconds, by pu
   await a.page.goto(grid(doctorId, day));
   await expect(marker(a.page)).toHaveAttribute("data-stream", "live");
   await expect.poll(() => calls.length).toBe(1); // the one refetch after connecting
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", FREE);
+  await expectFree(a.page, slots[1]);
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
 
-  const gone = chip(a.page, slots[1]);
-  await expect(gone).toHaveAttribute("data-state", INACTIVE, { timeout: 2000 });
-  await expect(gone).toContainText(/Just taken/);
+  await expectInactive(a.page, slots[1], /Just taken/, { timeout: 2000 });
   expect(calls).toHaveLength(1); // no poll was needed
   await closeAll(a.context, b.context);
 });
@@ -132,13 +130,13 @@ test("(b) a cancellation frees the time after one refetch", async ({
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE, {
+  await expectInactive(a.page, slots[1], undefined, {
     timeout: 2000,
   });
   const before = calls.length;
 
   await cancelFirst(b.page);
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", FREE, {
+  await expectFree(a.page, slots[1], {
     timeout: 3000,
   });
   expect(calls.length - before).toBe(1); // one refetch, not a poll
@@ -162,7 +160,7 @@ test("(c) with the push service unreachable the page says polling and still conv
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
   await a.page.clock.runFor(16_000); // one 15 s poll
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
+  await expectInactive(a.page, slots[1], undefined);
   await closeAll(a.context, b.context);
 });
 
@@ -196,7 +194,7 @@ test("(d) a rate-limited token endpoint is refused, and the page keeps polling",
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
   await a.page.clock.runFor(16_000);
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
+  await expectInactive(a.page, slots[1], undefined);
   await closeAll(a.context, b.context);
 });
 
@@ -226,7 +224,7 @@ test("(f) an unchanged poll renders the grid zero times, one event renders it on
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
+  await expectInactive(a.page, slots[1], undefined);
   expect(await renders()).toBe(settled + 1);
   await closeAll(a.context, b.context);
 });
@@ -248,7 +246,7 @@ test("(g) the same message delivered twice changes the page once", async ({
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expect(chip(a.page, slots[1])).toHaveAttribute("data-state", INACTIVE);
+  await expectInactive(a.page, slots[1], undefined);
   const after = Number(await field.getAttribute("data-renders"));
 
   const channel = `slots:${doctorId}:${day}`;

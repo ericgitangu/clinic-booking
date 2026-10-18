@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import { hhmm, pick } from "./api";
 import { ownCell } from "./support/cells";
+import { expectInactive } from "./support/chips";
 import { newPerson, sessionCookies } from "./support/auth";
 import { IDLE_MS, POLL_MS } from "../src/lib/polling";
 
@@ -123,10 +124,7 @@ test("a time another person books turns inactive on an open page without a reloa
 
   await page.clock.runFor(POLL_MS + 1000);
   // It stays in its place, inactive, instead of vanishing and shifting the others.
-  const gone = page.locator(`li[data-time="${hhmm(slots[0])}"]`);
-  await expect(gone).toHaveAttribute("data-state", "booked");
-  await expect(gone).toContainText("Booked");
-  await expect(gone.getByRole("link")).toHaveCount(0);
+  await expectInactive(page, slots[0], /Booked/);
   await expect(kept).toBeVisible();
   expect(
     await page.evaluate(

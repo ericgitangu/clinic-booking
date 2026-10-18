@@ -36,12 +36,13 @@ doctor's name.
 - Derivatives: WebP at 256 and 512 px (ImageMagick, quality 82, metadata stripped). The 1024 px originals are
   not kept in the repository. `scripts/avatars/portraits.py` (`make avatars`) repeats the run; it reads a
   cached Hugging Face login and never writes the token anywhere.
-- Model licence: **Apache License 2.0**. The model card's own header reads `license: apache-2.0`
-  (<https://huggingface.co/Tongyi-MAI/Z-Image-Turbo>), and the project's repository carries the Apache 2.0
-  text (<https://github.com/Tongyi-MAI/Z-Image/blob/main/LICENSE>). The card is not gated and adds no
-  terms about generated images. Apache 2.0 allows commercial use of the model and puts no restriction on
-  what is made with it, so using the outputs in this portfolio and in a commercial product is permitted. This
-  is a reading of the published licence, not legal advice.
+- Model licence: **Apache License 2.0**. The model card (`Tongyi-MAI/Z-Image-Turbo`,
+  <https://huggingface.co/Tongyi-MAI/Z-Image-Turbo>) declares `license: apache-2.0` in its metadata
+  (card data), confirmed with the Hugging Face CLI on 2026-10-19 against model revision `f332072aa78be7aecdf3ee76d5c247082da564a6`. The Space `mcp-tools/Z-Image-Turbo` is listed as running that
+  model. The project's licence text is at <https://github.com/Tongyi-MAI/Z-Image/blob/main/LICENSE>. The card is
+  not gated and adds no terms about generated images. Apache 2.0 allows commercial use and puts no
+  restriction on what is made with the model, so using the outputs in this portfolio and in a commercial
+  product is permitted. This is a reading of the published licence, not legal advice.
 
 The illustrations below (`<id>.svg`) stay as the fallback shown if a portrait fails to load; if that fails too,
 the app shows the doctor's initials.

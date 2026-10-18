@@ -6,6 +6,7 @@ import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
+import { needsSignIn } from "@/lib/auth-failure";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -35,6 +36,15 @@ export default async function MyAppointments({
   }
 
   const res = await api.myAppointments(callerFor(who));
+  if (!res.ok && needsSignIn(res)) {
+    return (
+      <SignInPrompt
+        title="My appointments"
+        body="Your session has ended. Sign in again with the Google account you book with."
+        returnTo="/appointments"
+      />
+    );
+  }
   // Someone who has never booked has no patient record yet: that is an empty list, not an error.
   const never =
     !res.ok && res.kind === "problem" && res.code === "PATIENT_NOT_FOUND";

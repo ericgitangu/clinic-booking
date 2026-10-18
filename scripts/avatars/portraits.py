@@ -71,12 +71,26 @@ def redact(text: str, token: str) -> str:
 
 
 def main(keys: list[str]) -> int:
+    import httpx
     from gradio_client import Client
+    from gradio_client.exceptions import AppError
     from huggingface_hub import get_token
 
+    # What a failed call can raise; anything else is a bug and should show its traceback.
+    expected = (
+        httpx.HTTPError,
+        AppError,
+        OSError,
+        ValueError,
+        RuntimeError,
+        subprocess.CalledProcessError,
+    )
     token = get_token()
     if not token:
-        print("No Hugging Face token cached; log in first (huggingface-cli login).", file=sys.stderr)
+        print(
+            "No Hugging Face token cached; log in first (huggingface-cli login).",
+            file=sys.stderr,
+        )
         return 2
     unknown = [k for k in keys if k not in IDS]
     if unknown:
@@ -86,8 +100,11 @@ def main(keys: list[str]) -> int:
     kw = "hf_token" if "hf_token" in inspect.signature(Client).parameters else "token"
     try:
         client = Client(SPACE, verbose=False, **{kw: token})
-    except Exception as e:  # noqa: BLE001 - report the type and a redacted message, never the token
-        print(f"could not reach {SPACE}: {type(e).__name__}: {redact(str(e), token)}", file=sys.stderr)
+    except expected as e:
+        print(
+            f"could not reach {SPACE}: {type(e).__name__}: {redact(str(e), token)}",
+            file=sys.stderr,
+        )
         return 1
 
     failed = 0
@@ -107,14 +124,25 @@ def main(keys: list[str]) -> int:
                 shutil.copy(result[0], source)
                 for size in (256, 512):
                     subprocess.run(
-                        ["magick", str(source), "-resize", f"{size}x{size}", "-strip", "-quality", "82",
-                         str(OUT / f"{IDS[key]}-{size}.webp")],
+                        [
+                            "magick",
+                            str(source),
+                            "-resize",
+                            f"{size}x{size}",
+                            "-strip",
+                            "-quality",
+                            "82",
+                            str(OUT / f"{IDS[key]}-{size}.webp"),
+                        ],
                         check=True,
                     )
                 print(f"{key} ok")
-            except Exception as e:  # noqa: BLE001
+            except expected as e:
                 failed += 1
-                print(f"{key} FAILED {type(e).__name__}: {redact(str(e), token)}", file=sys.stderr)
+                print(
+                    f"{key} FAILED {type(e).__name__}: {redact(str(e), token)}",
+                    file=sys.stderr,
+                )
     return 1 if failed else 0
 
 
