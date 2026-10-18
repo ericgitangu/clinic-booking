@@ -56,6 +56,23 @@ Realtime tokens (`POST /realtime/token/patient`, `POST /internal/realtime/token/
 `Retry-After`) when an address uses too many tokens in a minute or a day; `REALTIME_UNAVAILABLE` (503) when push is not
 configured or the month's publish budget is spent, so the client polls.
 
+Declared by [ADR-0033](adr/0033-staff-crud-veto-and-invites.md), not yet emitted (staff CRUD, veto and invites are
+pending build). These are bullets, not table rows, because the catalogue test requires the table and `CATALOGUE` to match
+exactly, and a documented code with no code behind it would fail it. The backend change that adds the code to
+`backend/app/domain/errors.py` and the `ProblemCode` enum moves its entry into the table above in the same commit,
+with the slug and title given here. `ACCESS_EXISTS` and `OWNER_PROTECTED` are already in the table and are reused.
+
+- `ROLE_ESCALATION` (403, slug `role-escalation`, title "Role escalation"). Fires when an admin tries to change or revoke
+  an admin, or when anyone changes their own access row. The client should not retry; ask the owner.
+- `APPOINTMENT_LOCKED` (409, slug `appointment-locked`, title "Appointment locked"). Fires when a patient books,
+  cancels or reschedules on a lineage that staff vetoed and locked. The client should show that the clinic has to be
+  contacted; resending cannot succeed until an admin unlocks.
+- `NOTHING_TO_VETO` (409, slug `nothing-to-veto`, title "Nothing to veto"). Fires when staff veto an appointment that
+  has no patient change to reverse. The client should refresh the appointment and its history.
+- `INVITE_INVALID` (404, slug `invite-invalid`, title "Invite invalid"). Fires for every failed accept (unknown,
+  reused, expired, revoked, or a Google email that is not the invited one) with an identical body, so a caller cannot
+  tell which. The client should show one generic message and ask the owner or admin for a new invite.
+
 Every code the API can emit is in this table: `tests/unit/test_error_catalogue.py` checks the
 domain error classes, the codes named in the handlers, the `ProblemCode` enum in the contract
 and this file against `CATALOGUE`.

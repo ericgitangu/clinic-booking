@@ -2,6 +2,7 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
+- Amended by: [ADR-0033](0033-staff-crud-veto-and-invites.md), 2026-10-18: staff are exempt from the lead-time rules, a staff veto sets a lock that follows reschedules and blocks patient changes with `APPOINTMENT_LOCKED`, and an undone cancel is a new appointment linked by lineage. Pending build.
 
 ## Status
 

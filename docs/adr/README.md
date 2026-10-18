@@ -36,6 +36,7 @@ MADR-style records for the clinic booking system. Every ADR has the same seven s
 | [0030](0030-staff-roles-and-access.md) | Staff roles granted by email, enforced in the app and again in the API | Accepted, decided by the engineer 2026-10-17 | Section 1 "key decisions" |
 | [0031](0031-realtime-push-via-ably-sse.md) | Realtime push via Ably SSE | Accepted, decided by the engineer 2026-10-18; pending build | Section 1 "components, key decisions, trade-offs" |
 | [0032](0032-admin-live-feed-descoped.md) | The admin live feed is descoped for this submission | Accepted, decided by the engineer 2026-10-18 | Section 1 "key decisions, trade-offs" |
+| [0033](0033-staff-crud-veto-and-invites.md) | Staff appointment CRUD, patient-change veto and email invites | Accepted, decided by the engineer 2026-10-18; pending build | Section 1 "key decisions, trade-offs" |
 
 **Adding an ADR.** Take the next free number and use the same seven headings. Link it from this table. `make lint` checks the markdown.
 
@@ -77,3 +78,4 @@ Checked against `main` (748d7d8) on 2026-10-18 (read, not run). Words used: ship
 | 0030 | Shipped |
 | 0031 | Shipped for patients |
 | 0032 | Descoped |
+| 0033 | Declared, not built (three PRs pending) |
