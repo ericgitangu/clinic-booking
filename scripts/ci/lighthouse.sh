@@ -42,15 +42,28 @@ fi
 [ -x "$CHROME_PATH" ] || { echo "no Chrome at $CHROME_PATH"; exit 1; }
 
 LOG="$(mktemp)"
+# LH_SERVER_CMD and LH_RUN_CMD exist so scripts/ci/test_ci_scripts.sh can drive this script with a
+# fake server and a fake runner; in CI both are unset.
 (
   cd apps/booking
-  API_URL="${E2E_API_URL:-http://127.0.0.1:8080}" E2E=1 RECAPTCHA_ENFORCE=false \
+  export API_URL="${E2E_API_URL:-http://127.0.0.1:8080}" E2E=1 RECAPTCHA_ENFORCE=false \
     INTERNAL_SIGNING_KEY="${INTERNAL_SIGNING_KEY:-}" BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-}" \
-    BETTER_AUTH_URL="$LHCI_BASE_URL" GOOGLE_CLIENT_ID=lh-google-client-id GOOGLE_CLIENT_SECRET=lh-google-client-secret \
-    exec pnpm exec next start -p "$PORT"
+    BETTER_AUTH_URL="$LHCI_BASE_URL" GOOGLE_CLIENT_ID=lh-google-client-id GOOGLE_CLIENT_SECRET=lh-google-client-secret
+  # shellcheck disable=SC2086 # LH_SERVER_CMD is a command line on purpose
+  if [ -n "${LH_SERVER_CMD:-}" ]; then exec $LH_SERVER_CMD; fi
+  exec pnpm exec next start -p "$PORT"
 ) > "$LOG" 2>&1 &
 SERVER=$!
-trap 'kill "$SERVER" 2>/dev/null || true; wait "$SERVER" 2>/dev/null || true' EXIT
+echo "$SERVER" > "$LOG.pid"
+
+# `pnpm exec next start` is a tree (pnpm, next, the server): take the children first, then the
+# recorded PID, so nothing else on the machine is touched.
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child"; done
+  kill "$pid" 2>/dev/null || true
+}
+trap 'kill_tree "$(cat "$LOG.pid" 2>/dev/null || echo "$SERVER")"; wait "$SERVER" 2>/dev/null || true; rm -f "$LOG.pid"' EXIT
 
 for _ in $(seq 1 30); do
   curl -sf -o /dev/null "$LHCI_BASE_URL/about" && break
@@ -59,9 +72,13 @@ for _ in $(seq 1 30); do
 done
 curl -sf -o /dev/null "$LHCI_BASE_URL/about" || { echo "next start never answered:"; cat "$LOG"; exit 1; }
 
-rm -rf "$LH_DIR/.lighthouseci"
-pnpm --dir "$LH_DIR" install --frozen-lockfile --ignore-scripts
 rc=0
-pnpm --dir "$LH_DIR" exec lhci autorun --config="$ROOT/scripts/ci/lighthouserc.cjs" || rc=$?
-node "$LH_DIR/summary.mjs" "$LHCI_OUTPUT_DIR" || true
+if [ -n "${LH_RUN_CMD:-}" ]; then
+  bash -c "$LH_RUN_CMD" || rc=$?
+else
+  rm -rf "$LH_DIR/.lighthouseci"
+  pnpm --dir "$LH_DIR" install --frozen-lockfile --ignore-scripts
+  pnpm --dir "$LH_DIR" exec lhci autorun --config="$ROOT/scripts/ci/lighthouserc.cjs" || rc=$?
+  node "$LH_DIR/summary.mjs" "$LHCI_OUTPUT_DIR" || true
+fi
 exit "$rc"

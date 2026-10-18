@@ -615,6 +615,41 @@ expect "deny_probe context: a leaked deploy variable fails" "$rc:$(grep -c 'cont
 bash "$HERE/deny_probe.sh" bogus "$OUT.x" >/dev/null 2>&1
 expect "deny_probe: an unknown mode is a usage error (exit 2)" "$?" 2
 
+# =========================================================================================
+# lighthouse.sh must not leave its `next start` running. A fake server (a shell that starts a
+# python child, like pnpm -> next -> server) stands in for the app; LH_RUN_CMD stands in for lhci.
+# =========================================================================================
+cat > "$WORK/fakeapp.sh" <<'FAKE'
+#!/usr/bin/env bash
+# a process tree: this shell -> python server (answers 200 to everything)
+python3 "$(dirname "$0")/fakeapp.py" "$1" &
+wait
+FAKE
+cat > "$WORK/fakeapp.py" <<'PY'
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self): self.send_response(200); self.end_headers()
+HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+PY
+LHP=18099
+lh_run() { # <name> <runner command> ; leaves the exit code in $rc
+  LH_PORT=$LHP LH_CHROME_PATH=/bin/sh LHCI_OUTPUT_DIR="$WORK/lh-out.$1" \
+    LH_SERVER_CMD="bash $WORK/fakeapp.sh $LHP" LH_RUN_CMD="$2" \
+    bash "$HERE/lighthouse.sh" >"$WORK/lh.$1.log" 2>&1; rc=$?
+}
+gone() { # no process of the fake app is left, and its port is closed
+  local n; n="$(pgrep -f "$WORK/fakeapp" 2>/dev/null | wc -l | tr -d ' ')"
+  if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$LHP/"; then echo "port-open"; else echo "closed:$n"; fi
+}
+lh_run ok "curl -sf http://127.0.0.1:$LHP/about >/dev/null"
+expect "lighthouse: the runner saw the server while it ran, exit 0" "$rc" 0
+expect "lighthouse: no server process or listener is left after a normal exit" "$(gone)" "closed:0"
+lh_run fail "curl -sf http://127.0.0.1:$LHP/ >/dev/null; exit 3"
+expect "lighthouse: a failing runner's exit code is the script's exit code" "$rc" 3
+expect "lighthouse: no server process or listener is left after a failure" "$(gone)" "closed:0"
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
