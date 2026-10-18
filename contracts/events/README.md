@@ -29,6 +29,16 @@ integers (compare them as `BigInt` pairs, txid first). A patient message's `seq`
 - After every (re)connect do one refetch of the availability: the push service documents no
   signal for a failed resume on SSE.
 
+## What the service really does (observed against the live service in CI)
+
+- A JWT works as a raw `Authorization: Bearer <jwt>` value on the event-stream endpoint (no extra
+  base64, no `accessToken` in the URL).
+- A refused or expired token does **not** produce an HTTP error status. The stream opens with `200`
+  and its first frame is `event: error` with data such as
+  `{"message":"token expired","code":40142,"statusCode":401}`. A client must read error frames:
+  codes 40140 to 40149 mean "mint a new token"; 40160 means the token may not read this channel
+  (do not retry; poll); anything else is a service problem (back off and poll).
+
 ## Credentials
 
 `POST /realtime/token/patient` (body `{doctor_id, date}`, public, rate limited) and
