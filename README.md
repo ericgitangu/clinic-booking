@@ -2,7 +2,7 @@
 
 A clinic appointment API in which the database, not application code, is what makes double booking impossible, with a Next.js booking app and an admin dashboard on top.
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) Release tag `v1.0.0`, commit `<sha>`.
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking)
 
 ## Start here
 
@@ -10,9 +10,10 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Click.** <https://clinic.ericgitangu.com/book> for the patient flow (Google sign-in), <https://clinic.ericgitangu.com/docs> for Swagger UI against the real API (no sign-in, as the brief asks).
 - **Read first.** [3.4 The concurrency guarantee](#34-the-concurrency-guarantee) and the two ADRs behind it, [ADR-0003](docs/adr/0003-double-booking-partial-unique-index.md) and [ADR-0018](docs/adr/0018-testing-strategy.md). If that logic is wrong, nothing else matters.
 - **Run.** [Section 2](#2-verify-the-claims-in-10-minutes) is a copy-paste path against production: 20 simultaneous bookings of one slot, then cancelling twice.
-- **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and an [ADR](docs/adr/README.md) that names what it costs. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
+- **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and an [ADR](docs/adr/README.md) that names what it costs. [`docs/architecture/overview.md`](docs/architecture/overview.md) has the diagrams (context, containers, booking, push, release, data handling), [`docs/engineering/decisions.md`](docs/engineering/decisions.md) the long decisions index, and [`docs/engineering/verification.md`](docs/engineering/verification.md) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](docs/runbooks/admin-access.md)), so a reviewer cannot sign in. I can grant access if you want to see it.
-- **AI use** is described by me in [section 11](#11-ai-reflection).
+- **AI use** is described by me in [section 11](#11-ai-reflection). The records it draws on (what I decided, what agents did, the stop rules) are in [`docs/engineering/ai-usage-facts.md`](docs/engineering/ai-usage-facts.md).
+- **Live versus declared.** What runs in production and what is only designed is stated in [the architecture overview](docs/architecture/overview.md#what-is-running-and-what-is-declared) and in the status column of [`decisions.md`](docs/engineering/decisions.md#beyond-the-brief).
 
 ## 1. Live URLs
 
@@ -27,7 +28,7 @@ A clinic appointment API in which the database, not application code, is what ma
 | Admin app (allowlisted) | <https://clinic-admin.ericgitangu.com> |
 | Pipelines | <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
 
-The earlier address, <https://sil-clinic-booking.vercel.app>, still serves the same deployment. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
+The earlier address, <https://sil-clinic-booking.vercel.app>, answers with a 308 redirect to the host above. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
 ## 2. Verify the claims in 10 minutes
 
@@ -159,7 +160,7 @@ stateDiagram-v2
 
 ### 4.1 The headline decisions
 
-Each row is the decision, what it costs me, and the ADR that weighs the alternatives. The ADRs are where the depth is.
+Each row is the decision, what it costs me, and the ADR that weighs the alternatives. The ADRs are where the depth is; [`docs/engineering/decisions.md`](docs/engineering/decisions.md) adds the alternative I rejected on each row.
 
 | Decision | What it costs | ADR |
 |---|---|---|
@@ -168,8 +169,8 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 | FastAPI is the single system of record; Go is allowed only for an optional read-only gateway | Python cold starts are slower than Go's; I mitigate with `--cpu-boost` and have not measured it | [0002](docs/adr/0002-fastapi-single-system-of-record.md), [0021](docs/adr/0021-go-realtime-gateway.md) |
 | UTC `timestamptz`, the clinic zone as data, naive datetimes rejected, an injected clock | One extra join to read the zone; no DST zone is in the seed data | [0005](docs/adr/0005-time-and-timezone-model.md) |
 | REST with OpenAPI 3.1, RFC 9457 errors with a closed code catalogue, and a TypeScript client generated from the contract | Type safety comes from codegen and a CI drift gate instead of inference; the generator is 0.x and pinned; no `/v1` prefix | [0006](docs/adr/0006-problem-details-error-model.md), [0007](docs/adr/0007-api-style-rest-openapi.md), [0011](docs/adr/0011-openapi-codegen-contract.md) |
-| Reschedule is an in-place update under a row lock, with one deadlock retry and then `409 CONCURRENT_UPDATE` | A slot swap can end with both requests rejected and the original state kept | [0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md) |
-| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.28 a month on the shared billing account | [0014](docs/adr/0014-hosting-region-and-cost.md), [0023](docs/adr/0023-zero-cost-edge-front-door.md) |
+| Reschedule is an in-place update under a row lock with one deadlock retry; a booking retry replays through an idempotency key stored on the appointment | A slot swap can end with both requests rejected; a key is bound to one doctor and time | [0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md), [0013](docs/adr/0013-idempotency-keys.md) |
+| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.34 a month on the shared billing account | [0014](docs/adr/0014-hosting-region-and-cost.md), [0023](docs/adr/0023-zero-cost-edge-front-door.md) |
 | CircleCI, keyless OIDC to workload identity federation, promote by tag after a smoke test, roll back automatically | `VERCEL_TOKEN` is long-lived; a main pipeline takes about 10 to 12 minutes (an estimate) | [0016](docs/adr/0016-cicd-circleci-keyless-deploy.md) |
 | The public API stays unauthenticated as the brief says; patients and staff sign in with Google in the web apps, with one reCAPTCHA check per action and roles checked on every request | Anyone holding an appointment id can change it through the public API (an IDOR I disclose in section 10) | [0012](docs/adr/0012-identity-and-abuse-controls-deferred.md), [0024](docs/adr/0024-google-sign-in-with-better-auth.md), [0029](docs/adr/0029-booking-flow.md), [0030](docs/adr/0030-staff-roles-and-access.md) |
 | Real Postgres in every test, a race harness that fails if it stops being concurrent, and a control that proves the index is what holds | Slower suites and a compose database in CI; no mocks to hide behind | [0018](docs/adr/0018-testing-strategy.md) |
@@ -184,12 +185,13 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 - **Variable slot lengths, multiple timezones per request, `completed` and `no_show` states.** Fixed 30 minutes and two states match the brief.
 - **Early session revocation.** Sessions are stateless cookies, so a role is looked up in `staff_access` on every request instead of living in the cookie ([ADR-0030](docs/adr/0030-staff-roles-and-access.md)).
 - **Measured latency and load.** The latency and 10x figures above are estimates and are labelled as such.
-- **Not on `main` when I wrote this:** idempotency keys ([ADR-0013](docs/adr/0013-idempotency-keys.md)), booking emails ([ADR-0025](docs/adr/0025-email-with-resend.md)), the offline-capable PWA shell, and the Go realtime gateway ([ADR-0021](docs/adr/0021-go-realtime-gateway.md)). The ADRs stay as the design record.
+- **A live admin feed.** I descoped it. The Go gateway I designed for it ([ADR-0021](docs/adr/0021-go-realtime-gateway.md)) billed about 900 vCPU-seconds per connected hour against roughly 21,619 vCPU-seconds of shared free-tier headroom and held 2 concurrent streams, so I closed that pull request (PR 37) and chose Ably's free package, which needs no payment method (evidence: `docs/evidence/ably-no-payment-method-2026-10-18.md`). The relay can publish admin events; no admin screen consumes them. The dashboard refreshes on request.
 - **The admin app cannot be tried without an invitation**, for the reason in the Start here list.
 
 ### 4.3 Beyond the brief
 
 - **Race-proof tests with a naive control** that must fail without the index: `make test-race`, `make test-control` ([ADR-0018](docs/adr/0018-testing-strategy.md)).
+- **Idempotency keys** on booking: a retry after a lost response returns the original booking instead of telling the real booker they lost the slot ([ADR-0013](docs/adr/0013-idempotency-keys.md)).
 - **Immutable releases with automatic rollback.** Every release is a tagged Cloud Run revision smoke-tested before it gets traffic, and a failed public check moves traffic back ([ADR-0016](docs/adr/0016-cicd-circleci-keyless-deploy.md), [rollback runbook](docs/runbooks/rollback.md)).
 - **Keyless deploy.** No long-lived GCP credential exists; CircleCI exchanges its OIDC token for a short-lived one, and only for `main` ([ADR-0016](docs/adr/0016-cicd-circleci-keyless-deploy.md)).
 - **Security gates in CI.** gitleaks, semgrep, pip-audit, a trivy image and config scan and a ZAP API scan, each wired as a CI job that fails on findings (ZAP fails on exit codes 1 and 3; warnings only pass) ([ADR-0017](docs/adr/0017-security-testing.md)).
@@ -198,6 +200,13 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 - **Google sign-in and a reCAPTCHA check per action** on the patient screens ([ADR-0024](docs/adr/0024-google-sign-in-with-better-auth.md), [ADR-0029](docs/adr/0029-booking-flow.md)).
 - **A generated, validated client.** Types, zod schemas and the SDK come from the OpenAPI contract, and CI fails on drift ([ADR-0011](docs/adr/0011-openapi-codegen-contract.md)).
 - **Request-id logging** with no PII in logs ([ADR-0019](docs/adr/0019-observability.md)), and branding, a web manifest and a sitemap ([ADR-0026](docs/adr/0026-branding-and-seo.md)).
+- **A shell-only PWA and slot lists that refresh** every 15 seconds while the tab is visible, with an idle stop ([ADR-0009](docs/adr/0009-realtime-polling-now-sse-later.md), [ADR-0010](docs/adr/0010-thin-nextjs-booking-ui.md)).
+- **Live slot events** through an outbox relay and Ably, with a hard monthly publish budget and polling as the fallback ([diagram](docs/architecture/overview.md#4-a-booked-slot-reaching-other-open-pages)).
+- **Booking emails and a daily reminder** through Resend, sent only to verified, linked accounts ([ADR-0025](docs/adr/0025-email-with-resend.md)).
+- **Swagger UI, ReDoc and fonts served from the repo**, so the first click does not depend on a CDN.
+- **A production ZAP baseline, Lighthouse budgets and a kill switch** for the deployed services ([ADR-0017](docs/adr/0017-security-testing.md)).
+
+The status of each item (shipped, declared, descoped) and what it costs is in [`docs/engineering/decisions.md`](docs/engineering/decisions.md#beyond-the-brief).
 
 ## 5. API reference & error catalogue
 
@@ -231,9 +240,9 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 
 ## 7. Testing
 
-**Everything runs against the real thing.** Backend tests use real Postgres 17 with no mocked repositories. The web gate is the `e2e-real` CI job: it brings up the real API and Postgres with docker compose (migrations and seed included) and runs the browser scenarios (`apps/booking/e2e`) and the generated client's tests (`packages/api/tests/real-api.test.ts`) against them: booking, a double booking, cancelling, cancelling twice, rescheduling, a past time, a time under an hour away, and the typed error for each. Stand-ins exist only where a real response cannot be produced: `packages/api/tests/call.test.ts` feeds the client answers a correct server never sends, to prove contract drift is caught. The reCAPTCHA check is switched off for test runs only (`apps/booking/src/lib/human-check.ts`), and its verifier is unit-tested on every reject path.
+**Everything runs against the real thing.** Backend tests use real Postgres 17 with no mocked repositories. The web gate is the `e2e-real` CI job: it brings up the real API and Postgres with docker compose (migrations and seed included) and runs the browser scenarios (`apps/booking/e2e`) and the generated client's tests (`packages/api/tests/real-api.test.ts`) against them: booking, a double booking, cancelling, cancelling twice, rescheduling, a past time, a time under an hour away, and the typed error for each. Stand-ins exist only where a real response cannot be produced or the service is a third party: Google's token endpoint in the sign-in tests, and a damaged real response in the generated client's drift test, each labelled in the test. The reCAPTCHA check is switched off for test runs only (`apps/booking/src/lib/human-check.ts`), and its verifier is unit-tested on every reject path.
 
-By a count of test functions (`rg`, so parametrized cases are counted once): 181 in `backend/tests` and 179 cases across the web apps and packages. The backend job fails under 85% coverage. The race harness is described in [3.4](#34-the-concurrency-guarantee).
+Test counts, coverage and the mutation checks that proved the tests can fail are quoted from each pull request's review in [`docs/engineering/verification.md`](docs/engineering/verification.md). The backend job fails under 85% coverage and a separate unit-only gate holds the pure domain code at 95%. The race harness is described in [3.4](#34-the-concurrency-guarantee).
 
 **Generated client.** The types, zod schemas and SDK in `packages/api/src/generated` come from `contracts/openapi.json` (`make gen-client`, `@hey-api/openapi-ts`), and the lint job fails if they differ from a fresh run ([ADR-0011](docs/adr/0011-openapi-codegen-contract.md), [ADR-0029](docs/adr/0029-booking-flow.md)).
 
@@ -263,7 +272,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Security note.** Signing in with Google and the reCAPTCHA check protect the web screens and the web app's own `/internal` routes: a patient reaches only their own appointments (the API answers 404 for anyone else's), and the patient is always derived from the account, never from the browser. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP at the proxy, and patient-scoped reads there rely on unguessable UUIDs, so anyone who has an appointment or patient id can read or change it there. That is accepted debt, and it also means the phone-number check on patient creation (a duplicate phone returns `PATIENT_PHONE_EXISTS`) tells an API caller whether a number is registered. Review trigger: any real patient data, or a need to authenticate the public API (ADR-0012, ADR-0022, ADR-0024, ADR-0029).
 
-**Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.28 a month there (accepted); Cloud Run compute and egress stay within the free tier. The $0 rule was my own constraint, not the brief's. The reasoning, the region audit and the recount are in [ADR-0014](docs/adr/0014-hosting-region-and-cost.md) and [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md); `cost_check.sh` is the guard.
+**Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.34 a month there (accepted); Cloud Run compute and egress stay within the free tier. I approved a ceiling of about $0.34 a month. A $3 Cloud Run spend cap is set in the cloud console, so it is not in the repository, and `cost_check.sh --live` checks that the two budgets exist (it needs a billing login, so it runs locally); that the cap action is on can only be confirmed in the console. Ably's free package needs no payment method (evidence: `docs/evidence/ably-no-payment-method-2026-10-18.md`). The $0 rule was my own constraint, not the brief's. The reasoning, the region audit and the recount are in [ADR-0014](docs/adr/0014-hosting-region-and-cost.md) and [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md); `cost_check.sh` is the guard.
 
 ## 11. AI reflection
 
