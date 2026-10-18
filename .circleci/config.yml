@@ -930,7 +930,8 @@ workflows:
       - build-scan
       - dast
       - web-quality
-      - e2e-real
+      - e2e-real:
+          context: ably-ci
       - admin-e2e
       - cost-static
 
@@ -958,7 +959,8 @@ workflows:
       - sca
       - build-scan
       - web-quality
-      - e2e-real
+      - e2e-real:
+          context: ably-ci
       - admin-e2e
       - cost-static
       - build-scan-push:
