@@ -597,6 +597,16 @@ jobs:
           name: Enforce the Lighthouse budgets
           command: test "$(cat /tmp/lighthouse-exit)" = 0
       - run:
+          name: Rebuild the booking app the way the release does and check it loads reCAPTCHA (public build env)
+          command: |
+            # The release builds with no Vercel environment, so NEXT_PUBLIC_* come from
+            # scripts/ci/public-build.env. This builds with exactly those values and checks the details
+            # page loads reCAPTCHA Enterprise with the key (regression test for the missing-token outage).
+            export $(awk '$1 == "booking" { sub(/^[^ ]+ /, ""); print }' scripts/ci/public-build.env)
+            pnpm -C apps/booking build
+            E2E_PUBLIC_BUILD=1 E2E_EXPECT_SITE_KEY="$NEXT_PUBLIC_RECAPTCHA_SITE_KEY" E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 \
+              pnpm -C apps/booking exec playwright test e2e/recaptcha-script.spec.ts
+      - run:
           name: API logs
           command: docker compose logs api | tail -80
           when: on_fail

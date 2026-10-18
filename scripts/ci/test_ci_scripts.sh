@@ -900,6 +900,47 @@ PATH="$WORK/fakegit:$PATH" CIRCLE_BRANCH=feature LH_WATCH=no/such/path LH_PORT=$
 expect "lighthouse: fetches main with an explicit refspec (works in a shallow clone)" \
   "$(grep -c 'fetch origin main:refs/remotes/origin/main' "$WORK/fakegit/fetch.log")" 1
 
+# =========================================================================================
+# vercel_offline_build.sh: NEXT_PUBLIC_* values come from public-build.env, fail closed before the
+# build (a referenced name without a value) and after it (a value missing from the static output).
+# A fake build command stands in for `vercel build`; no network, no ports.
+# =========================================================================================
+pb_setup() { # <name>: a tiny repo whose booking source references NEXT_PUBLIC_FOO
+  PB="$WORK/pb.$1"; rm -rf "$PB"; mkdir -p "$PB/apps/booking/src" "$PB/apps/admin/src" "$PB/packages/ui/src"
+  echo 'export const k = process.env.NEXT_PUBLIC_FOO ?? "";' > "$PB/apps/booking/src/a.ts"
+  echo 'export const b = 1;' > "$PB/apps/admin/src/b.ts"; echo 'export const c = 1;' > "$PB/packages/ui/src/c.ts"
+  printf '# test\nbooking NEXT_PUBLIC_FOO=pub-value-123\n' > "$PB/public.env"
+  printf '#!/bin/sh\ntouch "%s/build-ran"\nmkdir -p .vercel/output/static/_next\nprintf %%s "$NEXT_PUBLIC_FOO" > .vercel/output/static/_next/chunk.js\n' "$PB" > "$PB/build-ok.sh"
+  printf '#!/bin/sh\ntouch "%s/build-ran"\nmkdir -p .vercel/output/static/_next\nprintf %%s "no public value here" > .vercel/output/static/_next/chunk.js\n' "$PB" > "$PB/build-lossy.sh"
+}
+pb_run() { # <name> <app dir> <build script> ; leaves rc, output in $PB/out
+  ( cd "$WORK" && env -u VERCEL_TOKEN REPO_ROOT="$PB" PUBLIC_ENV_FILE="$PB/public.env" VERCEL_APP_DIR="$2" VERCEL_BUILD_CMD="sh $PB/$3" \
+      bash "$HERE/vercel_offline_build.sh" ) >"$PB/out" 2>&1; rc=$?
+}
+pb_setup ok; pb_run ok apps/booking build-ok.sh
+expect "public build env: a referenced NEXT_PUBLIC_* with a value builds, and the value reaches the output" "$rc:$([ -e "$PB/build-ran" ] && echo built)" "0:built"
+pb_setup missing; echo '# nothing' > "$PB/public.env"; pb_run missing apps/booking build-ok.sh
+expect "public build env: a referenced name with no value refuses BEFORE the build" "$rc:$([ -e "$PB/build-ran" ] && echo built || echo not-built):$(grep -c 'NEXT_PUBLIC_FOO' "$PB/out")" "1:not-built:1"
+pb_setup empty; printf 'booking NEXT_PUBLIC_FOO=\n' > "$PB/public.env"; pb_run empty apps/booking build-ok.sh
+expect "public build env: an empty value refuses before the build" "$rc:$([ -e "$PB/build-ran" ] && echo built || echo not-built)" "1:not-built"
+pb_setup otherapp; printf 'admin NEXT_PUBLIC_FOO=pub-value-123\n' > "$PB/public.env"; pb_run otherapp apps/booking build-ok.sh
+expect "public build env: a value listed for another app does not count" "$rc:$([ -e "$PB/build-ran" ] && echo built || echo not-built)" "1:not-built"
+pb_setup lossy; pb_run lossy apps/booking build-lossy.sh
+expect "public build env: a build whose output lacks the value refuses to ship" "$rc:$(grep -c 'is not in the built static output' "$PB/out")" "1:1"
+pb_setup admin; pb_run admin apps/admin build-ok.sh
+expect "public build env: an app that references no NEXT_PUBLIC_* needs no entry" "$rc" 0
+pb_setup token; ( cd "$WORK" && VERCEL_TOKEN=x REPO_ROOT="$PB" PUBLIC_ENV_FILE="$PB/public.env" VERCEL_APP_DIR=apps/booking VERCEL_BUILD_CMD="sh $PB/build-ok.sh" bash "$HERE/vercel_offline_build.sh" ) >"$PB/out" 2>&1; rc=$?
+expect "public build env: a Vercel token in the environment still refuses the build" "$rc" 1
+# the real repo: every NEXT_PUBLIC_* its sources reference has a value for that app in the committed file
+real_ok=0
+for app in booking admin; do
+  for name in $( { grep -rhoE 'NEXT_PUBLIC_[A-Z0-9_]+' "$HERE/../../apps/$app/src" "$HERE"/../../packages/*/src 2>/dev/null || true; } | sort -u); do
+    grep -qE "^$app $name=.+" "$HERE/public-build.env" || { echo "no value for $app $name"; real_ok=1; }
+  done
+done
+expect "public build env: the committed file covers every NEXT_PUBLIC_* the real sources reference" "$real_ok" 0
+expect "public build env: the committed file holds only NEXT_PUBLIC_* names" "$(grep -vE '^(#|$)' "$HERE/public-build.env" | grep -vcE '^[a-z]+ NEXT_PUBLIC_[A-Z0-9_]+=')" 0
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
