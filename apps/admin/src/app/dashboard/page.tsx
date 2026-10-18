@@ -4,6 +4,7 @@ import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
 import { KpiStrip } from "@/components/kpi-strip";
 import { RangeNav } from "@/components/range-nav";
+import { RefreshButton } from "@/components/refresh-button";
 import { StaffBar } from "@/components/staff-bar";
 import { StatusFilter } from "@/components/status-filter";
 import { eachDay, formatBucket, lastDays } from "@/lib/clinic-time";
@@ -75,7 +76,10 @@ export default async function Dashboard({
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
             Dashboard
           </h1>
-          <RangeNav days={days} />
+          <div className="flex flex-wrap items-center gap-2">
+            <RangeNav days={days} />
+            <RefreshButton />
+          </div>
         </div>
 
         <KpiStrip
