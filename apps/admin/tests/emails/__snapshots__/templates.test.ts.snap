@@ -1,0 +1,296 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`staff email templates > staffBooked: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You have been booked</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">You have been booked</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has booked a visit for you.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Reason from the clinic: The doctor is on call that morning, so we moved you.</p>
+
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">See my appointments</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffBooked: subject, html and text > subject 1`] = `"Your appointment has been booked: Tuesday 20 October, 09:00"`;
+
+exports[`staff email templates > staffBooked: subject, html and text > text 1`] = `
+"YOU HAVE BEEN BOOKED
+
+Hello Amina Wanjiku, the clinic has booked a visit for you.
+
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Reason from the clinic: The doctor is on call that morning, so we moved you.
+
+See my appointments: https://clinic.ericgitangu.com/appointments
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffCancelled: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your appointment was cancelled</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Cancelled: Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your appointment was cancelled</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has cancelled this visit.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Reason from the clinic: The doctor is on call that morning, so we moved you.</p>
+
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/book" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">Book another visit</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffCancelled: subject, html and text > subject 1`] = `"Your appointment on Tuesday 20 October, 09:00 has been cancelled"`;
+
+exports[`staff email templates > staffCancelled: subject, html and text > text 1`] = `
+"YOUR APPOINTMENT WAS CANCELLED
+
+Hello Amina Wanjiku, the clinic has cancelled this visit.
+
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Reason from the clinic: The doctor is on call that morning, so we moved you.
+
+Book another visit: https://clinic.ericgitangu.com/book
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffInvite: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You are invited</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Accept your invitation before Wednesday 21 October, 18:00, East Africa Time (GMT+03:00)</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">You are invited</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">You have been invited to the Idyllic Clinic admin as a viewer, who can see the dashboard with patient details hidden.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Role: viewer</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">Open until Wednesday 21 October, 18:00, East Africa Time (GMT+03:00)</p></div>
+
+<p style="margin:14px 0 0;font-size:15px;line-height:22px;">Sign in with Google using the email address this message came to. The link works once and only for that address.</p>
+<div style="padding:24px 0 4px;"><a href="https://clinic-admin.ericgitangu.com/invite/Zq3_tOkEn-abcDEF0123456789abcdefghijklmnopqr" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">Accept the invitation</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because a member of staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, invited you. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffInvite: subject, html and text > subject 1`] = `"You are invited to the Idyllic Clinic admin"`;
+
+exports[`staff email templates > staffInvite: subject, html and text > text 1`] = `
+"YOU ARE INVITED
+
+You have been invited to the Idyllic Clinic admin as a viewer, who can see the dashboard with patient details hidden.
+
+Role: viewer
+Open until Wednesday 21 October, 18:00, East Africa Time (GMT+03:00)
+
+Sign in with Google using the email address this message came to. The link works once and only for that address.
+
+Accept the invitation: https://clinic-admin.ericgitangu.com/invite/Zq3_tOkEn-abcDEF0123456789abcdefghijklmnopqr
+
+--
+You are getting this because a member of staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, invited you. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffRemind: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A reminder of your appointment</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Coming up: Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">A reminder of your appointment</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic is reminding you of your visit.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+
+
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">Move or cancel it</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, sent you a reminder. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffRemind: subject, html and text > subject 1`] = `"Reminder: your appointment on Tuesday 20 October, 09:00"`;
+
+exports[`staff email templates > staffRemind: subject, html and text > text 1`] = `
+"A REMINDER OF YOUR APPOINTMENT
+
+Hello Amina Wanjiku, the clinic is reminding you of your visit.
+
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Move or cancel it: https://clinic.ericgitangu.com/appointments
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, sent you a reminder. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffRescheduled: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your appointment was moved</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Now Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your appointment was moved</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has given your visit a new time.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:15px;color:#4a5878;text-decoration:line-through;">Was: Monday 19 October, 14:30</p><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Reason from the clinic: The doctor is on call that morning, so we moved you.</p>
+
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">See my appointments</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffRescheduled: subject, html and text > subject 1`] = `"Your appointment has been moved to Tuesday 20 October, 09:00"`;
+
+exports[`staff email templates > staffRescheduled: subject, html and text > text 1`] = `
+"YOUR APPOINTMENT WAS MOVED
+
+Hello Amina Wanjiku, the clinic has given your visit a new time.
+
+Was: Monday 19 October, 14:30
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Reason from the clinic: The doctor is on call that morning, so we moved you.
+
+See my appointments: https://clinic.ericgitangu.com/appointments
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffRunningLate: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your doctor is running late</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Your Tuesday 20 October, 09:00 visit may start about 25 minutes later</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your doctor is running late</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, Dr. Achieng Otieno is running about 25 minutes behind today. Your visit may start a little later than planned. We are sorry for the wait.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Note from the clinic: A late emergency.</p>
+
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">See my appointments</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, told today&#39;s patients of your doctor about the delay. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffRunningLate: subject, html and text > subject 1`] = `"Dr. Achieng Otieno is running about 25 minutes late today"`;
+
+exports[`staff email templates > staffRunningLate: subject, html and text > text 1`] = `
+"YOUR DOCTOR IS RUNNING LATE
+
+Hello Amina Wanjiku, Dr. Achieng Otieno is running about 25 minutes behind today. Your visit may start a little later than planned. We are sorry for the wait.
+
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Note from the clinic: A late emergency.
+
+See my appointments: https://clinic.ericgitangu.com/appointments
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, told today's patients of your doctor about the delay. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
+exports[`staff email templates > staffVetoed: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your change was reversed</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Back on Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your change was reversed</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has reversed the change you made, so your visit is back on.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:15px;color:#4a5878;text-decoration:line-through;">You had moved it to: Wednesday 21 October, 11:00</p><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Reason from the clinic: The doctor is on call that morning, so we moved you.</p>
+<p style="margin:14px 0 0;font-size:15px;line-height:22px;">This visit is now locked, so it cannot be changed online. If you need to change it, reply to this email.</p>
+<div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">See my appointments</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > staffVetoed: subject, html and text > subject 1`] = `"Your appointment on Tuesday 20 October, 09:00 still stands"`;
+
+exports[`staff email templates > staffVetoed: subject, html and text > text 1`] = `
+"YOUR CHANGE WAS REVERSED
+
+Hello Amina Wanjiku, the clinic has reversed the change you made, so your visit is back on.
+
+You had moved it to: Wednesday 21 October, 11:00
+Tuesday 20 October, 09:00
+Dr. Achieng Otieno
+East Africa Time (GMT+03:00), 30 minutes.
+
+Reason from the clinic: The doctor is on call that morning, so we moved you.
+
+This visit is now locked, so it cannot be changed online. If you need to change it, reply to this email.
+
+See my appointments: https://clinic.ericgitangu.com/appointments
+
+--
+You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, changed an appointment of yours. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
