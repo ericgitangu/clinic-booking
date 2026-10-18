@@ -23,10 +23,13 @@ const WANTED = [
   "better-auth.account_data",
 ];
 
-export async function sessionCookies(email: string): Promise<Cookie[]> {
+export async function sessionCookies(
+  email: string,
+  image?: string,
+): Promise<Cookie[]> {
   const jar = await signInAs(
     auth,
-    newPerson({ email, name: email.split("@")[0] }),
+    newPerson({ email, name: email.split("@")[0], image }),
   );
   const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 24;
   const cookies = jar

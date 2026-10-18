@@ -70,7 +70,12 @@ export default async function Dashboard({
 
   return (
     <>
-      <StaffBar email={staff.email} role={staff.role} />
+      <StaffBar
+        name={staff.name}
+        email={staff.email}
+        image={staff.image}
+        role={staff.role}
+      />
       <div className="space-y-6 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
