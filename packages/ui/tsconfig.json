@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "ES2022"
-    ],
+    "lib": ["dom", "dom.iterable", "ES2022"],
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -17,13 +13,8 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@clinic/ui/*": [
-        "./src/*"
-      ]
+      "@clinic/ui/*": ["./src/*"]
     }
   },
-  "include": [
-    "src",
-    "tests"
-  ]
+  "include": ["src", "tests"]
 }

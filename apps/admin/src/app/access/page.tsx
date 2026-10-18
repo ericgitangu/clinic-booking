@@ -15,7 +15,12 @@ export default async function AccessPage() {
     throw new Error(`access list failed (${res.status} ${res.code})`);
   return (
     <>
-      <StaffBar email={staff.email} role={staff.role} />
+      <StaffBar
+        name={staff.name}
+        email={staff.email}
+        image={staff.image}
+        role={staff.role}
+      />
       <div className="py-6">
         <AccessManager entries={res.data.items} />
       </div>
