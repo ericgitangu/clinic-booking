@@ -17,7 +17,12 @@ export default async function Forbidden() {
       </p>
       {staff && (
         <div className="mt-6">
-          <StaffBar email={staff.email} role={staff.role} />
+          <StaffBar
+            name={staff.name}
+            email={staff.email}
+            image={staff.image}
+            role={staff.role}
+          />
         </div>
       )}
     </section>

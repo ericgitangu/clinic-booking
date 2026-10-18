@@ -37,6 +37,8 @@ export interface Person {
   /** Google's subject: a long number, the same for a person whichever device or instance. */
   googleSub: string;
   emailVerified: boolean;
+  /** Google profile picture address (the `picture` claim); absent for an account without one. */
+  image?: string;
 }
 
 // A person nobody has used before: a fresh address and a fresh Google subject, so every scenario
@@ -64,6 +66,7 @@ function idToken(p: Person): string {
     email: p.email,
     email_verified: p.emailVerified,
     name: p.name,
+    ...(p.image ? { picture: p.image } : {}),
     iat: now,
     exp: now + 3600,
   })}.stubbed-signature`;

@@ -38,7 +38,12 @@ export default async function AppointmentPage({
 
   return (
     <>
-      <StaffBar email={staff.email} role={staff.role} />
+      <StaffBar
+        name={staff.name}
+        email={staff.email}
+        image={staff.image}
+        role={staff.role}
+      />
       <div className="space-y-6 py-6">
         <Link
           href="/dashboard"
