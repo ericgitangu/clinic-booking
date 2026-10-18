@@ -261,6 +261,17 @@ static_checks() {
 # ------------------------------------------------------------------------------------------
 REGION=us-east4
 
+# C5: the Artifact Registry repository must stay under this many bytes (the free tier is 0.5 GiB,
+# 536,870,912 bytes). Raised from 400 MB to 450 MB on 2026-10-18: the repository reports 417.198 MB
+# for two images of about 64 MB; the reasoning and the review trigger are in docs/adr/0014.
+AR_SIZE_BOUND_BYTES=450000000
+
+# ar_size_within_bound <bytes>: success only for a whole number strictly under the bound.
+ar_size_within_bound() {
+  case "$1" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$1" -lt "$AR_SIZE_BOUND_BYTES" ]
+}
+
 gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
   if [ -n "${GCLOUD_ACCOUNT:-}" ]; then gcloud --account "$GCLOUD_ACCOUNT" "$@"; else gcloud "$@"; fi
 }
@@ -450,7 +461,9 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
 case "$MODE" in
   --static) static_checks ;;
   --live) live_checks ;;
-  *) echo "usage: $0 [--static|--live]"; exit 2 ;;
+  # the size judgement on its own, so the selftest can prove the bound without a registry
+  --ar-size) if ar_size_within_bound "${2:-}"; then pass "C5 size ${2:-} < $AR_SIZE_BOUND_BYTES"; else fail "C5 size '${2:-}' is not under $AR_SIZE_BOUND_BYTES"; fi ;;
+  *) echo "usage: $0 [--static|--live|--ar-size BYTES]"; exit 2 ;;
 esac
 
 echo
