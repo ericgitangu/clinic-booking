@@ -191,6 +191,18 @@ expect_fail "a different budget id"          "does not name budget id" mutate_su
 fresh; out="$(cd "$DIR" && bash scripts/cost_check.sh --static 2>&1)"
 if grep -F "C11" <<<"$out" | grep -qF "cap status not readable via API; see docs/evidence/spend-cap-2026-10-18.md"; then ok "the pass line says the status is not readable via API and points at the evidence"; else bad "C11 pass wording"; fi
 
+echo "== Artifact Registry size bound (C5: parsing and threshold only, no registry involved) =="
+ar_size() { ( cd "$PRISTINE" && bash scripts/cost_check.sh --ar-size "$1" 2>&1 ) || true; }  # exits 1 on a FAIL; the text is what is judged
+for n in 0 417198000 449999999; do
+  if ar_size "$n" | grep -q "^PASS  C5 size $n < 450000000"; then ok "C5: $n bytes is under the 450 MB bound"; else bad "C5: $n bytes should pass"; fi
+done
+for n in 450000000 450000001 536870912; do
+  if ar_size "$n" | grep -q "^FAIL  C5 size '$n' is not under 450000000"; then ok "C5: $n bytes is not under the bound"; else bad "C5: $n bytes should fail"; fi
+done
+for n in "" "abc" "-5" "4.5e8"; do
+  if ar_size "$n" | grep -q "^FAIL  C5 size"; then ok "C5: unreadable size '$n' fails, never passes"; else bad "C5: unreadable size '$n' should fail"; fi
+done
+
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }
 expect_fail "no deploy commands visible" "scanner is blind" blind
