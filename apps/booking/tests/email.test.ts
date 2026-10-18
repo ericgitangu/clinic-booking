@@ -229,6 +229,56 @@ describe("sending", () => {
     expect(took).toBeGreaterThanOrEqual(250);
     expect(took).toBeLessThan(1500);
   });
+  it("logs why Resend refused: status, name and the message with addresses redacted and cut at 200", async () => {
+    // A real local HTTP server (any free port) that answers like Resend does for a bad request.
+    const { createServer } = await import("node:http");
+    const long = "x".repeat(300);
+    const hit = createServer((_req, res) => {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          statusCode: 400,
+          name: "validation_error",
+          message: `Invalid \`to\` field: pat.person@example.test is not allowed, cc bob+tag@mail.example.test. ${long}`,
+        }),
+      );
+    });
+    await new Promise<void>((ok) => hit.listen(0, "127.0.0.1", ok));
+    const port = (hit.address() as { port: number }).port;
+    const apiKey = ["re", "unit", "test", "key", "0123456789"].join("_"); // ggignore
+    vi.stubEnv("RESEND_API_KEY", apiKey);
+    vi.stubEnv("RESEND_BASE_URL", `http://127.0.0.1:${port}`);
+    const errors = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const r = await sendEmail(
+      "pat.person@example.test",
+      {
+        subject: "Secret subject",
+        html: "<p>Secret body</p>",
+        text: "Secret body",
+      },
+      "ack/1",
+    );
+    await new Promise((ok) => hit.close(ok));
+    expect(r).toEqual({ ok: false, reason: "rejected", status: 400 });
+    const line = String(errors.mock.calls[0][0]);
+    const logged = JSON.parse(line) as Record<string, unknown>;
+    expect(logged).toMatchObject({
+      message: "email rejected",
+      status: 400,
+      name: "validation_error",
+      key: "ack",
+    });
+    const why = String(logged.detail ?? "");
+    expect(why).toContain(
+      "Invalid `to` field: <redacted> is not allowed, cc <redacted>.",
+    );
+    expect(why.length).toBeLessThanOrEqual(200);
+    expect(line).not.toContain("example.test");
+    expect(line).not.toContain(apiKey);
+    expect(line).not.toContain("Secret");
+  });
   it("without a key it reports not configured and makes no request", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     const spy = vi.spyOn(globalThis, "fetch");

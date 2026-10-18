@@ -20,6 +20,21 @@ export type SendResult =
       status?: number;
     };
 
+// Resend's own words for why it refused, for the log: any email address in them is replaced, the API
+// key is never shown even if it were echoed back, and the line is cut at 200 characters. The request
+// (addresses, subject, body) and the key are never logged.
+export function describeRefusal(
+  message: unknown,
+  key: string,
+): string | undefined {
+  if (typeof message !== "string" || message === "") return undefined;
+  return message
+    .split(key)
+    .join("<redacted>")
+    .replace(/[^\s<>"'`,;()]+@[^\s<>"'`,;()]*[^\s<>"'`,;().]/g, "<redacted>")
+    .slice(0, 200);
+}
+
 let warned = false;
 
 // Whether email is set up at all. When it is not (RESEND_API_KEY missing), nothing is sent and
@@ -73,11 +88,13 @@ export async function sendEmail(
     const body = (await res.json().catch(() => null)) as {
       id?: string;
       name?: string;
+      message?: string;
     } | null;
     if (!res.ok || !body?.id) {
       logError("email rejected", {
         status: res.status,
         name: body?.name,
+        detail: describeRefusal(body?.message, key),
         key: tag,
       });
       return { ok: false, reason: "rejected", status: res.status };
