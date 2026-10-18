@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import {
   checkRequest,
   type ApiFailure,
@@ -15,6 +16,7 @@ import {
 import type { ActionState, NextSlot } from "@/lib/action-state";
 import * as api from "@/lib/api";
 import { addDays, clinicDay, formatWhen } from "@/lib/clinic-time";
+import { acknowledge } from "@/lib/email/acknowledge";
 import { heldMessage } from "@/lib/held";
 import { checkHuman, type Action } from "@/lib/human-check";
 import { describeProblem, fieldMessages } from "@/lib/problems";
@@ -93,6 +95,14 @@ function keyFor(sent: string | undefined): string {
     : crypto.randomUUID();
 }
 
+// The doctor's name and specialty for an email (a lookup that fails just leaves them out).
+async function doctorFacts(doctorId: string) {
+  const d = await api.getDoctor(doctorId);
+  return d.ok
+    ? { full_name: d.data.full_name, specialty: d.data.specialty }
+    : null;
+}
+
 async function signedIn(): Promise<Identity | null> {
   return getIdentity();
 }
@@ -158,6 +168,15 @@ export async function bookAppointment(
       doctorId: doctor,
     });
   }
+  // After the response has gone, so the email can never hold up the confirmation page.
+  const made = booked.data;
+  after(async () =>
+    acknowledge("booked", made, {
+      caller,
+      who,
+      doctor: await doctorFacts(made.doctor_id),
+    }),
+  );
   redirect(`/book/confirmed/${booked.data.id}`);
 }
 
@@ -181,6 +200,15 @@ export async function cancelAppointment(
     if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
     return failed(done);
   }
+  const cancelled = done.data;
+  const asCaller = callerFor(who);
+  after(async () =>
+    acknowledge("cancelled", cancelled, {
+      caller: asCaller,
+      who,
+      doctor: await doctorFacts(cancelled.doctor_id),
+    }),
+  );
   revalidatePath("/appointments");
   return { status: "done", message: "Appointment cancelled." };
 }
@@ -200,6 +228,8 @@ export async function rescheduleAppointment(
   if (blocked) return blocked;
 
   const caller = callerFor(who);
+  // The time it is moving from, for the email (a lookup that fails just leaves it out).
+  const before = await api.myAppointment(caller, id);
   const done = await api.rescheduleMine(caller, id, startsAt as string);
   if (!done.ok) {
     if (done.kind === "invalid_request") return error("APPOINTMENT_NOT_FOUND");
@@ -217,6 +247,16 @@ export async function rescheduleAppointment(
       doctorId,
     });
   }
+  const moved = done.data;
+  const previousStartsAt = before.ok ? before.data.starts_at : undefined;
+  after(async () =>
+    acknowledge("rescheduled", moved, {
+      caller,
+      who,
+      doctor: await doctorFacts(moved.doctor_id),
+      previousStartsAt,
+    }),
+  );
   revalidatePath("/appointments");
   redirect("/appointments?rescheduled=1");
 }

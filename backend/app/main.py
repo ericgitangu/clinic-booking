@@ -11,7 +11,17 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from app.api.routers import admin, appointments, doctors, health, me, patients, problems, realtime
+from app.api.routers import (
+    admin,
+    appointments,
+    doctors,
+    health,
+    me,
+    patients,
+    problems,
+    realtime,
+    reminders,
+)
 from app.core.clinic_zone import set_default_zone
 from app.core.config import Settings
 from app.core.cors import add_cors
@@ -64,6 +74,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(me.router)
     app.include_router(realtime.router)
     app.include_router(realtime.admin_router)
+    app.include_router(reminders.router)
 
     # Error responses carry only application/problem+json in the served spec, too.
     _default_openapi = app.openapi

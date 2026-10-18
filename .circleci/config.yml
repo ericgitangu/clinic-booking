@@ -556,6 +556,9 @@ jobs:
           command: |
             echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
             echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            echo "export CRON_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
+            # Every booking sends an email: keep the day's counter from limiting the run (the cap has its own scenario)
+            echo "export EMAIL_DAILY_LIMIT=100000 EMAIL_MONTHLY_LIMIT=1000000 EMAIL_ACK_RESERVE=0" >> "$BASH_ENV"
       - run:
           name: API and database (compose runs the migrations and the seed)
           command: WEB_ORIGIN=http://localhost:3100 docker compose up -d --build --wait
@@ -573,7 +576,7 @@ jobs:
             # the generated client against the real API (reads, real problems, the whole booking path)
             REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts
             # the same Google person on two app instances gets the same patient (real OAuth callback, real API)
-            REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts
+            REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts
             pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e
