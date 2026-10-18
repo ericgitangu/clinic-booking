@@ -73,6 +73,7 @@ async def _remove_test_rows() -> None:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
         await conn.execute("TRUNCATE staff_access, staff_access_audit RESTART IDENTITY")
         await conn.execute("TRUNCATE patient_accounts")
+        await conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")
         keep = [uuid.uuid5(NAMESPACE, f"patient:{key}") for key, _ in DEMO_PATIENTS]
         await conn.execute("DELETE FROM patients WHERE id <> ALL($1::uuid[])", keep)
     finally:
@@ -158,6 +159,19 @@ async def reset_appointments() -> None:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
     finally:
         await conn.close()
+
+
+@pytest_asyncio.fixture
+async def realtime_clean(owner_conn: asyncpg.Connection) -> AsyncIterator[None]:
+    """A clean realtime state: no budget or token-cap rows, the relay cursor at the horizon."""
+    await owner_conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")
+    await owner_conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
+    await owner_conn.execute(
+        "UPDATE event_relay_cursor SET txid = pg_snapshot_xmin(pg_current_snapshot()), id = 0, "
+        "debited_txid = pg_snapshot_xmin(pg_current_snapshot()), debited_id = 0"
+    )
+    yield
+    await owner_conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import IdempotencyKey, get_clock, get_session, get_settings
+from app.api.deps import IdempotencyKey, get_clock, get_relay, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import AppointmentNotFound
@@ -19,6 +19,7 @@ from app.schemas.appointment import (
 )
 from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
 from app.services import booking
+from app.services.relay import Relay
 
 router = APIRouter(tags=["appointments"])
 
@@ -42,6 +43,7 @@ async def create_appointment(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     booked = await booking.book(
         session,
@@ -52,6 +54,7 @@ async def create_appointment(
         starts_at=body.starts_at,
         idempotency_key=idempotency_key,
     )
+    await relay.run(clock)
     response.headers["Location"] = f"/appointments/{booked.appointment.id}"
     response.headers.update(_NO_STORE)
     if booked.replayed:
@@ -87,9 +90,11 @@ async def cancel_appointment(
     response: Response,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    await relay.run(clock)
     return _to_schema(appt)
 
 
@@ -105,9 +110,11 @@ async def reschedule_appointment(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     appt = await booking.reschedule(
         session, clock, settings, appointment_id=appointment_id, new_starts_at=body.starts_at
     )
+    await relay.run(clock)
     return _to_schema(appt)

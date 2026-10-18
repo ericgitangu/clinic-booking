@@ -784,6 +784,22 @@ expect "gitleaks install: the CI cache is keyed on the installer script (version
   "$(grep -c 'gitleaks-v1-{{ checksum "scripts/ci/install_gitleaks.sh" }}' "$HERE/../../.circleci/config.yml")" 2
 expect "gitleaks install: the pinned version is $pin_ver" "$(grep -c "gitleaks_${pin_ver}_checksums.txt" "$HERE/install_gitleaks.sh")" 1
 
+# =========================================================================================
+# The API deploy keeps every secret. `--set-secrets` REPLACES the service's secret list, so a
+# deploy that forgets one drops it from the next revision (push goes silently off if it is the
+# Ably key). Nothing else redeploys clinic-api: rollback, promote and prune only move traffic.
+# =========================================================================================
+CONFIG="$HERE/../../.circleci/config.yml"
+deploy_line="$(grep -E 'gcloud run deploy clinic-api ' "$CONFIG")"
+expect "deploy: exactly one command deploys clinic-api" "$(grep -c . <<<"$deploy_line")" 1
+for secret in DATABASE_URL=clinic-database-url-app:latest \
+              INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest \
+              ABLY_API_KEY=clinic-ably-api-key:latest; do
+  expect "deploy: --set-secrets carries ${secret%%=*}" "$(grep -c -- "--set-secrets [^ ]*${secret}" <<<"$deploy_line")" 1
+done
+other="$(grep -rE 'run (deploy|services update|services replace)' "$HERE" "$HERE/../../.circleci/config.yml" 2>/dev/null | grep -v 'test_ci_scripts.sh' | grep -c 'clinic-api')"
+expect "deploy: no other script redeploys or updates clinic-api (the secrets list cannot be dropped)" "$other" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

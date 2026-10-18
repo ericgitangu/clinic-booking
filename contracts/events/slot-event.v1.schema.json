@@ -1,0 +1,48 @@
+{
+  "$id": "https://clinic.example/contracts/events/slot-event.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A time of one doctor on one clinic-local day was taken or became free again.",
+  "properties": {
+    "doctor_id": {
+      "format": "uuid",
+      "title": "Doctor Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "slot_taken",
+        "slot_freed"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "local_date": {
+      "description": "Clinic-local date of the slot (the channel's date).",
+      "format": "date",
+      "title": "Local Date",
+      "type": "string"
+    },
+    "seq": {
+      "description": "\"<txid>.<id>.<part>\": apply a message only if it sorts after the last one applied and its (txid, id) is after the cursor of the availability response in use.",
+      "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})\\.[01]$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "starts_at": {
+      "description": "The slot's start as a UTC instant (\u2026Z).",
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "doctor_id",
+    "local_date",
+    "starts_at",
+    "kind",
+    "seq"
+  ],
+  "title": "SlotEvent",
+  "type": "object"
+}

@@ -103,3 +103,30 @@ async def test_outside_working_hours(client: httpx.AsyncClient) -> None:
     resp = await client.post("/appointments", json=_body(starts_at="2026-10-26T12:00:00+03:00"))
     assert resp.status_code == 422
     assert resp.json()["code"] == "OUTSIDE_WORKING_HOURS"
+
+
+EXTREME = [
+    "0001-01-01T00:00:00+00:02",  # cannot be written in UTC: year 0 would be needed
+    "9999-12-31T23:59:59-00:02",  # cannot be written in UTC: year 10000 would be needed
+]
+
+
+@pytest.mark.parametrize("starts_at", EXTREME)
+@pytest.mark.parametrize("headers", [{}, {"Idempotency-Key": "extreme-1"}])
+async def test_an_instant_that_cannot_be_written_in_utc_is_a_validation_error_not_a_500(
+    client: httpx.AsyncClient, headers: dict[str, str], starts_at: str
+) -> None:
+    resp = await client.post("/appointments", json=_body(starts_at=starts_at), headers=headers)
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.parametrize("starts_at", EXTREME)
+async def test_reschedule_refuses_the_same_instants(
+    client: httpx.AsyncClient, reset_appointments: None, starts_at: str
+) -> None:
+    first = await client.post("/appointments", json=_body())
+    resp = await client.patch(
+        f"/appointments/{first.json()['id']}/reschedule", json={"starts_at": starts_at}
+    )
+    assert resp.status_code == 422 and resp.json()["code"] == "VALIDATION_ERROR"

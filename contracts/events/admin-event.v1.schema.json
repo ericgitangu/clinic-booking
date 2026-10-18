@@ -1,0 +1,80 @@
+{
+  "$id": "https://clinic.example/contracts/events/admin-event.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A booking changed, for the staff dashboard. No appointment or patient identifiers.",
+  "properties": {
+    "doctor_id": {
+      "format": "uuid",
+      "title": "Doctor Id",
+      "type": "string"
+    },
+    "event_type": {
+      "enum": [
+        "booked",
+        "rescheduled",
+        "cancelled"
+      ],
+      "title": "Event Type",
+      "type": "string"
+    },
+    "from_local_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "From Local Date"
+    },
+    "from_starts_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "From Starts At"
+    },
+    "local_date": {
+      "format": "date",
+      "title": "Local Date",
+      "type": "string"
+    },
+    "seq": {
+      "description": "\"<txid>.<id>\" of the event.",
+      "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "to_starts_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "To Starts At"
+    }
+  },
+  "required": [
+    "event_type",
+    "doctor_id",
+    "local_date",
+    "from_local_date",
+    "from_starts_at",
+    "to_starts_at",
+    "seq"
+  ],
+  "title": "AdminEvent",
+  "type": "object"
+}

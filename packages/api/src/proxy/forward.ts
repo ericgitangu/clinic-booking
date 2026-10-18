@@ -10,6 +10,7 @@ const FORWARDED_REQUEST_HEADERS = new Set([
   "accept-language",
   "x-request-id",
   "idempotency-key",
+  "if-none-match",
 ]);
 
 // Only these upstream response headers reach the browser. Copying the rest would leak the
@@ -24,6 +25,7 @@ const FORWARDED_RESPONSE_HEADERS = new Set([
   "x-request-id",
   "server-timing",
   "idempotent-replayed",
+  "etag",
 ]);
 
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PATCH", "OPTIONS"]);
@@ -103,7 +105,11 @@ export function problem(
 ): Response {
   return new Response(JSON.stringify({ status, code, detail }), {
     status,
-    headers: { "content-type": "application/problem+json" },
+    // An error describes this one request and is never to be stored or shared.
+    headers: {
+      "content-type": "application/problem+json",
+      "cache-control": "no-store",
+    },
   });
 }
 
@@ -114,6 +120,9 @@ export interface ForwardOptions {
   clientIp?: string | null;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  // Request headers to pass on in addition to the allowlist, for one route that needs them (the
+  // live-updates token route checks Origin). Names are matched case-insensitively.
+  extraRequestHeaders?: readonly string[];
 }
 
 // Reads at most MAX_BODY_BYTES; the Content-Length header alone is client-controlled.
@@ -208,8 +217,12 @@ export async function forward(
   }
 
   const headers = new Headers();
+  const extra = new Set(
+    (opts.extraRequestHeaders ?? []).map((h) => h.toLowerCase()),
+  );
   req.headers.forEach((value, key) => {
-    if (FORWARDED_REQUEST_HEADERS.has(key)) headers.set(key, value);
+    if (FORWARDED_REQUEST_HEADERS.has(key) || extra.has(key))
+      headers.set(key, value);
   });
   if (opts.clientIp) headers.set("x-client-ip", opts.clientIp);
   if (opts.token)

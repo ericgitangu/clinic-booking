@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import DateOutOfRange, DoctorNotFound
-from app.domain.slots import generate_slots
+from app.domain.slots import generate_slots, taken_starts
 from app.repositories.appointments import booked_intervals_for_doctor
 from app.repositories.doctors import get_active_doctor, get_clinic, working_hours_for
 from app.schemas.availability import Availability, Slot
+from app.services.relay import horizon_cursor
 
 
 async def get_availability(
@@ -22,6 +23,8 @@ async def get_availability(
     doctor_id: uuid.UUID,
     on_date: date,
 ) -> Availability:
+    # First, so the cursor can only be older than the data read below, never newer.
+    cursor = await horizon_cursor(session)
     doctor = await get_active_doctor(session, doctor_id)
     if doctor is None:
         raise DoctorNotFound()
@@ -54,8 +57,10 @@ async def get_availability(
         doctor_id=doctor_id,
         date=on_date.isoformat(),
         timezone=clinic.timezone,
+        cursor=cursor,
         slots=[
             Slot(starts_at=s.starts_at.astimezone(tz), ends_at=s.ends_at.astimezone(tz))
             for s in slots
         ],
+        taken=[t.astimezone(tz) for t in taken_starts(windows, booked, tz, on_date)],
     )

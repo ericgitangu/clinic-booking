@@ -11,14 +11,17 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from app.api.routers import admin, appointments, doctors, health, me, patients, problems
+from app.api.routers import admin, appointments, doctors, health, me, patients, problems, realtime
 from app.core.clinic_zone import set_default_zone
 from app.core.config import Settings
 from app.core.cors import add_cors
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.problems import UnhandledErrorMiddleware, register_exception_handlers
+from app.schemas.events import EVENT_MODELS
 from app.schemas.problem import strip_json_from_error_responses
+from app.services.publisher import build_publisher
+from app.services.realtime_tokens import MinuteLimiter
 
 
 def create_app(settings: Settings) -> FastAPI:
@@ -32,6 +35,13 @@ def create_app(settings: Settings) -> FastAPI:
         redoc_url="/redoc",
     )
     app.state.settings = settings
+    app.state.publisher = build_publisher(
+        settings.ABLY_API_KEY.get_secret_value() if settings.ABLY_API_KEY else None,
+        settings.ABLY_REST_URL,
+        timeout=settings.REALTIME_RELAY_TIMEOUT_SECONDS,
+    )
+    app.state.relay = None
+    app.state.patient_token_limiter = MinuteLimiter(settings.REALTIME_TOKEN_PER_MINUTE)
     # Only for patient.created_at and access granted_at/revoked_at (they belong to no clinic).
     set_default_zone(settings.DEFAULT_CLINIC_TZ)
 
@@ -52,6 +62,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(admin.manage_router)
     app.include_router(admin.access_router)
     app.include_router(me.router)
+    app.include_router(realtime.router)
+    app.include_router(realtime.admin_router)
 
     # Error responses carry only application/problem+json in the served spec, too.
     _default_openapi = app.openapi
@@ -59,6 +71,13 @@ def create_app(settings: Settings) -> FastAPI:
     def _openapi() -> dict[str, object]:
         schema = _default_openapi()
         strip_json_from_error_responses(schema)
+        # The pushed messages never appear in a response body, so add them to the components: the
+        # generated clients then carry their types and zod schemas.
+        components = schema.setdefault("components", {})
+        assert isinstance(components, dict)  # noqa: S101  # FastAPI always builds a mapping
+        schemas = components.setdefault("schemas", {})
+        for name, model in EVENT_MODELS.items():
+            schemas[name] = model.model_json_schema(ref_template="#/components/schemas/{model}")
         return schema
 
     app.openapi = _openapi  # type: ignore[method-assign]  # FastAPI documents replacing openapi() this way

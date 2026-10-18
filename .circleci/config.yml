@@ -157,6 +157,31 @@ jobs:
           name: schemathesis contract tests
           command: cd backend && uv run pytest tests/contract -q
 
+  # The live leg: the adapter and the tokens against the real push service (a CI-only Ably app).
+  # Nothing here needs the database. The key arrives from the `ably-ci` context (publish, subscribe
+  # and history on the CI app only) and is read by the tests from the environment; it is never
+  # echoed. This context is unrestricted, so a pull-request branch can use it: the key can only
+  # publish to a throwaway app. A missing key fails the job instead of skipping the tests.
+  ably-real:
+    executor: backend
+    steps:
+      - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh backend/ .circleci/
+      - install_deps
+      - run:
+          name: The real push service (tests/integration/test_ably_real.py, all must run and pass)
+          command: |
+            set +x
+            : "${ABLY_API_KEY:?the ably-ci context is missing ABLY_API_KEY}"
+            cd backend
+            uv run pytest tests/integration/test_ably_real.py -q -rs --junitxml=test-results/ably-real.xml
+            # skipped tests would mean the key never reached them: that is a failure here
+            ! grep -q 'skipped="[1-9]' test-results/ably-real.xml
+      - store_test_results:
+          path: backend/test-results
+
   secrets:
     executor: backend
     steps:
@@ -326,7 +351,7 @@ jobs:
             : "${WEB_ORIGIN:?gcp-deploy context is missing WEB_ORIGIN}"
             : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
-            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=developer.ericgitangu@gmail.com" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
+            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,ABLY_API_KEY=clinic-ably-api-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=developer.ericgitangu@gmail.com" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
       - run:
           name: Tag-URL smoke behind the C19 egress gate
           command: |
@@ -530,7 +555,7 @@ jobs:
             echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
       - run:
           name: API and database (compose runs the migrations and the seed)
-          command: docker compose up -d --build --wait
+          command: WEB_ORIGIN=http://localhost:3100 docker compose up -d --build --wait
       - run:
           name: Build the booking app and run the booking scenarios against the real API
           command: |
@@ -891,6 +916,8 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - ably-real:
+          context: ably-ci
       - secrets
       - sast
       - sca
@@ -918,6 +945,8 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - ably-real:
+          context: ably-ci
       - secrets
       - sast
       - sca
