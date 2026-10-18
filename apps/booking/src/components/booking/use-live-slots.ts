@@ -5,10 +5,23 @@ import { client } from "@clinic/api/generated/client.gen";
 import type { Availability } from "@clinic/api/generated";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IDLE_MS, POLL_MS, pollInterval } from "@/lib/polling";
+import { IDLE_MS, POLL_MS, parseRetryAfter, pollInterval } from "@/lib/polling";
 
 // The browser reaches the API only through the same-origin proxy, never Cloud Run.
 client.setConfig({ baseUrl: "/api" });
+
+// When the proxy answers 429 it says how long to wait (Retry-After). The generated client throws
+// only the body on an error, so the header is read here, as the response passes, and kept until
+// the time it names. Polling and focus refetches both stay quiet until then.
+let retryNotBefore = 0;
+client.interceptors.response.use((response) => {
+  if (response.status === 429) {
+    const ms = parseRetryAfter(response.headers.get("retry-after"));
+    if (ms !== null) retryNotBefore = Date.now() + ms;
+  }
+  return response;
+});
+const retryWait = () => Math.max(retryNotBefore - Date.now(), 0);
 
 const INPUT_EVENTS = [
   "pointerdown",
@@ -55,8 +68,8 @@ export function useLiveSlots(initial: Availability) {
     // A failed poll is not retried inside the fetch (that would double the rate, and a 429 must not
     // be retried at all); the backed-off interval is the retry.
     retry: false,
-    refetchInterval: () => pollInterval(idle, failures.current),
-    refetchOnWindowFocus: !idle,
+    refetchInterval: () => pollInterval(idle, failures.current, retryWait()),
+    refetchOnWindowFocus: () => !idle && retryWait() === 0,
   });
 
   useEffect(() => {

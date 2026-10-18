@@ -71,11 +71,14 @@ function LiveNotice({
   return (
     <>
       <span hidden data-polling={armed ? "armed" : "pending"} />
-      {failing ? (
-        <p aria-live="polite" className="mb-4 text-sm text-muted-foreground">
-          Couldn&apos;t refresh the times just now. Trying again shortly.
-        </p>
-      ) : null}
+      <p
+        role="status"
+        aria-live="polite"
+        data-testid="refresh-hint"
+        className="mb-4 min-h-5 text-sm text-muted-foreground"
+      >
+        {failing ? "Couldn't refresh. We'll try again automatically." : ""}
+      </p>
       {taken ? (
         <p
           role="status"
