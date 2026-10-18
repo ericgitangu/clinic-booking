@@ -109,15 +109,20 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
-e2e: ## Playwright checks against the real API and database (docker compose, migrations and seed) and a production build
-	# A fresh database every time (this removes the compose volume), as in CI: the scenarios book real
-	# slots, and a database that keeps every earlier run eventually has no free times in the week a scenario uses.
-	# Throwaway keys for this run: the API verifies the signed assertions with INTERNAL_SIGNING_KEY, and
-	# the app signs its sessions with BETTER_AUTH_SECRET.
-	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32) WEB_ORIGIN=http://localhost:3100; \
-	docker compose down -v && docker compose up -d --build --wait && \
-	REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
-	REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts && \
+e2e: ## Playwright checks against the real API and database (their own docker compose project, migrations and seed) and a production build
+	# Its own compose project, ports and keys, and a fresh database every time, so it never touches (or
+	# `down -v`s) a developer's running stack, and the scenarios always start from an empty database.
+	# The API verifies signed assertions with INTERNAL_SIGNING_KEY, the app signs sessions with
+	# BETTER_AUTH_SECRET, and the reminder route wants CRON_SECRET: throwaway values for this run. The
+	# email allowances are raised so the day's counter never limits a run: every booking sends an email,
+	# and the cap itself is exercised by its own scenario (e2e/emails-cap.spec.ts) and the backend tests.
+	export COMPOSE_PROJECT_NAME=clinic-e2e API_HOST_PORT=18080 DB_HOST_PORT=15432 \
+	  E2E_API_URL=http://127.0.0.1:18080 REAL_API_URL=http://127.0.0.1:18080 \
+	  WEB_ORIGIN=http://localhost:3100 INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32) CRON_SECRET=$$(openssl rand -hex 32) \
+	  EMAIL_DAILY_LIMIT=100000 EMAIL_MONTHLY_LIMIT=1000000 EMAIL_ACK_RESERVE=0; \
+	docker compose -p clinic-e2e down -v && docker compose -p clinic-e2e up -d --build --wait && \
+	pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
+	pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts && \
 	cd apps/booking && pnpm build && pnpm test:e2e
 
 e2e-admin: ## Playwright for apps/admin against the real build, API and Postgres (compose); only Google sign-in is replaced
