@@ -71,6 +71,21 @@ function LiveNotice({
         data-stream={stream}
       />
       <p
+        data-testid="live-state"
+        className="mb-1 flex min-h-5 items-center gap-2 text-sm text-muted-foreground"
+      >
+        <span
+          aria-hidden
+          className="live-dot"
+          data-on={stream === "live" && !idle ? "live" : "off"}
+        />
+        {idle
+          ? "Updates paused"
+          : stream === "live"
+            ? "Live: times update as they change"
+            : "Checking for changes every few seconds"}
+      </p>
+      <p
         role="status"
         aria-live="polite"
         data-testid="refresh-hint"

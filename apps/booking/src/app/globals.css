@@ -54,3 +54,136 @@ input[name="slot"]:checked + .slot-chip-label {
     animation: none;
   }
 }
+
+/* ---- Booking face-lift (CSS only; every motion has a reduced-motion twin below) ---- */
+
+/* A soft mesh behind the page: two blurred colour pools from the brand palette, painted by a fixed
+   pseudo-element so it neither scrolls nor moves layout. Light uses the mist/aqua pair, dark the
+   navy/lotus-blue pair. Cheap: two radial gradients, no filter, no canvas, no image. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60rem 36rem at 12% -8%,
+      color-mix(in oklab, var(--accent) 85%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50rem 32rem at 100% 8%,
+      color-mix(in oklab, var(--primary) 10%, transparent),
+      transparent 70%
+    );
+}
+.dark body::before {
+  background:
+    radial-gradient(
+      60rem 36rem at 12% -8%,
+      color-mix(in oklab, var(--accent) 80%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50rem 32rem at 100% 8%,
+      color-mix(in oklab, var(--primary) 14%, transparent),
+      transparent 70%
+    );
+}
+
+/* Free times are links now: the same press and settle the radios had, plus a lift on hover. */
+a.slot-chip-label {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 160ms ease,
+    transform 120ms ease;
+}
+@media (hover: hover) {
+  a.slot-chip-label:hover {
+    transform: translateY(-1px);
+    border-color: var(--primary);
+    box-shadow: 0 4px 14px -6px
+      color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+}
+a.slot-chip-label:active {
+  transform: scale(0.97);
+  animation: slot-pick 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The one orchestrated load moment on a grid: the times rise in together, staggered by column.
+   Transform only (no opacity), so a screen reader or an axe scan never sees half-faded text. */
+@keyframes grid-rise {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.slot-grid > li {
+  animation: grid-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+
+/* The live-state dot: a calm pulse while the feed is live, steady otherwise. */
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--live) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+.live-dot {
+  --live: var(--muted-foreground);
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--live);
+}
+.live-dot[data-on="live"] {
+  --live: #0f8a4f;
+  animation: live-pulse 1.8s ease-out infinite;
+}
+.dark .live-dot[data-on="live"] {
+  --live: #4ade80;
+}
+
+/* A card that answers hover and focus-within without moving its neighbours. */
+.lift-card {
+  transition:
+    border-color 160ms ease,
+    box-shadow 200ms ease;
+}
+@media (hover: hover) {
+  .lift-card:hover {
+    border-color: color-mix(in oklab, var(--primary) 55%, var(--border));
+    box-shadow: 0 8px 24px -14px
+      color-mix(in oklab, var(--primary) 50%, transparent);
+  }
+}
+.lift-card:focus-within {
+  border-color: var(--ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.slot-chip-label,
+  .lift-card {
+    transition: none;
+  }
+  a.slot-chip-label:hover,
+  a.slot-chip-label:active {
+    transform: none;
+    animation: none;
+  }
+  .slot-grid > li {
+    animation: none;
+  }
+  .live-dot[data-on="live"] {
+    animation: none;
+  }
+}

@@ -3,6 +3,7 @@ import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { SessionMenu } from "@/components/account/session-menu";
+import { ShortcutHelp } from "@/components/booking/shortcut-help";
 import { Providers } from "@/components/pwa/providers";
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { FOOTER_COLUMNS } from "@/lib/footer-links";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             >
               {children}
             </PageShell>
+            <ShortcutHelp />
           </Providers>
         </ThemeProvider>
       </body>

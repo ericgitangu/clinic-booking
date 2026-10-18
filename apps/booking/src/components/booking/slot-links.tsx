@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { memo, useEffect, useRef } from "react";
+import { useArrowKeys } from "@/components/booking/use-arrow-keys";
 import { formatTime } from "@/lib/clinic-time";
 import type { Chip } from "@/lib/slot-chips";
 
@@ -21,6 +22,7 @@ export const SlotLinks = memo(function SlotLinks({
   // a poll that changes nothing must not move it.
   const field = useRef<HTMLFieldSetElement>(null);
   const renders = useRef(0);
+  useArrowKeys(field, { vertical: true });
   useEffect(() => {
     renders.current += 1;
     field.current?.setAttribute("data-renders", String(renders.current));
@@ -28,11 +30,16 @@ export const SlotLinks = memo(function SlotLinks({
   return (
     <fieldset ref={field}>
       <legend className="sr-only">Times</legend>
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-        {chips.map((c) => {
+      <ul className="slot-grid grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+        {chips.map((c, i) => {
           const time = formatTime(c.starts_at);
           return (
-            <li key={c.starts_at} data-state={c.state} data-time={time}>
+            <li
+              key={c.starts_at}
+              data-state={c.state}
+              data-time={time}
+              style={{ "--i": Math.min(i, 12) } as React.CSSProperties}
+            >
               {c.state === "free" ? (
                 <Link
                   href={detailsHref(doctorId, c.starts_at)}

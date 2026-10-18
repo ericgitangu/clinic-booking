@@ -37,7 +37,7 @@ export default async function BookPage() {
           {res.data.items.map((d) => (
             <li
               key={d.id}
-              className="flex flex-col rounded-xl border border-border bg-card p-5"
+              className="lift-card flex flex-col rounded-xl border border-border bg-card p-5"
             >
               <div className="flex items-center gap-4">
                 <span aria-hidden="true">

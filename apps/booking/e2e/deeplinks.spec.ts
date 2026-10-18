@@ -13,8 +13,8 @@ import { newPerson, sessionCookies } from "./support/auth";
 
 // Deep links: a free time links to its details page, a taken or held time has no link, and each
 // appointment has its own page (booked, or cancelled with the time freed). Real stack. Instance
-// i = repeat * 6 + scenario owns calendar cell 40 + i (no other spec uses 40 to 99).
-const cellOf = (scenario: number, repeat: number) => 40 + repeat * 6 + scenario;
+// i = repeat * 8 + scenario owns calendar cell 40 + i (no other spec uses 40 to 99).
+const cellOf = (scenario: number, repeat: number) => 40 + repeat * 8 + scenario;
 
 let nextIp = 0;
 const ip = () =>
@@ -272,4 +272,68 @@ test("doctor avatars show, with explicit sizes, on the list, the slot page and t
   await bookOn(page, doctorId, slots[5]);
   await sized("section img", "56");
   await closeAll(me.context);
+});
+
+test("arrow keys move between free times and between days; ? opens the shortcut list but never while typing", async ({
+  browser,
+}, testInfo) => {
+  const { doctorId, day, slots } = await farCell(
+    cellOf(6, testInfo.repeatEachIndex),
+  );
+  const visitor = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
+  const page = await visitor.newPage();
+  await page.setViewportSize({ width: 360, height: 800 }); // three columns
+  await page.goto(grid(doctorId, day));
+  const first = chip(page, slots[0]).getByRole("link");
+  await first.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(chip(page, slots[1]).getByRole("link")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(page.locator("li[data-time] a").last()).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("li[data-time] a").nth(3)).toBeFocused();
+
+  const days = page
+    .getByRole("navigation", { name: "Pick a day" })
+    .locator("a");
+  await days.first().focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(days.nth(1)).toBeFocused();
+
+  // ? opens the list; Escape closes it; typing a ? into a field does neither.
+  await page.locator("body").press("?");
+  const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(help).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(help).toHaveCount(0);
+  const date = page.getByLabel("Another date");
+  await date.focus();
+  await page.keyboard.press("?");
+  await expect(help).toHaveCount(0);
+  await visitor.close();
+});
+
+test("the live-state line says how the grid is being kept current", async ({
+  browser,
+}, testInfo) => {
+  const { doctorId, day } = await farCell(cellOf(7, testInfo.repeatEachIndex));
+  const visitor = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
+  const page = await visitor.newPage();
+  await page.goto(grid(doctorId, day));
+  await expect(page.locator("[data-polling]")).toHaveAttribute(
+    "data-polling",
+    "armed",
+  );
+  await expect(page.getByTestId("live-state")).toContainText(
+    /Live: times update|Checking for changes/,
+  );
+  await visitor.close();
 });

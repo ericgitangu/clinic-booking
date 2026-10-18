@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
@@ -63,15 +64,19 @@ export default async function MyAppointments({
         <>
           <h2 className="mt-8 font-heading text-xl font-semibold">Upcoming</h2>
           {upcoming.length === 0 ? (
-            <p className="mt-3 text-base text-muted-foreground">
-              Nothing booked.
-            </p>
+            <div className="mt-4 flex items-center gap-4 rounded-xl border border-dashed border-border bg-card/60 p-6">
+              <CalendarPlus
+                aria-hidden
+                className="size-8 shrink-0 text-primary"
+              />
+              <p className="text-base text-muted-foreground">Nothing booked.</p>
+            </div>
           ) : (
             <ul className="mt-4 space-y-4">
               {upcoming.map((a) => (
                 <li
                   key={a.id}
-                  className="rounded-xl border border-border bg-card p-5"
+                  className="lift-card rounded-xl border border-border bg-card p-5"
                 >
                   <Link
                     href={`/appointments/${a.id}`}

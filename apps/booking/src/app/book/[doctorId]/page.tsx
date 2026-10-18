@@ -96,6 +96,9 @@ export default async function PickTime({
       <h2 className="mt-8 font-heading text-xl font-semibold">
         {formatDayLong(day)}
       </h2>
+      <p className="mt-2 hidden text-sm text-muted-foreground pointer-fine:block">
+        Tip: arrow keys move between times and days. Press ? for shortcuts.
+      </p>
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
