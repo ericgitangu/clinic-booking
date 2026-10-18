@@ -709,7 +709,10 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
 LHP=18099
 lh_run() { # <name> <runner command> ; leaves the exit code in $rc
-  LH_PORT=$LHP LH_CHROME_PATH=/bin/sh LHCI_OUTPUT_DIR="$WORK/lh-out.$1" \
+  # CIRCLE_BRANCH=main on purpose. Earlier tests export CIRCLE_BRANCH=feature, and on a branch with no
+  # changes under the watched paths lighthouse.sh skips itself and exits 0: these cases then failed
+  # (got 0, want 3) only when the checkout equalled main, i.e. on the release pipeline.
+  CIRCLE_BRANCH=main LH_PORT=$LHP LH_CHROME_PATH=/bin/sh LHCI_OUTPUT_DIR="$WORK/lh-out.$1" \
     LH_SERVER_CMD="bash $WORK/fakeapp.sh $LHP" LH_RUN_CMD="$2" \
     bash "$HERE/lighthouse.sh" >"$WORK/lh.$1.log" 2>&1; rc=$?
 }
@@ -717,6 +720,11 @@ gone() { # no process of the fake app is left, and its port is closed
   local n; n="$(pgrep -f "$WORK/fakeapp" 2>/dev/null | wc -l | tr -d ' ')"
   if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$LHP/"; then echo "port-open"; else echo "closed:$n"; fi
 }
+# a skip must say so, and must not start anything (watch list pointed at a path nothing changes)
+CIRCLE_BRANCH=feature LH_WATCH=no/such/path LH_PORT=$LHP LH_CHROME_PATH=/bin/sh LHCI_OUTPUT_DIR="$WORK/lh-out.skip" \
+  LH_SERVER_CMD="bash $WORK/fakeapp.sh $LHP" LH_RUN_CMD="exit 3" bash "$HERE/lighthouse.sh" >"$WORK/lh.skip.log" 2>&1; rc=$?
+expect "lighthouse: a branch with no changes under the watched paths skips, says so, and starts no server" \
+  "$rc:$(grep -c 'skipping Lighthouse' "$WORK/lh.skip.log"):$(gone)" "0:1:closed:0"
 lh_run ok "curl -sf http://127.0.0.1:$LHP/about >/dev/null"
 expect "lighthouse: the runner saw the server while it ran, exit 0" "$rc" 0
 expect "lighthouse: no server process or listener is left after a normal exit" "$(gone)" "closed:0"
