@@ -30,9 +30,18 @@ async function truth(): Promise<Metrics["totals"]> {
 
 const upcoming = (page: Page) => page.getByTestId("kpi-upcoming-booked");
 
-/** Presses Refresh and waits until the page shows the real count, so the next step starts fresh. */
+/**
+ * Presses Refresh and waits until that refresh has finished: the button counts finished refreshes
+ * (data-refreshes), and only after that does the page show the real count. Waiting on the count
+ * alone is not enough, because a number that is already right would pass before the refresh had
+ * run, and a refresh still in flight could fill the cache after the next step.
+ */
 async function refreshUntil(page: Page, expected: number) {
-  await page.getByRole("button", { name: "Refresh" }).click();
+  const button = page.getByTestId("refresh-metrics");
+  const finished = Number(await button.getAttribute("data-refreshes"));
+  await button.click();
+  await expect(button).toHaveAttribute("data-refreshes", String(finished + 1));
+  await expect(button).toBeEnabled();
   await expect(upcoming(page)).toHaveText(String(expected));
 }
 
