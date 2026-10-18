@@ -31,15 +31,10 @@ export const SlotLinks = memo(function SlotLinks({
     <fieldset ref={field}>
       <legend className="sr-only">Times</legend>
       <ul className="slot-grid grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-        {chips.map((c, i) => {
+        {chips.map((c) => {
           const time = formatTime(c.starts_at);
           return (
-            <li
-              key={c.starts_at}
-              data-state={c.state}
-              data-time={time}
-              style={{ "--i": Math.min(i, 12) } as React.CSSProperties}
-            >
+            <li key={c.starts_at} data-state={c.state} data-time={time}>
               {c.state === "free" ? (
                 <Link
                   href={detailsHref(doctorId, c.starts_at)}
