@@ -114,6 +114,10 @@ export type AdminAppointment = {
      * Status
      */
     status: 'booked' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
 };
 
 /**
@@ -132,6 +136,8 @@ export type AdminAppointmentPage = {
 
 /**
  * Appointment
+ *
+ * An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone.
  */
 export type Appointment = {
     /**
@@ -170,6 +176,10 @@ export type Appointment = {
      * Status
      */
     status: 'booked' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
     /**
      * Updated At
      */
@@ -235,6 +245,10 @@ export type AppointmentWithDoctor = {
      * Status
      */
     status: 'booked' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
     /**
      * Updated At
      */
@@ -626,7 +640,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -671,6 +685,8 @@ export type SeriesPoint = {
     booked: number;
     /**
      * Bucket Start
+     *
+     * Start of the bucket as ISO 8601 local time without an offset, in the zone of the clinic each event belongs to (not an instant). With clinics in different zones, events fall in the bucket of their own clinic's local day or hour, so a series merges the same local hour or day of every clinic.
      */
     bucket_start: string;
     /**
@@ -781,6 +797,14 @@ export type WorkingWindow = {
 
 export type CreateAppointmentAppointmentsPostData = {
     body: AppointmentCreate;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.
+         */
+        'Idempotency-Key'?: string | null;
+    };
     path?: never;
     query?: never;
     url: '/appointments';
@@ -803,7 +827,7 @@ export type CreateAppointmentAppointmentsPostErrors = {
 
 export type CreateAppointmentAppointmentsPostResponses = {
     /**
-     * Successful Response
+     * Created, or the earlier booking replayed for the same Idempotency-Key
      */
     201: Appointment;
 };
@@ -1493,6 +1517,14 @@ export type MyAppointmentsInternalMeAppointmentsGetResponse = MyAppointmentsInte
 
 export type BookMineInternalMeAppointmentsPostData = {
     body: MeAppointmentCreate;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * Chosen by the client once per booking attempt and reused on a retry. The same key with the same doctor and time returns the original booking with `Idempotent-Replayed: true`; with a different doctor or time it is IDEMPOTENCY_KEY_REUSED; once the booking is cancelled it is IDEMPOTENCY_KEY_CONSUMED.
+         */
+        'Idempotency-Key'?: string | null;
+    };
     path?: never;
     query?: never;
     url: '/internal/me/appointments';
@@ -1527,7 +1559,7 @@ export type BookMineInternalMeAppointmentsPostErrors = {
 
 export type BookMineInternalMeAppointmentsPostResponses = {
     /**
-     * Successful Response
+     * Created, or the earlier booking replayed for the same Idempotency-Key
      */
     201: Appointment;
 };

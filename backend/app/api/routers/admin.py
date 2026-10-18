@@ -68,7 +68,17 @@ access_router = APIRouter(
 _NO_STORE = {"Cache-Control": "no-store"}
 
 
-@router.get("/metrics", response_model=Metrics, responses=problem_responses(422))
+@router.get(
+    "/metrics",
+    response_model=Metrics,
+    responses=problem_responses(422),
+    description=(
+        "Activity series, totals and per-doctor load for the clinic-local days `[from, to)`. Each "
+        "event or visit is placed by the zone of its own doctor's clinic. `bucket_start` is "
+        "clinic-local wall-clock time, not an instant, so with clinics in different zones the "
+        "series merges the same local day (or hour) of every clinic."
+    ),
+)
 async def get_metrics(
     response: Response,
     from_: Annotated[date, Query(alias="from")],

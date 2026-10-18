@@ -62,6 +62,7 @@ async def patient_appointments(
             cancelled_at=appt.cancelled_at,
             created_at=appt.created_at,
             updated_at=appt.updated_at,
+            timezone=appt.timezone,
             doctor=DoctorRef(id=doctor.id, full_name=doctor.full_name, specialty=doctor.specialty),
         )
         for appt, doctor in rows

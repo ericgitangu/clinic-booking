@@ -55,7 +55,8 @@ export const zAdminAppointment = z.object({
     patient_id: z.uuid(),
     patient_name: z.string(),
     starts_at: z.iso.datetime({ offset: true }),
-    status: z.enum(['booked', 'cancelled'])
+    status: z.enum(['booked', 'cancelled']),
+    timezone: z.string()
 });
 
 /**
@@ -68,6 +69,8 @@ export const zAdminAppointmentPage = z.object({
 
 /**
  * Appointment
+ *
+ * An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone.
  */
 export const zAppointment = z.object({
     cancellation_reason: z.string().nullable(),
@@ -79,6 +82,7 @@ export const zAppointment = z.object({
     patient_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
+    timezone: z.string(),
     updated_at: z.iso.datetime({ offset: true })
 });
 
@@ -159,6 +163,7 @@ export const zAppointmentWithDoctor = z.object({
     patient_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
+    timezone: z.string(),
     updated_at: z.iso.datetime({ offset: true })
 });
 
@@ -262,12 +267,14 @@ export const zProblemCode = z.enum([
     'DATE_OUT_OF_RANGE',
     'SLOT_MISALIGNED',
     'OUTSIDE_WORKING_HOURS',
+    'IDEMPOTENCY_KEY_REUSED',
     'SLOT_TAKEN',
     'PATIENT_DOUBLE_BOOKED',
     'APPOINTMENT_ALREADY_CANCELLED',
     'APPOINTMENT_ALREADY_STARTED',
     'PATIENT_PHONE_EXISTS',
     'CONCURRENT_UPDATE',
+    'IDEMPOTENCY_KEY_CONSUMED',
     'ACCESS_EXISTS',
     'OWNER_PROTECTED',
     'ACCESS_NOT_FOUND',
@@ -422,8 +429,12 @@ export const zDoctorList = z.object({
 
 export const zCreateAppointmentAppointmentsPostBody = zAppointmentCreate;
 
+export const zCreateAppointmentAppointmentsPostHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(255).regex(/^[\x21-\x7e]{1,255}$/).nullish()
+});
+
 /**
- * Successful Response
+ * Created, or the earlier booking replayed for the same Idempotency-Key
  */
 export const zCreateAppointmentAppointmentsPostResponse = zAppointment;
 
@@ -605,8 +616,12 @@ export const zMyAppointmentsInternalMeAppointmentsGetResponse = zPatientAppointm
 
 export const zBookMineInternalMeAppointmentsPostBody = zMeAppointmentCreate;
 
+export const zBookMineInternalMeAppointmentsPostHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(255).regex(/^[\x21-\x7e]{1,255}$/).nullish()
+});
+
 /**
- * Successful Response
+ * Created, or the earlier booking replayed for the same Idempotency-Key
  */
 export const zBookMineInternalMeAppointmentsPostResponse = zAppointment;
 

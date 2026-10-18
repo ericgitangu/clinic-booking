@@ -5,7 +5,12 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { firstDoctor, hhmm, pick } from "./api";
+import { callApi } from "@clinic/api/call";
+import {
+  bookMineInternalMeAppointmentsPost,
+  myAppointmentsInternalMeAppointmentsGet,
+} from "@clinic/api/generated";
+import { API, firstDoctor, hhmm, pick } from "./api";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // Real stack: this app, the real API and database (docker compose), and a real Better Auth session
@@ -287,4 +292,123 @@ test("the booking screens never scroll sideways on a 360px phone", async ({
     expect(scroll, path).toBeLessThanOrEqual(inner);
   }
   await closeAll(context, signedOut);
+});
+
+test("the form's idempotency key is the one the API got: a retry of the booking returns it, a new time gets a new key", async ({
+  browser,
+}) => {
+  const { doctorId, slots } = await pick(4);
+  const { context, page, person } = await signedIn(browser);
+  const keyOf = () =>
+    page.locator('input[name="idempotency_key"]').inputValue();
+
+  await page.goto(details(doctorId, slots[0]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+  const key = await keyOf();
+  expect(key).toMatch(/^[\x21-\x7e]{1,255}$/);
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You are booked" }),
+  ).toBeVisible();
+  const booked = page.url().split("/").pop();
+
+  // The same attempt, sent again by a client that never saw the response: the API recognises the
+  // key the form sent and returns the booking that was made, not SLOT_TAKEN.
+  process.env.API_URL = API;
+  const retry = await callApi(
+    "bookMine",
+    (client) =>
+      bookMineInternalMeAppointmentsPost({
+        client,
+        body: { doctor_id: doctorId, starts_at: slots[0] },
+        headers: { "Idempotency-Key": key },
+      }),
+    {
+      caller: {
+        sub: person.googleSub,
+        email: person.email,
+        role: "patient",
+        emailVerified: true,
+      },
+    },
+  );
+  expect(retry).toMatchObject({ ok: true, status: 201 });
+  expect(retry.ok && retry.data.id).toBe(booked);
+
+  // Another time is another attempt: a fresh key.
+  await page.goto(details(doctorId, slots[1]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+  expect(await keyOf()).not.toBe(key);
+  await closeAll(context);
+});
+
+test("two server-action requests of one attempt, with the same key, book once and both answer with that booking", async ({
+  browser,
+}) => {
+  const { doctorId, slots } = await pick(5);
+  const { context, page, person } = await signedIn(browser);
+  await page.goto(details(doctorId, slots[0]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+
+  // The click sends one server-action request. Send it to the app twice, byte for byte, at the
+  // same time (a double submit, or a retry whose first response was lost): both carry the form's
+  // one Idempotency-Key. The browser is given the first answer; the second is kept to compare.
+  const answers: { redirect: string | null; status: number }[] = [];
+  let sent = 0;
+  await page.route("**/book/**", async (route) => {
+    const req = route.request();
+    if (req.method() !== "POST" || !req.headers()["next-action"] || sent > 0) {
+      return route.continue();
+    }
+    sent++;
+    const both = await Promise.all([route.fetch(), route.fetch()]);
+    for (const r of both) {
+      answers.push({
+        status: r.status(),
+        redirect: r.headers()["x-action-redirect"] ?? null,
+      });
+    }
+    await route.fulfill({ response: both[0] });
+  });
+
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You are booked" }),
+  ).toBeVisible();
+  expect(sent).toBe(1);
+  expect(answers).toHaveLength(2);
+
+  // Both requests were answered with a redirect to the confirmation of the SAME appointment: the
+  // second one found the booking the first made. With a different key per request the second
+  // would have been refused (the patient already holds that time) and would not redirect.
+  const target = (r: { redirect: string | null }) =>
+    r.redirect?.split(";")[0] ?? null;
+  expect(target(answers[0])).toMatch(/^\/book\/confirmed\/[0-9a-f-]{36}$/);
+  expect(target(answers[1])).toBe(target(answers[0]));
+
+  process.env.API_URL = API;
+  const mine = await callApi(
+    "myAppointments",
+    (client) => myAppointmentsInternalMeAppointmentsGet({ client }),
+    {
+      caller: {
+        sub: person.googleSub,
+        email: person.email,
+        role: "patient",
+        emailVerified: true,
+      },
+    },
+  );
+  expect(mine.ok).toBe(true);
+  const items = mine.ok ? mine.data.items : [];
+  expect(items).toHaveLength(1);
+  expect(items[0].starts_at).toBe(slots[0]);
+  expect(page.url().endsWith(items[0].id)).toBe(true);
+  await closeAll(context);
 });

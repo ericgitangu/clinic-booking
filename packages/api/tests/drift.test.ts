@@ -75,7 +75,7 @@ async function zAppointment(dir: string) {
 
 const NOW = "2026-10-17T08:00:00Z";
 const ID = "11111111-1111-4111-8111-111111111111";
-// A payload as the API sent it before the change.
+// A payload as the API sends it today; the control test checks the generated schema accepts it.
 const oldPayload = {
   id: ID,
   doctor_id: ID,
@@ -87,6 +87,7 @@ const oldPayload = {
   cancelled_at: NOW,
   created_at: NOW,
   updated_at: NOW,
+  timezone: "Africa/Nairobi",
 };
 
 const READS_FIELD = `import type { Appointment } from "./out/types.gen";\nexport const startOf = (a: Appointment): string => a.starts_at;\n`;

@@ -23,7 +23,9 @@ class Slot:
     ends_at: datetime  # starts_at + 30 min
 
 
-def grid_for_date(windows: Sequence[Window], tz: ZoneInfo, local_date: date) -> list[datetime]:
+def grid_for_date(
+    windows: Sequence[Window], tz: ZoneInfo, local_date: date, slot: timedelta = SLOT
+) -> list[datetime]:
     """Aligned slot starts (UTC) for the date, before lead/booked filtering.
 
     De-duplicated by clinic-local wall time, so a fall-back repeated hour yields one slot.
@@ -34,7 +36,7 @@ def grid_for_date(windows: Sequence[Window], tz: ZoneInfo, local_date: date) -> 
         start_utc = datetime.combine(local_date, start_t, tzinfo=tz).astimezone(UTC)
         end_utc = datetime.combine(local_date, end_t, tzinfo=tz).astimezone(UTC)
         cur = start_utc
-        while cur + SLOT <= end_utc:
+        while cur + slot <= end_utc:
             local_wall = cur.astimezone(tz)
             # A slot start derived from a real UTC instant always round-trips; the spring-
             # forward gap never appears because UTC stepping jumps over it.
@@ -42,27 +44,36 @@ def grid_for_date(windows: Sequence[Window], tz: ZoneInfo, local_date: date) -> 
             if key not in seen_local:
                 seen_local.add(key)
                 starts.append(cur)
-            cur += SLOT
+            cur += slot
     starts.sort()
     return starts
 
 
 def generate_slots(
     windows: Sequence[Window],
-    booked_starts: Iterable[datetime],
+    booked: Iterable[tuple[datetime, datetime]],
     tz: ZoneInfo,
     local_date: date,
     now: datetime,
     lead: timedelta,
+    slot: timedelta = SLOT,
 ) -> list[Slot]:
-    """Bookable slots: the grid minus booked starts and anything inside the lead window."""
-    booked = {b.astimezone(UTC) for b in booked_starts}
+    """Bookable slots: the grid minus anything that overlaps a booked interval or sits inside
+    the lead window.
+
+    ``booked`` holds each booking's ``(starts_at, ends_at)``. A candidate ``[start, start + slot)``
+    is dropped when it overlaps any of them, so the result stays correct for a slot length that
+    differs from the length the bookings were made with. Production wires only the 30-minute
+    ``SLOT``; the parameter is part of the function's contract, not of the public API.
+    """
+    intervals = [(b0.astimezone(UTC), b1.astimezone(UTC)) for b0, b1 in booked]
     threshold = now.astimezone(UTC) + lead
     out: list[Slot] = []
-    for start in grid_for_date(windows, tz, local_date):
-        if start in booked:
-            continue
+    for start in grid_for_date(windows, tz, local_date, slot):
+        end = start + slot
         if start < threshold:
             continue
-        out.append(Slot(starts_at=start, ends_at=start + SLOT))
+        if any(b0 < end and b1 > start for b0, b1 in intervals):
+            continue
+        out.append(Slot(starts_at=start, ends_at=end))
     return out

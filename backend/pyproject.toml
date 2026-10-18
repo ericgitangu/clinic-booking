@@ -81,6 +81,11 @@ source = ["app"]
 # invoked through httpx.ASGITransport is measured, not just imported.
 concurrency = ["thread", "greenlet"]
 
+[tool.coverage.report]
+# Two decimals, so a threshold compares the real figure: at 0 decimals coverage.py rounds 94.7 up to
+# 95 and `--fail-under=95` would pass.
+precision = 2
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

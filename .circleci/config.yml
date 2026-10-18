@@ -134,6 +134,9 @@ jobs:
               -m "not race and not control" \
               --junitxml=test-results/pytest/results.xml \
               --cov=app --cov-report=xml --cov-fail-under=85
+            # the pure domain is held to 95% by its own unit tests alone (two decimals: see pyproject), so
+            # integration coverage cannot stand in for them
+            uv run pytest tests/unit --cov=app/domain --cov-report=term --cov-fail-under=95
             uv run pytest -m race -rA
             uv run pytest -m control -rA
       - store_test_results:
@@ -227,7 +230,7 @@ jobs:
       - run:
           name: ZAP API scan against the compose stack
           command: |
-            docker compose up -d --wait
+            docker compose up -d --build --wait
             NET=$(docker network ls --filter name=clinic_default --format '{{.Name}}')
             chmod a+rwx .zap   # the ZAP container user is not the runner's uid
             set +e
