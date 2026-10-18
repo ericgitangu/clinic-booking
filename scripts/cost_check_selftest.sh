@@ -19,7 +19,7 @@ mkdir -p "$PRISTINE"
 ( cd "$ROOT" && tar -cf - \
     --exclude=node_modules --exclude=.terraform --exclude=.venv --exclude=__pycache__ \
     --exclude=apps/booking/src/generated \
-    .circleci infra scripts Makefile apps/booking/vercel.json apps/booking/next.config.ts apps/booking/src packages/ui/src packages/api/src ) | ( cd "$PRISTINE" && tar -xf - )
+    .circleci infra scripts docs/evidence Makefile apps/booking/vercel.json apps/booking/next.config.ts apps/booking/src packages/ui/src packages/api/src ) | ( cd "$PRISTINE" && tar -xf - )
 
 PASSES=0; FAILS=0; N=0
 ok()  { PASSES=$((PASSES + 1)); printf 'PASS  %s\n' "$1"; }
@@ -33,6 +33,7 @@ sum() { cksum "$DIR/$1" 2>/dev/null | cut -d' ' -f1; }
 MUTATED=1
 mutate_sub()   { local before; before="$(sum "$1")"; ( cd "$DIR" && perl -pi -e "$2" "$1" ); [ "$(sum "$1")" != "$before" ] || MUTATED=0; }
 mutate_add()   { mkdir -p "$(dirname "$DIR/$1")"; printf '%s\n' "$2" >> "$DIR/$1"; }
+mutate_rm()      { [ -e "$DIR/$1" ] || MUTATED=0; rm -f "$DIR/$1"; }
 mutate_write() { mkdir -p "$(dirname "$DIR/$1")"; printf '%s\n' "$2" > "$DIR/$1"; }
 
 # expect_fail <name> <expected substring> <mutation cmd...>
@@ -176,6 +177,19 @@ expect_fail "docs route imports the proxy (relative)" "doc route not force-stati
 expect_fail "docs route fetches Cloud Run"            "doc route not force-static" mutate_add apps/booking/src/app/docs/route.ts 'const r = await fetch("https://x.run.app");'
 expect_fail "docs route re-exports the proxy handler" "doc route not force-static" mutate_add apps/booking/src/app/redoc/route.ts 'export { GET } from "../api/[...path]/route";'
 expect_fail "force-static only in a comment"          "doc route not force-static" mutate_sub apps/booking/src/app/docs/route.ts 's/^export const dynamic = "force-static";/export const dynamic = "force-dynamic"; \/\/ force-static/'
+
+echo "== spend cap evidence (C11) =="
+EV=docs/evidence/spend-cap-2026-10-18.md
+expect_pass "recorded Configured evidence passes" nop
+expect_fail "evidence file missing"          "C11 cap status not readable via API; evidence file missing" mutate_rm "$EV"
+expect_fail "evidence empty"                 "does not record 'Spend cap status: Configured'" mutate_write "$EV" ""
+expect_fail "status Not applicable"          "does not record 'Spend cap status: Configured'" mutate_sub "$EV" 's/Spend cap status: Configured/Spend cap status: Not applicable/'
+expect_fail "status blank"                   "does not record 'Spend cap status: Configured'" mutate_sub "$EV" 's/Spend cap status: Configured/Spend cap status:/'
+expect_fail "status only mentioned in prose" "does not record 'Spend cap status: Configured'" mutate_sub "$EV" 's/^- Spend cap status: Configured/Spend cap status: Configured (prose)/'
+expect_fail "budget id missing"              "does not name budget id" mutate_sub "$EV" 's/bfd734ab-ef98-414a-8bb1-b6442c1dec94/REDACTED/g'
+expect_fail "a different budget id"          "does not name budget id" mutate_sub "$EV" 's/bfd734ab-ef98-414a-8bb1-b6442c1dec94/c193126c-b3ca-4076-98b6-e451c5c531ed/g'
+fresh; out="$(cd "$DIR" && bash scripts/cost_check.sh --static 2>&1)"
+if grep -F "C11" <<<"$out" | grep -qF "cap status not readable via API; see docs/evidence/spend-cap-2026-10-18.md"; then ok "the pass line says the status is not readable via API and points at the evidence"; else bad "C11 pass wording"; fi
 
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }
