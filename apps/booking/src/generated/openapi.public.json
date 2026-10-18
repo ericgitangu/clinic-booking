@@ -471,6 +471,7 @@
         "enum": [
           "UNAUTHENTICATED",
           "FORBIDDEN",
+          "CLIENT_ADDRESS_UNKNOWN",
           "VALIDATION_ERROR",
           "TIMEZONE_REQUIRED",
           "UNKNOWN_DOCTOR",
@@ -1210,6 +1211,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
           },
           "403": {
             "content": {

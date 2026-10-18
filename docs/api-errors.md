@@ -12,6 +12,7 @@ current state; may succeed later or in another state.
 |---|---|---|---|---|
 | UNAUTHENTICATED | 401 | unauthenticated | Unauthenticated | The internal assertion is missing, malformed, expired or does not match the request. |
 | FORBIDDEN | 403 | forbidden | Forbidden | The internal assertion is valid but its role may not use this endpoint. |
+| CLIENT_ADDRESS_UNKNOWN | 400 | client-address-unknown | Client address unknown | The request carries no usable client address, so it cannot be rate limited. Retry. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
 | TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | The datetime is naive (and nothing else is wrong). |
 | UNKNOWN_DOCTOR | 422 | unknown-doctor | Unknown doctor | The body references a non-existent or inactive doctor. |
@@ -50,7 +51,8 @@ time replays the booking with `Idempotent-Replayed: true`; a different doctor or
 `IDEMPOTENCY_KEY_CONSUMED`. A malformed key (not 1-255 visible ASCII characters) is
 `VALIDATION_ERROR`.
 
-Realtime tokens (`POST /realtime/token/patient`, `POST /internal/realtime/token/admin`): `RATE_LIMITED` (429, with
+Realtime tokens (`POST /realtime/token/patient`, `POST /internal/realtime/token/admin`): `CLIENT_ADDRESS_UNKNOWN`
+(400) when the proxy supplied no usable `x-client-ip` (the API never guesses one from the socket); `RATE_LIMITED` (429, with
 `Retry-After`) when an address uses too many tokens in a minute or a day; `REALTIME_UNAVAILABLE` (503) when push is not
 configured or the month's publish budget is spent, so the client polls.
 

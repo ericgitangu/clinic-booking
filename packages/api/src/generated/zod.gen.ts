@@ -285,6 +285,7 @@ export const zPatientTokenRequest = z.object({
 export const zProblemCode = z.enum([
     'UNAUTHENTICATED',
     'FORBIDDEN',
+    'CLIENT_ADDRESS_UNKNOWN',
     'VALIDATION_ERROR',
     'TIMEZONE_REQUIRED',
     'UNKNOWN_DOCTOR',

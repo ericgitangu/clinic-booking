@@ -5,17 +5,22 @@
 1. take the single cursor row ``FOR UPDATE SKIP LOCKED`` (a second relay returns at once);
 2. read events after the cursor whose writing transaction is older than the snapshot's ``xmin``
    (every such transaction has finished, so no earlier event can still appear), at most 100;
-3. drop events too old to matter, debit the monthly budget, publish them in one batch with
-   deterministic ids ``<txid>.<id>`` (``…<part>`` for patient messages);
+3. drop events too old to matter; count the events not yet counted against the monthly budget
+   (past ``debited_through``) and debit them in this same transaction; publish the batch with
+   deterministic ids ``<txid>.<id>`` (``...<part>`` for patient messages);
 4. advance the cursor only after the push service accepted the batch.
 
-A failure leaves the cursor where it was, so the next trigger retries; a repeat inside the push
-service's duplicate window is dropped by id, and consumers also order by ``seq``.
+A failure leaves the cursor where it was, so the next trigger retries; the debit and
+``debited_through`` are committed with it, so retrying the same events during an outage costs
+nothing more. A batch that provably never left this process (nothing was sent) rolls back,
+debit included. A repeat inside the push service's duplicate window is dropped by id, and
+consumers also order by ``seq``.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
 There is no always-on worker, so an event stuck behind a concurrent open transaction waits for
-the next trigger; the clients' safety-net poll covers that gap.
+the next trigger; the clients' safety-net poll covers that gap. After three failed publishes in a
+row the relay stops trying for a minute (a circuit breaker, logged once when it opens).
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import text
@@ -40,7 +46,10 @@ _log = logging.getLogger(APP_LOGGER)
 BATCH = 100
 
 _CURSOR = text(
-    "SELECT txid::text AS txid, id FROM event_relay_cursor WHERE singleton FOR UPDATE SKIP LOCKED"
+    """
+    SELECT txid::text AS txid, id, debited_txid::text AS debited_txid, debited_id
+    FROM event_relay_cursor WHERE singleton FOR UPDATE SKIP LOCKED
+    """
 )
 # One statement, so the horizon and the read agree. txid travels as text: asyncpg has no xid8 codec.
 _EVENTS = text(
@@ -55,10 +64,34 @@ _EVENTS = text(
     """
 )
 _ADVANCE = text(
-    "UPDATE event_relay_cursor SET txid = CAST(:txid AS text)::xid8, id = :id, updated_at = :now "
-    "WHERE singleton"
+    """
+    UPDATE event_relay_cursor
+    SET txid = CAST(:txid AS text)::xid8, id = :id,
+        debited_txid = CAST(:txid AS text)::xid8, debited_id = :id, updated_at = :now
+    WHERE singleton
+    """
+)
+_MARK_DEBITED = text(
+    """
+    UPDATE event_relay_cursor
+    SET debited_txid = CAST(:txid AS text)::xid8, debited_id = :id, updated_at = :now
+    WHERE singleton
+    """
 )
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
+
+BREAKER_FAILURES = 3
+BREAKER_PAUSE = timedelta(seconds=60)
+
+
+@dataclass(frozen=True)
+class RelayResult:
+    published: int = 0
+    failed: bool = False
+
+
+class _NothingSent(Exception):
+    """Internal: roll the transaction back (debit included) because no request left this process."""
 
 
 async def horizon_cursor(session: AsyncSession) -> str:
@@ -83,6 +116,54 @@ def _event(row: object) -> tuple[OutboxEvent, datetime]:
     )
 
 
+async def _relay_in(
+    session: AsyncSession,
+    publisher: EventPublisher,
+    budget: PublishBudget,
+    clock: Clock,
+    *,
+    max_age: timedelta,
+    limit: int,
+) -> RelayResult:
+    cursor = (await session.execute(_CURSOR)).first()
+    if cursor is None:
+        return RelayResult()  # another relay holds the cursor row
+    rows = (
+        await session.execute(_EVENTS, {"txid": cursor.txid, "id": cursor.id, "limit": limit})
+    ).all()
+    if not rows:
+        return RelayResult()
+    now = clock.now()
+    parsed = [_event(r) for r in rows]
+    last = parsed[-1][0]
+    fresh = [e for e, occurred in parsed if now - occurred <= max_age]
+    paid_through = (int(cursor.debited_txid), int(cursor.debited_id))
+    unpaid = [m for e in fresh if (e.txid, e.id) > paid_through for m in messages_for(e)]
+    messages: list[OutboundMessage] = [m for e in fresh for m in messages_for(e)]
+
+    spent = bool(unpaid) and (
+        await budget.exhausted(now) or not await budget.debit(len(unpaid), now, session=session)
+    )
+    if spent or not messages:
+        # Nothing to send (all too old) or no budget left: move past them, push is off.
+        messages = []
+    elif unpaid:
+        await session.execute(_MARK_DEBITED, {"txid": str(last.txid), "id": last.id, "now": now})
+    published = 0
+    if messages:
+        try:
+            await publisher.publish(messages)
+        except PublishError as exc:
+            if not exc.sent:
+                raise _NothingSent from exc
+            # The service answered (and may have counted it): keep the debit, retry later.
+            _log.warning("realtime publish failed, retrying on a later trigger: %s", exc)
+            return RelayResult(failed=True)
+        published = len(messages)
+    await session.execute(_ADVANCE, {"txid": str(last.txid), "id": last.id, "now": now})
+    return RelayResult(published=published)
+
+
 async def relay_once(
     sessionmaker: async_sessionmaker[AsyncSession],
     publisher: EventPublisher,
@@ -91,39 +172,30 @@ async def relay_once(
     *,
     max_age: timedelta,
     limit: int = BATCH,
-) -> int:
-    """Relay one batch. Returns the number of messages published (0 if none or not published)."""
+) -> RelayResult:
+    """Relay one batch; how many messages went out, and whether the push failed."""
     if not publisher.enabled:
-        return 0
-    async with sessionmaker() as session, session.begin():
-        cursor = (await session.execute(_CURSOR)).first()
-        if cursor is None:
-            return 0  # another relay holds the cursor row
-        rows = (
-            await session.execute(_EVENTS, {"txid": cursor.txid, "id": cursor.id, "limit": limit})
-        ).all()
-        if not rows:
-            return 0
-        now = clock.now()
-        parsed = [_event(r) for r in rows]
-        last = parsed[-1][0]
-        fresh = [e for e, occurred in parsed if now - occurred <= max_age]
-        messages: list[OutboundMessage] = [m for e in fresh for m in messages_for(e)]
-        published = 0
-        if messages:
-            if not await budget.debit(len(messages), now):
-                messages = []  # budget spent: drop them, the safety-net poll covers the UI
-            else:
-                try:
-                    await publisher.publish(messages)
-                except PublishError as exc:
-                    if not exc.sent:
-                        await budget.refund(len(messages), now)
-                    _log.warning("realtime publish failed, will retry on the next trigger: %s", exc)
-                    return 0  # the cursor stays: leaving the block rolls nothing forward
-                published = len(messages)
-        await session.execute(_ADVANCE, {"txid": str(last.txid), "id": last.id, "now": now})
-    return published
+        return RelayResult()
+    async with sessionmaker() as session:
+        await session.begin()
+        try:
+            result = await _relay_in(
+                session, publisher, budget, clock, max_age=max_age, limit=limit
+            )
+            await session.commit()
+            return result
+        except _NothingSent:
+            await session.rollback()  # nothing left this process: debit and mark undone too
+            _log.warning("realtime push service unreachable, retrying on a later trigger")
+            return RelayResult(failed=True)
+        except asyncio.CancelledError:
+            # The caller's time ran out, possibly with the batch already accepted over there: keep
+            # what was debited (the cursor itself was not moved) rather than count it twice later.
+            await asyncio.shield(session.commit())
+            raise
+        except BaseException:
+            await session.rollback()
+            raise
 
 
 class Relay:
@@ -141,17 +213,37 @@ class Relay:
         self.budget = budget
         self._timeout = settings.REALTIME_RELAY_TIMEOUT_SECONDS
         self._max_age = timedelta(seconds=settings.REALTIME_MAX_EVENT_AGE_SECONDS)
+        self._failures = 0
+        self._paused_until: datetime | None = None
 
     async def run(self, clock: Clock) -> int:
         if not self.publisher.enabled:
             return 0
+        now = clock.now()
+        if self._paused_until is not None and now < self._paused_until:
+            return 0  # breaker open: skip the attempt, the clients' poll covers the gap
         try:
-            return await asyncio.wait_for(
+            result = await asyncio.wait_for(
                 relay_once(
                     self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
                 ),
                 timeout=self._timeout,
             )
         except Exception:  # noqa: BLE001  # a push problem must never fail the booking response
-            _log.warning("realtime relay failed; the next trigger retries", exc_info=True)
-            return 0
+            _log.warning("realtime relay failed; a later trigger retries", exc_info=True)
+            result = RelayResult(failed=True)
+        if not result.failed:
+            self._failures = 0
+            self._paused_until = None
+            return result.published
+        self._failures += 1
+        if self._failures >= BREAKER_FAILURES and self._paused_until is None:
+            self._paused_until = now + BREAKER_PAUSE
+            _log.warning(
+                "realtime push failed %s times in a row: not trying again for %s seconds",
+                self._failures,
+                int(BREAKER_PAUSE.total_seconds()),
+            )
+        elif self._failures >= BREAKER_FAILURES:
+            self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
+        return 0

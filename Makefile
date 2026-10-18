@@ -114,7 +114,7 @@ e2e: ## Playwright checks against the real API and database (docker compose, mig
 	# slots, and a database that keeps every earlier run eventually has no free times in the week a scenario uses.
 	# Throwaway keys for this run: the API verifies the signed assertions with INTERNAL_SIGNING_KEY, and
 	# the app signs its sessions with BETTER_AUTH_SECRET.
-	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32); \
+	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32) WEB_ORIGIN=http://localhost:3100; \
 	docker compose down -v && docker compose up -d --build --wait && \
 	REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
 	REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts && \

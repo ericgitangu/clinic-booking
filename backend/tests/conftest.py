@@ -167,7 +167,8 @@ async def realtime_clean(owner_conn: asyncpg.Connection) -> AsyncIterator[None]:
     await owner_conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")
     await owner_conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
     await owner_conn.execute(
-        "UPDATE event_relay_cursor SET txid = pg_snapshot_xmin(pg_current_snapshot()), id = 0"
+        "UPDATE event_relay_cursor SET txid = pg_snapshot_xmin(pg_current_snapshot()), id = 0, "
+        "debited_txid = pg_snapshot_xmin(pg_current_snapshot()), debited_id = 0"
     )
     yield
     await owner_conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")

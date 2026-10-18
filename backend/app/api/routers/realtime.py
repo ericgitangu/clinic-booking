@@ -8,6 +8,7 @@ off, so clients fall back to polling at once.
 
 from __future__ import annotations
 
+import ipaddress
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
@@ -18,6 +19,7 @@ from app.api.deps import CAN_MANAGE, get_clock, get_relay, get_session, get_sett
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import (
+    ClientAddressUnknown,
     DateOutOfRange,
     DoctorNotFound,
     Forbidden,
@@ -42,12 +44,15 @@ _NO_STORE = {"Cache-Control": "no-store"}
 
 
 def _client_ip(request: Request) -> str:
-    # The proxy sets x-client-ip itself and drops any the caller sent; the API is reachable only
-    # through it (IAM). Without it, fall back to the socket peer.
-    forwarded = request.headers.get("x-client-ip")
-    if forwarded:
-        return forwarded
-    return request.client.host if request.client else "unknown"
+    """The address the proxy saw. It sets x-client-ip itself and drops any the caller sent; the API
+    is reachable only through it (IAM). A missing or unparsable value is refused, never replaced by
+    the socket peer, which is the shared upstream and would put every visitor in one bucket."""
+    forwarded = request.headers.get("x-client-ip", "").strip()
+    try:
+        ipaddress.ip_address(forwarded)
+    except ValueError:
+        raise ClientAddressUnknown() from None
+    return forwarded
 
 
 def _require_key(settings: Settings) -> str:
@@ -59,7 +64,7 @@ def _require_key(settings: Settings) -> str:
 @router.post(
     "/realtime/token/patient",
     response_model=RealtimeToken,
-    responses=problem_responses(403, 404, 422, 429, 503),
+    responses=problem_responses(400, 403, 404, 422, 429, 503),
 )
 async def patient_token(
     body: PatientTokenRequest,

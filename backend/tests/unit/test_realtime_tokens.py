@@ -86,6 +86,12 @@ def test_address_key_groups_ipv6_by_slash_64_and_keeps_ipv4_whole() -> None:
     assert address_key("not an ip") == "invalid"
 
 
+def test_address_key_unwraps_ipv4_mapped_ipv6() -> None:
+    assert address_key("::ffff:203.0.113.9") == address_key("203.0.113.9") == "v4:203.0.113.9"
+    assert address_key("::ffff:cb00:7109") == "v4:203.0.113.9"  # the same address in hex form
+    assert address_key("::ffff:203.0.113.10") != address_key("::ffff:203.0.113.9")
+
+
 def test_minute_limiter_allows_the_limit_then_refuses_then_recovers() -> None:
     limiter = MinuteLimiter(3)
     assert [limiter.allow("k", NOW) for _ in range(4)] == [True, True, True, False]

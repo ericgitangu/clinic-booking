@@ -250,3 +250,73 @@ async def test_the_admin_token_without_an_assertion_is_a_401(realtime_clean: Non
     )
     async with _client(app) as c:
         assert (await c.post(ADMIN_PATH)).status_code == 401
+
+
+# --- the client address: never guessed, IPv4-mapped unwrapped; no-store on every answer ---------
+
+
+async def test_a_request_without_a_usable_client_address_is_refused_not_guessed(
+    realtime_clean: None, owner_conn: asyncpg.Connection
+) -> None:
+    async with _client(make_realtime_app(RecordingPublisher())) as c:
+        # The test transport's socket peer is 127.0.0.1; it must never stand in for the client.
+        absent = await c.post(PATH, json=_body())
+        for bad in ("", "not-an-ip", "999.1.1.1", "203.0.113.5, 198.51.100.1"):
+            wrong = await c.post(PATH, json=_body(), headers=_from(bad))
+            assert wrong.status_code == 400, bad
+            assert wrong.json()["code"] == "CLIENT_ADDRESS_UNKNOWN"
+    assert absent.status_code == 400 and absent.json()["code"] == "CLIENT_ADDRESS_UNKNOWN"
+    assert await owner_conn.fetchval("SELECT count(*) FROM realtime_token_cap") == 0
+
+
+async def test_ipv4_mapped_ipv6_addresses_count_as_the_ipv4_client(realtime_clean: None) -> None:
+    app = make_realtime_app(
+        RecordingPublisher(), REALTIME_TOKEN_DAILY_CAP=2, REALTIME_TOKEN_PER_MINUTE=100
+    )
+    async with _client(app) as c:
+        same = [
+            (await c.post(PATH, json=_body(), headers=_from(ip))).status_code
+            for ip in ("203.0.113.60", "::ffff:203.0.113.60", "::ffff:cb00:713c")
+        ]
+        other = await c.post(PATH, json=_body(), headers=_from("::ffff:203.0.113.61"))
+    assert same == [200, 200, 429], "one client, written three ways"
+    assert other.status_code == 200, "a different mapped client is not in the same bucket"
+
+
+@pytest.mark.parametrize(
+    ("headers", "body", "status"),
+    [
+        (_from("203.0.113.70"), _body(), 200),
+        ({}, _body(), 400),  # no client address
+        (_from("203.0.113.71", origin="https://evil.example"), _body(), 403),
+        (_from("203.0.113.72"), {"doctor_id": "nope", "date": DAY}, 422),
+        (_from("203.0.113.73"), _body(date="2020-01-01"), 422),
+        (
+            _from("203.0.113.74"),
+            {"doctor_id": "00000000-0000-4000-8000-000000000000", "date": DAY},
+            404,
+        ),
+    ],
+)
+async def test_every_answer_of_the_patient_token_route_is_no_store(
+    realtime_clean: None, headers: dict[str, str], body: dict[str, str], status: int
+) -> None:
+    async with _client(make_realtime_app(RecordingPublisher())) as c:
+        resp = await c.post(PATH, json=body, headers=headers)
+    assert resp.status_code == status, resp.text
+    assert resp.headers["cache-control"] == "no-store"
+
+
+async def test_the_rate_limited_and_unavailable_answers_are_no_store_too(
+    realtime_clean: None,
+) -> None:
+    limited_app = make_realtime_app(RecordingPublisher(), REALTIME_TOKEN_PER_MINUTE=1)
+    async with _client(limited_app) as c:
+        await c.post(PATH, json=_body(), headers=_from("203.0.113.80"))
+        limited = await c.post(PATH, json=_body(), headers=_from("203.0.113.80"))
+    off = make_realtime_app(key=None)
+    async with _client(off) as c:
+        unavailable = await c.post(PATH, json=_body(), headers=_from("203.0.113.81"))
+    assert limited.status_code == 429 and unavailable.status_code == 503
+    for resp in (limited, unavailable):
+        assert resp.headers["cache-control"] == "no-store"

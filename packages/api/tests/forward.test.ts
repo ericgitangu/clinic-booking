@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildTarget,
   forward,
+  problem,
   resolveUpstream,
   rewriteLocation,
 } from "../src/proxy/forward";
@@ -342,6 +343,50 @@ describe("buildTarget refuses any path the URL parser would rewrite", () => {
   });
 });
 
+describe("extra request headers and the client address", () => {
+  it("passes Origin on only when the caller asked for it", async () => {
+    const send = async (extra?: string[]) => {
+      const cap: Captured = {};
+      await forward(
+        new Request("https://web.example/api/x", {
+          method: "POST",
+          headers: {
+            origin: "https://web.example",
+            "content-type": "application/json",
+          },
+          body: "{}",
+        }),
+        {
+          baseUrl: "https://api.example.run.app",
+          upstreamPath: "/x",
+          fetchImpl: mockFetch(cap),
+          extraRequestHeaders: extra,
+        },
+      );
+      return cap.init!.headers as Headers;
+    };
+    expect((await send()).has("origin")).toBe(false);
+    expect((await send(["Origin"])).get("origin")).toBe("https://web.example");
+    expect((await send(["authorization"])).has("origin")).toBe(false);
+  });
+
+  it("drops a client-supplied x-client-ip when the proxy has no address of its own", async () => {
+    const cap: Captured = {};
+    await forward(
+      new Request("https://web.example/api/x", {
+        headers: { "x-client-ip": "9.9.9.9" },
+      }),
+      {
+        baseUrl: "https://api.example.run.app",
+        upstreamPath: "/x",
+        clientIp: null,
+        fetchImpl: mockFetch(cap),
+      },
+    );
+    expect((cap.init!.headers as Headers).has("x-client-ip")).toBe(false);
+  });
+});
+
 describe("conditional requests pass through", () => {
   it("forwards If-None-Match and returns a 304 with its ETag", async () => {
     const cap: Captured = {};
@@ -443,5 +488,15 @@ describe("rewriteLocation", () => {
       },
     );
     expect(res.headers.get("location")).toBe("/api/appointments/abc");
+  });
+});
+
+describe("proxy-made errors are never cacheable", () => {
+  it("problem() marks every error no-store", () => {
+    for (const status of [403, 404, 405, 413, 502, 504]) {
+      const res = problem(status, "X", "x");
+      expect(res.headers.get("cache-control"), String(status)).toBe("no-store");
+      expect(res.headers.get("content-type")).toBe("application/problem+json");
+    }
   });
 });

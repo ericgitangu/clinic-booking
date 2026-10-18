@@ -100,12 +100,50 @@ async def test_concurrent_relays_publish_each_event_exactly_once(
 
     async def relay() -> int:
         await barrier.wait()
-        return await relay_once(
+        result = await relay_once(
             sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE, limit=100
         )
+        return result.published
 
     sent = await asyncio.gather(*[relay() for _ in range(8)])
     assert sorted(sent) == [0] * 7 + [80], sent  # one relay took the row, the rest skipped it
     ids = [m.id for m in publisher.messages]
     assert len(ids) == len(set(ids)) == 80
     assert await owner_conn.fetchval("SELECT count(*) FROM appointment_events") == 40
+
+
+async def test_a_second_relay_does_not_wait_for_the_one_holding_the_cursor(
+    realtime_clean: None, owner_conn: asyncpg.Connection
+) -> None:
+    import time
+
+    appt = await owner_conn.fetchval(
+        "INSERT INTO appointments (doctor_id, patient_id, starts_at, ends_at) "
+        "VALUES ($1, $2, $3::timestamptz, $3::timestamptz + interval '30 minutes') RETURNING id",
+        seeded_doctor_id("otieno"),
+        seeded_patient_id("amina"),
+        datetime(2026, 10, 28, 6, 0, tzinfo=UTC),
+    )
+    await owner_conn.execute(
+        "INSERT INTO appointment_events "
+        "(appointment_id, doctor_id, event_type, to_starts_at, local_date) "
+        "VALUES ($1, $2, 'booked', $3, '2026-10-28')",
+        appt,
+        seeded_doctor_id("otieno"),
+        datetime(2026, 10, 28, 6, 0, tzinfo=UTC),
+    )
+    sessionmaker = _sessionmaker()
+    budget = PublishBudget(sessionmaker, 25_000)
+    slow = RecordingPublisher(delay=1.5)  # the first relay holds the cursor row this long
+    first = asyncio.create_task(
+        relay_once(sessionmaker, slow, budget, FakeClock(FIXED_NOW), max_age=HUGE)
+    )
+    await asyncio.sleep(0.4)  # the first has taken the row and is inside its publish
+    started = time.monotonic()
+    second = await relay_once(
+        sessionmaker, RecordingPublisher(), budget, FakeClock(FIXED_NOW), max_age=HUGE
+    )
+    waited = time.monotonic() - started
+    assert second.published == 0
+    assert waited < 0.5, f"the second relay waited {waited:.2f}s for the lease instead of skipping"
+    assert (await first).published == 2

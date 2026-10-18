@@ -67,11 +67,12 @@ def build_problem(
         "request_id": _request_id(request),
         "errors": errors,
     }
+    # A problem describes this one request and must never be stored or shared.
     return JSONResponse(
         status_code=spec.status,
         content=body,
         media_type=PROBLEM_MEDIA_TYPE,
-        headers=headers,
+        headers={"Cache-Control": "no-store", **(headers or {})},
     )
 
 

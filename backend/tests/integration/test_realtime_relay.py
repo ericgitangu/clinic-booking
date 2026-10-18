@@ -69,17 +69,20 @@ async def test_cancel_and_reschedule_push_freed_and_taken_in_order(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
     publisher = RecordingPublisher()
+
+    def patient_names() -> list[str]:
+        return [m.name for m in publisher.messages if m.channel != "admin:events"]
+
     async with await _client(make_realtime_app(publisher)) as c:
         appt = (await c.post("/appointments", json=_body())).json()["id"]
+        assert patient_names() == ["slot_taken"], "book pushed before its response"
         moved = await c.patch(f"/appointments/{appt}/reschedule", json={"starts_at": SLOT_10})
+        assert moved.status_code == 200
+        # The reschedule itself pushed: 09:00 freed, 10:00 taken (checked before the next write).
+        assert patient_names() == ["slot_taken", "slot_freed", "slot_taken"]
         gone = await c.patch(f"/appointments/{appt}/cancel", json={"reason": "plans changed"})
-    assert moved.status_code == gone.status_code == 200
-    assert [m.name for m in publisher.messages if m.channel != "admin:events"] == [
-        "slot_taken",  # booked 09:00
-        "slot_freed",  # reschedule: 09:00 freed ...
-        "slot_taken",  # ... 10:00 taken
-        "slot_freed",  # cancel: 10:00 freed
-    ]
+        assert gone.status_code == 200
+        assert patient_names() == ["slot_taken", "slot_freed", "slot_taken", "slot_freed"]
     assert [m.name for m in publisher.messages if m.channel == "admin:events"] == [
         "booked",
         "rescheduled",
@@ -176,7 +179,7 @@ async def test_the_snapshot_guard_holds_back_events_behind_an_open_transaction(
     sessionmaker = get_sessionmaker(app.state.settings)
     budget = PublishBudget(sessionmaker, 25_000)
     sent = await relay_once(sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE)
-    assert sent == 4
+    assert sent.published == 4
     patient_ids = [m.id for m in publisher.messages if m.channel != "admin:events"]
     assert patient_ids == [f"{first[0]}.{first[1]}.1", f"{second[0]}.{second[1]}.1"]
     assert await _cursor(owner_conn) == second
@@ -205,7 +208,9 @@ async def test_a_backlog_larger_than_a_batch_arrives_complete_in_order_once(
     sessionmaker = get_sessionmaker(app.state.settings)
     budget = PublishBudget(sessionmaker, 25_000)
     rounds = 0
-    while await relay_once(sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE):
+    while (
+        await relay_once(sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE)
+    ).published:
         rounds += 1
         assert rounds < 10
     assert rounds == 5  # 450 events at 100 a batch
@@ -213,9 +218,8 @@ async def test_a_backlog_larger_than_a_batch_arrives_complete_in_order_once(
     expected = [f"{t}.{i}" for t, i in await _events(owner_conn)]
     assert admin_ids == expected and len(set(admin_ids)) == 450
     # Running it again publishes nothing: the cursor is past everything.
-    assert (
-        await relay_once(sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE) == 0
-    )
+    again = await relay_once(sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=HUGE)
+    assert again.published == 0
 
 
 async def test_events_older_than_the_max_age_are_dropped_not_replayed(
@@ -271,7 +275,8 @@ async def test_a_push_that_never_left_this_process_gives_its_budget_back(
 
     async with await _client(make_realtime_app(Unreachable())) as c:
         assert (await c.post("/appointments", json=_body())).status_code == 201
-    assert await owner_conn.fetchval("SELECT used FROM realtime_publish_budget") == 0
+    # Nothing left this process: the whole transaction, debit included, was rolled back.
+    assert await owner_conn.fetchval("SELECT count(*) FROM realtime_publish_budget") == 0
     # An answer from the service may have been counted there, so that debit stays.
     async with await _client(make_realtime_app(RecordingPublisher(fail=True))) as c:
         assert (await c.post("/appointments", json=_body(BRIAN, SLOT_10))).status_code == 201
@@ -294,3 +299,127 @@ async def test_an_admin_metrics_request_retries_events_a_failed_push_left_behind
         assert resp.status_code == 200
     assert [m.name for m in publisher.messages] == ["slot_taken", "booked"]
     assert await _cursor(owner_conn) == (await _events(owner_conn))[-1]
+
+
+# --- an outage costs each event once; the breaker; the single "spent" test ---------------------
+
+
+async def _used(conn: asyncpg.Connection) -> int:
+    value = await conn.fetchval("SELECT used FROM realtime_publish_budget")
+    return int(value) if value is not None else 0
+
+
+async def test_an_outage_debits_each_event_once_however_many_triggers_retry_it(
+    realtime_clean: None, owner_conn: asyncpg.Connection
+) -> None:
+    publisher = RecordingPublisher(fail=True)
+    clock = FakeClock(FIXED_NOW)
+    # The breaker is not under test here: a huge threshold-free relay is built by hand.
+    app = make_realtime_app(publisher, clock=clock)
+    async with await _client(app) as c:
+        assert (await c.post("/appointments", json=_body())).status_code == 201  # 1 event, 2 msgs
+    sessionmaker = get_sessionmaker(app.state.settings)
+    budget = PublishBudget(sessionmaker, 25_000)
+    for _ in range(10):
+        result = await relay_once(sessionmaker, publisher, budget, clock, max_age=HUGE)
+        assert result.failed and result.published == 0
+    assert await _used(owner_conn) == 2, "ten retries of the same event, one debit"
+    # A second event costs its own two, once, and the first is still not charged again.
+    async with await _client(app) as c:
+        assert (await c.post("/appointments", json=_body(BRIAN, SLOT_10))).status_code == 201
+    for _ in range(5):
+        await relay_once(sessionmaker, publisher, budget, clock, max_age=HUGE)
+    assert await _used(owner_conn) == 4
+    publisher.fail = False
+    done = await relay_once(sessionmaker, publisher, budget, clock, max_age=HUGE)
+    assert done.published == 4 and not done.failed  # both events, in order, at last
+    assert await _used(owner_conn) == 4
+    assert await _cursor(owner_conn) == (await _events(owner_conn))[-1]
+
+
+async def test_a_hanging_service_that_times_out_keeps_its_debit_once(
+    realtime_clean: None, owner_conn: asyncpg.Connection
+) -> None:
+    publisher = RecordingPublisher(delay=30)
+    app = make_realtime_app(publisher, REALTIME_RELAY_TIMEOUT_SECONDS=0.3)
+    async with await _client(app) as c:
+        for _ in range(3):
+            assert (await c.post("/appointments", json=_body(BRIAN, SLOT_10))).status_code in (
+                201,
+                409,
+            )
+    assert await _used(owner_conn) == 2, "the batch may have been accepted over there: counted once"
+
+
+async def test_the_breaker_opens_after_three_failures_and_closes_after_a_minute(
+    realtime_clean: None, owner_conn: asyncpg.Connection, capsys: pytest.CaptureFixture[str]
+) -> None:
+    publisher = RecordingPublisher(fail=True)
+    clock = FakeClock(FIXED_NOW)
+    app = make_realtime_app(publisher, clock=clock)
+    async with await _client(app) as c:
+        assert (await c.post("/appointments", json=_body())).status_code == 201  # failure 1
+        assert (await c.post("/appointments", json=_body(BRIAN, SLOT_10))).status_code == 201  # 2
+        assert (await c.post("/appointments", json=_body(AMINA, SLOT_11))).status_code == 201  # 3
+        calls = len(publisher.batches)
+        publisher.fail = False
+        # Open: further triggers do not even try, though the service has recovered.
+        for patient, at in (
+            (BRIAN, "2026-10-26T13:00:00+03:00"),
+            (AMINA, "2026-10-26T14:00:00+03:00"),
+        ):
+            assert (await c.post("/appointments", json=_body(patient, at))).status_code == 201
+        assert len(publisher.batches) == calls == 0
+        assert capsys.readouterr().out.count("not trying again") == 1, "logged once"
+        clock.set(FIXED_NOW + timedelta(seconds=59))
+        assert (
+            await c.post("/appointments", json=_body(BRIAN, "2026-10-26T15:00:00+03:00"))
+        ).status_code == 201
+        assert publisher.messages == []
+        clock.set(FIXED_NOW + timedelta(seconds=61))  # closed: the next trigger goes through
+        assert (
+            await c.post("/appointments", json=_body(AMINA, "2026-10-26T16:00:00+03:00"))
+        ).status_code == 201
+    assert len(publisher.messages) == 14, "all seven events, in order, once the breaker closed"
+    assert await _cursor(owner_conn) == (await _events(owner_conn))[-1]
+
+
+async def test_the_breaker_resets_on_a_success(realtime_clean: None) -> None:
+    publisher = RecordingPublisher(fail=True)
+    clock = FakeClock(FIXED_NOW)
+    app = make_realtime_app(publisher, clock=clock)
+    async with await _client(app) as c:
+        await c.post("/appointments", json=_body())
+        await c.post("/appointments", json=_body(BRIAN, SLOT_10))
+        publisher.fail = False
+        await c.post("/appointments", json=_body(AMINA, SLOT_11))  # success: failures back to 0
+        publisher.fail = True
+        await c.post("/appointments", json=_body(BRIAN, "2026-10-26T13:00:00+03:00"))
+        publisher.fail = False
+        await c.post("/appointments", json=_body(AMINA, "2026-10-26T14:00:00+03:00"))
+    assert len(publisher.messages) > 0, "two failures, a success, one failure: never three in a row"
+
+
+@pytest.mark.parametrize(("remaining", "spent"), [(4, False), (2, False), (1, True), (0, True)])
+async def test_one_test_for_spent_tokens_and_the_relay_agree_at_the_boundary(
+    realtime_clean: None, owner_conn: asyncpg.Connection, remaining: int, spent: bool
+) -> None:
+    # The smallest event is two messages, so with fewer than two left the month counts as spent
+    # for the token endpoints and for the relay alike.
+    cap = 10
+    await owner_conn.execute(
+        "INSERT INTO realtime_publish_budget (month, used) VALUES ('2026-10-01', $1)",
+        cap - remaining,
+    )
+    publisher = RecordingPublisher()
+    app = make_realtime_app(publisher, REALTIME_PUBLISH_CAP_PER_MONTH=cap)
+    async with await _client(app) as c:
+        token = await c.post(
+            "/realtime/token/patient",
+            json={"doctor_id": OTIENO, "date": "2026-10-26"},
+            headers={"x-client-ip": "203.0.113.50"},
+        )
+        booked = await c.post("/appointments", json=_body())
+    assert booked.status_code == 201
+    assert (token.status_code == 503) is spent
+    assert (len(publisher.messages) == 0) is spent

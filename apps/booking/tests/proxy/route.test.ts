@@ -6,7 +6,7 @@ vi.mock("@clinic/api/proxy/gcp-id-token", async (importOriginal) => {
   return { ...real, mintIdToken: vi.fn(), minting_enabled: vi.fn(() => false) };
 });
 
-import { GET } from "@/app/api/[...path]/route";
+import { GET, POST } from "@/app/api/[...path]/route";
 import {
   TokenMintError,
   mintIdToken,
@@ -19,6 +19,25 @@ function call(path: string[], headers: Record<string, string> = {}) {
     headers,
   });
   return GET(req, { params: Promise.resolve({ path }) });
+}
+
+function post(
+  path: string[],
+  headers: Record<string, string> = {},
+  body = "{}",
+) {
+  const req = new Request(`https://web.example/api/${path.join("/")}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body,
+  });
+  return POST(req, { params: Promise.resolve({ path }) });
+}
+
+// What the stand-in for Cloud Run received: the upstream request's headers.
+function upstreamHeaders(spy: ReturnType<typeof vi.spyOn>): Headers {
+  const init = spy.mock.calls.at(-1)?.[1] as RequestInit;
+  return init.headers as Headers;
 }
 
 beforeEach(() => {
@@ -111,5 +130,105 @@ describe("the real route handler", () => {
       statuses.push((await call(["doctors"])).status);
     expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
     expect(statuses.slice(10)).toEqual([429, 429]);
+  });
+});
+
+describe("the live-updates token route and the client address", () => {
+  const TOKEN = ["realtime", "token", "patient"];
+  const SITE = "https://web.example";
+  const stub = () =>
+    vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response("{}", { status: 200 }));
+
+  afterEach(() => {
+    delete process.env.VERCEL;
+  });
+
+  it("refuses a cross-site Origin with a 403 and sends nothing upstream", async () => {
+    const spy = stub();
+    for (const origin of [
+      "https://evil.example",
+      "http://web.example", // same host, other scheme
+      "https://web.example.evil.example",
+      "null",
+    ]) {
+      const res = await post(TOKEN, {
+        origin,
+        "x-vercel-forwarded-for": "203.0.113.5",
+      });
+      expect(res.status, origin).toBe(403);
+      expect((await res.json()).code).toBe("FORBIDDEN");
+    }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("passes this site's own Origin on to the API, for this route only", async () => {
+    const spy = stub();
+    const ok = await post(TOKEN, {
+      origin: SITE,
+      "x-vercel-forwarded-for": "203.0.113.5",
+    });
+    expect(ok.status).toBe(200);
+    expect(upstreamHeaders(spy).get("origin")).toBe(SITE);
+
+    await post(["appointments"], {
+      origin: SITE,
+      "x-vercel-forwarded-for": "203.0.113.5",
+    });
+    expect(upstreamHeaders(spy).has("origin")).toBe(false);
+  });
+
+  it("lets a request with no Origin through (not a browser) without inventing one", async () => {
+    const spy = stub();
+    const res = await post(TOKEN, { "x-vercel-forwarded-for": "203.0.113.5" });
+    expect(res.status).toBe(200);
+    expect(upstreamHeaders(spy).has("origin")).toBe(false);
+  });
+
+  it("only checks Origin on that route and that method", async () => {
+    const spy = stub();
+    const other = await post(["appointments"], {
+      origin: "https://evil.example",
+      "x-vercel-forwarded-for": "203.0.113.5",
+    });
+    expect(other.status).toBe(200); // other routes keep their CORS-free behaviour
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("always sets x-client-ip from the edge's address, and drops one the client sent", async () => {
+    const spy = stub();
+    await call(["doctors"], {
+      "x-vercel-forwarded-for": "203.0.113.5",
+      "x-client-ip": "9.9.9.9",
+    });
+    expect(upstreamHeaders(spy).get("x-client-ip")).toBe("203.0.113.5");
+
+    // The right-most entry is the one the nearest trusted proxy appended.
+    await call(["doctors"], {
+      "x-vercel-forwarded-for": "6.6.6.6, 203.0.113.7",
+      "x-client-ip": "9.9.9.9",
+    });
+    expect(upstreamHeaders(spy).get("x-client-ip")).toBe("203.0.113.7");
+
+    await call(["doctors"], {
+      "x-forwarded-for": "198.51.100.4",
+      "x-client-ip": "9.9.9.9",
+    });
+    expect(upstreamHeaders(spy).get("x-client-ip")).toBe("198.51.100.4");
+  });
+
+  it("on Vercel with no address the API gets none (it answers 400), never the client's own header", async () => {
+    process.env.VERCEL = "1";
+    const spy = stub();
+    await call(["doctors"], { "x-client-ip": "9.9.9.9" });
+    expect(upstreamHeaders(spy).has("x-client-ip")).toBe(false);
+  });
+
+  it("off Vercel (development, end-to-end runs) the client is this machine", async () => {
+    delete process.env.VERCEL;
+    const spy = stub();
+    await call(["doctors"], { "x-client-ip": "9.9.9.9" });
+    expect(upstreamHeaders(spy).get("x-client-ip")).toBe("127.0.0.1");
   });
 });

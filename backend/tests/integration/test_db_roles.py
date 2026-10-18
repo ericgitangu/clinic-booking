@@ -109,3 +109,28 @@ async def test_realtime_tables_keep_the_app_role_least_privileged(
             "UPDATE": True,
             **none,
         }
+
+
+async def test_the_event_log_is_append_only_for_the_app_role(
+    owner_conn: asyncpg.Connection,
+) -> None:
+    # Its (txid, id) is the ordering the relay trusts: the runtime role may add and read, no more.
+    assert await _privileges(owner_conn, "appointment_events") == {
+        "SELECT": True,
+        "INSERT": True,
+        "UPDATE": False,
+        "DELETE": False,
+        "TRUNCATE": False,
+    }
+
+
+async def test_the_app_role_cannot_rewrite_an_events_ordering_column(
+    app_conn: asyncpg.Connection,
+) -> None:
+    tx = app_conn.transaction()
+    await tx.start()
+    try:
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await app_conn.execute("UPDATE appointment_events SET txid = pg_current_xact_id()")
+    finally:
+        await tx.rollback()

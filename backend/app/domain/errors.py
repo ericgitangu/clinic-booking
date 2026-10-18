@@ -42,6 +42,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "The internal assertion is valid but its role may not use this endpoint.",
     ),
     ErrorSpec(
+        "CLIENT_ADDRESS_UNKNOWN",
+        400,
+        "Client address unknown",
+        "The request carries no usable client address, so it cannot be rate limited. Retry.",
+    ),
+    ErrorSpec(
         "VALIDATION_ERROR",
         422,
         "Validation error",
@@ -312,3 +318,7 @@ class RateLimited(DomainError):
 
 class RealtimeUnavailable(DomainError):
     code = "REALTIME_UNAVAILABLE"
+
+
+class ClientAddressUnknown(DomainError):
+    code = "CLIENT_ADDRESS_UNKNOWN"

@@ -85,6 +85,8 @@ def address_key(ip: str) -> str:
         addr = ipaddress.ip_address(ip.strip())
     except ValueError:
         return "invalid"
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped  # ::ffff:203.0.113.9 is the IPv4 client, not one of 2**96 siblings
     if isinstance(addr, ipaddress.IPv6Address):
         return "v6:" + str(ipaddress.ip_network(f"{addr}/64", strict=False).network_address)
     return "v4:" + str(addr)

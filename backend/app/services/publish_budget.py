@@ -31,11 +31,13 @@ _DEBIT = text(
     "UPDATE realtime_publish_budget SET used = used + :n, updated_at = :now "
     "WHERE month = :m AND used + :n <= :cap RETURNING used"
 )
-_REFUND = text(
-    "UPDATE realtime_publish_budget SET used = greatest(used - :n, 0), updated_at = :now "
-    "WHERE month = :m"
-)
 _USED = text("SELECT used FROM realtime_publish_budget WHERE month = :m")
+
+
+# The fewest messages one event can publish (a slot message and an admin message). With less than
+# this left, no further event can be sent, so the budget counts as spent: the relay, which stops
+# publishing, and the token endpoints, which stop minting, both ask the same question.
+MIN_EVENT_MESSAGES = 2
 
 
 def month_of(moment: datetime) -> date:
@@ -50,33 +52,47 @@ class PublishBudget:
         self.cap = cap
         self._switch_logged: set[date] = set()
 
-    async def debit(self, n: int, now: datetime) -> bool:
-        """Reserve ``n`` publishes for this month; False when they do not fit under the cap."""
+    async def debit(self, n: int, now: datetime, *, session: AsyncSession | None = None) -> bool:
+        """Reserve ``n`` publishes for this month; False when they do not fit under the cap.
+
+        With a ``session`` the debit joins that transaction, so it commits or rolls back with the
+        caller's other writes (the relay keeps its cursor and its debit in step that way).
+        """
         if n <= 0:
             return True
         month = month_of(now)
-        async with self._sessionmaker() as session, session.begin():
-            await session.execute(_ENSURE, {"m": month, "now": now})
+
+        async def run(active: AsyncSession) -> bool:
+            await active.execute(_ENSURE, {"m": month, "now": now})
             row = (
-                await session.execute(_DEBIT, {"m": month, "n": n, "now": now, "cap": self.cap})
+                await active.execute(_DEBIT, {"m": month, "n": n, "now": now, "cap": self.cap})
             ).first()
-        if row is None:
+            return row is not None
+
+        if session is not None:
+            granted = await run(session)
+        else:
+            async with self._sessionmaker() as own, own.begin():
+                granted = await run(own)
+        if not granted:
             self._log_switch_once(month)
             return False
         return True
-
-    async def refund(self, n: int, now: datetime) -> None:
-        """Give back a reservation for a batch that provably never left this process."""
-        async with self._sessionmaker() as session, session.begin():
-            await session.execute(_REFUND, {"m": month_of(now), "n": n, "now": now})
 
     async def used(self, now: datetime) -> int:
         async with self._sessionmaker() as session:
             value = (await session.execute(_USED, {"m": month_of(now)})).scalar_one_or_none()
         return int(value) if value is not None else 0
 
+    async def remaining(self, now: datetime) -> int:
+        return max(self.cap - await self.used(now), 0)
+
     async def exhausted(self, now: datetime) -> bool:
-        return await self.used(now) >= self.cap
+        """True when not even the smallest event fits. The one test for "spent"."""
+        spent = await self.remaining(now) < MIN_EVENT_MESSAGES
+        if spent:
+            self._log_switch_once(month_of(now))
+        return spent
 
     def _log_switch_once(self, month: date) -> None:
         if month in self._switch_logged:

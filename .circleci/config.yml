@@ -530,7 +530,7 @@ jobs:
             echo "export BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$BASH_ENV"
       - run:
           name: API and database (compose runs the migrations and the seed)
-          command: docker compose up -d --build --wait
+          command: WEB_ORIGIN=http://localhost:3100 docker compose up -d --build --wait
       - run:
           name: Build the booking app and run the booking scenarios against the real API
           command: |
