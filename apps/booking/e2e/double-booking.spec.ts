@@ -138,7 +138,7 @@ test("the confirm step refuses a time the patient already holds, before the API 
   await closeAll(a.context);
 });
 
-test("a time someone else takes stays in place as an inactive No longer available chip", async ({
+test("a time someone else takes stays in place as an inactive Booked chip", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await farCell(
@@ -163,7 +163,9 @@ test("a time someone else takes stays in place as an inactive No longer availabl
   await page.clock.runFor(16_000);
   const gone = chip(page, slots[1]);
   await expect(gone).toBeDisabled();
-  await expect(gone).toHaveAccessibleName(/No longer available/);
+  // The API lists every booked time, so the chip says Booked (a time that merely left the list,
+  // with no such answer, would read No longer available).
+  await expect(gone).toHaveAccessibleName(/Booked/);
   expect(await order()).toEqual(before); // nothing moved under a finger
   await closeAll(viewer, other.context);
 });
@@ -296,7 +298,7 @@ test("when polling has paused the page says so in the words the hint uses", asyn
   await ctx.close();
 });
 
-test("losing the race on a move (a confirmed 409) shows that time as Just taken, in place", async ({
+test("losing the race on a move (a confirmed 409) shows that time as an inactive chip, in place", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await farCell(
@@ -319,6 +321,6 @@ test("losing the race on a move (a confirmed 409) shows that time as Just taken,
   ).toContainText("That time was just taken.");
   const lost = chip(me.page, slots[3]);
   await expect(lost).toBeDisabled();
-  await expect(lost).toHaveAccessibleName(/Just taken/);
+  await expect(lost).toHaveAccessibleName(/Booked/); // the API lists it as taken, which wins
   await closeAll(me.context, other.context);
 });
