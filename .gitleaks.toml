@@ -9,4 +9,7 @@ description = "Known-safe paths and placeholders"
 paths = [
   '''\.env\.example$''',
   '''docs/.*''',
+  # Public-by-design browser values (a reCAPTCHA site key ships to every visitor); the file's header
+  # says nothing secret may be added, and the unit tests check it holds only NEXT_PUBLIC_* names.
+  '''^scripts/ci/public-build\.env$''',
 ]
