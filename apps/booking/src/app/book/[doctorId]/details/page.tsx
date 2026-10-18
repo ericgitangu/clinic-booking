@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Button } from "@clinic/ui/components/ui/button";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { BookingForm } from "@/components/booking/booking-form";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
+import { heldMessage } from "@/lib/held";
+import { ownBooked } from "@/lib/own";
+import { heldAt } from "@/lib/slot-chips";
 import { getIdentity } from "@/lib/session";
 
 export const metadata: Metadata = {
@@ -27,10 +31,13 @@ export default async function Details({
   if (!startsAt || !ISO.test(startsAt) || Number.isNaN(Date.parse(startsAt))) {
     redirect(`/book/${doctorId}`);
   }
-  const [doctor, who] = await Promise.all([
+  const [doctor, who, own] = await Promise.all([
     api.getDoctor(doctorId),
     getIdentity(),
+    ownBooked(),
   ]);
+  // Already holds this time (with this doctor or another)? Do not offer a booking at all.
+  const held = who ? heldAt(own, startsAt) : undefined;
   if (!doctor.ok && doctor.status < 500) notFound();
 
   return (
@@ -58,7 +65,38 @@ export default async function Details({
         </p>
       </div>
       <div className="mt-8">
-        {who ? (
+        {held ? (
+          <div
+            data-testid="already-held"
+            className="rounded-xl border border-border bg-muted p-5"
+          >
+            <h2 className="font-heading text-xl font-semibold">
+              You already have a visit at this time
+            </h2>
+            <p className="mt-2 text-base">
+              {heldMessage({
+                sameDoctor: held.doctor_id === doctorId,
+                when: formatWhen(startsAt),
+                doctor: held.doctor_name ?? "your doctor",
+              })}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button asChild size="lg" className="h-12 px-6 text-base">
+                <Link href="/appointments">My appointments</Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-12 px-6 text-base"
+              >
+                <Link href={`/book/${doctorId}?date=${clinicDay(startsAt)}`}>
+                  Pick another time
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : who ? (
           <BookingForm
             doctorId={doctorId}
             startsAt={startsAt}

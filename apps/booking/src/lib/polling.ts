@@ -50,11 +50,3 @@ export function parseRetryAfter(
   }
   return Math.min(ms, MAX_RETRY_AFTER_MS);
 }
-
-/**
- * Whether a time the person had picked is gone from the latest list. An unset pick is never "taken".
- */
-export const pickWasTaken = (
-  picked: string,
-  slots: readonly { starts_at: string }[],
-): boolean => picked !== "" && !slots.some((s) => s.starts_at === picked);

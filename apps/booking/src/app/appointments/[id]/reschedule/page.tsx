@@ -10,6 +10,7 @@ import {
   formatWhen,
   isValidDay,
 } from "@/lib/clinic-time";
+import { ownBooked } from "@/lib/own";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { callerFor, getIdentity } from "@/lib/session";
 
@@ -65,7 +66,10 @@ export default async function Reschedule({
     : clinicDay(appt.data.starts_at) >= today
       ? clinicDay(appt.data.starts_at)
       : today;
-  const avail = await api.getAvailability(appt.data.doctor_id, day);
+  const [avail, own] = await Promise.all([
+    api.getAvailability(appt.data.doctor_id, day),
+    ownBooked(),
+  ]);
 
   return (
     <section className="pb-28 pt-8">
@@ -97,6 +101,7 @@ export default async function Reschedule({
             mode="reschedule"
             appointmentId={id}
             availability={avail.data}
+            own={own}
           />
         ) : (
           <p

@@ -5,6 +5,7 @@ import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
 import { clinicDay, formatDayLong, isValidDay } from "@/lib/clinic-time";
+import { ownBooked } from "@/lib/own";
 import { describeProblem } from "@/lib/problems";
 
 // Doctor pages are listed in the sitemap, so they are indexable. The canonical address drops the
@@ -36,9 +37,10 @@ export default async function PickTime({
   const today = clinicDay(new Date());
   const day = isValidDay(date) ? date : today;
 
-  const [doctor, avail] = await Promise.all([
+  const [doctor, avail, own] = await Promise.all([
     api.getDoctor(doctorId),
     api.getAvailability(doctorId, day),
+    ownBooked(),
   ]);
   if (
     !doctor.ok &&
@@ -89,6 +91,7 @@ export default async function PickTime({
             mode="details"
             doctorId={doctorId}
             availability={avail.data}
+            own={own}
           />
         ) : (
           <p
