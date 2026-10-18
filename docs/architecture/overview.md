@@ -69,8 +69,8 @@ Reading it:
 | FastAPI service, Neon, the two Vercel apps, Google sign-in, reCAPTCHA per action | Running | ADRs 0002, 0014, 0023, 0024, 0029 |
 | Idempotency keys, shell-only PWA, 15 second polling | Running | ADRs 0013, 0010, 0009 |
 | Resend email and reminders | Declared: PR 27 is open | [ADR-0025](../adr/0025-email-with-resend.md) |
-| Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | ADR-0031 (in PR 29) |
-| Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | ADR-0031 |
+| Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
+| Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
 | Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | ADRs 0007, 0026, 0017 |
 | Go SSE gateway and the admin live feed | Descoped (PR 37 closed) | [ADR-0021](../adr/0021-go-realtime-gateway.md) |
 
