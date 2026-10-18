@@ -660,24 +660,33 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.end_headers(); self.wfile.write(json.dumps({"access_token": "ya29.SECRETSECRETSECRETSECRET"}).encode()); return
         self.send_response(403); self.send_header("Content-Type", "application/json"); self.end_headers()
         self.wfile.write(json.dumps({"error": "unauthorized_client", "error_description": "rejected by the attribute condition for projects/291652953712 token abcdefghijklmnopqrstuvwxyz0123"}).encode())
-HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+srv = HTTPServer(("127.0.0.1", int(sys.argv[1])), H)
+open(sys.argv[3], "w").write(str(srv.server_port))  # tells the test it is listening
+srv.serve_forever()
 PY
-start_stub() { python3 "$WORK/stub.py" "$1" "$2" >/dev/null 2>&1 & echo $! > "$WORK/stub.pid"; for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$1/" && break; sleep 0.3; done; }
+# The stand-in listens on a free port the kernel picks and tells the test through a FIFO once it is
+# listening, so two runs of this suite on one machine cannot collide and nothing polls or sleeps.
+start_stub() { # <mode>: sets STUB_PORT
+  rm -f "$WORK/stub.fifo"; mkfifo "$WORK/stub.fifo"
+  python3 "$WORK/stub.py" 0 "$1" "$WORK/stub.fifo" >/dev/null 2>&1 & echo $! > "$WORK/stub.pid"
+  STUB_PORT="$(timeout 30 cat "$WORK/stub.fifo")"
+  [ -n "$STUB_PORT" ] || { echo "stand-in server did not start"; exit 1; }
+}
 stop_stub() { kill "$(cat "$WORK/stub.pid")" 2>/dev/null; wait "$(cat "$WORK/stub.pid")" 2>/dev/null; }
 new_fx probe; OUT="$WORK/probe.out"
-start_stub 18097 deny
-PROBE_RUN_APP_URL=http://127.0.0.1:18097 bash "$HERE/deny_probe.sh" run-app "$OUT.runapp" >/dev/null 2>&1; rc=$?
+start_stub deny
+PROBE_RUN_APP_URL=http://127.0.0.1:$STUB_PORT bash "$HERE/deny_probe.sh" run-app "$OUT.runapp" >/dev/null 2>&1; rc=$?
 expect "deny_probe run-app: 403 anonymous and 401 junk bearer pass" "$rc:$(grep -c 'result=PASS' "$OUT.runapp")" "0:2"
-CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:18097/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wif" >/dev/null 2>&1; rc=$?
+CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:$STUB_PORT/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wif" >/dev/null 2>&1; rc=$?
 expect "deny_probe wif: a rejected exchange passes" "$rc:$(grep -c 'result=PASS' "$OUT.wif")" "0:1"
 expect "deny_probe wif: project number and long opaque strings are redacted" \
   "$(grep -c '291652953712\|abcdefghijklmnopqrstuvwxyz' "$OUT.wif")$(grep -c '\[redacted\]' "$OUT.wif")" 01
 expect "deny_probe wif: the OIDC token is never written" "$(grep -c 'eyJhbGciOi' "$OUT.wif")" 0
 stop_stub
-start_stub 18098 open
-PROBE_RUN_APP_URL=http://127.0.0.1:18098 bash "$HERE/deny_probe.sh" run-app "$OUT.open" >/dev/null 2>&1; rc=$?
+start_stub open
+PROBE_RUN_APP_URL=http://127.0.0.1:$STUB_PORT bash "$HERE/deny_probe.sh" run-app "$OUT.open" >/dev/null 2>&1; rc=$?
 expect "deny_probe run-app: an open service FAILS the probe" "$rc:$(grep -c 'result=FAIL' "$OUT.open")" "1:2"
-CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:18098/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wifopen" >/dev/null 2>&1; rc=$?
+CIRCLE_OIDC_TOKEN_V2=eyJhbGciOi.fake.jwt PROBE_STS_URL=http://127.0.0.1:$STUB_PORT/v1/token bash "$HERE/deny_probe.sh" wif "$OUT.wifopen" >/dev/null 2>&1; rc=$?
 expect "deny_probe wif: an issued access token FAILS the probe" "$rc:$(grep -c 'observed=ISSUED' "$OUT.wifopen")" "1:1"
 expect "deny_probe wif: an issued token is not written to the record" "$(grep -c 'SECRETSECRET' "$OUT.wifopen")" 0
 stop_stub
@@ -707,7 +716,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self): self.send_response(200); self.end_headers()
 HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
-LHP=18099
+LHP="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"  # a free port, not a fixed one
 lh_run() { # <name> <runner command> ; leaves the exit code in $rc
   # CIRCLE_BRANCH=main on purpose. Earlier tests export CIRCLE_BRANCH=feature, and on a branch with no
   # changes under the watched paths lighthouse.sh skips itself and exits 0: these cases then failed
