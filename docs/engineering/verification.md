@@ -73,7 +73,9 @@ A test that has never been seen failing proves little, so these are the mutation
 
 ## Known limits of the test setup
 
-- The double-booking specs and the fixed-slot `booking.spec` test fail on a reused database, also on `main`. End-to-end runs assume a fresh database per run: CI provides one, and a local rerun needs `make down` first (it runs `docker compose down -v`). PR 48 (open) removes a related service-worker routing dependency in the double-submit test.
+- The double-booking specs and the fixed-slot `booking.spec` test fail on a reused database, also on `main`. End-to-end runs assume a fresh database per run: CI provides one, and `make e2e` recreates the compose volume itself (Makefile, `e2e` target). Only a direct Playwright run on a kept stack (`pnpm -C apps/booking test:e2e`, or `KEEP_STACK=1 make e2e-admin`, per `scripts/e2e_admin.sh`) needs `make down` first, which runs `docker compose down -v`. PR 48 (open) removes a related service-worker routing dependency in the double-submit test.
 - The development-environment isolation follow-up (per-run port and database isolation, `reuseExistingServer` false, a configurable API host port, `coverage.xml` in `.gitignore`) is descoped for time. Risk: parallel local runs can collide. Fix: that follow-up.
 - The Lighthouse `/` performance rule is a warning, not an error: CI medians varied from 77 to 89 run to run (PR 42), and the 0.85 budget has not been lowered.
 - `test_ably_real.py` needs the CI Ably key, so it is skipped locally and runs only in CI.
+
+- Resend Domains page, observed by the gatekeeper on 2026-10-18: `mail.ericgitangu.com` is the only domain with status Verified. The booking emails in PR 27 (open) are sent from it, per the ADR-0025 amendment in that PR.

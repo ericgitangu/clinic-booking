@@ -14,7 +14,7 @@ Product, cost and security calls that were mine. The first column is where it is
 | ADRs are finished before any implementation starts; implementation then goes to cheaper models | 2026-10-16 | Memory note (stated twice) |
 | Cut the optional stretch items for admin OAuth and the Turnstile bot check, later reinstated as Google sign-in and reCAPTCHA | 2026-10-16, 2026-10-17 | [ADR-0022](../adr/0022-admin-auth-and-bot-protection.md) |
 | Drop the Docker Hub context and pull CI images through `mirror.gcr.io` | 2026-10-16 | [ADR-0016](../adr/0016-cicd-circleci-keyless-deploy.md) |
-| Full production frontend in scope; Google sign-in, Resend email, branding | 2026-10-17 | ADRs 0010, 0024, 0025, 0026 (decided by the engineer) |
+| Full production frontend in scope; Google sign-in, Resend email, branding | 2026-10-17 | ADRs 0024, 0025, 0026 (decided by the engineer); the scope amendment to ADR-0010 is dated 2026-10-17 in its header, whose Deciders line says only "engineering" |
 | Two apps in one workspace, with the public hostnames | 2026-10-17 | ADRs 0027, 0028 |
 | The booking flow and its one human check per action; staff roles by email | 2026-10-17 | ADRs 0029, 0030 |
 | No mocks of our own code: "mocks are implementation gaps in disguise"; only third parties may be stood in, and labelled | 2026-10-17 | Memory note; [ADR-0018](../adr/0018-testing-strategy.md) |
