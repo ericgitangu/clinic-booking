@@ -3,6 +3,7 @@
 - Date: 2026-10-17
 - Deciders: engineering, decided by the engineer
 - Amends: [ADR-0024](0024-google-sign-in-with-better-auth.md), [ADR-0010](0010-thin-nextjs-booking-ui.md)
+- Amended by: [ADR-0033](0033-staff-crud-veto-and-invites.md), 2026-10-18: admins may invite admins and viewers and manage viewers; staff writes are audited with an actor and a reason; staff create, veto and lock. Access management is no longer owner-only. Pending build.
 
 ## Status
 
