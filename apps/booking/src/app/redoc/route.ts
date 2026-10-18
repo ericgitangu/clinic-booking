@@ -1,4 +1,8 @@
-// Static ReDoc, loaded from jsDelivr at a pinned version, pointing at /openapi.json.
+import { docsResponse } from "@/lib/docs-page";
+
+// Static ReDoc served from this origin (copied from the pinned redoc package by
+// scripts/vendor-docs.mjs), pointing at /openapi.json. The v3 standalone bundle is an ES module (it
+// uses import.meta), so it needs type="module"; telemetry is off so no usage data leaves the page.
 export const dynamic = "force-static";
 
 const HTML = `<!doctype html>
@@ -9,13 +13,11 @@ const HTML = `<!doctype html>
     <title>Clinic Booking API — ReDoc</title>
   </head>
   <body>
-    <redoc spec-url="/openapi.json"></redoc>
-    <script src="https://cdn.jsdelivr.net/npm/redoc@3.0.1/bundles/redoc.standalone.js" integrity="sha384-j07qRKHNNmcwU1/Y1elJc7pDLHXP/QfbQXTtSkbOJ7uYGJikqAzsFVbY2zR9FqOT" crossorigin="anonymous"></script>
+    <redoc spec-url="/openapi.json" disable-telemetry="true"></redoc>
+    <script type="module" src="/docs-assets/redoc/redoc.standalone.js"></script>
   </body>
 </html>`;
 
 export async function GET(): Promise<Response> {
-  return new Response(HTML, {
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  return docsResponse(HTML);
 }
