@@ -276,32 +276,62 @@ async function lastId(channel: string): Promise<string> {
 test("(h) a patient token cannot read the admin channel", async ({
   browser,
 }, testInfo) => {
-  const { doctorId, day } = await farCell(cellOf(7, testInfo.repeatEachIndex));
+  const { doctorId, day, slots } = await farCell(
+    cellOf(7, testInfo.repeatEachIndex),
+  );
   const a = await viewer(browser);
   const res = await a.context.request.post("/api/realtime/token/patient", {
     data: { doctor_id: doctorId, date: day },
     headers: { origin: "http://localhost:3100", "x-forwarded-for": ip() },
   });
   expect(res.status()).toBe(200);
-  const t = (await res.json()) as { token: string; stream_url: string };
+  const t = (await res.json()) as {
+    token: string;
+    stream_url: string;
+    channel: string;
+  };
+
+  // The token's capability names exactly one channel, subscribe only.
+  const claims = JSON.parse(
+    Buffer.from(t.token.split(".")[1], "base64url").toString(),
+  ) as Record<string, string>;
+  expect(JSON.parse(claims["x-ably-capability"])).toEqual({
+    [`slots:${doctorId}:${day}`]: ["subscribe"],
+  });
+  expect(t.channel).toBe(`slots:${doctorId}:${day}`);
+
+  // Asking the service for the admin channel with it: whatever the service does with the stream
+  // (an error frame, or silence), no message may arrive, even while an admin event is published.
   const url = new URL(t.stream_url);
   url.searchParams.set("channels", "admin:events");
-  const stream = await fetch(url, {
-    headers: { Authorization: `Bearer ${t.token}` },
-  });
-  // The real service may send a blank line before the error frame: read until the frame or the end.
-  const reader = stream.body!.getReader();
-  const decoder = new TextDecoder();
-  let first = "";
-  while (!/event: error[\s\S]*\n\n/.test(first) && first.length < 4096) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    first += decoder.decode(value, { stream: true });
-  }
-  await reader.cancel();
-  expect(first).toContain("event: error");
-  expect(first).toContain("40160");
-  await closeAll(a.context);
+  const abort = new AbortController();
+  const stop = setTimeout(() => abort.abort(), 6000);
+  const seen: string[] = [];
+  const reading = (async () => {
+    try {
+      const stream = await fetch(url, {
+        headers: { Authorization: `Bearer ${t.token}` },
+        signal: abort.signal,
+      });
+      const reader = stream.body!.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        seen.push(decoder.decode(value, { stream: true }));
+      }
+    } catch {
+      /* aborted at the end of the observation window */
+    }
+  })();
+  const b = await patient(browser);
+  await bookOn(b.page, doctorId, slots[1]); // publishes to admin:events as well
+  await reading;
+  clearTimeout(stop);
+  const text = seen.join("");
+  expect(text).not.toContain("event: message");
+  expect(text).not.toContain("booked"); // the admin event's name
+  await closeAll(a.context, b.context);
 });
 
 test("(e) React StrictMode's double mount in development mints one push token, not two", async ({
