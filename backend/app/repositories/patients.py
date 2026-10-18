@@ -14,9 +14,16 @@ async def get_patient(session: AsyncSession, patient_id: uuid.UUID) -> Patient |
 
 
 async def insert_patient(
-    session: AsyncSession, *, full_name: str, phone: str | None, email: str | None
+    session: AsyncSession,
+    *,
+    full_name: str,
+    phone: str | None,
+    email: str | None,
+    synthetic: bool = False,
 ) -> Patient:
-    patient = Patient(id=uuid.uuid4(), full_name=full_name, phone=phone, email=email)
+    patient = Patient(
+        id=uuid.uuid4(), full_name=full_name, phone=phone, email=email, synthetic=synthetic
+    )
     session.add(patient)
     await session.flush()
     return patient
