@@ -358,6 +358,62 @@ if grep -q "verdict: OK" <<<"$out" && grep -q "exit=0" <<<"$out"; then ok "unver
 if ! grep -q 'echo "SKIP' "$PRISTINE/scripts/cost_check.sh" && [ "$(grep -c '^  *unverified C' "$PRISTINE/scripts/cost_check.sh")" -ge 3 ]; then ok "unverified: the live checks report C11 budgets, C13 and C14 through unverified()"; else bad "unverified: a live check still prints a bare SKIP"; fi
 if grep -q 'COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14"' "$PRISTINE/.circleci/config.yml"; then ok "unverified: CI lists exactly the three checks it cannot run"; else bad "unverified: the CI allowlist is missing or wrong"; fi
 
+
+echo "== clinic-realtime deploy: the pinned shape, mutated one flag at a time =="
+RT='deploy clinic-realtime'
+rt_sub() { mutate_sub "$CI" "$1"; }
+expect_fail "realtime: --min-instances 1" "min-instances missing or not 0" rt_sub 's/--min-instances 0/--min-instances 1/ if /deploy clinic-realtime/'
+expect_fail "realtime: --min-instances 1 is also not the pinned shape" "clinic-realtime deploy not pinned" rt_sub 's/--min-instances 0/--min-instances 1/ if /deploy clinic-realtime/'
+expect_fail "realtime: --max-instances 9" "max-instances out of range" rt_sub 's/--max-instances 2/--max-instances 9/ if /deploy clinic-realtime/'
+expect_fail "realtime: --max-instances 3 (allowed for the API, not for the gateway)" "clinic-realtime deploy not pinned" rt_sub 's/--max-instances 2/--max-instances 3/ if /deploy clinic-realtime/'
+expect_fail "realtime: --max-instances 1 (pinned to exactly 2)" "clinic-realtime deploy not pinned" rt_sub 's/--max-instances 2/--max-instances 1/ if /deploy clinic-realtime/'
+expect_fail "realtime: no --max-instances" "max-instances missing" rt_sub 's/--max-instances 2 // if /deploy clinic-realtime/'
+expect_fail "realtime: --allow-unauthenticated" "public-access flag" rt_sub 's/--no-allow-unauthenticated/--allow-unauthenticated/ if /deploy clinic-realtime/'
+expect_fail "realtime: --no-invoker-iam-check" "public-access flag" rt_sub 's/--no-allow-unauthenticated/--no-allow-unauthenticated --no-invoker-iam-check/ if /deploy clinic-realtime/'
+expect_fail "realtime: CPU throttling off" "always-on or network flag" rt_sub 's/--cpu-boost/--cpu-boost --no-cpu-throttling/ if /deploy clinic-realtime/'
+expect_fail "realtime: a VPC connector" "always-on or network flag" rt_sub 's/--cpu-boost/--cpu-boost --vpc-connector x/ if /deploy clinic-realtime/'
+expect_fail "realtime: concurrency 50" "clinic-realtime deploy not pinned" rt_sub 's/--concurrency 1 /--concurrency 50 / if /deploy clinic-realtime/'
+expect_fail "realtime: 1 vCPU" "clinic-realtime deploy not pinned" rt_sub 's/--cpu 0.25/--cpu 1/ if /deploy clinic-realtime/'
+expect_fail "realtime: request timeout 3600" "clinic-realtime deploy not pinned" rt_sub 's/--timeout 900/--timeout 3600/ if /deploy clinic-realtime/'
+expect_fail "realtime: no service account" "run deploy missing --service-account" rt_sub 's/--service-account \S+ // if /deploy clinic-realtime/'
+expect_fail "realtime: another region" "region outside us-east4/us-east1" rt_sub 's/--region us-east4/--region europe-west3/ if /deploy clinic-realtime/'
+expect_fail "realtime: the deploy line is gone" "clinic-realtime deploy not pinned" rt_sub 's/gcloud run deploy clinic-realtime/gcloud run services describe clinic-realtime/'
+expect_pass "realtime: 0.5 vCPU is the documented fallback" rt_sub 's/--cpu 0.25/--cpu 0.5/ if /deploy clinic-realtime/'
+
+echo "== live C1 / C2 judgements for the gateway (no project needed) =="
+c1() { # <name> <want PASS|FAIL> <row>
+  local f="$WORK/c1.$RANDOM.tsv" out
+  printf '%b\n' "$3" > "$f"
+  out="$(bash "$ROOT/scripts/cost_check.sh" --c1 "$f" 2>&1)"
+  if grep -q "^$2  C1" <<<"$out"; then ok "C1: $1 -> $2"; else bad "C1: $1 (wanted $2; got $(grep -E '^(PASS|FAIL)' <<<"$out" | head -1))"; fi
+}
+c1 "gateway max=2 min=0 throttled automatic" PASS 'clinic-realtime\t2\t0\t0\ttrue\tautomatic'
+c1 "gateway max=3" FAIL 'clinic-realtime\t3\t0\t0\ttrue\tautomatic'
+c1 "gateway max=1" FAIL 'clinic-realtime\t1\t0\t0\ttrue\tautomatic'
+c1 "gateway max unset" FAIL 'clinic-realtime\tUNSET\t0\t0\ttrue\tautomatic'
+c1 "gateway min=1" FAIL 'clinic-realtime\t2\t1\t0\ttrue\tautomatic'
+c1 "gateway service-level min=1" FAIL 'clinic-realtime\t2\t0\t1\ttrue\tautomatic'
+c1 "gateway throttling off (always-allocated CPU)" FAIL 'clinic-realtime\t2\t0\t0\tfalse\tautomatic'
+c1 "gateway manual scaling" FAIL 'clinic-realtime\t2\t0\t0\ttrue\tmanual'
+c1 "api max=3 still passes" PASS 'clinic-api\t3\t0\t0\ttrue\tautomatic'
+c1 "api max=4" FAIL 'clinic-api\t4\t0\t0\ttrue\tautomatic'
+c2() { # <name> <want> <service> <iam-disabled> <members...>
+  local name="$1" want="$2" svc="$3" dis="$4" f="$WORK/c2.$RANDOM.txt" out; shift 4
+  printf '%s\n' "$@" > "$f"
+  out="$(bash "$ROOT/scripts/cost_check.sh" --c2 "$svc" "$dis" "$f" 2>&1)"
+  if grep -q "^$want  C2" <<<"$out"; then ok "C2: $name -> $want"; else bad "C2: $name (wanted $want; got $(grep -E '^(PASS|FAIL)' <<<"$out" | head -1))"; fi
+}
+P=sil-clinic-booking
+A="serviceAccount:clinic-admin@$P.iam.gserviceaccount.com"; S="serviceAccount:clinic-smoke@$P.iam.gserviceaccount.com"; W="serviceAccount:clinic-web@$P.iam.gserviceaccount.com"
+c2 "gateway: admin app and smoke only" PASS clinic-realtime false "$A" "$S"
+c2 "gateway: the public proxy must not be bound" FAIL clinic-realtime false "$A" "$S" "$W"
+c2 "gateway: admin only (the smoke could not run)" FAIL clinic-realtime false "$A"
+c2 "gateway: an extra user" FAIL clinic-realtime false "$A" "$S" "user:someone@example.com"
+c2 "gateway: public" FAIL clinic-realtime false "$A" "$S" "allUsers"
+c2 "gateway: invoker check disabled" FAIL clinic-realtime true "$A" "$S"
+c2 "api: web, admin and smoke" PASS clinic-api false "$A" "$S" "$W"
+c2 "api: the web proxy missing" FAIL clinic-api false "$A" "$S"
+
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }
 expect_fail "no deploy commands visible" "scanner is blind" blind

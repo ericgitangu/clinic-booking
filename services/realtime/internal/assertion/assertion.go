@@ -30,6 +30,9 @@ const (
 	SkewSecond = 5
 )
 
+// SmokeSub is the subject the release smoke signs with (backend/app/api/deps.py SMOKE_SUB).
+const SmokeSub = "smoke:verify-claims"
+
 // ErrInvalid wraps every rejection. The reason is for logs only, never for the response.
 var ErrInvalid = errors.New("assertion rejected")
 

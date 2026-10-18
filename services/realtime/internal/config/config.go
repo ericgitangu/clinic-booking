@@ -18,7 +18,11 @@ type Config struct {
 	// SigningKey verifies the staff assertion (INTERNAL_SIGNING_KEY, the key the admin app and
 	// the API share). OwnerEmails are the people who hold the owner role by configuration, not
 	// by a staff_access row (ADMIN_EMAILS, the same variable the API reads).
-	SigningKey  []byte
+	SigningKey []byte
+	// SmokeKey, when set, lets the release pipeline open a stream with its own assertion
+	// (SMOKE_SIGNING_KEY, role "smoke"). That identity sees only the release smoke's synthetic
+	// events, in the viewer shape, and reads no staff_access row.
+	SmokeKey    []byte
 	OwnerEmails map[string]bool
 
 	MaxStreamsPerInstance int
@@ -51,6 +55,7 @@ func Load(get Lookup) (Config, error) {
 		Port:                  r.str("PORT", "8080"),
 		DatabaseURL:           r.str("DATABASE_URL", ""),
 		SigningKey:            []byte(r.str("INTERNAL_SIGNING_KEY", "")),
+		SmokeKey:              []byte(r.str("SMOKE_SIGNING_KEY", "")),
 		OwnerEmails:           emails(r.str("ADMIN_EMAILS", "")),
 		MaxStreamsPerInstance: r.integer("MAX_STREAMS_PER_INSTANCE", 1),
 		MaxStreamsPerPerson:   r.integer("MAX_STREAMS_PER_PERSON", 1),
@@ -99,6 +104,9 @@ func (c Config) Validate() error {
 	}
 	if len(c.SigningKey) < 32 {
 		add("INTERNAL_SIGNING_KEY must be at least 32 bytes")
+	}
+	if len(c.SmokeKey) > 0 && len(c.SmokeKey) < 32 {
+		add("SMOKE_SIGNING_KEY must be at least 32 bytes when set")
 	}
 	if c.MaxStreamsPerInstance < 1 {
 		add("MAX_STREAMS_PER_INSTANCE must be >= 1")

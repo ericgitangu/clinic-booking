@@ -106,8 +106,14 @@ func (h *harness) grant(w who) {
 	}
 }
 
-// header signs an assertion for exactly this request target.
+var smokeKey = []byte("test-smoke-key-0123456789abcdefABCDEFGH")
+
+// header signs an assertion for exactly this request target with the staff key.
 func header(w who, target string, mutate func(map[string]any)) http.Header {
+	return headerWith(testKey, w, target, mutate)
+}
+
+func headerWith(key []byte, w who, target string, mutate func(map[string]any)) http.Header {
 	now := time.Now().Unix()
 	claims := map[string]any{
 		"aud": assertion.Audience, "sub": "sub-" + w.email, "email": w.email, "role": w.role,
@@ -116,7 +122,7 @@ func header(w who, target string, mutate func(map[string]any)) http.Header {
 	if mutate != nil {
 		mutate(claims)
 	}
-	v, err := assertion.Sign(claims, testKey)
+	v, err := assertion.Sign(claims, key)
 	if err != nil {
 		panic(err)
 	}

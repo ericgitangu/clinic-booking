@@ -6,7 +6,8 @@
 #   project   create the project, link billing, enable the APIs Terraform itself needs
 #   state     create the Terraform state bucket (us-east1)
 #   service   create the Cloud Run service shell      (AFTER terraform apply: needs the runtime SA)
-#   invoker   grant run.invoker to the web, admin and smoke  (AFTER terraform apply: needs those SAs)
+#   invoker   grant run.invoker: web, admin and smoke on clinic-api; admin and smoke only on
+#             clinic-realtime  (AFTER terraform apply: needs those SAs)
 #
 # Every mode is safe to re-run. Several modes can be given in one call, e.g.
 #   bash infra/bootstrap.sh project state
@@ -109,7 +110,7 @@ step_service() {
 }
 
 step_invoker() {
-  echo ">>> invoker: run.invoker for the web proxy, the admin app and the smoke identity (no public access)"
+  echo ">>> invoker: run.invoker for the web proxy, the admin app and the smoke identity on clinic-api; the admin app and the smoke identity only on clinic-realtime (no public access)"
   local svc sa found=0
   for svc in clinic-api clinic-realtime; do
     # clinic-realtime exists only if the optional realtime feature was deployed.
@@ -119,7 +120,11 @@ step_invoker() {
       continue
     fi
     found=1
-    for sa in clinic-web clinic-admin clinic-smoke; do
+    # The live-feed gateway is reached only through the admin app (its BFF signs the staff
+    # assertion), plus the release smoke; clinic-web (the public booking proxy) never needs it.
+    local members="clinic-web clinic-admin clinic-smoke"
+    [ "$svc" = clinic-realtime ] && members="clinic-admin clinic-smoke"
+    for sa in $members; do
       run gcloud run services add-iam-policy-binding "$svc" \
         --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION" \
         --member "serviceAccount:${sa}@${PROJECT}.iam.gserviceaccount.com" \

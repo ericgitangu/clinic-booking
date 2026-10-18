@@ -93,8 +93,9 @@ my @order = (
   "resource_class outside small/medium", "docker_layer_caching enabled", "docker build flags",
   "docker pull or cache-from", "terraform banned resource or API",
   "run deploy missing --service-account",
+  "clinic-realtime deploy not pinned",
 );
-my %hits; my $lines = 0; my $deploys = 0;
+my %hits; my $lines = 0; my $deploys = 0; my $realtime_deploys = 0;
 sub hit { my ($c, $l) = @_; $hits{$c}{$l} = 1; }
 my %region_ok = ("us-east4" => 1, "us-east1" => 1);
 sub region_value_ok { my $v = shift; return 1 if $region_ok{$v}; return 1 if $v =~ /^(?:\$|var\.|local\.)/; return 0; }
@@ -108,6 +109,21 @@ while (my $row = <STDIN>) {
   my $gc = $line =~ /\bgcloud\b|"\$\{G\[\@\]\}"|\brun\s+(?:deploy|services|jobs|revisions)\b/;
 
   if ($gc) {
+    if ($line =~ /\brun\s+deploy\s+clinic-realtime\b/) {
+      # The live-feed gateway scales from zero to at most two instances on demand and back to zero:
+      # one stream per instance (concurrency 1, which is also what Cloud Run requires below 1 vCPU),
+      # at most a quarter or a half vCPU, request-based billing (no --no-cpu-throttling, checked
+      # above), the 15-minute request timeout, and no public access.
+      $realtime_deploys++;
+      my $ok = $line =~ /--min-instances[= ]+0(?!\d)/
+            && $line =~ /--max-instances[= ]+2(?!\d)/
+            && $line =~ /--concurrency[= ]+1(?!\d)/
+            && $line =~ /--cpu[= ]+(?:0\.25|0\.5)(?![\d.])/
+            && $line =~ /--memory[= ]+(?:128|256|512)Mi(?!\w)/
+            && $line =~ /--timeout[= ]+900(?!\d)/
+            && $line =~ /--no-allow-unauthenticated/;
+      hit("clinic-realtime deploy not pinned", $label) unless $ok;
+    }
     if ($line =~ /\brun\s+deploy\b/) {
       $deploys++;
       hit("min-instances missing or not 0", $label) unless $line =~ /--min-instances[= ]+0(?!\d)/;
@@ -150,6 +166,7 @@ while (my $row = <STDIN>) {
   hit("terraform banned resource or API", $label) if $is_tf && $line =~ $TF_BAN;
 }
 
+hit("clinic-realtime deploy not pinned", "the pipeline has no single gcloud run deploy clinic-realtime") if $realtime_deploys != 1;
 print "SCANNED $lines $deploys\n";
 for my $c (@order) {
   if ($hits{$c}) { print "FAIL $c: $_\n" for sort keys %{$hits{$c}}; }
@@ -369,6 +386,45 @@ count_secrets() {
   SECRET_VERSIONS_LIVE="$total"
 }
 
+# judge_c1: one tab-separated row per service on stdin (name, maxScale, template minScale, service
+# minScale, cpu-throttling, scaling mode). The gateway must scale from zero to EXACTLY two instances
+# on demand; the API to between one and three. Request-based billing (throttling true), automatic
+# scaling and a minimum of zero hold for both.
+judge_c1() {
+  local name max min smin thr mode top floor
+  while IFS=$'\t' read -r name max min smin thr mode; do
+    top=3 floor=1
+    if [ "$name" = clinic-realtime ]; then top=2 floor=2; fi
+    if [ "$max" != "UNSET" ] && [ "$max" -ge "$floor" ] 2>/dev/null && [ "$max" -le "$top" ] && [ "$min" = 0 ] && [ "$smin" = 0 ] && [ "$thr" = true ] && [ "$mode" = automatic ]; then
+      pass "C1 $name max=$max min=0 throttling=true scaling=automatic"
+    else
+      fail "C1 $name max=$max min=$min service-min=$smin throttling=$thr scaling=$mode"
+    fi
+  done
+}
+
+# judge_c2 <service> <iam-disabled>: the invoker members on stdin, one per line. The API admits the
+# web proxy, the admin app and the smoke identity; the gateway only the admin app and the smoke
+# identity (the public booking proxy never reaches it).
+judge_c2() {
+  local svc="$1" dis="$2" got want who
+  got="$(sort)"
+  want="serviceAccount:clinic-admin@${PROJECT}.iam.gserviceaccount.com
+serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com"
+  who="clinic-admin and clinic-smoke"
+  if [ "$svc" != clinic-realtime ]; then
+    want="$want
+serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
+    who="clinic-web, clinic-admin and clinic-smoke"
+  fi
+  want="$(printf '%s\n' "$want" | sort)"
+  if [ "$got" = "$want" ] && [ "$dis" = false ]; then
+    pass "C2 $svc invoker members are exactly $who"
+  else
+    fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
+  fi
+}
+
 live_checks() {
   : "${PROJECT:?set PROJECT for --live}"
   command -v gcloud >/dev/null || { fail "gcloud not installed"; return; }
@@ -388,31 +444,17 @@ live_checks() {
   if [ -z "$c1" ]; then
     fail "C1 no Cloud Run services found (or field paths unverified)"
   else
-    local name max min smin thr mode
-    while IFS=$'\t' read -r name max min smin thr mode; do
-      if [ "$max" != "UNSET" ] && [ "$max" -ge 1 ] 2>/dev/null && [ "$max" -le 3 ] && [ "$min" = 0 ] && [ "$smin" = 0 ] && [ "$thr" = true ] && [ "$mode" = automatic ]; then
-        pass "C1 $name max=$max min=0 throttling=true scaling=automatic"
-      else
-        fail "C1 $name max=$max min=$min service-min=$smin throttling=$thr scaling=$mode"
-      fi
-    done <<< "$c1"
+    judge_c1 <<< "$c1"
   fi
 
   # C3 probes /ready, not /healthz: Google's frontend answers /healthz itself with a 404, so that path can never show the IAM result.
-  # C2 + C3: invoker members are EXACTLY the web, admin and smoke identities; direct run.app is an IAM denial.
-  local svc want got dis url c403 c401
-  want="serviceAccount:clinic-admin@${PROJECT}.iam.gserviceaccount.com
-serviceAccount:clinic-smoke@${PROJECT}.iam.gserviceaccount.com
-serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
+  # C2 + C3: invoker members are exactly the identities each service admits; direct run.app is an IAM denial.
+  local svc got dis url c403 c401
   for svc in clinic-api clinic-realtime; do
     gc run services describe "$svc" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1 || continue
     got="$(gc run services get-iam-policy "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '[.bindings[]? | select(.role == "roles/run.invoker") | .members[]] | sort | .[]')"
     dis="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format=json | jq -r '.metadata.annotations["run.googleapis.com/invoker-iam-disabled"] // "false"')"
-    if [ "$got" = "$want" ] && [ "$dis" = false ]; then
-      pass "C2 $svc invoker members are exactly clinic-web, clinic-admin and clinic-smoke"
-    else
-      fail "C2 $svc invoker members: [$(printf '%s' "$got" | tr '\n' ' ')] iam-disabled=$dis"
-    fi
+    judge_c2 "$svc" "$dis" <<< "$got"
     url="$(gc run services describe "$svc" --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
     c403="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/ready")"
     c401="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'X-Serverless-Authorization: Bearer junk' "$url/ready")"
@@ -610,7 +652,10 @@ case "$MODE" in
   # the verdict logic on its own: --verdict "<unverified ids>" "<allowed ids>"
   --verdict) UNVERIFIED=" ${2:-}" ;;
   --ar-kept) if ar_kept_within_bound "${2:-}"; then pass "C5 kept images ${2:-} <= $AR_KEPT_IMAGES_BOUND_BYTES"; else fail "C5 kept images '${2:-}' is not within $AR_KEPT_IMAGES_BOUND_BYTES"; fi ;;
-  *) echo "usage: $0 [--static|--live|--ar-size BYTES yes|no VERSIONS|--ar-kept BYTES|--ar-ceiling VERSIONS|--verdict 'IDS' 'ALLOWED']"; exit 2 ;;
+  # the C1 / C2 judgements on their own, so the selftest can prove them without a project
+  --c1) judge_c1 < "${2:?usage: $0 --c1 FILE}" ;;
+  --c2) PROJECT="${PROJECT:-sil-clinic-booking}" judge_c2 "${2:?service}" "${3:?iam-disabled}" < "${4:?members file}" ;;
+  *) echo "usage: $0 [--static|--live|--ar-size BYTES yes|no VERSIONS|--ar-kept BYTES|--ar-ceiling VERSIONS|--verdict 'IDS' 'ALLOWED'|--c1 FILE|--c2 SERVICE IAM_DISABLED FILE]"; exit 2 ;;
 esac
 
 echo

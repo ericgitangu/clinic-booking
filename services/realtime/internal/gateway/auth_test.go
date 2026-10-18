@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -138,5 +139,53 @@ func expectBody(t *testing.T, s *sse, code string) {
 	_, c, _ := problem(t, s)
 	if c != code {
 		t.Fatalf("code = %s, want %s", c, code)
+	}
+}
+
+// The release pipeline's own identity: signed with the smoke key, role smoke, and nothing else.
+func TestSmokeIdentity(t *testing.T) {
+	smoke := who{"ci-smoke@gateway-tests.org", "smoke"}
+	target := "/stream"
+	sign := func(key []byte, w who, sub string) http.Header {
+		return headerWith(key, w, target, func(c map[string]any) { c["sub"] = sub })
+	}
+
+	t.Run("not configured", func(t *testing.T) {
+		h := start(t, nil)
+		expect(t, h.openRaw(target, sign(smokeKey, smoke, assertion.SmokeSub)), http.StatusUnauthorized, "UNAUTHENTICATED")
+	})
+
+	h := start(t, func(c *config.Config) { c.SmokeKey = smokeKey; c.MaxStreamsPerInstance = 4; c.MaxStreamsPerPerson = 4 })
+
+	// The smoke key opens nothing but the smoke identity.
+	expect(t, h.openRaw(target, sign(smokeKey, who{ownerEmail, "owner"}, assertion.SmokeSub)), http.StatusUnauthorized, "UNAUTHENTICATED")
+	expect(t, h.openRaw(target, sign(smokeKey, smoke, "someone-else")), http.StatusUnauthorized, "UNAUTHENTICATED")
+	// And the staff key cannot claim to be it.
+	expect(t, h.openRaw(target, sign(testKey, smoke, assertion.SmokeSub)), http.StatusForbidden, "FORBIDDEN")
+	// An unknown key is still an unknown key.
+	expect(t, h.openRaw(target, sign([]byte("another-key-0123456789abcdefABCDEFGHIJ"), smoke, assertion.SmokeSub)), http.StatusUnauthorized, "UNAUTHENTICATED")
+
+	api := h.env.NewAPI(t)
+	doctor := api.Doctor()
+	s := h.openRaw(target, sign(smokeKey, smoke, assertion.SmokeSub))
+	if s.resp.StatusCode != http.StatusOK {
+		t.Fatalf("smoke refused: %d", s.resp.StatusCode)
+	}
+	if f, _ := s.nextEvent(t, 3*time.Second); f.Event != "hello" || !strings.Contains(f.Data, `"role":"smoke"`) {
+		t.Fatalf("hello = %+v", f)
+	}
+	// A real patient's booking is invisible to it; the synthetic patient's is the only event.
+	api.Book(doctor)
+	patient, name := api.Patient()
+	testenv.MarkSynthetic(t, h.env, patient)
+	synth := api.BookFor(doctor, patient, name)
+	ev, ok := s.nextEvent(t, 5*time.Second)
+	if !ok || ev.Event != "booked" {
+		t.Fatalf("got %+v", ev)
+	}
+	for _, leak := range []string{name, synth.ID, "patient_name", "appointment_id"} {
+		if strings.Contains(ev.Data, leak) {
+			t.Fatalf("the smoke stream leaked %q: %s", leak, ev.Data)
+		}
 	}
 }

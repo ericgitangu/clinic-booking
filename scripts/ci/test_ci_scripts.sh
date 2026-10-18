@@ -947,6 +947,64 @@ done
 expect "public build env: the committed file covers every NEXT_PUBLIC_* the real sources reference" "$real_ok" 0
 expect "public build env: the committed file holds only NEXT_PUBLIC_* names" "$(grep -vE '^(#|$)' "$HERE/public-build.env" | grep -vcE '^[a-z]+ NEXT_PUBLIC_[A-Z0-9_]+=')" 0
 
+# =========================================================================================
+# realtime_prereqs.sh: the steps only a person can do fail with the command to run, not a mystery.
+# =========================================================================================
+mkdir -p "$WORK/bin-rt"
+cat > "$WORK/bin-rt/gcloud" <<'FAKE'
+#!/usr/bin/env bash
+case "$*" in
+  "secrets versions list"*) cat "$RT/versions.json" ;;
+  "run services get-iam-policy"*) cat "$RT/policy.json" ;;
+  *) echo "fake gcloud: unhandled: $*" >&2; exit 99 ;;
+esac
+FAKE
+chmod +x "$WORK/bin-rt/gcloud"
+rt_run() { # <name> <mode> ; uses $RT
+  ( cd "$WORK" && PATH="$WORK/bin-rt:$PATH" GOOGLE_PROJECT_ID=p RT="$RT" bash "$HERE/realtime_prereqs.sh" $2 ) >"$RT/out" 2>&1
+  echo $?
+}
+RT="$WORK/rt1"; mkdir -p "$RT"
+echo '[]' > "$RT/versions.json"
+expect "realtime prereqs: no secret version -> fails" "$(rt_run x '')" 1
+expect "realtime prereqs: ...and names the runbook" "$(grep -c 'docs/runbooks/neon.md' "$RT/out")" 1
+echo '[{"name":"v1"}]' > "$RT/versions.json"
+expect "realtime prereqs: one enabled version -> ok" "$(rt_run x '')" 0
+adm='"serviceAccount:clinic-admin@p.iam.gserviceaccount.com"'; smk='"serviceAccount:clinic-smoke@p.iam.gserviceaccount.com"'; web='"serviceAccount:clinic-web@p.iam.gserviceaccount.com"'
+pol() { echo "{\"bindings\":[{\"role\":\"roles/run.invoker\",\"members\":[$1]}]}" > "$RT/policy.json"; }
+pol "$adm,$smk"
+expect "realtime prereqs: admin + smoke invokers -> ok" "$(rt_run x --after-deploy)" 0
+pol "$adm"
+expect "realtime prereqs: smoke binding missing -> fails" "$(rt_run x --after-deploy)" 1
+expect "realtime prereqs: ...and prints the exact bootstrap command" "$(grep -c 'bash infra/bootstrap.sh invoker' "$RT/out")" 1
+pol "$adm,$smk,$web"
+expect "realtime prereqs: the public proxy bound -> fails" "$(rt_run x --after-deploy)" 1
+echo '{"bindings":[]}' > "$RT/policy.json"
+expect "realtime prereqs: no bindings at all -> fails" "$(rt_run x --after-deploy)" 1
+
+# promote.sh and rollback.sh serve the gateway through SERVICE: it must be the service they touch.
+new_fx rtpromote; export GOOGLE_PROJECT_ID=p
+echo '{"status":{"traffic":[{"revisionName":"rev-p","percent":100}]}}' > "$FX/service_before.json"
+echo '{"status":{"traffic":[{"revisionName":"rev-p","percent":0},{"revisionName":"rev-n","percent":100,"tag":"sha-n"}]}}' > "$FX/service_after.json"
+( cd "$WORK/repo" && CIRCLE_SHA1="$(git -C "$WORK/origin.git" rev-parse main)" SERVICE=clinic-realtime PROMOTE_DIR="$FX/promoted" bash "$HERE/promote.sh" sha-n ) >"$FX/out" 2>&1
+expect "promote.sh with SERVICE=clinic-realtime moves clinic-realtime traffic" "$(grep -c 'run services update-traffic clinic-realtime' "$FX/calls.all")" 1
+expect "promote.sh with SERVICE=clinic-realtime never touches clinic-api" "$(grep -c 'clinic-api' "$FX/calls.all")" 0
+
+# =========================================================================================
+# measure_realtime_cost.sh: the judgement fails closed; the README line is a placeholder until measured.
+# =========================================================================================
+MEASURE="$HERE/../ops/measure_realtime_cost.sh"
+judge_rc() { bash "$MEASURE" --judge "$1" "$2" >/dev/null 2>&1; echo $?; }
+expect "measure: 900 vCPU-s per connected hour (0.25 vCPU) is within the budget" "$(judge_rc 360 90)" 0
+expect "measure: 990 is within the budget" "$(judge_rc 360 99)" 0
+expect "measure: 1 vCPU (3600 per hour) exceeds the budget" "$(judge_rc 360 360)" 1
+expect "measure: too few connected seconds fails closed" "$(judge_rc 60 15)" 1
+expect "measure: no CPU recorded fails closed" "$(judge_rc 360 0)" 1
+expect "measure: non-numbers fail closed" "$(judge_rc abc 10)" 1
+expect "measure: the README line is a placeholder until measured" "$(EVIDENCE="$WORK/none.json" bash "$MEASURE" --readme-line)" "Measured cost of one connected hour: to be measured after the first deploy."
+echo '{"measured_at":"2026-10-20T10:00:00Z","connected_seconds":360,"vcpu_seconds_per_connected_hour":912,"budget":1100,"hours_of_shared_headroom":23.7}' > "$WORK/ev.json"
+expect "measure: the README line is generated from the evidence file" "$(EVIDENCE="$WORK/ev.json" bash "$MEASURE" --readme-line | grep -c '912 vCPU-seconds per connected hour')" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

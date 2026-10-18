@@ -133,20 +133,21 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. The assertion, bound to this exact request. Nothing touches the database before it passes.
-	principal, err := assertion.Verify(r.Header.Get(assertion.Header), g.cfg.SigningKey,
-		r.Method, r.RequestURI, nil, time.Now())
+	principal, smoke, err := g.principal(r)
 	if err != nil {
 		g.log.Info("assertion refused", slog.String("reason", err.Error()))
 		g.writeProblem(w, r, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication required",
 			"A valid staff assertion is required.", nil)
 		return
 	}
-	switch principal.Role {
-	case "owner", "admin", "viewer":
-	default:
-		g.log.Info("assertion refused", slog.String("reason", "role not allowed for this endpoint"))
-		g.writeProblem(w, r, http.StatusForbidden, "FORBIDDEN", "Forbidden", "This role cannot read the live feed.", nil)
-		return
+	if !smoke {
+		switch principal.Role {
+		case "owner", "admin", "viewer":
+		default:
+			g.log.Info("assertion refused", slog.String("reason", "role not allowed for this endpoint"))
+			g.writeProblem(w, r, http.StatusForbidden, "FORBIDDEN", "Forbidden", "This role cannot read the live feed.", nil)
+			return
+		}
 	}
 
 	var from *cursor.Cursor
@@ -182,16 +183,19 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer lease.Release()
 
-	current, err := g.roleOf(r.Context(), lease, principal.Email)
-	if err != nil {
-		g.log.Error("role lookup failed", slog.String("error", err.Error()))
-		g.dbUnavailable(w, r)
-		return
-	}
-	if current == "" || current != principal.Role {
-		g.log.Info("assertion refused", slog.String("reason", "role is not the one currently held"))
-		g.writeProblem(w, r, http.StatusForbidden, "FORBIDDEN", "Forbidden", "You no longer hold this role.", nil)
-		return
+	current := "smoke"
+	if !smoke {
+		current, err = g.roleOf(r.Context(), lease, principal.Email)
+		if err != nil {
+			g.log.Error("role lookup failed", slog.String("error", err.Error()))
+			g.dbUnavailable(w, r)
+			return
+		}
+		if current == "" || current != principal.Role {
+			g.log.Info("assertion refused", slog.String("reason", "role is not the one currently held"))
+			g.writeProblem(w, r, http.StatusForbidden, "FORBIDDEN", "Forbidden", "You no longer hold this role.", nil)
+			return
+		}
 	}
 
 	var pos cursor.Cursor
@@ -210,7 +214,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
-		staff: current == "owner" || current == "admin", email: principal.Email}
+		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke}
 	begin := time.Now()
 	reason := s.run(r.Context(), lease)
 	g.log.Info("stream closed",
@@ -218,6 +222,24 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		slog.String("role", current),
 		slog.Float64("connected_seconds", time.Since(begin).Seconds()),
 		slog.Int("events_sent", s.sent))
+}
+
+// principal verifies the assertion with the staff key and, if that key did not sign it and a
+// smoke key is configured, with the smoke key. The smoke key only ever opens the smoke identity.
+func (g *Gateway) principal(r *http.Request) (p assertion.Principal, smoke bool, err error) {
+	header := r.Header.Get(assertion.Header)
+	p, err = assertion.Verify(header, g.cfg.SigningKey, r.Method, r.RequestURI, nil, time.Now())
+	if err == nil || len(g.cfg.SmokeKey) == 0 || !strings.Contains(err.Error(), "bad signature") {
+		return p, false, err
+	}
+	p, err = assertion.Verify(header, g.cfg.SmokeKey, r.Method, r.RequestURI, nil, time.Now())
+	if err != nil {
+		return assertion.Principal{}, false, err
+	}
+	if p.Role != "smoke" || p.Sub != assertion.SmokeSub {
+		return assertion.Principal{}, false, fmt.Errorf("%w: not the smoke caller", assertion.ErrInvalid)
+	}
+	return p, true, nil
 }
 
 func (g *Gateway) dbUnavailable(w http.ResponseWriter, r *http.Request) {
@@ -233,6 +255,7 @@ type session struct {
 	role  string
 	staff bool
 	email string
+	smoke bool
 	sent  int
 }
 
@@ -309,7 +332,8 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 			delivered := false
 			for _, row := range rows {
 				s.pos = row.Cursor() // advance first: a skipped row must not be re-read
-				if row.Synthetic {
+				// Staff never see the release smoke's synthetic patient; the smoke sees nothing else.
+				if row.Synthetic != s.smoke {
 					continue
 				}
 				name, data, err := events.Encode(row, s.staff)
@@ -351,6 +375,9 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 				return ReasonClient
 			}
 		case <-roleT.C:
+			if s.smoke {
+				continue
+			}
 			current, err := g.roleOf(ctx, lease, s.email)
 			switch {
 			case err != nil && ctx.Err() != nil:
