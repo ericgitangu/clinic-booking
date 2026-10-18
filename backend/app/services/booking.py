@@ -253,6 +253,9 @@ async def reschedule(
         appt.starts_at = new_starts_at
         appt.ends_at = new_starts_at + SLOT
         appt.updated_at = now
+        # The new time gets its own reminder.
+        appt.reminder_claimed_at = None
+        appt.reminder_sent_at = None
         await event_repo.insert_event(
             session,
             appointment_id=appt.id,

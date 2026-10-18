@@ -28,9 +28,9 @@ const ROWS = [
   ],
   [
     "Email address",
-    "Matching your sign-in to your patient record, and appointment emails once they are active",
-    "Neon database. Appointment emails through Resend are planned (not yet active)",
-    "Same as above. Resend keeps sent-mail records under its own retention",
+    "Matching your sign-in to your patient record, and appointment emails",
+    "Neon database. Appointment emails are sent through Resend",
+    "Same as above. Resend keeps sent-mail records for 30 days on the free plan",
   ],
   [
     "Google profile (name, email, picture)",
@@ -113,8 +113,7 @@ export default function DataPage() {
       <p>
         The site runs on Vercel, the booking service on Google Cloud Run in
         us-east4, and the database on Neon in aws-us-east-1. Appointment emails
-        are planned through Resend (not yet active). The reasons for the region
-        are in{" "}
+        are sent through Resend. The reasons for the region are in{" "}
         <a
           className={LINK}
           href="https://github.com/ericgitangu/clinic-booking/blob/main/docs/adr/0014-hosting-region-and-cost.md"

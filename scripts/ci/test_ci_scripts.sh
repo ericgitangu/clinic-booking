@@ -415,6 +415,8 @@ print("Vercel CLI 59.5.0\n" + json.dumps(body))
 PY
 }
 ALL="BETTER_AUTH_URL BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL API_AUDIENCE GCP_PROJECT_NUMBER GCP_SERVICE_ACCOUNT_EMAIL GCP_WORKLOAD_IDENTITY_POOL_ID GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID ADMIN_EMAILS"
+# The names only the booking app needs (it sends the email and runs the reminder cron).
+BOOKING_ONLY="RESEND_API_KEY CRON_SECRET"
 
 new_fx env_ok
 env_table production 0 $ALL OTHER
@@ -440,9 +442,32 @@ bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
 expect "env check: a Preview-only value does not satisfy production" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
 new_fx env_all_envs
-env_table all 0 $ALL
+env_table all 0 $ALL $BOOKING_ONLY
 bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
 expect "env check: All Environments counts" "$rc" 0
+
+new_fx env_booking_no_resend
+env_table production 0 $ALL CRON_SECRET
+out="$(bash "$HERE/vercel_env_check.sh" booking production 2>&1)"; rc=$?
+expect "env check: booking needs RESEND_API_KEY" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names RESEND_API_KEY as the missing one" "$(grep -c 'RESEND_API_KEY' <<<"$out")" 1
+expect "env check: a missing-name failure never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+new_fx env_booking_no_cron
+env_table production 0 $ALL RESEND_API_KEY
+out="$(bash "$HERE/vercel_env_check.sh" booking production 2>&1)"; rc=$?
+expect "env check: booking needs CRON_SECRET" "$([ "$rc" -ne 0 ] && echo refused)" refused
+expect "env check: names CRON_SECRET as the missing one" "$(grep -c 'CRON_SECRET' <<<"$out")" 1
+
+new_fx env_booking_ok
+env_table production 0 $ALL $BOOKING_ONLY
+bash "$HERE/vercel_env_check.sh" booking production >/dev/null 2>&1; rc=$?
+expect "env check: booking passes with the email names set" "$rc" 0
+
+new_fx env_admin_without_email_names
+env_table production 0 $ALL
+bash "$HERE/vercel_env_check.sh" admin production >/dev/null 2>&1; rc=$?
+expect "env check: admin does not need the email names" "$rc" 0
 
 new_fx env_hidden
 env_table production 2 $ALL

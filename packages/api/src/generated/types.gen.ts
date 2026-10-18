@@ -352,6 +352,47 @@ export type ChangeRoleRequest = {
 };
 
 /**
+ * ClaimedReminder
+ *
+ * One appointment to remind, with its instants in the offset of ``timezone``, the zone of the
+ * clinic the doctor works at (the email shows the time in that zone).
+ */
+export type ClaimedReminder = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Claimed At
+     */
+    claimed_at: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Patient Email
+     */
+    patient_email: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Specialty
+     */
+    specialty: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
+};
+
+/**
  * Clinic
  */
 export type Clinic = {
@@ -464,6 +505,86 @@ export type DoctorRef = {
      * Specialty
      */
     specialty: string;
+};
+
+/**
+ * EmailBudget
+ *
+ * What the email provider's free plan still allows: the day's and the month's counts (both
+ * UTC), and ``remaining``, how many more may be sent now, which is the smaller of the two.
+ */
+export type EmailBudget = {
+    /**
+     * Daily Limit
+     */
+    daily_limit: number;
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Month
+     */
+    month: string;
+    /**
+     * Month Sent
+     */
+    month_sent: number;
+    /**
+     * Monthly Limit
+     */
+    monthly_limit: number;
+    /**
+     * Remaining
+     */
+    remaining: number;
+    /**
+     * Sent
+     */
+    sent: number;
+};
+
+/**
+ * EmailRelease
+ *
+ * Which day and month a reserved email that was never sent is given back to.
+ */
+export type EmailRelease = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Month
+     */
+    month: string;
+};
+
+/**
+ * EmailReservation
+ *
+ * The answer to "may I send one more email": ``granted`` means one was taken from both the day
+ * and the month (give it back with ``/emails/release`` if the send then fails); otherwise
+ * ``reason`` names the cap that refused it. ``day`` and ``month`` are what it was taken from.
+ */
+export type EmailReservation = {
+    budget: EmailBudget;
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Granted
+     */
+    granted: boolean;
+    /**
+     * Month
+     */
+    month: string;
+    /**
+     * Reason
+     */
+    reason: 'day' | 'month' | null;
 };
 
 /**
@@ -757,6 +878,60 @@ export type RealtimeToken = {
      * Ttl Seconds
      */
     ttl_seconds: number;
+};
+
+/**
+ * ReminderBatch
+ *
+ * What one run may send now: the claimed appointments and the day's email budget.
+ */
+export type ReminderBatch = {
+    /**
+     * Daily Limit
+     */
+    daily_limit: number;
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Items
+     */
+    items: Array<ClaimedReminder>;
+    /**
+     * Sent Today
+     */
+    sent_today: number;
+};
+
+/**
+ * ReminderSent
+ */
+export type ReminderSent = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Sent
+     */
+    sent: boolean;
+};
+
+/**
+ * ReminderSentRequest
+ *
+ * What was claimed: marking sent only applies if the appointment is still that claim.
+ */
+export type ReminderSentRequest = {
+    /**
+     * Claimed At
+     */
+    claimed_at: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
 };
 
 /**
@@ -1603,6 +1778,91 @@ export type GetSessionInfoInternalAdminSessionGetResponses = {
 
 export type GetSessionInfoInternalAdminSessionGetResponse = GetSessionInfoInternalAdminSessionGetResponses[keyof GetSessionInfoInternalAdminSessionGetResponses];
 
+export type ReleaseEmailInternalEmailsReleasePostData = {
+    body: EmailRelease;
+    path?: never;
+    query?: never;
+    url: '/internal/emails/release';
+};
+
+export type ReleaseEmailInternalEmailsReleasePostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type ReleaseEmailInternalEmailsReleasePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmailBudget;
+};
+
+export type ReleaseEmailInternalEmailsReleasePostResponse = ReleaseEmailInternalEmailsReleasePostResponses[keyof ReleaseEmailInternalEmailsReleasePostResponses];
+
+export type ReserveEmailInternalEmailsReservePostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/emails/reserve';
+};
+
+export type ReserveEmailInternalEmailsReservePostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type ReserveEmailInternalEmailsReservePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmailReservation;
+};
+
+export type ReserveEmailInternalEmailsReservePostResponse = ReserveEmailInternalEmailsReservePostResponses[keyof ReserveEmailInternalEmailsReservePostResponses];
+
+export type EmailsTodayInternalEmailsTodayGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/emails/today';
+};
+
+export type EmailsTodayInternalEmailsTodayGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type EmailsTodayInternalEmailsTodayGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmailBudget;
+};
+
+export type EmailsTodayInternalEmailsTodayGetResponse = EmailsTodayInternalEmailsTodayGetResponses[keyof EmailsTodayInternalEmailsTodayGetResponses];
+
 export type MyAppointmentsInternalMeAppointmentsGetData = {
     body?: never;
     path?: never;
@@ -1852,6 +2112,88 @@ export type AdminTokenInternalRealtimeTokenAdminPostResponses = {
 };
 
 export type AdminTokenInternalRealtimeTokenAdminPostResponse = AdminTokenInternalRealtimeTokenAdminPostResponses[keyof AdminTokenInternalRealtimeTokenAdminPostResponses];
+
+export type ClaimRemindersInternalRemindersClaimPostData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * On
+         *
+         * Remind for this clinic-local date, not tomorrow (a rehearsal or a re-run).
+         */
+        on?: string | null;
+    };
+    url: '/internal/reminders/claim';
+};
+
+export type ClaimRemindersInternalRemindersClaimPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ClaimRemindersInternalRemindersClaimPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReminderBatch;
+};
+
+export type ClaimRemindersInternalRemindersClaimPostResponse = ClaimRemindersInternalRemindersClaimPostResponses[keyof ClaimRemindersInternalRemindersClaimPostResponses];
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostData = {
+    body: ReminderSentRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/reminders/{appointment_id}/sent';
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReminderSent;
+};
+
+export type MarkReminderSentInternalRemindersAppointmentIdSentPostResponse = MarkReminderSentInternalRemindersAppointmentIdSentPostResponses[keyof MarkReminderSentInternalRemindersAppointmentIdSentPostResponses];
 
 export type PostPatientPatientsPostData = {
     body: PatientCreate;

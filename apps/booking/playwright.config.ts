@@ -9,6 +9,16 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   workers: process.env.CI ? 2 : undefined,
   reporter: "list",
+  // The email-allowance scenario runs by itself after everything else: while the allowance is at its
+  // limit, any other scenario's email would be dropped.
+  projects: [
+    { name: "main", testIgnore: /emails-cap\.spec/ },
+    {
+      name: "allowance",
+      testMatch: /emails-cap\.spec/,
+      dependencies: ["main"],
+    },
+  ],
   use: {
     baseURL: "http://localhost:3100",
     ...(process.env.PW_CHROME_PATH
@@ -20,6 +30,14 @@ export default defineConfig({
   // Every scenario runs against the real API and database: docker compose with migrations and
   // seed (`make e2e` starts it; CI's e2e-real job does too). E2E_API_URL points elsewhere if needed.
   webServer: [
+    {
+      // STAND-IN for Resend's HTTP API only (see e2e/support/resend-standin.mjs). Everything else,
+      // the app, the API and the database, is real.
+      command: "node e2e/support/resend-standin.mjs",
+      url: "http://127.0.0.1:3198/_health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 15_000,
+    },
     {
       command: "pnpm exec next start -p 3100",
       url: "http://localhost:3100",
@@ -37,6 +55,10 @@ export default defineConfig({
         // Present only so the auth instance can be built; the tests never complete a Google sign-in.
         GOOGLE_CLIENT_ID: "e2e-google-client-id",
         GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
+        // Email goes to the Resend stand-in. The key is a throwaway the stand-in expects.
+        RESEND_API_KEY: ["re", "e2e", "standin", "key"].join("_"), // ggignore
+        RESEND_BASE_URL: "http://127.0.0.1:3198",
+        CRON_SECRET: process.env.CRON_SECRET ?? "",
       },
     },
     // On a machine with no push-service key (E2E_PUSH_LOCAL=1) the live-update scenarios run against

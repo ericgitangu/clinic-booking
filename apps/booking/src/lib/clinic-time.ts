@@ -29,9 +29,9 @@ export function isValidDay(day: string | undefined): day is string {
   );
 }
 
-export function formatTime(iso: string): string {
+export function formatTime(iso: string, zone: string = CLINIC_TZ): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: CLINIC_TZ,
+    timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -62,6 +62,25 @@ export function formatDayShort(day: string): { weekday: string; date: string } {
   };
 }
 
-export function formatWhen(iso: string): string {
-  return `${formatDayLong(clinicDay(iso))}, ${formatTime(iso)}`;
+// The day and time of an instant in the given IANA zone (the clinic's own, from the appointment's
+// `timezone`), "Tuesday 20 October, 09:00". Defaults to the Nairobi clinic the screens are written for.
+export function formatWhen(iso: string, zone: string = CLINIC_TZ): string {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+  return `${formatDayLong(day)}, ${formatTime(iso, zone)}`;
+}
+
+// "East Africa Time (GMT+03:00)": the zone's name and its offset at that instant, for the line under a
+// time in an email so a patient in another zone knows which clock it is.
+export function zoneLabel(iso: string, zone: string = CLINIC_TZ): string {
+  const at = new Date(iso);
+  const part = (style: "long" | "longOffset") =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone, timeZoneName: style })
+      .formatToParts(at)
+      .find((p) => p.type === "timeZoneName")?.value ?? zone;
+  return `${part("long")} (${part("longOffset")})`;
 }

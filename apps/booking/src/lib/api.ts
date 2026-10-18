@@ -4,9 +4,14 @@
 // /internal/me endpoints with the signed assertion for the signed-in person: the API decides which
 // patient that is, never the browser. Doctors, free times and the readiness check are public.
 import "server-only";
+import { FROM_ADDRESS } from "@/lib/email/sender";
 import { callApi, type Caller } from "@clinic/api/call";
 import {
   bookMineInternalMeAppointmentsPost,
+  claimRemindersInternalRemindersClaimPost,
+  markReminderSentInternalRemindersAppointmentIdSentPost,
+  releaseEmailInternalEmailsReleasePost,
+  reserveEmailInternalEmailsReservePost,
   cancelMineInternalMeAppointmentsAppointmentIdCancelPatch,
   doctorAvailabilityDoctorsDoctorIdAvailabilityGet,
   getDoctorDoctorsDoctorIdGet,
@@ -119,4 +124,63 @@ export const rescheduleMine = (caller: Caller, id: string, startsAt: string) =>
         body: { starts_at: startsAt },
       }),
     { caller },
+  );
+
+// --- email ---------------------------------------------------------------------------------------
+
+// Who the scheduled reminder run signs as. The API accepts this role and subject for the reminder
+// routes and for nothing else.
+export const SYSTEM_CALLER: Caller = {
+  sub: "system:reminders",
+  email: FROM_ADDRESS,
+  role: "system",
+  emailVerified: true,
+};
+
+// Takes one email from the day's and the month's allowance before it is sent, atomically in the
+// database. `granted: false` (with the cap that refused) is a normal answer: do not send.
+export const reserveEmail = (caller: Caller) =>
+  callApi(
+    "reserveEmail",
+    (client) => reserveEmailInternalEmailsReservePost({ client }),
+    { caller },
+  );
+
+// Gives a reserved email back when the send then failed, to the day and month it was taken from.
+export const releaseEmail = (
+  caller: Caller,
+  taken: { day: string; month: string },
+) =>
+  callApi(
+    "releaseEmail",
+    (client) => releaseEmailInternalEmailsReleasePost({ client, body: taken }),
+    { caller },
+  );
+
+export const claimReminders = (limit: number, on?: string) =>
+  callApi(
+    "claimReminders",
+    (client) =>
+      claimRemindersInternalRemindersClaimPost({
+        client,
+        query: { limit, on },
+      }),
+    { caller: SYSTEM_CALLER },
+  );
+
+// Reports a reminder as sent, quoting the claim it was sent under: if the appointment was moved or
+// the claim replaced in the meantime the API marks nothing and answers sent: false.
+export const markReminderSent = (
+  appointmentId: string,
+  claim: { claimed_at: string; starts_at: string },
+) =>
+  callApi(
+    "markReminderSent",
+    (client) =>
+      markReminderSentInternalRemindersAppointmentIdSentPost({
+        client,
+        path: { appointment_id: appointmentId },
+        body: claim,
+      }),
+    { caller: SYSTEM_CALLER },
   );

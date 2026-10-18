@@ -44,13 +44,12 @@ export default function AboutPage() {
           Conflict-free booking: the database itself refuses a second booking
           for the same doctor and time.
         </li>
-      </ul>
-
-      <h2>Planned next</h2>
-      <p>These are being built and are not live yet.</p>
-      <ul>
-        <li>Email reminders the day before a visit.</li>
-        <li>An admin view of the day for the front desk.</li>
+        <li>
+          Email: an acknowledgement when you book, move or cancel, and a
+          reminder the evening before (sent between 18:00 and 19:00 Nairobi
+          time, at most 50 a day), through Resend.
+        </li>
+        <li>An admin view of the day for the front desk, behind a sign-in.</li>
       </ul>
 
       <h2>How it could grow</h2>

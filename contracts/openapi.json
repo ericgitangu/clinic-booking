@@ -601,6 +601,58 @@
         "title": "ChangeRoleRequest",
         "type": "object"
       },
+      "ClaimedReminder": {
+        "description": "One appointment to remind, with its instants in the offset of ``timezone``, the zone of the\nclinic the doctor works at (the email shows the time in that zone).",
+        "properties": {
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "claimed_at": {
+            "format": "date-time",
+            "title": "Claimed At",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "patient_email": {
+            "title": "Patient Email",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "specialty": {
+            "title": "Specialty",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "appointment_id",
+          "starts_at",
+          "claimed_at",
+          "doctor_name",
+          "specialty",
+          "patient_name",
+          "patient_email"
+        ],
+        "title": "ClaimedReminder",
+        "type": "object"
+      },
       "Clinic": {
         "properties": {
           "id": {
@@ -766,6 +818,120 @@
           "specialty"
         ],
         "title": "DoctorRef",
+        "type": "object"
+      },
+      "EmailBudget": {
+        "description": "What the email provider's free plan still allows: the day's and the month's counts (both\nUTC), and ``remaining``, how many more may be sent now, which is the smaller of the two.",
+        "properties": {
+          "daily_limit": {
+            "title": "Daily Limit",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "month_sent": {
+            "title": "Month Sent",
+            "type": "integer"
+          },
+          "monthly_limit": {
+            "title": "Monthly Limit",
+            "type": "integer"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "sent",
+          "daily_limit",
+          "month",
+          "month_sent",
+          "monthly_limit",
+          "remaining"
+        ],
+        "title": "EmailBudget",
+        "type": "object"
+      },
+      "EmailRelease": {
+        "additionalProperties": false,
+        "description": "Which day and month a reserved email that was never sent is given back to.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "month"
+        ],
+        "title": "EmailRelease",
+        "type": "object"
+      },
+      "EmailReservation": {
+        "description": "The answer to \"may I send one more email\": ``granted`` means one was taken from both the day\nand the month (give it back with ``/emails/release`` if the send then fails); otherwise\n``reason`` names the cap that refused it. ``day`` and ``month`` are what it was taken from.",
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/EmailBudget"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "granted": {
+            "title": "Granted",
+            "type": "boolean"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "month"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "granted",
+          "reason",
+          "day",
+          "month",
+          "budget"
+        ],
+        "title": "EmailReservation",
         "type": "object"
       },
       "ErrorItem": {
@@ -1286,6 +1452,80 @@
           "ttl_seconds"
         ],
         "title": "RealtimeToken",
+        "type": "object"
+      },
+      "ReminderBatch": {
+        "description": "What one run may send now: the claimed appointments and the day's email budget.",
+        "properties": {
+          "daily_limit": {
+            "title": "Daily Limit",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimedReminder"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sent_today": {
+            "title": "Sent Today",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "items",
+          "sent_today",
+          "daily_limit"
+        ],
+        "title": "ReminderBatch",
+        "type": "object"
+      },
+      "ReminderSent": {
+        "properties": {
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "appointment_id",
+          "sent"
+        ],
+        "title": "ReminderSent",
+        "type": "object"
+      },
+      "ReminderSentRequest": {
+        "additionalProperties": false,
+        "description": "What was claimed: marking sent only applies if the appointment is still that claim.",
+        "properties": {
+          "claimed_at": {
+            "format": "date-time",
+            "title": "Claimed At",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claimed_at",
+          "starts_at"
+        ],
+        "title": "ReminderSentRequest",
         "type": "object"
       },
       "RescheduleRequest": {
@@ -2648,6 +2888,120 @@
         ]
       }
     },
+    "/internal/emails/release": {
+      "post": {
+        "description": "Give back one reserved email whose send failed, so a failure does not use the allowance.",
+        "operationId": "release_email_internal_emails_release_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRelease"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailBudget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Email",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
+    "/internal/emails/reserve": {
+      "post": {
+        "description": "Take one email from the day's and the month's allowance before sending it, atomically: under\nany number of concurrent senders the caps are never exceeded. A refusal is a normal answer\n(``granted`` false and the cap that said no), not an error: the caller just does not send.",
+        "operationId": "reserve_email_internal_emails_reserve_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailReservation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Reserve Email",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
+    "/internal/emails/today": {
+      "get": {
+        "operationId": "emails_today_internal_emails_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailBudget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Emails Today",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
     "/internal/me/appointments": {
       "get": {
         "operationId": "my_appointments_internal_me_appointments_get",
@@ -3043,6 +3397,147 @@
         "summary": "Admin Token",
         "tags": [
           "realtime"
+        ]
+      }
+    },
+    "/internal/reminders/claim": {
+      "post": {
+        "description": "Claim the appointments due a reminder, with a lease. Each claimed row stays claimed until it\nis marked sent; a claim older than the lease can be taken again by a later run.",
+        "operationId": "claim_reminders_internal_reminders_claim_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Remind for this clinic-local date, not tomorrow (a rehearsal or a re-run).",
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Remind for this clinic-local date, not tomorrow (a rehearsal or a re-run).",
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderBatch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Claim Reminders",
+        "tags": [
+          "reminders"
+        ]
+      }
+    },
+    "/internal/reminders/{appointment_id}/sent": {
+      "post": {
+        "description": "Record that the email provider accepted this reminder. Called only after a 2xx from it, and\nonly for the claim it was sent under: if the appointment was moved or the claim has been\nreplaced since, nothing is marked (``sent`` is false) and the reminder stays due.",
+        "operationId": "mark_reminder_sent_internal_reminders__appointment_id__sent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderSentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderSent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Mark Reminder Sent",
+        "tags": [
+          "reminders"
         ]
       }
     },
