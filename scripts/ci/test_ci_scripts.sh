@@ -724,6 +724,66 @@ lh_run fail "curl -sf http://127.0.0.1:$LHP/ >/dev/null; exit 3"
 expect "lighthouse: a failing runner's exit code is the script's exit code" "$rc" 3
 expect "lighthouse: no server process or listener is left after a failure" "$(gone)" "closed:0"
 
+# =========================================================================================
+# install_gitleaks.sh: pinned checksum, one retry, cache. A fake curl stands in for GitHub
+# (third party); the tarball is a real gzip of a tiny `gitleaks`.
+# =========================================================================================
+GLW="$WORK/gl"; mkdir -p "$GLW/src"
+printf '#!/bin/sh\necho "gitleaks version fake"\n' > "$GLW/src/gitleaks"; chmod +x "$GLW/src/gitleaks"
+tar -czf "$GLW/good.tgz" -C "$GLW/src" gitleaks
+GL_SHA="$( (sha256sum "$GLW/good.tgz" 2>/dev/null || shasum -a 256 "$GLW/good.tgz") | cut -d' ' -f1)"
+printf '<html>502 Bad Gateway</html>' > "$GLW/bad.html"
+cat > "$WORK/bin/curl-gl" <<'FAKE'
+#!/usr/bin/env bash
+# serves $GLW/answers in order: "good" | "bad" | "fail"; counts calls
+n=$(( $(cat "$GLW/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GLW/calls"
+ans="$(sed -n "${n}p" "$GLW/answers")"
+out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
+case "$ans" in
+  good) cp "$GLW/good.tgz" "$out" ;;
+  bad) cp "$GLW/bad.html" "$out" ;;
+  *) exit 22 ;;
+esac
+FAKE
+chmod +x "$WORK/bin/curl-gl"
+mkdir -p "$WORK/glbin"; ln -sf "$WORK/bin/curl-gl" "$WORK/glbin/curl"
+export GLW
+gl_run() { # <name> <answers...>: runs the installer in a fresh dir with a fresh cache
+  GLD="$WORK/gl.$1"; rm -rf "$GLD"; mkdir -p "$GLD/cache" "$GLD/cwd"; shift
+  : > "$GLW/answers"; for a in "$@"; do echo "$a" >> "$GLW/answers"; done; rm -f "$GLW/calls"
+  ( cd "$GLD/cwd" && PATH="$WORK/glbin:$PATH" GITLEAKS_SHA256="$GL_SHA" GITLEAKS_URL=https://example.invalid/g.tgz \
+      GITLEAKS_CACHE="$GLD/cache" GITLEAKS_RETRY_SLEEP=0 bash "$HERE/install_gitleaks.sh" ) >"$GLD/out" 2>&1; rc=$?
+}
+gl_calls() { cat "$GLW/calls" 2>/dev/null || echo 0; }
+gl_run ok good
+expect "gitleaks install: a verified download installs the binary" "$rc:$(grep -c 'gitleaks version fake' "$GLD/out"):$(gl_calls)" "0:1:1"
+gl_run retry bad good
+expect "gitleaks install: a bad first download is retried once and then succeeds" "$rc:$(gl_calls):$(grep -c 'retrying once' "$GLD/out")" "0:2:1"
+gl_run retryfail fail good
+expect "gitleaks install: a failed first download is retried once" "$rc:$(gl_calls)" "0:2"
+gl_run bothbad bad bad good
+expect "gitleaks install: two bad downloads fail with a clear message and never try a third time" \
+  "$rc:$(gl_calls):$(grep -c "expected sha256 $GL_SHA" "$GLD/out")" "1:2:2"
+expect "gitleaks install: ...and nothing is installed" "$([ -e "$GLD/cwd/gitleaks" ] && echo installed || echo none)" none
+expect "gitleaks install: ...and the bad file is not left in the cache" "$([ -e "$GLD/cache/gitleaks_8.30.1_linux_x64.tar.gz" ] && echo cached || echo clean)" clean
+# cache hit: no download at all
+GLD="$WORK/gl.hit"; rm -rf "$GLD"; mkdir -p "$GLD/cache" "$GLD/cwd"; cp "$GLW/good.tgz" "$GLD/cache/gitleaks_8.30.1_linux_x64.tar.gz"
+: > "$GLW/answers"; rm -f "$GLW/calls"
+( cd "$GLD/cwd" && PATH="$WORK/glbin:$PATH" GITLEAKS_SHA256="$GL_SHA" GITLEAKS_CACHE="$GLD/cache" bash "$HERE/install_gitleaks.sh" ) >"$GLD/out" 2>&1; rc=$?
+expect "gitleaks install: a verified cached tarball needs no download" "$rc:$(gl_calls)" "0:0"
+# a corrupted cache entry is discarded and downloaded again
+GLD="$WORK/gl.corrupt"; rm -rf "$GLD"; mkdir -p "$GLD/cache" "$GLD/cwd"; cp "$GLW/bad.html" "$GLD/cache/gitleaks_8.30.1_linux_x64.tar.gz"
+printf 'good\n' > "$GLW/answers"; rm -f "$GLW/calls"
+( cd "$GLD/cwd" && PATH="$WORK/glbin:$PATH" GITLEAKS_SHA256="$GL_SHA" GITLEAKS_URL=https://example.invalid/g.tgz GITLEAKS_CACHE="$GLD/cache" GITLEAKS_RETRY_SLEEP=0 bash "$HERE/install_gitleaks.sh" ) >"$GLD/out" 2>&1; rc=$?
+expect "gitleaks install: a corrupted cache entry is replaced by a fresh verified download" "$rc:$(gl_calls)" "0:1"
+# the pin in the script is the official one, and the CI cache key names the same version
+pin_ver="$(sed -n 's/^VERSION=//p' "$HERE/install_gitleaks.sh")"
+expect "gitleaks install: the default checksum is the official linux_x64 one" \
+  "$(grep -c '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb' "$HERE/install_gitleaks.sh")" 1
+expect "gitleaks install: the CI cache is keyed on the installer script (version and checksum live there)" \
+  "$(grep -c 'gitleaks-v1-{{ checksum "scripts/ci/install_gitleaks.sh" }}' "$HERE/../../.circleci/config.yml")" 2
+expect "gitleaks install: the pinned version is $pin_ver" "$(grep -c "gitleaks_${pin_ver}_checksums.txt" "$HERE/install_gitleaks.sh")" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

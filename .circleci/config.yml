@@ -161,12 +161,19 @@ jobs:
     executor: backend
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - gitleaks-v1-{{ checksum "scripts/ci/install_gitleaks.sh" }}
+      - run:
+          name: Install gitleaks (pinned, checksum verified, one retry)
+          command: bash scripts/ci/install_gitleaks.sh
+      - save_cache:
+          key: gitleaks-v1-{{ checksum "scripts/ci/install_gitleaks.sh" }}
+          paths:
+            - ~/.cache/gitleaks
       - run:
           name: gitleaks (full history)
-          command: |
-            VERSION=8.30.1
-            curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
-            ./gitleaks git --no-banner
+          command: ./gitleaks git --no-banner
 
   sast:
     executor: backend
