@@ -147,4 +147,5 @@ def test_the_json_schemas_under_contracts_are_the_models_schemas() -> None:
         on_disk = json.loads((root / f"{stem}.schema.json").read_text())
         assert on_disk == schema, f"{stem}: run `make openapi` to regenerate contracts/events"
         assert on_disk["additionalProperties"] is False
-        assert not any(w in " ".join(on_disk["properties"]).lower() for w in BANNED)
+        if stem != "staff-event.v1":  # the staff shape names the appointment and patient on purpose
+            assert not any(w in " ".join(on_disk["properties"]).lower() for w in BANNED)

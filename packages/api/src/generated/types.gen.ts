@@ -1804,6 +1804,59 @@ export type StaffCreateAppointment = {
 };
 
 /**
+ * StaffEvent
+ *
+ * The same event for an owner or admin on the live feed: it adds the appointment (to link to
+ * it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+ * (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+ * through the push service. A viewer gets ``AdminEvent`` instead.
+ */
+export type StaffEvent = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Cancellation Reason
+     */
+    cancellation_reason: string | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Event Type
+     */
+    event_type: 'booked' | 'rescheduled' | 'cancelled' | 'vetoed' | 'unlocked' | 'arrived' | 'no_show';
+    /**
+     * From Local Date
+     */
+    from_local_date: string | null;
+    /**
+     * From Starts At
+     */
+    from_starts_at: string | null;
+    /**
+     * Local Date
+     */
+    local_date: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Seq
+     *
+     * "<txid>.<id>" of the event.
+     */
+    seq: string;
+    /**
+     * To Starts At
+     */
+    to_starts_at: string | null;
+};
+
+/**
  * StaffReasonRequest
  *
  * Cancel, veto and unlock carry only the reason.

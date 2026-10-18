@@ -101,5 +101,23 @@ ALTER ROLE clinic_owner SET idle_in_transaction_session_timeout = '5min';
 SQL
 ```
 
-Apply the two `GRANT`s from the event-cursor migration idempotently, and confirm
-`SHOW max_prepared_transactions` is `0`; record it in the PR description.
+Migration `0014_realtime_reader_role` grants the role its privileges when it exists (and only
+raises a NOTICE when it does not, so a release is never blocked). If the role was created after
+the migration ran, re-apply the same statements as the database owner and confirm the result:
+
+```bash
+psql "postgresql://clinic_owner:${OWNER_PW}@${NEON_HOST}/clinic?sslmode=require" \
+  -v ON_ERROR_STOP=1 -f scripts/ops/realtime_grants.sql
+```
+
+Confirm `SHOW max_prepared_transactions` is `0`; record it in the PR description.
+
+The gateway is a Go service, so its secret holds a plain `postgres://` URL for the **direct**
+(non-pooler) endpoint, not the asyncpg form:
+
+```bash
+RT_URL="postgres://clinic_realtime:${RT_PW}@${NEON_HOST}/clinic?sslmode=require"
+printf %s "$RT_URL" | gcloud secrets versions add clinic-database-url-realtime --data-file=- \
+  --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
+unset RT_PW RT_URL
+```

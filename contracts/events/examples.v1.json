@@ -1,0 +1,157 @@
+{
+  "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+  "cases": [
+    {
+      "name": "booked",
+      "row": {
+        "txid": 845,
+        "id": 17,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": "Family emergency",
+        "synthetic": false,
+        "event_type": "booked",
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "local_date": "2026-10-21",
+        "from_local_date": null
+      },
+      "viewer": {
+        "event_type": "booked",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "845.17"
+      },
+      "staff": {
+        "event_type": "booked",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "845.17",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null
+      }
+    },
+    {
+      "name": "cancelled keeps the reason for staff only",
+      "row": {
+        "txid": 845,
+        "id": 18,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": "Family emergency",
+        "synthetic": false,
+        "event_type": "cancelled",
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": null,
+        "local_date": "2026-10-21",
+        "from_local_date": null
+      },
+      "viewer": {
+        "event_type": "cancelled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": null,
+        "seq": "845.18"
+      },
+      "staff": {
+        "event_type": "cancelled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": null,
+        "seq": "845.18",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": "Family emergency"
+      }
+    },
+    {
+      "name": "rescheduled across days",
+      "row": {
+        "txid": 845,
+        "id": 19,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "synthetic": false,
+        "event_type": "rescheduled",
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-22T07:00:00.000000Z",
+        "local_date": "2026-10-22",
+        "from_local_date": "2026-10-21"
+      },
+      "viewer": {
+        "event_type": "rescheduled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-22",
+        "from_local_date": "2026-10-21",
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-22T07:00:00.000000Z",
+        "seq": "845.19"
+      },
+      "staff": {
+        "event_type": "rescheduled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-22",
+        "from_local_date": "2026-10-21",
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-22T07:00:00.000000Z",
+        "seq": "845.19",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null
+      }
+    },
+    {
+      "name": "rescheduled same day",
+      "row": {
+        "txid": 900,
+        "id": 20,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "synthetic": false,
+        "event_type": "rescheduled",
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-21T08:00:00.000000Z",
+        "local_date": "2026-10-21",
+        "from_local_date": null
+      },
+      "viewer": {
+        "event_type": "rescheduled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-21T08:00:00.000000Z",
+        "seq": "900.20"
+      },
+      "staff": {
+        "event_type": "rescheduled",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": "2026-10-21T06:30:00.000000Z",
+        "to_starts_at": "2026-10-21T08:00:00.000000Z",
+        "seq": "900.20",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null
+      }
+    }
+  ]
+}

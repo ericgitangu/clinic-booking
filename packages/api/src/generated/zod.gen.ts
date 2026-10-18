@@ -930,6 +930,35 @@ export const zStaffCreateAppointment = z.object({
 });
 
 /**
+ * StaffEvent
+ *
+ * The same event for an owner or admin on the live feed: it adds the appointment (to link to
+ * it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+ * (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+ * through the push service. A viewer gets ``AdminEvent`` instead.
+ */
+export const zStaffEvent = z.object({
+    appointment_id: z.uuid(),
+    cancellation_reason: z.string().nullable(),
+    doctor_id: z.uuid(),
+    event_type: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled',
+        'vetoed',
+        'unlocked',
+        'arrived',
+        'no_show'
+    ]),
+    from_local_date: z.iso.date().nullable(),
+    from_starts_at: z.iso.datetime({ offset: true }).nullable(),
+    local_date: z.iso.date(),
+    patient_name: z.string(),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
+    to_starts_at: z.iso.datetime({ offset: true }).nullable()
+});
+
+/**
  * StaffReasonRequest
  *
  * Cancel, veto and unlock carry only the reason.

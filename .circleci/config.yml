@@ -74,6 +74,17 @@ executors:
     resource_class: medium
     working_directory: ~/repo
 
+  go_db:
+    docker:
+      - image: mirror.gcr.io/cimg/go:1.26
+      - image: mirror.gcr.io/cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic
+    resource_class: medium
+    working_directory: ~/repo
+
 jobs:
   lint:
     executor: lint
@@ -144,6 +155,55 @@ jobs:
           path: backend/test-results
       - store_artifacts:
           path: backend/coverage.xml
+
+  go-quality:
+    description: services/realtime, the Go live-feed gateway. gofmt, vet, staticcheck, golangci-lint, gosec, govulncheck and the race-enabled tests against a real Postgres and the real API.
+    executor: go_db
+    steps:
+      - checkout
+      - run:
+          name: Install uv and sync the backend (the tests book through the real API)
+          command: |
+            curl -LsSf https://astral.sh/uv/0.11.28/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            export PATH="$HOME/.local/bin:$PATH"
+            cd backend && uv sync --frozen
+      - create_app_role
+      - run:
+          name: migrate + seed, then start the API the tests book through
+          command: |
+            cd backend
+            export DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic
+            uv run alembic upgrade head
+            uv run python -m app.scripts.seed
+            DATABASE_URL=postgresql+asyncpg://clinic_app:clinic_app_local@localhost:5432/clinic \
+              nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8080 > /tmp/api.log 2>&1 &
+            for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
+            curl -fsS http://127.0.0.1:8080/health
+      - run:
+          name: gofmt, go vet, staticcheck, golangci-lint (strict, no baseline)
+          command: |
+            cd services/realtime
+            test -z "$(gofmt -l .)"
+            go vet ./...
+            go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+            go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+      - run:
+          name: gosec and govulncheck (any finding fails)
+          command: |
+            cd services/realtime
+            go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet ./...
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run:
+          name: go test -race against the real database and API
+          command: |
+            cd services/realtime
+            export TEST_OWNER_DSN=postgres://clinic:clinic@127.0.0.1:5432/clinic
+            export TEST_REALTIME_DSN=postgres://clinic_realtime:clinic_realtime_local@127.0.0.1:5432/clinic
+            export TEST_API_URL=http://127.0.0.1:8080
+            go test -race -count=1 ./...
+      - store_artifacts:
+          path: /tmp/api.log
 
   backend-contract:
     executor: backend_db
@@ -943,6 +1003,7 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - go-quality
       - ably-real:
           context: ably-ci
       - secrets
@@ -973,6 +1034,7 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - go-quality
       - ably-real:
           context: ably-ci
       - secrets
@@ -991,6 +1053,7 @@ workflows:
             - backend-quality
             - backend-test
             - backend-contract
+            - go-quality
             - secrets
             - sast
             - sca

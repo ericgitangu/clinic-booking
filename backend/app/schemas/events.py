@@ -52,6 +52,18 @@ class AdminEvent(BaseModel):
     seq: str = Field(pattern=CURSOR_PATTERN, description='"<txid>.<id>" of the event.')
 
 
+class StaffEvent(AdminEvent):
+    """The same event for an owner or admin on the live feed: it adds the appointment (to link to
+    it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+    (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+    through the push service. A viewer gets ``AdminEvent`` instead."""
+
+    model_config = ConfigDict(extra="forbid", title="StaffEvent")
+    appointment_id: uuid.UUID
+    patient_name: str
+    cancellation_reason: str | None
+
+
 class RealtimeToken(BaseModel):
     """A short-lived subscribe-only credential for one channel (a signed JWT)."""
 
@@ -68,13 +80,21 @@ class PatientTokenRequest(BaseModel):
     date: _dt.date
 
 
-EVENT_MODELS: dict[str, type[BaseModel]] = {"SlotEvent": SlotEvent, "AdminEvent": AdminEvent}
+EVENT_MODELS: dict[str, type[BaseModel]] = {
+    "SlotEvent": SlotEvent,
+    "AdminEvent": AdminEvent,
+    "StaffEvent": StaffEvent,
+}
 
 
 def event_json_schemas() -> dict[str, dict[str, object]]:
     """Standalone JSON Schemas (draft 2020-12) of the pushed messages, by file stem."""
     out: dict[str, dict[str, object]] = {}
-    for stem, model in (("slot-event.v1", SlotEvent), ("admin-event.v1", AdminEvent)):
+    for stem, model in (
+        ("slot-event.v1", SlotEvent),
+        ("admin-event.v1", AdminEvent),
+        ("staff-event.v1", StaffEvent),
+    ):
         schema = model.model_json_schema()
         out[stem] = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
