@@ -10,7 +10,7 @@
 
 Accepted. The web project is lean core because its proxy route handlers and landing page are the public URL ([ADR-0023](0023-zero-cost-edge-front-door.md)). The pages and features below are built as droppable slices in the order of the cut line at the end; dropping a slice never removes the proxy or the landing page.
 
-**Build status (2026-10-18, main 748d7d8): Partly shipped.** Shipped as two apps: the server-first booking flow, sign-in, the admin dashboard with its read-only `/internal/admin/*` endpoints and indexes, reCAPTCHA, the shell-only service worker with an offline page (#33), the 60 second cached admin metrics (#30) and live slot updates on the booking page over Ably with polling as the safety net (#44). Emails and the reminder cron are built (PR #27); the first live send is still to be confirmed. Paths and `/admin` routes in the body predate the split; see the amendment.
+**Build status (2026-10-18, main 748d7d8): Partly shipped.** Shipped as two apps: the server-first booking flow, sign-in, the admin dashboard with its read-only `/internal/admin/*` endpoints and indexes, reCAPTCHA, the shell-only service worker with an offline page (#33), the 60 second cached admin metrics (#30) and live slot updates on the booking page over Ably with polling as the safety net (#44). Emails and the reminder cron are built (PR #27); booking and cancellation emails were verified live on 2026-10-18. Paths and `/admin` routes in the body predate the split; see the amendment.
 
 ## Context
 

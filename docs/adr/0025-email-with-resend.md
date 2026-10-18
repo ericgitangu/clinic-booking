@@ -7,7 +7,7 @@
 
 Accepted. Implemented 2026-10-18 with the changes listed under "As built". Patients get an email when they book, reschedule or cancel, and a reminder the evening before.
 
-**Build status (2026-10-18, main 1b2a462): Built (PR #27).** Booking acknowledgements, the evening-before reminder, the claim and sent endpoints, the migration and the daily cron (15:00 UTC) are on main. Mail goes only to verified, linked accounts, so the first live send is still to be confirmed in the Resend logs.
+**Build status (2026-10-18, main 1b2a462): Built (PR #27).** Booking acknowledgements, the evening-before reminder, the claim and sent endpoints, the migration and the daily cron (15:00 UTC) are on main. Booking and cancellation emails were verified live on 2026-10-18; the daily reminder cron's first send is still unconfirmed.
 
 ## Context
 

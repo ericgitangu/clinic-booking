@@ -68,7 +68,7 @@ Reading it:
 |---|---|---|
 | FastAPI service, Neon, the two Vercel apps, Google sign-in, reCAPTCHA per action | Running | ADRs 0002, 0014, 0023, 0024, 0029 |
 | Idempotency keys, shell-only PWA, 15 second polling | Running | ADRs 0013, 0010, 0009 |
-| Resend email and reminders | Merged (PR 27); first live send to be confirmed in the Resend logs | [ADR-0025](../adr/0025-email-with-resend.md) |
+| Resend email and reminders | Merged (PR 27); booking and cancellation emails verified live 2026-10-18, the daily reminder's first send unconfirmed | [ADR-0025](../adr/0025-email-with-resend.md) |
 | Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
 | Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
 | Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | ADRs 0007, 0026, 0017 |
@@ -177,6 +177,6 @@ Only `main` can deploy: the deploy contexts are restricted to the branch, and so
 | Google subject, verified email, display name | Neon (`patient_accounts`, `staff_access`); a stateless session cookie in the browser | Sign-in and ownership of appointments | Better Auth keeps no auth database ([ADR-0024](../adr/0024-google-sign-in-with-better-auth.md)) |
 | reCAPTCHA token | Sent to Google for an assessment, never stored by the app | The human check on book, cancel and reschedule | No secret is stored: the call uses the Vercel identity ([ADR-0029](../adr/0029-booking-flow.md)) |
 | Slot events: doctor, local date, start time, `taken` or `freed`, a sequence id | Ably | Live slot lists | No appointment or patient identifier; contract in `contracts/events/`. Running |
-| Patient name, doctor and time, sent to the signed-in patient's own verified address | Resend | Acknowledgements and a reminder the evening before, from `reminders@mail.ericgitangu.com` (a verified subdomain) | Only linked, verified accounts are mailed; Resend keeps sent-mail records under its own retention ([ADR-0025](../adr/0025-email-with-resend.md)). Merged (PR 27); first live send to be confirmed |
+| Patient name, doctor and time, sent to the signed-in patient's own verified address | Resend | Acknowledgements and a reminder the evening before, from `reminders@mail.ericgitangu.com` (a verified subdomain) | Only linked, verified accounts are mailed; Resend keeps sent-mail records under its own retention ([ADR-0025](../adr/0025-email-with-resend.md)). Merged (PR 27); booking and cancellation emails verified live 2026-10-18 |
 
 The public REST API has no patient authentication, as the brief requires. Anyone holding an appointment or patient UUID can read or change it there ([ADR-0012](../adr/0012-identity-and-abuse-controls-deferred.md)); the README's section 10 states this.
