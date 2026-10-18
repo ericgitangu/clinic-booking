@@ -19,7 +19,7 @@ cd "$(dirname "$0")/../.."
 LH_DIR=scripts/ci/lighthouse   # holds the exact @lhci/cli version and its lockfile
 LH_WATCH="${LH_WATCH:-apps/ packages/ui/ scripts/ci/lighthouse scripts/ci/lighthouse.sh scripts/ci/lighthouserc.cjs}"
 if [ "${CIRCLE_BRANCH:-main}" != main ]; then
-  git fetch origin main --quiet 2>/dev/null || true
+  git fetch origin main:refs/remotes/origin/main --quiet 2>/dev/null || true
   if base="$(git merge-base origin/main HEAD 2>/dev/null)" \
      && changed="$(git diff --name-only "$base" HEAD -- $LH_WATCH 2>/dev/null)" \
      && [ -z "$changed" ]; then
