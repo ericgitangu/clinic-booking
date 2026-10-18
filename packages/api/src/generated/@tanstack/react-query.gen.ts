@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { bookMineInternalMeAppointmentsPost, cancelAppointmentAppointmentsAppointmentIdCancelPatch, cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch, cancelMineInternalMeAppointmentsAppointmentIdCancelPatch, changeAccessRoleInternalAdminAccessEmailPatch, createAppointmentAppointmentsPost, doctorAvailabilityDoctorsDoctorIdAvailabilityGet, getAppointmentAppointmentsAppointmentIdGet, getDoctorDoctorsDoctorIdGet, getLineageInternalAdminAppointmentsAppointmentIdLineageGet, getMetricsInternalAdminMetricsGet, getProblemProblemsSlugGet, getSessionInfoInternalAdminSessionGet, grantAccessInternalAdminAccessPost, healthHealthGet, linkAccountInternalAccountsLinkPost, listAccessInternalAdminAccessGet, listAppointmentsInternalAdminAppointmentsGet, listDoctorsDoctorsGet, listProblemsProblemsGet, myAppointmentInternalMeAppointmentsAppointmentIdGet, myAppointmentsInternalMeAppointmentsGet, type Options, patientAppointmentsPatientsPatientIdAppointmentsGet, postPatientPatientsPost, readyReadyGet, rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch, rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch, rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch, revokeAccessInternalAdminAccessEmailDelete } from '../sdk.gen';
-import type { BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostResponse, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchResponse, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostResponse, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetResponse, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetResponse, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetResponse, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetResponse, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetResponse, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostResponse, HealthHealthGetData, HealthHealthGetResponse, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostResponse, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetResponse, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetResponse, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponse, ListProblemsProblemsGetData, ListProblemsProblemsGetResponse, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetResponse, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetResponse, PostPatientPatientsPostData, PostPatientPatientsPostResponse, ReadyReadyGetData, ReadyReadyGetResponse, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteResponse } from '../types.gen';
+import { adminTokenInternalRealtimeTokenAdminPost, bookMineInternalMeAppointmentsPost, cancelAppointmentAppointmentsAppointmentIdCancelPatch, cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch, cancelMineInternalMeAppointmentsAppointmentIdCancelPatch, changeAccessRoleInternalAdminAccessEmailPatch, createAppointmentAppointmentsPost, doctorAvailabilityDoctorsDoctorIdAvailabilityGet, getAppointmentAppointmentsAppointmentIdGet, getDoctorDoctorsDoctorIdGet, getLineageInternalAdminAppointmentsAppointmentIdLineageGet, getMetricsInternalAdminMetricsGet, getProblemProblemsSlugGet, getSessionInfoInternalAdminSessionGet, grantAccessInternalAdminAccessPost, healthHealthGet, linkAccountInternalAccountsLinkPost, listAccessInternalAdminAccessGet, listAppointmentsInternalAdminAppointmentsGet, listDoctorsDoctorsGet, listProblemsProblemsGet, myAppointmentInternalMeAppointmentsAppointmentIdGet, myAppointmentsInternalMeAppointmentsGet, type Options, patientAppointmentsPatientsPatientIdAppointmentsGet, patientTokenRealtimeTokenPatientPost, postPatientPatientsPost, readyReadyGet, rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch, rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch, rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch, revokeAccessInternalAdminAccessEmailDelete } from '../sdk.gen';
+import type { AdminTokenInternalRealtimeTokenAdminPostData, AdminTokenInternalRealtimeTokenAdminPostResponse, BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostResponse, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchResponse, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostResponse, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetResponse, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetResponse, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetResponse, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetResponse, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetResponse, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostResponse, HealthHealthGetData, HealthHealthGetResponse, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostResponse, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetResponse, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetResponse, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponse, ListProblemsProblemsGetData, ListProblemsProblemsGetResponse, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetResponse, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetResponse, PatientTokenRealtimeTokenPatientPostData, PatientTokenRealtimeTokenPatientPostResponse, PostPatientPatientsPostData, PostPatientPatientsPostResponse, ReadyReadyGetData, ReadyReadyGetResponse, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteResponse } from '../types.gen';
 
 /**
  * Create Appointment
@@ -527,6 +527,25 @@ export const rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchMut
 };
 
 /**
+ * Admin Token
+ *
+ * A five-minute, subscribe-only token for the staff dashboard's event channel.
+ */
+export const adminTokenInternalRealtimeTokenAdminPostMutation = (options?: Partial<Options<AdminTokenInternalRealtimeTokenAdminPostData>>): UseMutationOptions<AdminTokenInternalRealtimeTokenAdminPostResponse, DefaultError, Options<AdminTokenInternalRealtimeTokenAdminPostData>> => {
+    const mutationOptions: UseMutationOptions<AdminTokenInternalRealtimeTokenAdminPostResponse, DefaultError, Options<AdminTokenInternalRealtimeTokenAdminPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await adminTokenInternalRealtimeTokenAdminPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * Post Patient
  */
 export const postPatientPatientsPostMutation = (options?: Partial<Options<PostPatientPatientsPostData>>): UseMutationOptions<PostPatientPatientsPostResponse, DefaultError, Options<PostPatientPatientsPostData>> => {
@@ -616,3 +635,22 @@ export const readyReadyGetOptions = (options?: Options<ReadyReadyGetData>) => qu
     },
     queryKey: readyReadyGetQueryKey(options)
 });
+
+/**
+ * Patient Token
+ *
+ * A five-minute, subscribe-only token for one doctor's slots on one day.
+ */
+export const patientTokenRealtimeTokenPatientPostMutation = (options?: Partial<Options<PatientTokenRealtimeTokenPatientPostData>>): UseMutationOptions<PatientTokenRealtimeTokenPatientPostResponse, DefaultError, Options<PatientTokenRealtimeTokenPatientPostData>> => {
+    const mutationOptions: UseMutationOptions<PatientTokenRealtimeTokenPatientPostResponse, DefaultError, Options<PatientTokenRealtimeTokenPatientPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await patientTokenRealtimeTokenPatientPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};

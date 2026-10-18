@@ -32,3 +32,9 @@ class FakeClock:
 
     def now(self) -> datetime:
         return self._fixed
+
+    def set(self, moment: datetime) -> None:
+        """Move the clock (a test crossing a month boundary, say)."""
+        if moment.tzinfo is None:
+            raise ValueError("FakeClock requires an aware datetime")
+        self._fixed = moment.astimezone(UTC)

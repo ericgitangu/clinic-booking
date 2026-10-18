@@ -68,6 +68,25 @@ export const zAdminAppointmentPage = z.object({
 });
 
 /**
+ * AdminEvent
+ *
+ * A booking changed, for the staff dashboard. No appointment or patient identifiers.
+ */
+export const zAdminEvent = z.object({
+    doctor_id: z.uuid(),
+    event_type: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled'
+    ]),
+    from_local_date: z.iso.date().nullable(),
+    from_starts_at: z.iso.datetime({ offset: true }).nullable(),
+    local_date: z.iso.date(),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
+    to_starts_at: z.iso.datetime({ offset: true }).nullable()
+});
+
+/**
  * Appointment
  *
  * An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone.
@@ -253,11 +272,20 @@ export const zPatientCreate = z.object({
 });
 
 /**
+ * PatientTokenRequest
+ */
+export const zPatientTokenRequest = z.object({
+    date: z.iso.date(),
+    doctor_id: z.uuid()
+});
+
+/**
  * ProblemCode
  */
 export const zProblemCode = z.enum([
     'UNAUTHENTICATED',
     'FORBIDDEN',
+    'CLIENT_ADDRESS_UNKNOWN',
     'VALIDATION_ERROR',
     'TIMEZONE_REQUIRED',
     'UNKNOWN_DOCTOR',
@@ -274,6 +302,7 @@ export const zProblemCode = z.enum([
     'APPOINTMENT_ALREADY_STARTED',
     'PATIENT_PHONE_EXISTS',
     'CONCURRENT_UPDATE',
+    'RATE_LIMITED',
     'IDEMPOTENCY_KEY_CONSUMED',
     'ACCESS_EXISTS',
     'OWNER_PROTECTED',
@@ -284,6 +313,7 @@ export const zProblemCode = z.enum([
     'PROBLEM_NOT_FOUND',
     'NOT_FOUND',
     'METHOD_NOT_ALLOWED',
+    'REALTIME_UNAVAILABLE',
     'DB_UNAVAILABLE',
     'INTERNAL_ERROR'
 ]);
@@ -311,6 +341,19 @@ export const zProblemEntry = z.object({
     slug: z.string(),
     status: z.int(),
     title: z.string()
+});
+
+/**
+ * RealtimeToken
+ *
+ * A short-lived subscribe-only credential for one channel (a signed JWT).
+ */
+export const zRealtimeToken = z.object({
+    channel: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    stream_url: z.string(),
+    token: z.string(),
+    ttl_seconds: z.int()
 });
 
 /**
@@ -354,11 +397,26 @@ export const zSlot = z.object({
  * Availability
  */
 export const zAvailability = z.object({
+    cursor: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
     date: z.string(),
     doctor_id: z.uuid(),
     slot_minutes: z.literal(30).optional().default(30),
     slots: z.array(zSlot),
+    taken: z.array(z.iso.datetime({ offset: true })),
     timezone: z.string()
+});
+
+/**
+ * SlotEvent
+ *
+ * A time of one doctor on one clinic-local day was taken or became free again.
+ */
+export const zSlotEvent = z.object({
+    doctor_id: z.uuid(),
+    kind: z.enum(['slot_taken', 'slot_freed']),
+    local_date: z.iso.date(),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})\.[01]$/),
+    starts_at: z.iso.datetime({ offset: true })
 });
 
 /**
@@ -656,6 +714,11 @@ export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPa
  */
 export const zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse = zAppointment;
 
+/**
+ * Successful Response
+ */
+export const zAdminTokenInternalRealtimeTokenAdminPostResponse = zRealtimeToken;
+
 export const zPostPatientPatientsPostBody = zPatientCreate;
 
 /**
@@ -696,3 +759,10 @@ export const zGetProblemProblemsSlugGetResponse = zProblemEntry;
  * Successful Response
  */
 export const zReadyReadyGetResponse = zHealth;
+
+export const zPatientTokenRealtimeTokenPatientPostBody = zPatientTokenRequest;
+
+/**
+ * Successful Response
+ */
+export const zPatientTokenRealtimeTokenPatientPostResponse = zRealtimeToken;

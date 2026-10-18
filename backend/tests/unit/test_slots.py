@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from app.domain.slots import Slot, generate_slots, grid_for_date
+from app.domain.slots import Slot, generate_slots, grid_for_date, taken_starts
 
 NAIROBI = ZoneInfo("Africa/Nairobi")
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -162,3 +162,41 @@ def test_a_booking_that_started_before_the_day_still_blocks_its_overlap() -> Non
         timedelta(0),
     )
     assert (0, 0) not in _starts(slots) and (0, 30) in _starts(slots)
+
+
+# --- taken_starts: the booked half of the grid -------------------------------------------------
+
+
+def _taken(
+    booked: list[tuple[datetime, datetime]], slot: timedelta = timedelta(minutes=30)
+) -> list[tuple[int, int]]:
+    return _local_times(
+        [Slot(s, s + slot) for s in taken_starts(OTIENO_MON, booked, NAIROBI, DAY, slot)], NAIROBI
+    )
+
+
+def test_taken_is_the_grid_slots_a_booking_overlaps() -> None:
+    assert _taken([_interval(9, 0, 30)]) == [(9, 0)]
+    assert _taken([_interval(9, 0, 60)]) == [(9, 0), (9, 30)]
+    assert _taken([_interval(9, 10, 30)]) == [(9, 0), (9, 30)]  # straddles two slots
+    assert _taken([]) == []
+
+
+def test_taken_ignores_bookings_outside_the_working_grid_and_touching_ones() -> None:
+    assert _taken([_interval(12, 0, 60)]) == []  # the lunch break is not a slot
+    assert _taken([_interval(7, 0, 60)]) == []  # ends exactly when the day starts
+    assert _taken([_interval(8, 0, 30)]) == [(8, 0)]
+
+
+def test_a_time_is_free_or_taken_never_both_and_never_neither() -> None:
+    booked = [_interval(9, 0, 30), _interval(10, 30, 60), _interval(15, 0, 30)]
+    free = generate_slots(OTIENO_MON, booked, NAIROBI, DAY, FAR_PAST, timedelta(0))
+    taken = taken_starts(OTIENO_MON, booked, NAIROBI, DAY)
+    grid = grid_for_date(OTIENO_MON, NAIROBI, DAY)
+    assert {s.starts_at for s in free}.isdisjoint(taken)
+    assert {s.starts_at for s in free} | set(taken) == set(grid)
+
+
+def test_taken_does_not_depend_on_the_lead_time_or_the_clock() -> None:
+    # A booked time stays booked even when it is already past; only the free list drops by lead.
+    assert _taken([_interval(8, 0, 30)]) == [(8, 0)]

@@ -17,6 +17,7 @@ from app.api.deps import (
     CAN_MANAGE,
     OWNER_ONLY,
     get_clock,
+    get_relay,
     get_session,
     get_settings,
     require_identity,
@@ -38,6 +39,7 @@ from app.schemas.problem import problem_responses
 from app.services import access as access_service
 from app.services import admin as service
 from app.services import booking
+from app.services.relay import Relay
 
 router = APIRouter(
     prefix="/internal/admin",
@@ -86,8 +88,11 @@ async def get_metrics(
     bucket: Bucket = "day",
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    relay: Relay = Depends(get_relay),
 ) -> Metrics:
     response.headers.update(_NO_STORE)
+    # A dashboard request is also a chance to push events stuck behind an open transaction.
+    await relay.run(clock)
     return await service.metrics(session, clock, start=from_, end=to, bucket=bucket)
 
 
@@ -208,9 +213,11 @@ async def cancel_for_patient(
     response: Response,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    await relay.run(clock)
     return Appointment.model_validate(appt)
 
 
@@ -226,9 +233,11 @@ async def reschedule_for_patient(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     appt = await booking.reschedule(
         session, clock, settings, appointment_id=appointment_id, new_starts_at=body.starts_at
     )
+    await relay.run(clock)
     return Appointment.model_validate(appt)

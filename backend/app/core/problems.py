@@ -67,17 +67,22 @@ def build_problem(
         "request_id": _request_id(request),
         "errors": errors,
     }
+    # A problem describes this one request and must never be stored or shared.
     return JSONResponse(
         status_code=spec.status,
         content=body,
         media_type=PROBLEM_MEDIA_TYPE,
-        headers=headers,
+        headers={"Cache-Control": "no-store", **(headers or {})},
     )
 
 
 async def _domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     exc = cast(DomainError, exc)
-    headers = {"Retry-After": "2"} if exc.code == "DB_UNAVAILABLE" else None
+    headers: dict[str, str] | None = None
+    if exc.code == "DB_UNAVAILABLE":
+        headers = {"Retry-After": "2"}
+    elif exc.retry_after is not None:
+        headers = {"Retry-After": str(exc.retry_after)}
     return build_problem(request, exc.code, detail=exc.detail, headers=headers)
 
 
