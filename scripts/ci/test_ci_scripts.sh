@@ -33,6 +33,7 @@ case "$*" in
   "run services update-traffic"*--remove-tags*)
     echo "$*" >> "$FX/calls" ;;
   "run revisions describe"*)
+    [ -f "$FX/revfail" ] && { echo "ERROR: (gcloud.run.revisions.describe) 503" >&2; exit 1; }
     rev="$4"; jq -r --arg r "$rev" '.[$r] // ""' "$FX/revision_images.json" ;;
   "artifacts docker images list"*)
     cat "$FX/images.json" ;;
@@ -224,7 +225,7 @@ expect "promote: keep set is the new revision plus the one live BEFORE" \
 bash "$HERE/prune.sh" >/dev/null 2>&1; rc=$?
 expect "prune: exit 0" "$rc" 0
 expect "prune: removes the skipped and the old tags, keeps new and previous" \
-  "$(grep -- '--remove-tags' "$FX/calls" | sed 's/.*--remove-tags //' | tr ',' '\n' | sort | paste -sd, -)" "sha-a,sha-o"
+  "$(grep -- '--remove-tags' "$FX/calls" | sed 's/.*--remove-tags //; s/ --project.*//' | tr ',' '\n' | sort | paste -sd, -)" "sha-a,sha-o"
 expect "prune: deletes the skipped and the old image" \
   "$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | sort | paste -sd, -)" "sha256:aaa,sha256:ooo"
 expect "prune: never deletes the live image" "$(cnt 'sha256:bbb')" 0
@@ -274,6 +275,69 @@ expect "superseded: state is skipped" "$(cat "$PROMOTE_DIR/state")" skipped
 expect "superseded: traffic is not touched" "$(mut 'to-tags')" 0
 bash "$HERE/prune.sh" >/dev/null 2>&1
 expect "superseded: prune does nothing" "$(mut 'images delete')$(mut 'remove-tags')" "00"
+
+
+# ---- prune.sh safety: in-flight images, --dry-run, fail closed, superseded self-cleanup -------
+prune_fx() { # <name>: B just promoted (live), P the rollback target, A skipped, O old
+  new_fx "$1"
+  cat > "$FX/service_before.json" <<'J'
+{"status":{"traffic":[{"revisionName":"rev-b","percent":100,"tag":"sha-b"},{"revisionName":"rev-p","percent":0,"tag":"sha-p"},
+ {"revisionName":"rev-a","percent":0,"tag":"sha-a"},{"revisionName":"rev-o","percent":0,"tag":"sha-o"}]}}
+J
+  cp "$FX/service_before.json" "$FX/service_after.json"; touch "$FX/promoted"
+  jq -n '{"rev-b":"r/clinic-api@sha256:bbb","rev-p":"r/clinic-api@sha256:ppp","rev-a":"r/clinic-api@sha256:aaa","rev-o":"r/clinic-api@sha256:ooo"}' > "$FX/revision_images.json"
+  export PROMOTE_DIR="$WORK/pr.$1"; mkdir -p "$PROMOTE_DIR"; echo promoted > "$PROMOTE_DIR/state"
+  echo '{"revisions":["rev-b","rev-p"],"current":"rev-b","previous":"rev-p"}' > "$PROMOTE_DIR/keep.json"
+  export GOOGLE_PROJECT_ID=p CIRCLE_SHA1="$HEAD_SHA"
+  NEWER_SHA="$(git rev-parse HEAD)"; export NEWER_SHA
+}
+img() { printf '{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"%s","tags":"%s"}' "$1" "$2"; }
+
+prune_fx inflight
+echo "[$(img sha256:bbb sha-b),$(img sha256:ppp sha-p),$(img sha256:aaa ""),$(img sha256:ooo "sha-${HEAD_SHA:0:7}"),$(img sha256:nnn "sha-${NEWER_SHA:0:7}"),$(img sha256:uuu sha-deadbee)]" > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a release that is not yet deployed (newer commit) is never deleted" "$(cnt 'sha256:nnn')" 0
+expect "prune: a tag for a commit this checkout cannot resolve is never deleted" "$(cnt 'sha256:uuu')" 0
+expect "prune: the superseded and old images are still deleted" "$rc:$(grep -c 'images delete' "$FX/calls")" "0:2"
+expect "prune: every call names the project" "$(grep -vc -- '--project p' "$FX/calls.all")" 0
+
+prune_fx dry
+echo "[$(img sha256:bbb sha-b),$(img sha256:ppp sha-p),$(img sha256:aaa ""),$(img sha256:ooo "sha-${HEAD_SHA:0:7}")]" > "$FX/images.json"
+bash "$HERE/prune.sh" --dry-run >"$FX/out" 2>&1; rc=$?
+expect "prune --dry-run: exit 0, lists the tag removal and both deletions" "$rc:$(grep -c '^dry-run: would run' "$FX/out")" "0:3"
+expect "prune --dry-run: changes nothing" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
+
+prune_fx failclosed
+echo "[$(img sha256:bbb sha-b),$(img sha256:aaa sha-a),$(img sha256:ooo sha-o)]" > "$FX/images.json"
+touch "$FX/revfail"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a failing revision lookup exits non-zero" "$([ "$rc" -ne 0 ] && echo failed)" failed
+expect "prune: a failing revision lookup deletes nothing and removes no tag" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
+rm -f "$FX/revfail"
+bash "$HERE/prune.sh" --bogus >/dev/null 2>&1
+expect "prune: an unknown flag is a usage error (exit 2)" "$?" 2
+
+new_fx selfclean
+cat > "$FX/service_before.json" <<'J'
+{"status":{"traffic":[{"revisionName":"rev-p","percent":100,"tag":"sha-p"},{"revisionName":"rev-q","percent":0,"tag":"sha-q"},
+ {"revisionName":"rev-x","percent":0,"tag":"sha-abcdef1"}]}}
+J
+cp "$FX/service_before.json" "$FX/service_after.json"
+jq -n '{"rev-p":"r/clinic-api@sha256:ppp","rev-q":"r/clinic-api@sha256:qqq","rev-x":"r/clinic-api@sha256:xxx"}' > "$FX/revision_images.json"
+export PROMOTE_DIR="$WORK/pr.selfclean"; mkdir -p "$PROMOTE_DIR"; echo skipped > "$PROMOTE_DIR/state"
+export GOOGLE_PROJECT_ID=p CIRCLE_SHA1=abcdef1234567890abcdef1234567890abcdef12
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune (superseded): removes only its own tag" "$rc:$(grep -c 'remove-tags sha-abcdef1 ' "$FX/calls")" "0:1"
+expect "prune (superseded): deletes only its own image" "$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | paste -sd, -)" "sha256:xxx"
+expect "prune (superseded): never touches the serving or the rollback image" "$(cnt 'sha256:ppp')$(cnt 'sha256:qqq')" 00
+new_fx selfclean_same
+cp "$WORK/fx.selfclean/service_before.json" "$FX/service_before.json"; cp "$FX/service_before.json" "$FX/service_after.json"
+jq -n '{"rev-p":"r/clinic-api@sha256:ppp","rev-q":"r/clinic-api@sha256:qqq","rev-x":"r/clinic-api@sha256:ppp"}' > "$FX/revision_images.json"
+bash "$HERE/prune.sh" >/dev/null 2>&1
+expect "prune (superseded): an own image the serving revision also runs is kept" "$(cnt 'images delete')$(cnt 'remove-tags sha-abcdef1 ')" "01"
+dry="$(bash "$HERE/prune.sh" --dry-run 2>&1 | grep -c '^dry-run: would run')"
+expect "prune (superseded) --dry-run: only says what it would do" "$dry$(cnt 'images delete')" "10"
+unset NEWER_SHA
 
 # =========================================================================================
 # require_head.sh

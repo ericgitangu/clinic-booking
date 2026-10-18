@@ -339,7 +339,7 @@ jobs:
             - state
             - keep.json
       - run:
-          name: Prune superseded revisions and images (best effort; cost-check C6 flags leftovers)
+          name: Prune superseded revisions and images (a failed lookup deletes nothing; cost-check C5/C6 still count)
           command: bash scripts/ci/prune.sh || echo "WARN prune failed; the next cost-check will report any extra versions"
       - run:
           name: Deploy marker, success
@@ -850,6 +850,19 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Halt unless this commit was promoted (the promoted release checks the live state)
+          command: |
+            # A release that a newer commit superseded cleans up its own tag and image in ship-api, but
+            # the newer release's image is already in the registry by then and counts as a version.
+            # That transient is not a cost overrun; the release that promoted runs this gate and sees
+            # the settled state.
+            if ! grep -qx promoted /tmp/ws/state 2>/dev/null; then
+              echo "This commit was not promoted; the promoted release runs the live cost check."
+              circleci-agent step halt
+            fi
       - run:
           name: WIF login (read-only roles)
           command: bash scripts/ci/gcp_login.sh
