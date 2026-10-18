@@ -6,6 +6,7 @@
 // with inline styles, as mail clients need, rather than through React, so the admin app takes on no
 // rendering dependency. Everything that comes from a person (names, the reason) goes through
 // `escapeHtml` on the way into the HTML and is left as written in the text version.
+import { APPOINTMENT_MINUTES } from "@clinic/api/appointment";
 import type { Composed } from "@clinic/api/mail";
 import { SITE } from "@/lib/site";
 import { formatWhen, zoneLabel } from "@/emails/time";
@@ -166,7 +167,7 @@ function visit(f: AppointmentFacts, w: When): BoxLine[] {
   return [
     { text: w.when, strong: true },
     { text: f.doctor },
-    { text: `${w.zone}, 30 minutes.`, muted: true },
+    { text: `${w.zone}, ${APPOINTMENT_MINUTES} minutes.`, muted: true },
   ];
 }
 
@@ -227,7 +228,7 @@ export function staffCancelled(f: AppointmentFacts & WithReason): Composed {
 /**
  * Staff reversed the patient's own last change (a cancel or a move) and locked the visit.
  * `startsAt` is the time the visit is back on; `previousStartsAt`, when given, is the time the
- * patient had moved it to.
+ * patient had moved it to. The wording says plainly what happened and why, and does not blame.
  */
 export function staffVetoed(
   f: AppointmentFacts & WithReason & { previousStartsAt?: string | null },
@@ -238,17 +239,17 @@ export function staffVetoed(
     box.unshift({
       text: formatWhen(f.previousStartsAt, f.timezone),
       strike: true,
-      label: "You had moved it to",
+      label: "The change that was reversed",
     });
-  return compose(`Your appointment on ${w.when} still stands`, {
+  return compose(`Your appointment on ${w.when} has been restored`, {
     preview: `Back on ${w.when} with ${f.doctor}`,
-    heading: "Your change was reversed",
-    lead: `Hello ${f.name}, the clinic has reversed the change you made, so your visit is back on.`,
+    heading: "Your appointment is back as it was",
+    lead: `Hello ${f.name}, the clinic has reversed the recent change to your appointment, so your visit is back as it was.`,
     box,
     reason: f.reason,
-    reasonLabel: "Reason from the clinic",
+    reasonLabel: "Why the clinic did this",
     extra: [
-      "This visit is now locked, so it cannot be changed online. If you need to change it, reply to this email.",
+      "Your visit is now locked, so it can no longer be changed online. If you need to change it, please contact the clinic.",
     ],
     button: appointmentsLink,
     why: PATIENT_WHY,
@@ -272,23 +273,37 @@ export function staffRemind(
   });
 }
 
-/** The doctor is running late today. `minutes` is how late (`RunningLateRequest.minutes`). */
+/** How late a doctor can be reported: whole minutes, 5 to 240. */
+export const LATE_MINUTES = { min: 5, max: 240 } as const;
+
+export type RunningLateMail =
+  { ok: true; mail: Composed } | { ok: false; error: "INVALID_MINUTES" };
+
+/**
+ * The doctor is running late today. `minutes` must be a whole number from 5 to 240; anything else
+ * (NaN, a fraction, zero, a huge number) gives `{ ok: false, error: "INVALID_MINUTES" }` and no email.
+ */
 export function staffRunningLate(
   f: AppointmentFacts & { minutes: number; reason?: string | null },
-): Composed {
+): RunningLateMail {
+  const m = f.minutes;
+  if (!Number.isInteger(m) || m < LATE_MINUTES.min || m > LATE_MINUTES.max)
+    return { ok: false, error: "INVALID_MINUTES" };
   const w = when(f);
-  const m = Math.max(1, Math.round(f.minutes));
-  const mins = `${m} ${m === 1 ? "minute" : "minutes"}`;
-  return compose(`${f.doctor} is running about ${mins} late today`, {
-    preview: `Your ${w.when} visit may start about ${mins} later`,
-    heading: "Your doctor is running late",
-    lead: `Hello ${f.name}, ${f.doctor} is running about ${mins} behind today. Your visit may start a little later than planned. We are sorry for the wait.`,
-    box: visit(f, w),
-    reason: f.reason ?? undefined,
-    reasonLabel: "Note from the clinic",
-    button: appointmentsLink,
-    why: "You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, told today's patients of your doctor about the delay.",
-  });
+  const mins = `${m} minutes`;
+  return {
+    ok: true,
+    mail: compose(`${f.doctor} is running about ${mins} late today`, {
+      preview: `Your ${w.when} visit may start about ${mins} later`,
+      heading: "Your doctor is running late",
+      lead: `Hello ${f.name}, ${f.doctor} is running about ${mins} behind today. Your visit may start a little later than planned. We are sorry for the wait.`,
+      box: visit(f, w),
+      reason: f.reason ?? undefined,
+      reasonLabel: "Note from the clinic",
+      button: appointmentsLink,
+      why: "You are getting this because staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, told today's patients of your doctor about the delay.",
+    }),
+  };
 }
 
 /**

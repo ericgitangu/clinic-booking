@@ -9,6 +9,8 @@ import {
   staffRunningLate,
   staffVetoed,
 } from "@/emails";
+import { APPOINTMENT_MINUTES } from "@clinic/api/appointment";
+import { readFileSync } from "node:fs";
 import { SITE } from "@/lib/site";
 
 const appt = {
@@ -37,8 +39,15 @@ const all = {
       previousStartsAt: "2026-10-21T11:00:00+03:00",
     }),
   staffRemind: () => staffRemind(appt),
-  staffRunningLate: () =>
-    staffRunningLate({ ...appt, minutes: 25, reason: "A late emergency." }),
+  staffRunningLate: () => {
+    const r = staffRunningLate({
+      ...appt,
+      minutes: 25,
+      reason: "A late emergency.",
+    });
+    if (!r.ok) throw new Error("expected a valid mail");
+    return r.mail;
+  },
   staffInvite: () =>
     staffInvite({
       role: "viewer",
@@ -90,8 +99,12 @@ describe("staff email templates", () => {
     "staffVetoed",
   ] as const)("%s shows the reason to the patient", (n) => {
     const m = all[n]();
-    expect(m.html).toContain(`Reason from the clinic: ${reason}`);
-    expect(m.text).toContain(`Reason from the clinic: ${reason}`);
+    const label =
+      n === "staffVetoed"
+        ? "Why the clinic did this"
+        : "Reason from the clinic";
+    expect(m.html).toContain(`${label}: ${reason}`);
+    expect(m.text).toContain(`${label}: ${reason}`);
   });
 
   it("shows the old time on a moved visit and on a reversed change", () => {
@@ -99,12 +112,21 @@ describe("staff email templates", () => {
       "Was: Monday 19 October, 14:30",
     );
     expect(all.staffVetoed().text).toContain(
-      "You had moved it to: Wednesday 21 October, 11:00",
+      "The change that was reversed: Wednesday 21 October, 11:00",
     );
   });
 
-  it("tells a vetoed patient the visit is locked", () => {
-    expect(all.staffVetoed().text).toContain("locked");
+  it("a veto says plainly what happened, why, and what to do, without blame", () => {
+    const t = all.staffVetoed().text;
+    expect(t).toContain(
+      "the clinic has reversed the recent change to your appointment",
+    );
+    expect(t).toContain("Why the clinic did this:");
+    expect(t).toContain("locked");
+    expect(t).toContain("please contact the clinic");
+    // replies go to the engineer, so the email must not send the patient to "reply"
+    expect(t).not.toMatch(/reply to this email/i);
+    expect(t).not.toMatch(/\byou (should|must|shouldn't)\b|your fault/i);
   });
 
   it("running late names the delay", () => {
@@ -112,9 +134,45 @@ describe("staff email templates", () => {
     expect(m.subject).toBe(
       "Dr. Achieng Otieno is running about 25 minutes late today",
     );
-    expect(staffRunningLate({ ...appt, minutes: 1 }).subject).toContain(
-      "1 minute late",
-    );
+  });
+
+  it.each([NaN, Infinity, -Infinity, 0, 4, 241, 1000, 5.5, -10, 1e9])(
+    "running late refuses %s minutes: a typed error and no mail",
+    (minutes) => {
+      expect(staffRunningLate({ ...appt, minutes })).toEqual({
+        ok: false,
+        error: "INVALID_MINUTES",
+      });
+    },
+  );
+
+  it.each([5, 30, 240])("running late accepts %s minutes", (minutes) => {
+    const r = staffRunningLate({ ...appt, minutes });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.mail.subject).toContain(`${minutes} minutes`);
+    for (const part of [r.mail.subject, r.mail.html, r.mail.text])
+      expect(part).not.toMatch(/NaN|undefined|Infinity/);
+  });
+
+  it("states the visit length from the one shared constant", () => {
+    expect(APPOINTMENT_MINUTES).toBe(30);
+    for (const n of [
+      "staffBooked",
+      "staffRescheduled",
+      "staffCancelled",
+      "staffVetoed",
+      "staffRemind",
+      "staffRunningLate",
+    ] as const)
+      expect(all[n]().text).toContain(`${APPOINTMENT_MINUTES} minutes.`);
+  });
+
+  it("no template hard-codes the visit length", () => {
+    for (const f of [
+      "src/emails/templates.ts",
+      "../booking/src/lib/email/idyllic-email.tsx",
+    ])
+      expect(readFileSync(f, "utf8")).not.toMatch(/\b30[ -]minutes?\b/i);
   });
 });
 
@@ -130,8 +188,11 @@ describe("escaping", () => {
         staffCancelled: staffCancelled,
         staffVetoed: staffVetoed,
         staffRemind: staffRemind,
-        staffRunningLate: (f: Parameters<typeof staffBooked>[0]) =>
-          staffRunningLate({ ...f, minutes: 10 }),
+        staffRunningLate: (f: Parameters<typeof staffBooked>[0]) => {
+          const r = staffRunningLate({ ...f, minutes: 10 });
+          if (!r.ok) throw new Error("expected a valid mail");
+          return r.mail;
+        },
       }[n as string]!;
       const m = make({ ...appt, reason: nasty });
       expect(m.html).not.toContain("<script");
@@ -156,12 +217,13 @@ describe("escaping", () => {
   });
 
   it("keeps a line break out of the subject", () => {
-    const m = staffRunningLate({
+    const r = staffRunningLate({
       ...appt,
       doctor: "Dr A\r\nBcc: x@y.test",
       minutes: 5,
     });
-    expect(m.subject).not.toMatch(/[\r\n]/);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.mail.subject).not.toMatch(/[\r\n]/);
   });
 
   it("escapeHtml covers the five characters", () => {

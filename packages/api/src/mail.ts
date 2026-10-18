@@ -6,6 +6,7 @@
 // Email is sent from the verified subdomain, not the root domain: Resend only sends from a domain
 // verified in its dashboard (mail.ericgitangu.com is the verified one), and keeping mail on a
 // subdomain protects the root domain's reputation.
+import "server-only";
 import { logError } from "./proxy/log";
 
 export const MAIL_DOMAIN = "mail.ericgitangu.com";

@@ -252,7 +252,7 @@ How your data is handled: https://clinic.ericgitangu.com/privacy"
 
 exports[`staff email templates > staffVetoed: subject, html and text > html 1`] = `
 "<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your change was reversed</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your appointment is back as it was</title></head>
 <body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
 <div style="display:none;max-height:0;overflow:hidden;">Back on Tuesday 20 October, 09:00 with Dr. Achieng Otieno</div>
 <div style="max-width:520px;margin:0 auto;">
@@ -260,11 +260,11 @@ exports[`staff email templates > staffVetoed: subject, html and text > html 1`] 
 <p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
 </div>
 <div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
-<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your change was reversed</h1>
-<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has reversed the change you made, so your visit is back on.</p>
-<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:15px;color:#4a5878;text-decoration:line-through;">You had moved it to: Wednesday 21 October, 11:00</p><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
-<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Reason from the clinic: The doctor is on call that morning, so we moved you.</p>
-<p style="margin:14px 0 0;font-size:15px;line-height:22px;">This visit is now locked, so it cannot be changed online. If you need to change it, reply to this email.</p>
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Your appointment is back as it was</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Amina Wanjiku, the clinic has reversed the recent change to your appointment, so your visit is back as it was.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:15px;color:#4a5878;text-decoration:line-through;">The change that was reversed: Wednesday 21 October, 11:00</p><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:15px;">Dr. Achieng Otieno</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+<p style="margin:16px 0 0;font-size:14px;color:#4a5878;">Why the clinic did this: The doctor is on call that morning, so we moved you.</p>
+<p style="margin:14px 0 0;font-size:15px;line-height:22px;">Your visit is now locked, so it can no longer be changed online. If you need to change it, please contact the clinic.</p>
 <div style="padding:24px 0 4px;"><a href="https://clinic.ericgitangu.com/appointments" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">See my appointments</a></div>
 </div>
 <hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
@@ -272,21 +272,21 @@ exports[`staff email templates > staffVetoed: subject, html and text > html 1`] 
 </div></body></html>"
 `;
 
-exports[`staff email templates > staffVetoed: subject, html and text > subject 1`] = `"Your appointment on Tuesday 20 October, 09:00 still stands"`;
+exports[`staff email templates > staffVetoed: subject, html and text > subject 1`] = `"Your appointment on Tuesday 20 October, 09:00 has been restored"`;
 
 exports[`staff email templates > staffVetoed: subject, html and text > text 1`] = `
-"YOUR CHANGE WAS REVERSED
+"YOUR APPOINTMENT IS BACK AS IT WAS
 
-Hello Amina Wanjiku, the clinic has reversed the change you made, so your visit is back on.
+Hello Amina Wanjiku, the clinic has reversed the recent change to your appointment, so your visit is back as it was.
 
-You had moved it to: Wednesday 21 October, 11:00
+The change that was reversed: Wednesday 21 October, 11:00
 Tuesday 20 October, 09:00
 Dr. Achieng Otieno
 East Africa Time (GMT+03:00), 30 minutes.
 
-Reason from the clinic: The doctor is on call that morning, so we moved you.
+Why the clinic did this: The doctor is on call that morning, so we moved you.
 
-This visit is now locked, so it cannot be changed online. If you need to change it, reply to this email.
+Your visit is now locked, so it can no longer be changed online. If you need to change it, please contact the clinic.
 
 See my appointments: https://clinic.ericgitangu.com/appointments
 

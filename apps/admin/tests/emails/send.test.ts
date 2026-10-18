@@ -2,13 +2,15 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   isDemoRecipient,
+  sendInviteEmail,
   sendStaffEmail,
   staffBooked,
+  staffInvite,
   STAFF_FROM,
   type StaffEmailInput,
 } from "@/emails";
 import { ASSERTION_HEADER } from "@clinic/api/assertion";
-import { defaultPorts } from "@/emails/ports";
+import { CALL_TIMEOUT_MS, defaultPorts, makePorts } from "@/emails/ports";
 
 // Two real local HTTP servers on free ports: one plays Resend, one plays the clinic API's three
 // calls (reserve, release, notified). The code under test is the real sendStaffEmail with its real
@@ -22,7 +24,7 @@ interface Hit {
 }
 
 const AUDIT = "7b0c1a52-3f0e-4c0e-9d57-0b6f1c2f8a11";
-const TO = "mwangi.kamau@mail.test";
+const TO = "mwangi.kamau@mailbox.co.ke";
 const TOKEN_LIKE = "SeCrEt-TOKEN-0123456789";
 
 let resend: Server;
@@ -202,35 +204,42 @@ describe("sendStaffEmail: the sending path", () => {
     ]);
   });
 
-  it("gives up on a Resend that never answers, inside the 5 s bound", async () => {
-    resend.closeAllConnections();
-    await new Promise((ok) => resend.close(ok));
+  it("gives up on a Resend that never answers", async () => {
     const hang = await listen(() => {});
     vi.stubEnv("RESEND_BASE_URL", `http://127.0.0.1:${hang.port}`);
+    logs();
     const t0 = Date.now();
-    const r = await sendStaffEmail(
-      input(),
-      // the real wiring with a short bound, to keep the test fast; the default is SEND_TIMEOUT_MS (5 s)
-      {
-        ...defaultPorts,
-        send: (to, m, k) =>
-          import("@clinic/api/mail").then((x) =>
-            x.sendMail(
-              { from: STAFF_FROM, replyTo: "r@x.test" },
-              to,
-              m,
-              k,
-              300,
-            ),
-          ),
-      },
-    );
+    const r = await sendStaffEmail(input(), makePorts(300, 300));
     hang.server.closeAllConnections();
     await new Promise((ok) => hang.server.close(ok));
     expect(r.outcome).toBe("send-failed");
     expect(Date.now() - t0).toBeLessThan(2000);
-    // restore a closed server for afterEach
-    resend = (await listen(() => {})).server;
+    // the unit reserved for it was given back
+    expect(apiHits.map((h) => h.url)).toContain("/internal/emails/release");
+  });
+
+  it("gives up on an API that never answers: reserve, release and notified are all bounded", async () => {
+    const hang = await listen(() => {});
+    vi.stubEnv("API_URL", `http://127.0.0.1:${hang.port}`);
+    logs();
+    const t0 = Date.now();
+    const ports = makePorts(300, 300);
+    expect((await sendStaffEmail(input(), ports)).outcome).toBe(
+      "reserve-failed",
+    );
+    const day = { day: "2026-10-18", month: "2026-10-01" };
+    expect(await ports.release(caller, day)).toMatchObject({ ok: false });
+    expect(await ports.markNotified(caller, AUDIT)).toMatchObject({
+      ok: false,
+    });
+    hang.server.closeAllConnections();
+    await new Promise((ok) => hang.server.close(ok));
+    expect(Date.now() - t0).toBeLessThan(3000);
+    expect(resendHits).toHaveLength(0);
+  });
+
+  it("the bound on every call in the path is 5 s", () => {
+    expect(CALL_TIMEOUT_MS).toBe(5_000);
   });
 
   it("the shared sender's bound is 5 s", async () => {
@@ -251,7 +260,23 @@ describe("sendStaffEmail: what never reaches the sender", () => {
     expect(apiHits).toHaveLength(0);
   });
 
-  it.each(["someone@example.com", "Someone@EXAMPLE.ORG", "  a.b@example.net "])(
+  it.each([
+    "someone@example.com",
+    "Someone@EXAMPLE.ORG",
+    "  a.b@example.net ",
+    "a@a.example.com",
+    "a@deep.sub.example.org",
+    "a@example.com.",
+    "a@EXAMPLE.NET.",
+    "a@mail.test",
+    "a@test",
+    "a@x.example",
+    "a@example",
+    "a@host.invalid",
+    "a@invalid",
+    "a@box.localhost",
+    "a@localhost",
+  ])(
     "a demo recipient (%s) never reaches Resend, even with deliver:true",
     async (to) => {
       expect(isDemoRecipient(to)).toBe(true);
@@ -266,10 +291,18 @@ describe("sendStaffEmail: what never reaches the sender", () => {
     },
   );
 
-  it("a real-looking domain that merely contains 'example' is not a demo recipient", () => {
-    expect(isDemoRecipient("a@notexample.com")).toBe(false);
-    expect(isDemoRecipient("a@example.com.evil.test")).toBe(false);
-    expect(isDemoRecipient("a@mail.test")).toBe(false);
+  it.each([
+    "a@notexample.com",
+    "a@example.com.evil.co.ke",
+    "a@myexample.org",
+    "a@contest.co.ke",
+    "a@latest.com",
+    "a@mailbox.co.ke",
+    "a@gmail.com",
+    "example.com@gmail.com",
+    "test@gmail.com",
+  ])("a real address (%s) is not a demo recipient", (to) => {
+    expect(isDemoRecipient(to)).toBe(false);
   });
 
   it.each([null, undefined, "", "   "])(
@@ -370,5 +403,166 @@ describe("sendStaffEmail: never throws, never logs personal data", () => {
       "re_test_key",
     ])
       expect(out).not.toContain(secret);
+  });
+});
+
+describe("leaks, ids and release", () => {
+  it.each([null, undefined, "", "   "] as unknown as string[])(
+    "refuses a missing audit id (%j) before reserving anything",
+    async (auditId) => {
+      logs();
+      const r = await sendStaffEmail(input({ auditId }));
+      expect(r.outcome).toBe("no-id");
+      expect(apiHits).toHaveLength(0);
+      expect(resendHits).toHaveLength(0);
+    },
+  );
+
+  it("a throw after the reservation gives the unit back", async () => {
+    logs();
+    const calls: string[] = [];
+    const r = await sendStaffEmail(input(), {
+      ...defaultPorts,
+      reserve: async () => {
+        calls.push("reserve");
+        return {
+          ok: true,
+          data: {
+            granted: true,
+            reason: null,
+            day: "2026-10-18",
+            month: "2026-10-01",
+            budget,
+          },
+        };
+      },
+      send: async () => {
+        throw new Error("network exploded");
+      },
+      release: async () => {
+        calls.push("release");
+        return { ok: true, data: true };
+      },
+    });
+    expect(r.outcome).toBe("error");
+    expect(calls).toEqual(["reserve", "release"]);
+  });
+
+  it("a throw while marking notified does not release: the email went out", async () => {
+    logs();
+    const calls: string[] = [];
+    const r = await sendStaffEmail(input(), {
+      ...defaultPorts,
+      markNotified: async () => {
+        throw new Error("x");
+      },
+      release: async () => {
+        calls.push("release");
+        return { ok: true, data: true };
+      },
+    });
+    expect(r).toMatchObject({ outcome: "sent", sent: true, notified: false });
+    expect(calls).toEqual([]);
+  });
+
+  it("logs a failed release with the id and code only", async () => {
+    const spy = logs();
+    resendStatus = 400;
+    const r = await sendStaffEmail(input(), {
+      ...defaultPorts,
+      release: async () => ({ ok: false, code: "UPSTREAM_UNREACHABLE" }),
+    });
+    expect(r.outcome).toBe("send-failed");
+    const line = spy.mock.calls
+      .map((c) => String(c[0]))
+      .find((l) => l.includes("not given back"));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line!)).toMatchObject({
+      audit: AUDIT,
+      code: "UPSTREAM_UNREACHABLE",
+    });
+    expect(line).not.toContain(TO);
+  });
+
+  it("a release that throws is logged and does not escape", async () => {
+    const spy = logs();
+    resendStatus = 400;
+    const r = await sendStaffEmail(input(), {
+      ...defaultPorts,
+      release: () => Promise.reject(new Error(`x ${TO}`)),
+    });
+    expect(r.outcome).toBe("send-failed");
+    const out = spy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(out).toContain("not given back");
+    expect(out).not.toContain(TO);
+  });
+});
+
+describe("sendInviteEmail", () => {
+  const INVITE = "0e6d8f3a-5b0c-4a77-8f5e-2f9d1f6c7b10";
+  const invite = (to: string | null = "new.admin@clinic.co.ke") => ({
+    caller,
+    inviteId: INVITE,
+    to,
+    mail: staffInvite({
+      role: "admin",
+      token: TOKEN_LIKE,
+      expiresAt: "2026-10-21T18:00:00+03:00",
+    }),
+  });
+
+  it("reserves, sends keyed on the invite id (not the token) and never calls /notified", async () => {
+    const r = await sendInviteEmail(invite());
+    expect(r).toEqual({
+      auditId: INVITE,
+      outcome: "sent",
+      sent: true,
+      notified: false,
+    });
+    expect(resendHits).toHaveLength(1);
+    const key = resendHits[0]!.headers["idempotency-key"];
+    expect(key).toBe(`invite/${INVITE}`);
+    expect(String(key)).not.toContain(TOKEN_LIKE);
+    expect(apiHits.map((h) => h.url)).toEqual(["/internal/emails/reserve"]);
+    const body = JSON.parse(resendHits[0]!.body);
+    expect(body.text).toContain(`/invite/${TOKEN_LIKE}`);
+    expect(body.text).not.toMatch(/[?&#]token=/);
+  });
+
+  it("honours the cap, demo domains and a failed send exactly as staff mail does", async () => {
+    logs();
+    cap = "day";
+    expect((await sendInviteEmail(invite())).outcome).toBe("cap-hit");
+    cap = "none";
+    expect((await sendInviteEmail(invite("x@example.com"))).outcome).toBe(
+      "demo-recipient",
+    );
+    expect((await sendInviteEmail(invite(null))).outcome).toBe("no-recipient");
+    expect(resendHits).toHaveLength(0);
+    resendStatus = 400;
+    expect((await sendInviteEmail(invite())).outcome).toBe("send-failed");
+    expect(apiHits.map((h) => h.url).join(" ")).not.toContain("/notified");
+    expect(apiHits.map((h) => h.url)).toContain("/internal/emails/release");
+  });
+
+  it("never writes the token or the link to a log", async () => {
+    const spy = logs();
+    resendStatus = 400;
+    await sendInviteEmail(invite());
+    cap = "month";
+    await sendInviteEmail(invite());
+    apiDown = true;
+    cap = "none";
+    await sendInviteEmail(invite());
+    apiDown = false;
+    await sendInviteEmail(invite(), {
+      ...defaultPorts,
+      send: () => Promise.reject(new Error(`/invite/${TOKEN_LIKE}`)),
+    });
+    const out = spy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(out).not.toBe("");
+    expect(out).not.toContain(TOKEN_LIKE);
+    expect(out).not.toContain("/invite/");
+    expect(out).not.toContain("new.admin");
   });
 });
