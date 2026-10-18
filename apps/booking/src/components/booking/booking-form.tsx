@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@clinic/ui/components/ui/button";
 import { bookAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
@@ -35,12 +41,20 @@ export function BookingForm({
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   useActionFeedback(state);
+  // A second click or tap while a submit is under way (the spam check can take a moment before
+  // `pending` turns on) is ignored: one attempt, one result. The attempt key above is the backstop.
+  const submitting = useRef(false);
+  useEffect(() => {
+    submitting.current = false;
+  }, [state]);
 
   return (
     <form
       className="space-y-6"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (submitting.current) return;
+        submitting.current = true;
         const fd = new FormData(e.currentTarget);
         fd.set("recaptcha_token", await getToken().catch(() => ""));
         startTransition(() => formAction(fd));
@@ -56,6 +70,16 @@ export function BookingForm({
           className="rounded-lg border border-border bg-muted p-4"
         >
           <p className="text-base font-semibold">{state.message}</p>
+          {state.code === "PATIENT_DOUBLE_BOOKED" ? (
+            <p className="mt-3 text-base">
+              <Link
+                href="/appointments"
+                className="font-medium underline underline-offset-4"
+              >
+                Open My appointments
+              </Link>
+            </p>
+          ) : null}
           {state.code === "SLOT_TAKEN" ? (
             <div className="mt-3">
               <NextSlots

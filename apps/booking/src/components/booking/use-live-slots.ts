@@ -106,6 +106,9 @@ export function useLiveSlots(initial: Availability) {
 
   return {
     slots: query.data.slots,
+    // Every taken time of this doctor and day, if the response lists them (a field the contract does
+    // not have yet; absent today).
+    taken: (query.data as { taken?: string[] }).taken,
     idle,
     armed,
     // The last refresh failed: the list on screen may be out of date.

@@ -5,7 +5,8 @@ export type Severity = "warning" | "error" | "critical";
 const COPY: Record<string, { message: string; severity: Severity }> = {
   SLOT_TAKEN: { message: "That time was just taken.", severity: "warning" },
   PATIENT_DOUBLE_BOOKED: {
-    message: "You already have an appointment at that time.",
+    message:
+      "You already have an appointment at that time. Pick another time, or look in My appointments.",
     severity: "warning",
   },
   SLOT_IN_PAST: {
@@ -68,6 +69,65 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
   },
   CONTRACT_VIOLATION: {
     message: "Something went wrong on our side. Try again in a moment.",
+    severity: "critical",
+  },
+  FORBIDDEN: {
+    message: "Your account cannot do that.",
+    severity: "error",
+  },
+  TIMEZONE_REQUIRED: {
+    message: "We could not tell the clinic's time zone. Try again in a moment.",
+    severity: "error",
+  },
+  UNKNOWN_DOCTOR: {
+    message: "We could not find that doctor.",
+    severity: "error",
+  },
+  UNKNOWN_PATIENT: {
+    message: "We could not find your patient record. Try booking again.",
+    severity: "error",
+  },
+  IDEMPOTENCY_KEY_REUSED: {
+    message:
+      "That booking attempt was already used for a different visit. Reload the page and try again.",
+    severity: "warning",
+  },
+  IDEMPOTENCY_KEY_CONSUMED: {
+    message:
+      "That booking attempt already finished. Check My appointments before trying again.",
+    severity: "warning",
+  },
+  ACCESS_EXISTS: {
+    message: "That person already has access.",
+    severity: "warning",
+  },
+  OWNER_PROTECTED: {
+    message: "The owner's access cannot be changed.",
+    severity: "warning",
+  },
+  ACCESS_NOT_FOUND: {
+    message: "We could not find that access entry.",
+    severity: "error",
+  },
+  PROBLEM_NOT_FOUND: {
+    message: "We could not find that error description.",
+    severity: "error",
+  },
+  NOT_FOUND: {
+    message: "We could not find that page or record.",
+    severity: "error",
+  },
+  METHOD_NOT_ALLOWED: {
+    message: "That action is not allowed here.",
+    severity: "error",
+  },
+  DB_UNAVAILABLE: {
+    message:
+      "The booking system is busy right now. Wait a moment and try again.",
+    severity: "critical",
+  },
+  INTERNAL_ERROR: {
+    message: "Something broke on our side. Try again in a moment.",
     severity: "critical",
   },
   RATE_LIMITED: {

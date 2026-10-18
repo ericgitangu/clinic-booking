@@ -100,7 +100,7 @@ async function bookAs(browser: Browser, doctorId: string, startsAt: string) {
   await ctx.close();
 }
 
-test("a time another person books disappears from an open page without a reload", async ({
+test("a time another person books turns inactive on an open page without a reload", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await ownCell(
@@ -122,7 +122,12 @@ test("a time another person books disappears from an open page without a reload"
   await bookAs(browser, doctorId, slots[0]);
 
   await page.clock.runFor(POLL_MS + 1000);
-  await expect(taken).toHaveCount(0);
+  // It stays in its place, inactive, instead of vanishing and shifting the others.
+  await expect(
+    page.getByRole("radio", {
+      name: new RegExp(`^${hhmm(slots[0])}.*No longer available`),
+    }),
+  ).toBeDisabled();
   await expect(kept).toBeVisible();
   expect(
     await page.evaluate(
@@ -132,7 +137,7 @@ test("a time another person books disappears from an open page without a reload"
   await ctx.close();
 });
 
-test("a time the person had picked and someone else books says it was just taken", async ({
+test("a time the person had picked and someone else books says it is no longer available", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await ownCell(
@@ -150,7 +155,7 @@ test("a time the person had picked and someone else books says it was just taken
 
   await page.clock.runFor(POLL_MS + 1000);
   await expect(
-    page.getByText(`${hhmm(slots[1])} was just taken`),
+    page.getByText(`${hhmm(slots[1])} is no longer available`),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
   await ctx.close();
@@ -198,7 +203,7 @@ test("polling stops after ten idle minutes and a click resumes it", async ({
 
   // No pointer or keyboard input for ten minutes (the clock jumps; intervals fire once).
   await page.clock.fastForward(IDLE_MS + 1000);
-  const chip = page.getByRole("button", { name: "Paused, click to refresh" });
+  const chip = page.getByRole("button", { name: "Paused. Click to refresh." });
   await expect(chip).toBeVisible();
   // The clock jump fired the 15 s interval once, just before the idle timer; let that reply land.
   await calls.settled();
