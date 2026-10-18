@@ -3,6 +3,7 @@ import {
   test,
   type Browser,
   type BrowserContext,
+  type BrowserContextOptions,
   type Page,
 } from "@playwright/test";
 import { callApi } from "@clinic/api/call";
@@ -25,8 +26,12 @@ const details = (doctorId: string, startsAt: string) =>
 
 type Person = ReturnType<typeof newPerson>;
 
-async function signedIn(browser: Browser, person: Person = newPerson()) {
-  const context = await browser.newContext();
+async function signedIn(
+  browser: Browser,
+  person: Person = newPerson(),
+  options: BrowserContextOptions = {},
+) {
+  const context = await browser.newContext(options);
   await context.addCookies(await sessionCookies(person));
   return { context, page: await context.newPage(), person };
 }
@@ -350,11 +355,22 @@ test("two server-action requests of one attempt, with the same key, book once an
   browser,
 }) => {
   const { doctorId, slots } = await pick(5);
-  const { context, page, person } = await signedIn(browser);
+  // No service worker in this test. Once the app's worker has installed and claimed the page (a
+  // moment after load, so it depends on timing), fetches go through it, and Playwright's
+  // page.route does not see requests a service worker handles: the action request then reached the
+  // server and booked, but the handler below never ran. Blocking the worker keeps every request on
+  // the path the test intercepts; the worker has its own scenarios in pwa.spec.ts.
+  const { context, page, person } = await signedIn(browser, newPerson(), {
+    serviceWorkers: "block",
+  });
   await page.goto(details(doctorId, slots[0]));
   await expect(
     page.getByRole("button", { name: "Confirm booking" }),
   ).toBeEnabled();
+  expect(
+    await page.evaluate(() => Boolean(navigator.serviceWorker?.controller)),
+    "no service worker may control the page while requests are intercepted",
+  ).toBe(false);
 
   // The click sends one server-action request. Send it to the app twice, byte for byte, at the
   // same time (a double submit, or a retry whose first response was lost): both carry the form's

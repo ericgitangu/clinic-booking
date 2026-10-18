@@ -7,6 +7,7 @@
     "./proxy/*": "./src/proxy/*.ts",
     "./generated": "./src/generated/index.ts",
     "./generated/*": "./src/generated/*.ts",
+    "./realtime": "./src/realtime/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
@@ -24,11 +25,16 @@
     "@eslint/js": "9.39.5",
     "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
     "eslint": "9.39.5",
     "globals": "17.13.0",
     "prettier": "3.9.10",
+    "react": "^19.3.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
     "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "react": "^19"
   }
 }
