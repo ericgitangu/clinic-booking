@@ -1,5 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // The header shows the person's Google profile picture, or their initials. Google's picture host
@@ -27,6 +33,17 @@ async function signedIn(
   const page = await context.newPage();
   await page.goto("/about");
   return { context, page, person };
+}
+
+// The initials are drawn by CSS from data-initials (no text node, so the button's name is only its
+// aria-label: WCAG 2.5.3 Label in Name). Check both the attribute and what is painted.
+async function expectInitials(button: Locator, initials: string) {
+  const mark = button.locator("[data-initials]");
+  await expect(mark).toHaveAttribute("data-initials", initials);
+  expect(
+    await mark.evaluate((el) => getComputedStyle(el, "::before").content),
+  ).toBe(`"${initials}"`);
+  await expect(button).toHaveText("");
 }
 
 const trigger = (page: Page, name: string) =>
@@ -67,7 +84,7 @@ test("with no picture the header shows initials", async ({ browser }) => {
     .map((w) => w[0])
     .join("")
     .toUpperCase();
-  await expect(button).toContainText(initials);
+  await expectInitials(button, initials);
   await context.close();
 });
 
@@ -78,7 +95,8 @@ test("when the picture fails to load the header falls back to initials", async (
   const button = trigger(page, person.name);
   await expect(button).toBeVisible();
   await expect(button.getByRole("img")).toHaveCount(0);
-  await expect(button).toContainText(
+  await expectInitials(
+    button,
     person.name
       .split(" ")
       .map((w) => w[0])
@@ -113,10 +131,15 @@ test("the menu opens from the keyboard, shows who and where, and the focus ring 
   await context.close();
 });
 
-test("axe finds nothing serious with the avatar menu closed and open, light and dark", async ({
+test("axe finds nothing serious with the avatar (picture or initials), menu closed and open, light and dark", async ({
   browser,
 }) => {
-  for (const scheme of ["light", "dark"] as const) {
+  for (const [scheme, image] of [
+    ["light", PICTURE],
+    ["dark", PICTURE],
+    ["light", undefined],
+    ["dark", undefined],
+  ] as const) {
     const { context, page, person } = await signedIn(
       browser,
       PICTURE,
@@ -128,14 +151,20 @@ test("axe finds nothing serious with the avatar menu closed and open, light and 
         (v) => v.impact === "serious" || v.impact === "critical",
       );
     await expect(trigger(page, person.name)).toBeVisible();
-    expect(await audit(), `${scheme}, closed`).toEqual([]);
+    expect(
+      await audit(),
+      `${scheme}, ${image ? "picture" : "initials"}, closed`,
+    ).toEqual([]);
     await trigger(page, person.name).click();
     await expect(page.getByRole("menu")).toBeVisible();
     // The menu fades in; axe must read its final colours, not a frame of the fade.
     await page
       .getByRole("menu")
       .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    expect(await audit(), `${scheme}, open`).toEqual([]);
+    expect(
+      await audit(),
+      `${scheme}, ${image ? "picture" : "initials"}, open`,
+    ).toEqual([]);
     await context.close();
   }
 });

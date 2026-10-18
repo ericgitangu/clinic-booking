@@ -7,7 +7,8 @@ export default defineConfig({
     alias: [
       {
         find: /^@clinic\/ui\/(components|lib)\/(.*)$/,
-        replacement: fileURLToPath(new URL("./src", import.meta.url)) + "/$1/$2",
+        replacement:
+          fileURLToPath(new URL("./src", import.meta.url)) + "/$1/$2",
       },
     ],
   },

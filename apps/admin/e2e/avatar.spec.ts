@@ -64,9 +64,14 @@ test("no picture, or one that fails to load, shows initials", async ({
     const { context, page, name } = await open(browser, image, google);
     await expect(trigger(page, name)).toBeVisible();
     await expect(trigger(page, name).getByRole("img")).toHaveCount(0);
-    await expect(trigger(page, name)).toContainText(
-      name.slice(0, 1).toUpperCase(),
-    );
+    // Drawn by CSS from data-initials: the button's name is only its aria-label (WCAG 2.5.3).
+    const mark = trigger(page, name).locator("[data-initials]");
+    const initials = name.slice(0, 1).toUpperCase();
+    await expect(mark).toHaveAttribute("data-initials", initials);
+    expect(
+      await mark.evaluate((el) => getComputedStyle(el, "::before").content),
+    ).toBe(`"${initials}"`);
+    await expect(trigger(page, name)).toHaveText("");
     await context.close();
   }
 });
@@ -74,7 +79,8 @@ test("no picture, or one that fails to load, shows initials", async ({
 test("the menu signs out, and axe finds nothing serious with it open", async ({
   browser,
 }) => {
-  const { context, page, name } = await open(browser, PICTURE, "picture");
+  // No picture: the initials are the visible content of the button, the case WCAG 2.5.3 checks.
+  const { context, page, name } = await open(browser, undefined, "picture");
   await trigger(page, name).click();
   await expect(page.getByRole("menu")).toBeVisible();
   // The menu fades in; axe must read its final colours, not a frame of the fade.

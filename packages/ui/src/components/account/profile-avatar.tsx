@@ -44,16 +44,18 @@ export function ProfileAvatar({
       />
     );
   }
+  // The initials are drawn by CSS from data-initials, not written as text. A button's name comes
+  // from its aria-label ("Account menu for Pat Mwangi"); visible text that its name does not
+  // contain (the initials) fails WCAG 2.5.3 Label in Name, and axe reads real text nodes.
   return (
     <span
       aria-hidden
+      data-initials={initialsOf(name)}
       style={box}
       className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground",
+        "inline-flex shrink-0 select-none items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground before:content-[attr(data-initials)]",
         className,
       )}
-    >
-      {initialsOf(name)}
-    </span>
+    />
   );
 }

@@ -43,7 +43,9 @@ describe("ProfileAvatar", () => {
         <ProfileAvatar name="Pat Mwangi" image={image} />,
       );
       expect(html).not.toContain("<img");
-      expect(html).toContain(">PM<");
+      // Drawn by CSS from data-initials: no text node for a screen reader or axe to read.
+      expect(html).toContain('data-initials="PM"');
+      expect(html).not.toContain(">PM<");
       expect(html).toContain('aria-hidden="true"');
     },
   );
