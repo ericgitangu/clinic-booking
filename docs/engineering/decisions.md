@@ -26,7 +26,7 @@ The README carries a ten-row summary. This page is the longer index: one row per
 
 ## Beyond the brief
 
-Status is as of the commit this page was last verified against. "Shipped" means on `main` and running in production, "declared" means the code or ADR exists but is not running, "descoped" means I decided not to build it.
+Status is as of main `4aef3b8` and live production on 2026-10-18. "Shipped" means on `main` and running in production, "declared" means the code or ADR exists but is not running, "descoped" means I decided not to build it.
 
 | Item | Why it is justified against the brief | Cost | Status | ADR |
 |---|---|---|---|---|
@@ -40,9 +40,11 @@ Status is as of the commit this page was last verified against. "Shipped" means 
 | Admin dashboard with owner, admin and viewer roles and a lineage view | A clinic needs to see and fix appointments | A second app and project | Shipped | [0027](../adr/0027-two-apps-in-a-workspace.md), [0030](../adr/0030-staff-roles-and-access.md) |
 | Shell-only PWA and 15 second slot polling | A stale slot list is the UX failure of the race the brief names | Polling load on Neon, bounded by an idle stop | Shipped (PR 33) | [0009](../adr/0009-realtime-polling-now-sse-later.md), [0010](../adr/0010-thin-nextjs-booking-ui.md) |
 | Branding, manifest, sitemap | A product that looks like one | None beyond build time | Shipped | [0026](../adr/0026-branding-and-seo.md) |
-| Booking emails and a daily reminder (Resend) | A patient needs a record of the booking | Resend's free plan; reminders go only to verified linked accounts | Declared until PR 27 merges | [0025](../adr/0025-email-with-resend.md) |
-| Live slot events through an outbox relay and Ably | Shows a taken slot without waiting for the next poll | Ably's free package with no payment method; a hard publish budget | Declared until PR 39 merges | ADR-0031 |
-| Production ZAP baseline, Lighthouse budgets, a kill switch | Checks the live site, not only the compose stack | CI credits | Declared until PR 32 merges | [0017](../adr/0017-security-testing.md) |
-| Self-hosted Swagger UI, ReDoc and fonts | The reviewer's first click must not depend on a CDN | Assets in the repo | Declared until PR 36 merges | [0007](../adr/0007-api-style-rest-openapi.md) |
+| Booking emails and a daily reminder (Resend) | A patient needs a record of the booking | Resend's free plan; reminders go only to verified linked accounts | Declared: PR 27 is open. Sends from `reminders@mail.ericgitangu.com`, the verified subdomain | [0025](../adr/0025-email-with-resend.md) |
+| Live slot events through an outbox relay and Ably | Shows a taken slot without waiting for the next poll | Ably's free package with no payment method; a hard publish budget | Publish side shipped (PR 39; production Ably count went 17 to 21 on a booking and a cancel). Browser subscription declared: PR 44 is open | ADR-0031 (in PR 29) |
+| Production ZAP baseline, Lighthouse budgets, a kill switch | Checks the live site, not only the compose stack | CI credits | Shipped (PR 32). The Lighthouse `/` performance rule is a warning (CI medians 77 to 89). The post-deploy checks have not run on a release until `VERCEL_ADMIN_TOKEN` is added | [0017](../adr/0017-security-testing.md) |
+| Self-hosted Swagger UI, ReDoc and fonts | The reviewer's first click must not depend on a CDN | Assets in the repo | Shipped (PR 36) | [0007](../adr/0007-api-style-rest-openapi.md) |
+| Production polish: motion, install surface, SEO heads, a lighter first load | A production feel | About 53 KB of fonts per app (PR 36) | Shipped (PR 38) | [0026](../adr/0026-branding-and-seo.md) |
+| Per-run port and database isolation for local e2e | Parallel local runs would not collide | Time I did not have | Descoped. Local reruns need `make down -v` first | [0018](../adr/0018-testing-strategy.md) |
 | Go SSE gateway for an admin live feed | A cheap way to hold many idle streams | A second runtime and 900 vCPU-seconds per connected hour (PR 37) | Descoped: PR 37 closed, superseded by Ably | [0021](../adr/0021-go-realtime-gateway.md) |
 | Admin live feed | Nice to have on the dashboard | Real-time plumbing for one user | Descoped | [0021](../adr/0021-go-realtime-gateway.md) |

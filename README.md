@@ -32,7 +32,7 @@ The earlier address, <https://sil-clinic-booking.vercel.app>, answers with a 308
 
 ## 2. Verify the claims in 10 minutes
 
-I ran everything below against production on 2026-10-17 (UTC). The commands are copy-paste. You need `curl`, `jq` and `python3`.
+I ran everything below against production on 2026-10-18 (UTC). The commands are copy-paste. You need `curl`, `jq` and `python3`.
 
 ```bash
 W=https://clinic.ericgitangu.com
@@ -84,7 +84,9 @@ curl -s -XPATCH $API/appointments/$ID/cancel -H 'content-type: application/json'
 
 Observed: the first returns `200`. The second returns `409` as `application/problem+json` with code `APPOINTMENT_ALREADY_CANCELLED` and a `request_id`.
 
-**The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`) and needs `uv`. I ran the script against production on 2026-10-17 and it printed `17/17 passed`. The release pipeline runs the same script against each new revision before it gets traffic, and runs `cost_check.sh --live` after the deploy.
+**Rerunning locally.** The end-to-end tests assume a fresh database, so start from `make down && make up`. `make down` runs `docker compose down -v`, which removes the database volume; without that, the old volume keeps earlier bookings and the double-booking specs fail. (`make down -v` is not the same thing: `-v` is Make's own version flag.)
+
+**The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`) and needs `uv`. I ran the script against production on 2026-10-18 and it printed `17/17 passed`. The release pipeline runs the same script against each new revision before it gets traffic, and runs `cost_check.sh --live` after the deploy.
 
 ## 3. System design
 
@@ -100,7 +102,7 @@ flowchart LR
   M[clinic-migrate: Cloud Run Job] -->|alembic, role clinic_owner| D
 ```
 
-One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
+One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Booking emails (PR 27, in flight) are sent from `Idyllic Clinic Booking <reminders@mail.ericgitangu.com>` with the reply-to set to my own address. `mail.ericgitangu.com` is the only domain verified in Resend, and a subdomain keeps the root domain's reputation out of it ([ADR-0025](docs/adr/0025-email-with-resend.md)). Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
 
 ### 3.2 Data model
 
@@ -186,6 +188,9 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 - **Early session revocation.** Sessions are stateless cookies, so a role is looked up in `staff_access` on every request instead of living in the cookie ([ADR-0030](docs/adr/0030-staff-roles-and-access.md)).
 - **Measured latency and load.** The latency and 10x figures above are estimates and are labelled as such.
 - **A live admin feed.** I descoped it. The Go gateway I designed for it ([ADR-0021](docs/adr/0021-go-realtime-gateway.md)) billed about 900 vCPU-seconds per connected hour against roughly 21,619 vCPU-seconds of shared free-tier headroom and held 2 concurrent streams, so I closed that pull request (PR 37) and chose Ably's free package, which needs no payment method (evidence: `docs/evidence/ably-no-payment-method-2026-10-18.md`). The relay can publish admin events; no admin screen consumes them. The dashboard refreshes on request.
+- **The admin release path is blocked on one secret.** `ship-admin` failed because the CI Vercel token was scoped to `clinic-web`; each project now has its own token, and the admin ship, rollback and public checks pass only after `VERCEL_ADMIN_TOKEN` is added to the `vercel-prod` context. Until then `verify-release`, `smoke-public` and `zap-prod` have not run on a release,.
+- **End-to-end tests assume a fresh database per run.** CI provides one; a local rerun needs `make down` first (it runs `docker compose down -v`), or the double-booking specs and the fixed-slot `booking.spec` test fail (also on `main`). Per-run port and database isolation is descoped for time.
+- **Booking emails are in flight.** PR 27 is open.
 - **The admin app cannot be tried without an invitation**, for the reason in the Start here list.
 
 ### 4.3 Beyond the brief
@@ -201,10 +206,10 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 - **A generated, validated client.** Types, zod schemas and the SDK come from the OpenAPI contract, and CI fails on drift ([ADR-0011](docs/adr/0011-openapi-codegen-contract.md)).
 - **Request-id logging** with no PII in logs ([ADR-0019](docs/adr/0019-observability.md)), and branding, a web manifest and a sitemap ([ADR-0026](docs/adr/0026-branding-and-seo.md)).
 - **A shell-only PWA and slot lists that refresh** every 15 seconds while the tab is visible, with an idle stop ([ADR-0009](docs/adr/0009-realtime-polling-now-sse-later.md), [ADR-0010](docs/adr/0010-thin-nextjs-booking-ui.md)).
-- **Live slot events** through an outbox relay and Ably, with a hard monthly publish budget and polling as the fallback ([diagram](docs/architecture/overview.md#4-a-booked-slot-reaching-other-open-pages)).
-- **Booking emails and a daily reminder** through Resend, sent only to verified, linked accounts ([ADR-0025](docs/adr/0025-email-with-resend.md)).
+- **Live slot events.** The API publishes them through an outbox relay to Ably, with a hard monthly publish budget (25,000) and polling as the fallback ([diagram](docs/architecture/overview.md#4-a-booked-slot-reaching-other-open-pages)). The publish side is live: booking and then cancelling in production moved the Ably message count from 17 to 21. The booking page subscribes in PR 44, which is open, so until it merges the pages rely on the 15 second polling.
+- **Booking emails and a daily reminder** through Resend, sent only to verified, linked accounts ([ADR-0025](docs/adr/0025-email-with-resend.md)). PR 27 is open, so this is in flight and not running in production.
 - **Swagger UI, ReDoc and fonts served from the repo**, so the first click does not depend on a CDN.
-- **A production ZAP baseline, Lighthouse budgets and a kill switch** for the deployed services ([ADR-0017](docs/adr/0017-security-testing.md)).
+- **A production ZAP baseline, Lighthouse budgets, an image prune and a kill switch** for the deployed services ([ADR-0017](docs/adr/0017-security-testing.md), [rollback runbook](docs/runbooks/rollback.md)). The Lighthouse `/` performance rule is a warning: CI medians varied from 77 to 89 run to run.
 
 The status of each item (shipped, declared, descoped) and what it costs is in [`docs/engineering/decisions.md`](docs/engineering/decisions.md#beyond-the-brief).
 
@@ -242,13 +247,13 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 
 **Everything runs against the real thing.** Backend tests use real Postgres 17 with no mocked repositories. The web gate is the `e2e-real` CI job: it brings up the real API and Postgres with docker compose (migrations and seed included) and runs the browser scenarios (`apps/booking/e2e`) and the generated client's tests (`packages/api/tests/real-api.test.ts`) against them: booking, a double booking, cancelling, cancelling twice, rescheduling, a past time, a time under an hour away, and the typed error for each. Stand-ins exist only where a real response cannot be produced or the service is a third party: Google's token endpoint in the sign-in tests, and a damaged real response in the generated client's drift test, each labelled in the test. The reCAPTCHA check is switched off for test runs only (`apps/booking/src/lib/human-check.ts`), and its verifier is unit-tested on every reject path.
 
-Test counts, coverage and the mutation checks that proved the tests can fail are quoted from each pull request's review in [`docs/engineering/verification.md`](docs/engineering/verification.md). The backend job fails under 85% coverage and a separate unit-only gate holds the pure domain code at 95%. The race harness is described in [3.4](#34-the-concurrency-guarantee).
+Four flakes were root-caused rather than retried: the script tests' shared fixed ports and the `CIRCLE_BRANCH` leak ([PR 49](docs/engineering/verification.md), [PR 43](docs/engineering/verification.md)), the live admin-channel test ([PR 45](docs/engineering/verification.md)) and the fonts spec ([PR 47](docs/engineering/verification.md)); the booking double-submit test is fixed in PR 48, which is open. Test counts, coverage and the mutation checks that proved the tests can fail are quoted from each pull request's review in [`docs/engineering/verification.md`](docs/engineering/verification.md). The backend job fails under 85% coverage and a separate unit-only gate holds the pure domain code at 95%. The race harness is described in [3.4](#34-the-concurrency-guarantee).
 
 **Generated client.** The types, zod schemas and SDK in `packages/api/src/generated` come from `contracts/openapi.json` (`make gen-client`, `@hey-api/openapi-ts`), and the lint job fails if they differ from a fresh run ([ADR-0011](docs/adr/0011-openapi-codegen-contract.md), [ADR-0029](docs/adr/0029-booking-flow.md)).
 
 Run each layer locally: `make lint hygiene`; backend tests with `cd backend && uv run pytest` against the compose database; web unit tests with `pnpm -r test` (add `REAL_API_URL=http://127.0.0.1:8080` to include the real-API client tests); browser tests with `make e2e`, which starts compose first.
 
-Observed in production on 2026-10-17: 20 parallel `POST /api/appointments` for one slot returned one 201 and 19 409s (`SLOT_TAKEN`), the same as the local race test.
+Observed in production on 2026-10-18: 20 parallel `POST /api/appointments` for one slot returned one 201 and 19 409s (`SLOT_TAKEN`), the same as the local race test.
 
 ## 8. Ambiguities & decisions
 
@@ -272,7 +277,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Security note.** Signing in with Google and the reCAPTCHA check protect the web screens and the web app's own `/internal` routes: a patient reaches only their own appointments (the API answers 404 for anyone else's), and the patient is always derived from the account, never from the browser. The public REST API at `/api` is intentionally unauthenticated, as the brief requires, so Swagger's Try it out works. It is rate-limited per IP at the proxy, and patient-scoped reads there rely on unguessable UUIDs, so anyone who has an appointment or patient id can read or change it there. That is accepted debt, and it also means the phone-number check on patient creation (a duplicate phone returns `PATIENT_PHONE_EXISTS`) tells an API caller whether a number is registered. Review trigger: any real patient data, or a need to authenticate the public API (ADR-0012, ADR-0022, ADR-0024, ADR-0029).
 
-**Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.34 a month there (accepted); Cloud Run compute and egress stay within the free tier. I approved a ceiling of about $0.34 a month. A $3 Cloud Run spend cap is set in the cloud console, so it is not in the repository, and `cost_check.sh --live` checks that the two budgets exist (it needs a billing login, so it runs locally); that the cap action is on can only be confirmed in the console. Ably's free package needs no payment method (evidence: `docs/evidence/ably-no-payment-method-2026-10-18.md`). The $0 rule was my own constraint, not the brief's. The reasoning, the region audit and the recount are in [ADR-0014](docs/adr/0014-hosting-region-and-cost.md) and [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md); `cost_check.sh` is the guard.
+**Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.34 a month there (accepted); Cloud Run compute and egress stay within the free tier. I approved a ceiling of about $0.34 a month. A $3 Cloud Run spend cap is set in the cloud console (status Configured, recorded in [`docs/evidence/spend-cap-2026-10-18.md`](docs/evidence/spend-cap-2026-10-18.md)), and `cost_check.sh --live` checks that the two budgets exist (it needs a billing login, so it runs locally); that the cap action is on can only be confirmed in the console. Ably's free package needs no payment method (evidence: `docs/evidence/ably-no-payment-method-2026-10-18.md`). The $0 rule was my own constraint, not the brief's. The reasoning, the region audit and the recount are in [ADR-0014](docs/adr/0014-hosting-region-and-cost.md) and [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md); `cost_check.sh` is the guard.
 
 ## 11. AI reflection
 
