@@ -289,8 +289,15 @@ test("(h) a patient token cannot read the admin channel", async ({
   const stream = await fetch(url, {
     headers: { Authorization: `Bearer ${t.token}` },
   });
+  // The real service may send a blank line before the error frame: read until the frame or the end.
   const reader = stream.body!.getReader();
-  const first = new TextDecoder().decode((await reader.read()).value);
+  const decoder = new TextDecoder();
+  let first = "";
+  while (!/event: error[\s\S]*\n\n/.test(first) && first.length < 4096) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    first += decoder.decode(value, { stream: true });
+  }
   await reader.cancel();
   expect(first).toContain("event: error");
   expect(first).toContain("40160");
