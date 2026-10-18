@@ -45,13 +45,18 @@ describe("doc routes are static and never fetch upstream", () => {
     for (const route of [docsRoute, redocRoute]) {
       const res = await route.GET();
       const html = await res.text();
-      // No absolute URL in any src/href: the bundles are the pinned npm packages, copied to /docs-assets.
-      expect(html).not.toMatch(/(?:src|href)="(?:https?:)?\/\//);
-      const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map(
-        (m) => m[1],
-      );
-      expect(assets.length).toBeGreaterThan(0);
-      for (const a of assets) expect(a).toMatch(/^\/docs-assets\//);
+      // No absolute URL in any src/href that loads something: the bundles are the pinned npm
+      // packages, copied to /docs-assets. Plain links (the site frame's navigation) may be absolute.
+      const loads = [
+        ...html.matchAll(/<(?:script|link|img)\b[^>]*?(?:src|href)="([^"]+)"/g),
+      ].map((m) => m[1] as string);
+      expect(loads.length).toBeGreaterThan(0);
+      for (const l of loads) {
+        expect(l).not.toMatch(/^(?:https?:)?\/\//);
+        // Same-origin files only: the vendored bundles, the frame's own files, the logo and icon.
+        expect(l).toMatch(/^\/(?:docs-assets\/|brand\/|favicon\.ico$)/);
+      }
+      expect(loads.some((l) => l.startsWith("/docs-assets/"))).toBe(true);
       const csp = res.headers.get("content-security-policy") ?? "";
       expect(csp).not.toMatch(/https?:|\*/);
       expect(csp).toContain("script-src 'self'");
