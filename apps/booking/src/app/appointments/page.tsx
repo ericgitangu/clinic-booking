@@ -81,6 +81,7 @@ export default async function MyAppointments({
                   <AppointmentActions
                     id={a.id}
                     when={formatWhen(a.starts_at)}
+                    startsAt={a.starts_at}
                   />
                 </li>
               ))}

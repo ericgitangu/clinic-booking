@@ -1,68 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Availability } from "@clinic/api/generated";
 import { Button } from "@clinic/ui/components/ui/button";
 import { rescheduleAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
 import { clinicDay, formatTime } from "@/lib/clinic-time";
 import { NextSlots } from "@/components/booking/next-slots";
+import { SlotRadios } from "@/components/booking/slot-radios";
 import { StickyCta } from "@/components/booking/sticky-cta";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useLiveSlots } from "@/components/booking/use-live-slots";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
-import { pickWasTaken } from "@/lib/polling";
+import { useOwnBooked } from "@/lib/own-bookings";
+import { buildChips, type Chip, type OwnBooking } from "@/lib/slot-chips";
 
-// `availability` is the server-rendered answer for one doctor and day; the chooser keeps it current.
-type Props =
-  | { mode: "details"; doctorId: string; availability: Availability }
-  | { mode: "reschedule"; appointmentId: string; availability: Availability };
+// `availability` is the server-rendered answer for one doctor and day; the chooser keeps it
+// current. `own` is what the signed-in patient already holds (empty when signed out).
+type Props = { own: OwnBooking[]; availability: Availability } & (
+  | { mode: "details"; doctorId: string }
+  | { mode: "reschedule"; appointmentId: string }
+);
 
-function SlotRadios({
-  slots,
-  value,
-  onChange,
-}: {
-  slots: { starts_at: string }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <fieldset>
-      <legend className="sr-only">Free times</legend>
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-        {slots.map((s) => (
-          <li key={s.starts_at}>
-            <label className="block">
-              <input
-                type="radio"
-                name="slot"
-                value={s.starts_at}
-                checked={value === s.starts_at}
-                onChange={() => onChange(s.starts_at)}
-                className="peer sr-only"
-              />
-              <span className="slot-chip-label flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-base font-semibold hover:bg-accent peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring">
-                {formatTime(s.starts_at)}
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
-    </fieldset>
-  );
+// What to tell someone whose pick stopped being a free time.
+function lostPickText(chips: readonly Chip[], pick: string): string {
+  if (!pick) return "";
+  const t = formatTime(pick);
+  const now = chips.find((c) => c.starts_at === pick)?.state;
+  if (now === "yours" || now === "yours-elsewhere")
+    return `${t} is already your visit. Pick another time.`;
+  // "Just taken" is only said when the API has confirmed it; a time that merely left the list is
+  // "no longer available" (it could be a booking, a cancelled day, a doctor's change).
+  return now === "just-taken" || now === "booked"
+    ? `${t} was just taken. Pick another time.`
+    : `${t} is no longer available. Pick another time.`;
 }
 
-// Says why the list changed under the person, and offers the way back when polling has stopped.
+// The two status lines are always on the page, and only their text changes, so a screen reader
+// announces a change instead of missing a node that appeared together with its words.
 function LiveNotice({
-  taken,
+  lost,
   idle,
   armed,
   failing,
   onResume,
 }: {
-  taken: string;
+  lost: string;
   idle: boolean;
   armed: boolean;
   failing: boolean;
@@ -75,25 +66,31 @@ function LiveNotice({
         role="status"
         aria-live="polite"
         data-testid="refresh-hint"
-        className="mb-4 min-h-5 text-sm text-muted-foreground"
+        className="mb-2 min-h-5 text-sm text-muted-foreground"
       >
-        {failing ? "Couldn't refresh. We'll try again automatically." : ""}
+        {!idle && failing
+          ? "Couldn't refresh. We'll try again automatically."
+          : ""}
       </p>
-      {taken ? (
-        <p
-          role="status"
-          className="mb-4 rounded-lg border border-border bg-muted p-4 text-base font-semibold"
-        >
-          {formatTime(taken)} was just taken. Pick another time.
-        </p>
-      ) : null}
+      <p
+        role="status"
+        aria-live="polite"
+        data-testid="lost-pick"
+        className={
+          lost
+            ? "mb-4 rounded-lg border border-border bg-muted p-4 text-base font-semibold"
+            : "sr-only"
+        }
+      >
+        {lost}
+      </p>
       {idle ? (
         <button
           type="button"
           onClick={onResume}
-          className="mb-4 rounded-full border border-border bg-muted px-4 py-2 text-base underline underline-offset-4"
+          className="mb-4 min-h-11 rounded-full border border-border bg-muted px-4 py-2 text-base underline underline-offset-4"
         >
-          Paused, click to refresh
+          Paused. Click to refresh.
         </button>
       ) : null}
     </>
@@ -101,20 +98,53 @@ function LiveNotice({
 }
 
 export function SlotChooser(props: Props) {
-  const [selected, setSelected] = useState("");
-  const [taken, setTaken] = useState("");
-  const { slots, idle, armed, failing, resume, refresh } = useLiveSlots(
-    props.availability,
+  const { availability } = props;
+  const day = availability.date;
+  const doctorId = availability.doctor_id;
+  const live = useLiveSlots(availability);
+  const own = useOwnBooked(props.own);
+
+  // Every free time this grid has shown, so one that disappears stays in its place as "Just taken"
+  // instead of vanishing and moving the others. Updated while rendering, only when there is
+  // something new to add (the documented pattern for state derived from props).
+  const [seen, setSeen] = useState<string[]>(() =>
+    availability.slots.map((s) => s.starts_at),
   );
-  // A time the person had picked that is gone from the latest list: say so and clear the pick.
-  useEffect(() => {
-    if (pickWasTaken(selected, slots)) {
-      setTaken(selected);
-      setSelected("");
-    } else if (selected) {
-      setTaken("");
-    }
-  }, [selected, slots]);
+  const unseen = live.slots.filter((s) => !seen.includes(s.starts_at));
+  if (unseen.length > 0) setSeen([...seen, ...unseen.map((s) => s.starts_at)]);
+
+  // Times the API has said, with a 409, someone else holds. Only these are called "Just taken".
+  const [confirmedTaken, setConfirmedTaken] = useState<string[]>([]);
+  const attempted = useRef("");
+
+  const chips = useMemo(
+    () =>
+      buildChips({
+        doctorId,
+        day,
+        slots: live.slots,
+        taken: live.taken,
+        own,
+        seen,
+        confirmedTaken,
+      }),
+    [doctorId, day, live.slots, live.taken, own, seen, confirmedTaken],
+  );
+
+  const [selected, setSelected] = useState("");
+  const [lost, setLost] = useState("");
+  const selectedIsFree = chips.some(
+    (c) => c.starts_at === selected && c.state === "free",
+  );
+  if (selected && !selectedIsFree) {
+    setLost(lostPickText(chips, selected));
+    setSelected("");
+  }
+  const choose = (v: string) => {
+    setLost("");
+    setSelected(v);
+  };
+
   const [state, formAction, pending] = useActionState(
     rescheduleAppointment,
     initialState,
@@ -123,30 +153,30 @@ export function SlotChooser(props: Props) {
   useActionFeedback(state);
   // Losing the race on submit means the list is stale: refetch it now rather than wait for the poll.
   const lostRace = state.status === "error" && state.code === "SLOT_TAKEN";
+  const { refresh } = live;
   useEffect(() => {
-    if (lostRace) void refresh();
+    if (!lostRace) return;
+    const t = attempted.current;
+    if (t) setConfirmedTaken((c) => (c.includes(t) ? c : [...c, t]));
+    void refresh();
   }, [lostRace, refresh]);
 
   const notice = (
     <LiveNotice
-      taken={taken}
-      idle={idle}
-      armed={armed}
-      failing={failing}
-      onResume={resume}
+      lost={lost}
+      idle={live.idle}
+      armed={live.armed}
+      failing={live.failing}
+      onResume={live.resume}
     />
   );
-
-  if (slots.length === 0) {
-    return (
-      <>
-        {notice}
-        <p className="rounded-lg border border-dashed border-border p-6 text-base text-muted-foreground">
-          No free times on this day. Pick another date above.
-        </p>
-      </>
-    );
-  }
+  const anyFree = chips.some((c) => c.state === "free");
+  const none = (
+    <p className="mb-4 rounded-lg border border-dashed border-border p-6 text-base text-muted-foreground">
+      No free times {chips.length > 0 ? "left " : ""}on this day. Pick another
+      date above.
+    </p>
+  );
 
   if (props.mode === "details") {
     const href = selected
@@ -155,7 +185,10 @@ export function SlotChooser(props: Props) {
     return (
       <>
         {notice}
-        <SlotRadios slots={slots} value={selected} onChange={setSelected} />
+        {anyFree ? null : none}
+        {chips.length > 0 ? (
+          <SlotRadios chips={chips} value={selected} onChange={choose} />
+        ) : null}
         <StickyCta
           hint={
             selected
@@ -184,13 +217,17 @@ export function SlotChooser(props: Props) {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         fd.set("starts_at", selected);
+        attempted.current = selected;
         fd.set("recaptcha_token", await getToken().catch(() => ""));
         startTransition(() => formAction(fd));
       }}
     >
       <input type="hidden" name="appointment_id" value={appointmentId} />
       {notice}
-      <SlotRadios slots={slots} value={selected} onChange={setSelected} />
+      {anyFree ? null : none}
+      {chips.length > 0 ? (
+        <SlotRadios chips={chips} value={selected} onChange={choose} />
+      ) : null}
       {state.status === "error" && state.code === "SLOT_TAKEN" ? (
         <div
           role="alert"
