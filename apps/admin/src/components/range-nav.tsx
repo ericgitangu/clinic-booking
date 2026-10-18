@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { vibrate } from "@clinic/ui/lib/haptics";
+import { haptic } from "@clinic/ui/lib/haptics";
 import { cn } from "@clinic/ui/lib/utils";
 import { RANGES } from "@/lib/filters";
 
@@ -30,9 +30,9 @@ export function RangeNav({ days }: { days: number }) {
           key={d}
           href={hrefFor(d)}
           aria-current={d === days ? "page" : undefined}
-          onClick={() => vibrate("info")}
+          onClick={() => haptic("info")}
           className={cn(
-            "inline-flex min-h-9 items-center rounded-md px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            "inline-flex min-h-11 items-center rounded-md px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             d === days
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
