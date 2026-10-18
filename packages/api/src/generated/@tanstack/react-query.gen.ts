@@ -405,6 +405,8 @@ export const getMetricsInternalAdminMetricsGetQueryKey = (options: Options<GetMe
 
 /**
  * Get Metrics
+ *
+ * Activity series, totals and per-doctor load for the clinic-local days `[from, to)`. Each event or visit is placed by the zone of its own doctor's clinic. `bucket_start` is clinic-local wall-clock time, not an instant, so with clinics in different zones the series merges the same local day (or hour) of every clinic.
  */
 export const getMetricsInternalAdminMetricsGetOptions = (options: Options<GetMetricsInternalAdminMetricsGetData>) => queryOptions<GetMetricsInternalAdminMetricsGetResponse, DefaultError, GetMetricsInternalAdminMetricsGetResponse, ReturnType<typeof getMetricsInternalAdminMetricsGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

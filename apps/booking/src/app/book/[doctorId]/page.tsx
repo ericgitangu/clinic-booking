@@ -7,10 +7,21 @@ import * as api from "@/lib/api";
 import { clinicDay, formatDayLong, isValidDay } from "@/lib/clinic-time";
 import { describeProblem } from "@/lib/problems";
 
-export const metadata: Metadata = {
-  title: "Pick a time",
-  robots: { index: false },
-};
+// Doctor pages are listed in the sitemap, so they are indexable. The canonical address drops the
+// ?date= choice; the share card (title, description) is inherited from the root layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ doctorId: string }>;
+}): Promise<Metadata> {
+  const { doctorId } = await params;
+  const path = `/book/${doctorId}`;
+  return {
+    title: "Pick a time",
+    alternates: { canonical: path },
+    openGraph: { url: path },
+  };
+}
 export const dynamic = "force-dynamic";
 
 export default async function PickTime({

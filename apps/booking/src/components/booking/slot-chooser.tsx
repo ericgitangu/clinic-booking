@@ -43,7 +43,7 @@ function SlotRadios({
                 onChange={() => onChange(s.starts_at)}
                 className="peer sr-only"
               />
-              <span className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-base font-semibold hover:bg-accent peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring">
+              <span className="slot-chip-label flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-base font-semibold hover:bg-accent peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring">
                 {formatTime(s.starts_at)}
               </span>
             </label>
