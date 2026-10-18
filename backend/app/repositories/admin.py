@@ -4,6 +4,12 @@ Two time axes on purpose: *activity* is bucketed by ``appointment_events.occurre
 someone booked, rescheduled or cancelled), *load* by ``appointments.starts_at`` (when the visit
 happens). The aggregates are plain SQL with bound parameters; the filtered list is built with
 SQLAlchemy Core.
+
+Every query here leaves out the appointments (and their events) of synthetic patients: the release
+pipeline's smoke test books and cancels real rows on every release, and those are not clinic
+activity. Each statement carries ``NOT p.synthetic`` through a join on the appointment's patient;
+``tests/integration/test_admin_synthetic.py`` fails if any one of them loses it. Patient-facing
+availability is a different code path and still counts a synthetic booking as holding its slot.
 """
 
 from __future__ import annotations
@@ -27,9 +33,12 @@ _SERIES = text(
            count(*) FILTER (WHERE e.event_type = 'rescheduled') AS rescheduled,
            count(*) FILTER (WHERE e.event_type = 'cancelled')   AS cancelled
     FROM appointment_events e
+    JOIN appointments a ON a.id = e.appointment_id
+    JOIN patients p ON p.id = a.patient_id
     JOIN doctors d ON d.id = e.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
-    WHERE e.occurred_at >= :coarse_from AND e.occurred_at < :coarse_to
+    WHERE NOT p.synthetic
+      AND e.occurred_at >= :coarse_from AND e.occurred_at < :coarse_to
       AND (e.occurred_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
       AND (e.occurred_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
     GROUP BY 1
@@ -37,15 +46,24 @@ _SERIES = text(
     """
 )
 
-_UPCOMING = text("SELECT count(*) FROM appointments WHERE status = 'booked' AND starts_at >= :now")
+_UPCOMING = text(
+    """
+    SELECT count(*)
+    FROM appointments a
+    JOIN patients p ON p.id = a.patient_id
+    WHERE NOT p.synthetic AND a.status = 'booked' AND a.starts_at >= :now
+    """
+)
 
 _VISITS = text(
     """
     SELECT a.doctor_id, count(*) FILTER (WHERE a.status = 'booked') AS booked_visits
     FROM appointments a
+    JOIN patients p ON p.id = a.patient_id
     JOIN doctors d ON d.id = a.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
-    WHERE a.starts_at >= :coarse_from AND a.starts_at < :coarse_to
+    WHERE NOT p.synthetic
+      AND a.starts_at >= :coarse_from AND a.starts_at < :coarse_to
       AND (a.starts_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
       AND (a.starts_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
     GROUP BY a.doctor_id
@@ -56,9 +74,12 @@ _CANCEL_ACTIONS = text(
     """
     SELECT e.doctor_id, count(*) AS cancelled_actions
     FROM appointment_events e
+    JOIN appointments a ON a.id = e.appointment_id
+    JOIN patients p ON p.id = a.patient_id
     JOIN doctors d ON d.id = e.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
-    WHERE e.event_type = 'cancelled'
+    WHERE NOT p.synthetic
+      AND e.event_type = 'cancelled'
       AND e.occurred_at >= :coarse_from AND e.occurred_at < :coarse_to
       AND (e.occurred_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
       AND (e.occurred_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
@@ -93,14 +114,21 @@ _LINEAGE = text(
     SELECT e.id, e.event_type, e.from_starts_at, e.to_starts_at, e.occurred_at,
            c.timezone AS timezone
     FROM appointment_events e
+    JOIN appointments a ON a.id = e.appointment_id
+    JOIN patients p ON p.id = a.patient_id
     JOIN doctors d ON d.id = e.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
-    WHERE e.appointment_id = :id
+    WHERE NOT p.synthetic AND e.appointment_id = :id
     ORDER BY e.id
     """
 )
 
-_APPT_EXISTS = text("SELECT 1 FROM appointments WHERE id = :id")
+_APPT_EXISTS = text(
+    """
+    SELECT 1 FROM appointments a JOIN patients p ON p.id = a.patient_id
+    WHERE NOT p.synthetic AND a.id = :id
+    """
+)
 
 
 def _range_params(from_day: date, to_day: date) -> dict[str, Any]:
@@ -191,6 +219,7 @@ async def appointments_page(
         .join(Doctor, Doctor.id == Appointment.doctor_id)
         .join(Clinic, Clinic.id == Doctor.clinic_id)
         .join(Patient, Patient.id == Appointment.patient_id)
+        .where(Patient.synthetic.is_(False))
         .order_by(Appointment.starts_at.desc(), Appointment.id.desc())
         .limit(limit + 1)
     )

@@ -9,7 +9,9 @@ from app.repositories.patients import insert_patient
 from app.schemas.patient import PatientCreate
 
 
-async def create_patient(session: AsyncSession, data: PatientCreate) -> Patient:
+async def create_patient(
+    session: AsyncSession, data: PatientCreate, *, synthetic: bool = False
+) -> Patient:
     try:
         async with session.begin():
             return await insert_patient(
@@ -17,6 +19,7 @@ async def create_patient(session: AsyncSession, data: PatientCreate) -> Patient:
                 full_name=data.full_name,
                 phone=data.phone,
                 email=str(data.email) if data.email is not None else None,
+                synthetic=synthetic,
             )
     except IntegrityError as exc:
         raise map_integrity_error(exc) from exc
