@@ -7,11 +7,18 @@ timezone-aware check, which the handler maps to TIMEZONE_REQUIRED.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Self
 from zoneinfo import ZoneInfo
 
-from pydantic import AwareDatetime, BaseModel, BeforeValidator, PlainSerializer, model_validator
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    BeforeValidator,
+    PlainSerializer,
+    model_validator,
+)
 
 from app.core.clinic_zone import default_zone
 
@@ -22,9 +29,21 @@ def _require_str(value: object) -> object:
     return value
 
 
+def _representable_in_utc(value: datetime) -> datetime:
+    """Refuse an instant that cannot be written in UTC (year 1 with a positive offset, year 9999
+    with a negative one); every later step converts to UTC and would fail without a handler."""
+    try:
+        value.astimezone(UTC)
+    except OverflowError as exc:
+        raise ValueError("the instant is outside the range that can be stored") from exc
+    return value
+
+
 # A string-only aware datetime: numbers/objects -> VALIDATION_ERROR; naive -> TIMEZONE_REQUIRED.
 # AwareDatetime must sit next to datetime; the str guard wraps it (runs first on input).
-StrAwareDatetime = Annotated[datetime, AwareDatetime, BeforeValidator(_require_str)]
+StrAwareDatetime = Annotated[
+    datetime, AwareDatetime, BeforeValidator(_require_str), AfterValidator(_representable_in_utc)
+]
 
 # Output instants for resources that belong to no clinic (a patient's created_at, a staff grant),
 # rendered in the configured default zone. Stays a date-time in the schema (return_type=datetime).

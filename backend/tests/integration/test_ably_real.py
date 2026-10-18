@@ -101,7 +101,7 @@ async def test_a_published_message_reaches_a_subscribe_only_stream_with_its_id()
     publisher = AblyPublisher(KEY, REST)
     async with _open(_token(channel), channel) as stream:
         assert stream.status_code == 200, await stream.aread()
-        await asyncio.sleep(1)  # attached
+        await asyncio.sleep(2)  # attached
         await publisher.publish([_message(channel, "9001.1.1")])
         got = await _next_message(stream)
     assert got["name"] == "slot_taken" and got["id"] == "9001.1.1"
@@ -113,7 +113,7 @@ async def test_the_same_id_published_twice_inside_the_window_is_delivered_once()
     publisher = AblyPublisher(KEY, REST)
     async with _open(_token(channel), channel) as stream:
         assert stream.status_code == 200
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         await publisher.publish([_message(channel, "9002.1.1")])
         await publisher.publish([_message(channel, "9002.1.1")])  # a relay retry
         await _next_message(stream)
@@ -138,7 +138,7 @@ async def test_the_admin_token_reads_the_admin_channel() -> None:
     publisher = AblyPublisher(KEY, REST)
     async with _open(token, ADMIN_CHANNEL) as stream:
         assert stream.status_code == 200, await stream.aread()
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         await publisher.publish([_message(ADMIN_CHANNEL, "9003.1")])
         got = await _next_message(stream)
     assert got["id"] == "9003.1"

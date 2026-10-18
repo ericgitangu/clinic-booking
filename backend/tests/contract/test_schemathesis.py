@@ -18,6 +18,7 @@ from schemathesis.checks import (
 from app.api.deps import get_clock
 from app.core.clock import FakeClock
 from app.main import create_app
+from app.services.publisher import DisabledPublisher
 from tests.conftest import FIXED_NOW, make_settings
 from tests.integration.realtime_support import TEST_KEY
 
@@ -25,6 +26,8 @@ from tests.integration.realtime_support import TEST_KEY
 # it answers 503 by design, and this suite treats every 5xx as a bug. (A throwaway key; it is only
 # used to sign tokens, nothing here reaches the push service.)
 _app = create_app(make_settings(ABLY_API_KEY=TEST_KEY))
+# Nothing in this suite may reach the network: tokens are signed locally, and publishing is off.
+_app.state.publisher = DisabledPublisher()
 _app.dependency_overrides[get_clock] = lambda: FakeClock(FIXED_NOW)
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", _app)
