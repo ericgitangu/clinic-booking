@@ -1,0 +1,13 @@
+{
+  "name": "clinic-avatar-generator",
+  "private": true,
+  "type": "module",
+  "description": "Dev-time only: regenerates the committed doctor avatars. Not part of the pnpm workspace and never bundled.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@dicebear/core": "9.4.2",
+    "@dicebear/lorelei": "9.4.2"
+  }
+}

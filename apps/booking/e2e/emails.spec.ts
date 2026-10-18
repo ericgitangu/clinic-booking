@@ -172,13 +172,16 @@ test("a Resend that never answers delays neither booking, moving nor cancelling"
       })
       .toBe(3);
     expect((await mailTo(person.email)).sent).toHaveLength(0);
-    // Each confirmation came back well inside a second, although every email hung for five.
+    // Each confirmation must come back far sooner than the 5 s abort of the hung email, which is
+    // what proves nothing waits on Resend: a request that waited would take 5 s or more. The limit
+    // is 3 s, not 1 s: a loaded runner took 1113 ms for the booking once, and 2692 ms was seen on a
+    // machine at load 67, while an idle run takes 100 to 300 ms. A limit that tight is a flake.
     console.log(
       `hanging Resend: book ${booking} ms, move ${moving} ms, cancel ${cancelling} ms`,
     );
-    expect(booking).toBeLessThan(1_000);
-    expect(moving).toBeLessThan(1_000);
-    expect(cancelling).toBeLessThan(1_000);
+    expect(booking).toBeLessThan(3_000);
+    expect(moving).toBeLessThan(3_000);
+    expect(cancelling).toBeLessThan(3_000);
   } finally {
     await hangMailTo(person.email, false);
   }
