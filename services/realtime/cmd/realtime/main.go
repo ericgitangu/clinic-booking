@@ -5,16 +5,49 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/ericgitangu/clinic-booking/services/realtime/internal/app"
 	"github.com/ericgitangu/clinic-booking/services/realtime/internal/config"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
 	os.Exit(run())
+}
+
+// healthcheck is for `docker compose` only (the image has no shell or curl). Cloud Run does not
+// use it: nothing probes the service, so nothing can wake it.
+func healthcheck() int {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+port+"/health", nil) // #nosec G704 -- loopback only, the port is validated as a number
+	if err != nil {
+		return 1
+	}
+	resp, err := http.DefaultClient.Do(req) // #nosec G704 -- loopback only, the port is validated as a number
+	if err != nil {
+		return 1
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func run() int {

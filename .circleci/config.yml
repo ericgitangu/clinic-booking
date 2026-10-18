@@ -810,7 +810,7 @@ jobs:
       - checkout
       - run:
           name: Skip when nothing this job covers changed (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ services/realtime/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
       - run:
           name: Throwaway keys for this run (the API checks signed assertions, the app signs sessions)
           command: |
@@ -819,8 +819,8 @@ jobs:
             # the one admin e-mail the API and the app both trust; the specs sign in as it
             echo "export ADMIN_EMAILS=owner@clinic.example" >> "$BASH_ENV"
       - run:
-          name: API and database (compose runs the migrations and the seed)
-          command: docker compose up -d --build --wait
+          name: API, database and live-feed gateway (compose runs the migrations and the seed)
+          command: docker compose --profile realtime up -d --build --wait
       - run:
           name: Build the admin app and run its scenarios against the real API
           command: |
@@ -834,7 +834,7 @@ jobs:
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm -C apps/admin build
             pnpm -C apps/admin exec playwright install --with-deps chromium
-            E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
+            E2E_API_URL=http://127.0.0.1:8080 E2E_REALTIME_URL=http://127.0.0.1:8090 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
       - run:
           name: API logs
           command: docker compose logs api | tail -80
