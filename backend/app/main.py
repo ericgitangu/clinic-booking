@@ -21,6 +21,7 @@ from app.api.routers import (
     problems,
     realtime,
     reminders,
+    smoke,
 )
 from app.core.clinic_zone import set_default_zone
 from app.core.config import Settings
@@ -75,6 +76,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(realtime.router)
     app.include_router(realtime.admin_router)
     app.include_router(reminders.router)
+    app.include_router(smoke.router)
 
     # Error responses carry only application/problem+json in the served spec, too.
     _default_openapi = app.openapi

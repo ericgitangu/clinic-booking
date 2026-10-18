@@ -125,6 +125,20 @@ resource "google_secret_manager_secret_iam_member" "runtime_signing_key" {
   member    = "serviceAccount:${google_service_account.api_runtime.email}"
 }
 
+# The API verifies the smoke test's assertion with its own key; the deployer (the CI identity)
+# reads that one secret to sign it. Neither can read the other secrets through these grants.
+resource "google_secret_manager_secret_iam_member" "runtime_smoke_key" {
+  secret_id = google_secret_manager_secret.smoke_signing_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api_runtime.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "deployer_smoke_key" {
+  secret_id = google_secret_manager_secret.smoke_signing_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "migrate_secret" {
   secret_id = google_secret_manager_secret.database_url_migrate.secret_id
   role      = "roles/secretmanager.secretAccessor"

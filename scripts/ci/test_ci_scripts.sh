@@ -836,6 +836,7 @@ deploy_line="$(grep -E 'gcloud run deploy clinic-api ' "$CONFIG")"
 expect "deploy: exactly one command deploys clinic-api" "$(grep -c . <<<"$deploy_line")" 1
 for secret in DATABASE_URL=clinic-database-url-app:latest \
               INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest \
+              SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest \
               ABLY_API_KEY=clinic-ably-api-key:latest; do
   expect "deploy: --set-secrets carries ${secret%%=*}" "$(grep -c -- "--set-secrets [^ ]*${secret}" <<<"$deploy_line")" 1
 done

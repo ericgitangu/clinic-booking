@@ -9,7 +9,7 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # asyncpg does not accept these DSN query params; libpq-style users expect them, so we
@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # HMAC key shared with the web apps' server side. Unset means every /internal/* call is
     # refused (fail closed), so a deployment without the key cannot be reached by accident.
     INTERNAL_SIGNING_KEY: SecretStr | None = None
+    # A second, separate HMAC key held only by the release pipeline's smoke test. It signs the one
+    # call that may create a synthetic patient (/internal/smoke/patients) and nothing else, so a
+    # leak of it cannot forge an admin or patient assertion. Unset means that call is refused.
+    SMOKE_SIGNING_KEY: SecretStr | None = None
     # Comma-separated owner emails. An owner is always `owner`, needs no staff_access row and can
     # never be granted, changed or revoked through the API. Must match the admin app's variable.
     ADMIN_EMAILS: str = ""
@@ -100,18 +104,30 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("INTERNAL_SIGNING_KEY", mode="before")
+    @field_validator("INTERNAL_SIGNING_KEY", "SMOKE_SIGNING_KEY", mode="before")
     @classmethod
-    def _signing_key_strength(cls, value: object) -> object:
+    def _signing_key_strength(cls, value: object, info: ValidationInfo) -> object:
         # An empty variable (compose passes `${VAR:-}`) means "not configured", never an empty key.
         if value is None or (isinstance(value, str) and value == ""):
             return None
         raw = value.get_secret_value() if isinstance(value, SecretStr) else value
         if not isinstance(raw, str) or len(raw) < _MIN_SIGNING_KEY_CHARS:
             raise ValueError(
-                f"INTERNAL_SIGNING_KEY must be at least {_MIN_SIGNING_KEY_CHARS} characters."
+                f"{info.field_name} must be at least {_MIN_SIGNING_KEY_CHARS} characters."
             )
         return value
+
+    @model_validator(mode="after")
+    def _keys_differ(self) -> Settings:
+        # One key per power: the smoke key must never also open the admin and patient endpoints.
+        if (
+            self.SMOKE_SIGNING_KEY is not None
+            and self.INTERNAL_SIGNING_KEY is not None
+            and self.SMOKE_SIGNING_KEY.get_secret_value()
+            == self.INTERNAL_SIGNING_KEY.get_secret_value()
+        ):
+            raise ValueError("SMOKE_SIGNING_KEY must differ from INTERNAL_SIGNING_KEY.")
+        return self
 
     @field_validator("DEFAULT_CLINIC_TZ")
     @classmethod
