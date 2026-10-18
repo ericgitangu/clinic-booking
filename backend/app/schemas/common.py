@@ -8,14 +8,12 @@ timezone-aware check, which the handler maps to TIMEZONE_REQUIRED.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 from zoneinfo import ZoneInfo
 
-from pydantic import AwareDatetime, BeforeValidator, PlainSerializer
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, PlainSerializer, model_validator
 
-# v1 is single-clinic; its zone is the output offset (timestamps are rendered in the clinic offset).
-# TD: a multi-clinic API would thread each appointment's clinic tz instead of this constant.
-CLINIC_TZ = ZoneInfo("Africa/Nairobi")
+from app.core.clinic_zone import default_zone
 
 
 def _require_str(value: object) -> object:
@@ -28,9 +26,29 @@ def _require_str(value: object) -> object:
 # AwareDatetime must sit next to datetime; the str guard wraps it (runs first on input).
 StrAwareDatetime = Annotated[datetime, AwareDatetime, BeforeValidator(_require_str)]
 
-# Output instants rendered in the clinic offset (+03:00), consistently for fresh writes and
-# DB reads alike. Stays a date-time in the schema (return_type=datetime).
+# Output instants for resources that belong to no clinic (a patient's created_at, a staff grant),
+# rendered in the configured default zone. Stays a date-time in the schema (return_type=datetime).
 ClinicDatetime = Annotated[
     datetime,
-    PlainSerializer(lambda d: d.astimezone(CLINIC_TZ), return_type=datetime, when_used="json"),
+    PlainSerializer(lambda d: d.astimezone(default_zone()), return_type=datetime, when_used="json"),
 ]
+
+
+class ClinicZoned(BaseModel):
+    """A response model whose instants are rendered in the zone it names.
+
+    ``timezone`` is the IANA name of the clinic the record belongs to (through its doctor); every
+    datetime field is converted to that zone on construction, so the offset in the JSON always
+    agrees with ``timezone``.
+    """
+
+    timezone: str
+
+    @model_validator(mode="after")
+    def _render_in_zone(self) -> Self:
+        zone = ZoneInfo(self.timezone)
+        for name in type(self).model_fields:
+            value = getattr(self, name)
+            if isinstance(value, datetime):
+                setattr(self, name, value.astimezone(zone))
+        return self

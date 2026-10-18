@@ -24,7 +24,7 @@ logs: ## Follow logs
 	docker compose logs -f
 
 migrate: ## Run migrations (one-shot)
-	docker compose run --rm migrate
+	docker compose run --rm --build migrate
 
 seed: ## Run the seed against the running stack
 	docker compose exec -T api python -m app.scripts.seed
@@ -115,7 +115,7 @@ e2e: ## Playwright checks against the real API and database (docker compose, mig
 	# Throwaway keys for this run: the API verifies the signed assertions with INTERNAL_SIGNING_KEY, and
 	# the app signs its sessions with BETTER_AUTH_SECRET.
 	export INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32); \
-	docker compose down -v && docker compose up -d --wait && \
+	docker compose down -v && docker compose up -d --build --wait && \
 	REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
 	REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts && \
 	cd apps/booking && pnpm build && pnpm test:e2e

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
-from app.schemas.common import ClinicDatetime, StrAwareDatetime
+from app.schemas.common import ClinicZoned, StrAwareDatetime
 
 
 class AppointmentCreate(BaseModel):
@@ -38,18 +39,20 @@ class CancelRequest(BaseModel):
         return v
 
 
-class Appointment(BaseModel):
+class Appointment(ClinicZoned):
+    """An appointment, with its instants in the offset of ``timezone``, its doctor's clinic zone."""
+
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     doctor_id: uuid.UUID
     patient_id: uuid.UUID
-    starts_at: ClinicDatetime
-    ends_at: ClinicDatetime
+    starts_at: datetime
+    ends_at: datetime
     status: Literal["booked", "cancelled"]
     cancellation_reason: str | None
-    cancelled_at: ClinicDatetime | None
-    created_at: ClinicDatetime
-    updated_at: ClinicDatetime
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class DoctorRef(BaseModel):

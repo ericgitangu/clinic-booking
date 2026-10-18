@@ -9,13 +9,14 @@ SQLAlchemy Core.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-from sqlalchemy import select, text, tuple_
+from sqlalchemy import func, select, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.appointment import Appointment
+from app.models.clinic import Clinic
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 
@@ -28,7 +29,9 @@ _SERIES = text(
     FROM appointment_events e
     JOIN doctors d ON d.id = e.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
-    WHERE e.occurred_at >= :from_ts AND e.occurred_at < :to_ts
+    WHERE e.occurred_at >= :coarse_from AND e.occurred_at < :coarse_to
+      AND (e.occurred_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
+      AND (e.occurred_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
     GROUP BY 1
     ORDER BY 1
     """
@@ -38,19 +41,28 @@ _UPCOMING = text("SELECT count(*) FROM appointments WHERE status = 'booked' AND 
 
 _VISITS = text(
     """
-    SELECT doctor_id, count(*) FILTER (WHERE status = 'booked') AS booked_visits
-    FROM appointments
-    WHERE starts_at >= :from_ts AND starts_at < :to_ts
-    GROUP BY doctor_id
+    SELECT a.doctor_id, count(*) FILTER (WHERE a.status = 'booked') AS booked_visits
+    FROM appointments a
+    JOIN doctors d ON d.id = a.doctor_id
+    JOIN clinics c ON c.id = d.clinic_id
+    WHERE a.starts_at >= :coarse_from AND a.starts_at < :coarse_to
+      AND (a.starts_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
+      AND (a.starts_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
+    GROUP BY a.doctor_id
     """
 )
 
 _CANCEL_ACTIONS = text(
     """
-    SELECT doctor_id, count(*) AS cancelled_actions
-    FROM appointment_events
-    WHERE event_type = 'cancelled' AND occurred_at >= :from_ts AND occurred_at < :to_ts
-    GROUP BY doctor_id
+    SELECT e.doctor_id, count(*) AS cancelled_actions
+    FROM appointment_events e
+    JOIN doctors d ON d.id = e.doctor_id
+    JOIN clinics c ON c.id = d.clinic_id
+    WHERE e.event_type = 'cancelled'
+      AND e.occurred_at >= :coarse_from AND e.occurred_at < :coarse_to
+      AND (e.occurred_at AT TIME ZONE c.timezone) >= CAST(:from_day AS timestamp)
+      AND (e.occurred_at AT TIME ZONE c.timezone) < CAST(:to_day AS timestamp)
+    GROUP BY e.doctor_id
     """
 )
 
@@ -76,28 +88,40 @@ _DOCTORS = text(
     """
 )
 
-_CLINIC_TZ = text("SELECT timezone FROM clinics ORDER BY created_at, id LIMIT 1")
-
 _LINEAGE = text(
     """
-    SELECT id, event_type, from_starts_at, to_starts_at, occurred_at
-    FROM appointment_events
-    WHERE appointment_id = :id
-    ORDER BY id
+    SELECT e.id, e.event_type, e.from_starts_at, e.to_starts_at, e.occurred_at,
+           c.timezone AS timezone
+    FROM appointment_events e
+    JOIN doctors d ON d.id = e.doctor_id
+    JOIN clinics c ON c.id = d.clinic_id
+    WHERE e.appointment_id = :id
+    ORDER BY e.id
     """
 )
 
 _APPT_EXISTS = text("SELECT 1 FROM appointments WHERE id = :id")
 
 
-async def clinic_timezone(session: AsyncSession) -> str | None:
-    return (await session.execute(_CLINIC_TZ)).scalar_one_or_none()
+def _range_params(from_day: date, to_day: date) -> dict[str, Any]:
+    """Bind values for a clinic-local day range ``[from_day, to_day)``.
+
+    The exact test compares each row's instant, converted to the zone of that row's own clinic,
+    with the two local midnights. The coarse UTC bounds (a day of slack either side, wider than any
+    UTC offset) let Postgres use the time index before that per-row test runs.
+    """
+    return {
+        "from_day": datetime.combine(from_day, time.min),
+        "to_day": datetime.combine(to_day, time.min),
+        "coarse_from": datetime.combine(from_day - timedelta(days=1), time.min, UTC),
+        "coarse_to": datetime.combine(to_day + timedelta(days=1), time.min, UTC),
+    }
 
 
 async def series(
-    session: AsyncSession, *, bucket: str, from_ts: datetime, to_ts: datetime
+    session: AsyncSession, *, bucket: str, from_day: date, to_day: date
 ) -> list[dict[str, Any]]:
-    rows = await session.execute(_SERIES, {"bucket": bucket, "from_ts": from_ts, "to_ts": to_ts})
+    rows = await session.execute(_SERIES, {"bucket": bucket, **_range_params(from_day, to_day)})
     return [dict(r) for r in rows.mappings()]
 
 
@@ -110,16 +134,16 @@ async def doctors(session: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def visits_by_doctor(
-    session: AsyncSession, *, from_ts: datetime, to_ts: datetime
+    session: AsyncSession, *, from_day: date, to_day: date
 ) -> dict[uuid.UUID, int]:
-    rows = await session.execute(_VISITS, {"from_ts": from_ts, "to_ts": to_ts})
+    rows = await session.execute(_VISITS, _range_params(from_day, to_day))
     return {r["doctor_id"]: int(r["booked_visits"]) for r in rows.mappings()}
 
 
 async def cancel_actions_by_doctor(
-    session: AsyncSession, *, from_ts: datetime, to_ts: datetime
+    session: AsyncSession, *, from_day: date, to_day: date
 ) -> dict[uuid.UUID, int]:
-    rows = await session.execute(_CANCEL_ACTIONS, {"from_ts": from_ts, "to_ts": to_ts})
+    rows = await session.execute(_CANCEL_ACTIONS, _range_params(from_day, to_day))
     return {r["doctor_id"]: int(r["cancelled_actions"]) for r in rows.mappings()}
 
 
@@ -144,8 +168,8 @@ async def appointments_page(
     *,
     status: str,
     doctor_id: uuid.UUID | None,
-    from_ts: datetime | None,
-    to_ts: datetime | None,
+    from_day: date | None,
+    to_day: date | None,
     after: tuple[datetime, uuid.UUID] | None,
     limit: int,
 ) -> list[dict[str, Any]]:
@@ -162,8 +186,10 @@ async def appointments_page(
             Appointment.status,
             Appointment.cancellation_reason,
             Appointment.created_at,
+            Clinic.timezone.label("timezone"),
         )
         .join(Doctor, Doctor.id == Appointment.doctor_id)
+        .join(Clinic, Clinic.id == Doctor.clinic_id)
         .join(Patient, Patient.id == Appointment.patient_id)
         .order_by(Appointment.starts_at.desc(), Appointment.id.desc())
         .limit(limit + 1)
@@ -172,10 +198,19 @@ async def appointments_page(
         stmt = stmt.where(Appointment.status == status)
     if doctor_id is not None:
         stmt = stmt.where(Appointment.doctor_id == doctor_id)
-    if from_ts is not None:
-        stmt = stmt.where(Appointment.starts_at >= from_ts)
-    if to_ts is not None:
-        stmt = stmt.where(Appointment.starts_at < to_ts)
+    # Dates are clinic-local days: compare each row's start, in the zone of its own clinic, with
+    # the local midnight. The coarse UTC bound lets the starts_at index narrow the scan first.
+    local_start = func.timezone(Clinic.timezone, Appointment.starts_at)
+    if from_day is not None:
+        stmt = stmt.where(
+            Appointment.starts_at >= datetime.combine(from_day - timedelta(days=1), time.min, UTC),
+            local_start >= datetime.combine(from_day, time.min),
+        )
+    if to_day is not None:
+        stmt = stmt.where(
+            Appointment.starts_at < datetime.combine(to_day + timedelta(days=1), time.min, UTC),
+            local_start < datetime.combine(to_day, time.min),
+        )
     if after is not None:
         # Keyset paging on the same (starts_at DESC, id DESC) order the index serves.
         stmt = stmt.where(tuple_(Appointment.starts_at, Appointment.id) < tuple_(*after))

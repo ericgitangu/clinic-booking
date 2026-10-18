@@ -10,7 +10,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.errors import DateOutOfRange, DoctorNotFound
 from app.domain.slots import generate_slots
-from app.repositories.appointments import booked_starts_for_doctor
+from app.repositories.appointments import booked_intervals_for_doctor
 from app.repositories.doctors import get_active_doctor, get_clinic, working_hours_for
 from app.schemas.availability import Availability, Slot
 
@@ -46,7 +46,7 @@ async def get_availability(
     next_day_start = datetime.combine(on_date + timedelta(days=1), time.min, tzinfo=tz).astimezone(
         UTC
     )
-    booked = await booked_starts_for_doctor(session, doctor_id, day_start, next_day_start)
+    booked = await booked_intervals_for_doctor(session, doctor_id, day_start, next_day_start)
 
     lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
     slots = generate_slots(windows, booked, tz, on_date, now, lead)
@@ -54,5 +54,8 @@ async def get_availability(
         doctor_id=doctor_id,
         date=on_date.isoformat(),
         timezone=clinic.timezone,
-        slots=[Slot(starts_at=s.starts_at, ends_at=s.ends_at) for s in slots],
+        slots=[
+            Slot(starts_at=s.starts_at.astimezone(tz), ends_at=s.ends_at.astimezone(tz))
+            for s in slots
+        ],
     )
