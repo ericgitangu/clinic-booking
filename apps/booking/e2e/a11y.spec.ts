@@ -15,6 +15,8 @@ const ip = () =>
 async function clean(page: Page, view: string) {
   // Colour contrast is read from what is painted, so let any opening animation (a dialog fading in)
   // finish first.
+  // After a client-side refresh the title is rewritten a moment after the content; wait for it.
+  await expect(page).toHaveTitle(/\S/);
   await page.waitForFunction(() =>
     document.getAnimations().every((a) => a.playState !== "running"),
   );
