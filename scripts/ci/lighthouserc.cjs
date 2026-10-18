@@ -7,18 +7,20 @@
 // representative run (the first CI run saw `/` at 0.72, 0.84 and 0.89 and passed that way).
 // `median` reports what a typical visit scores and never lets one run speak for the others.
 //
-// Measured on CircleCI (e2e-real), performance medians, 5 runs per page unless noted:
-//   pipeline 127: `/` 89 (runs 79 to 92), /about 93, /book 92, /data 94
-//   pipeline 137: `/` 77 (runs 80, 66, 77, 75, 78; LCP median 3.3 s), /about 91, /book 90, /data 90
-//   pipeline 113 (3 runs): `/` 84.
-// Accessibility, best practices and SEO were 100 on every run. The other three pages clear 0.85 by a
-// wide margin; `/` swings between 77 and 89 on the same kind of runner, so it does not pass reliably.
+// Measured on CircleCI (e2e-real), performance, 5 runs per page unless noted (the numbers are read from
+// the `lighthouse/` artifacts of each job):
+//   pipeline 127: `/` median 89 (runs 79 to 92)  /about 93   /book 92   /data 94
+//   pipeline 137: `/` median 77 (80, 66, 77, 75, 78; LCP median 3.3 s)   /about 91   /book 90   /data 90
+//   pipeline 139: `/` median 86 (77, 81, 86, 87, 89; LCP median 3.3 s)   /about 92   /book 94   /data 92
+//   pipeline 113 (3 runs): `/` median 84.
+// Accessibility, best practices and SEO were 100 on every run of every page. The three other pages clear
+// 0.85 with margin in every sample; `/` has medians of 84, 89, 77 and 86, so it does not pass reliably.
 //
-// `/` performance is therefore REPORT-ONLY (`warn`): a hard gate on a page that fails one run in
-// three would be a flaky gate, and the budget (0.85) and the aggregation (`median`) are not to be
-// changed to hide that. The fix is the page (its largest contentful paint is the hero paragraph);
-// change `/`'s level to `error` once its CI median holds above 0.85 across several runs. Every other
-// assertion is a hard gate.
+// `/` performance is therefore REPORT-ONLY (`warn`): a hard gate on a page that misses in one sample of
+// three or four would be a flaky gate, and the budget (0.85) and the aggregation (`median`) are not to be
+// changed to hide that. The fix is the page (its largest contentful paint is the hero paragraph). After
+// the hero change has merged, measure 5 CI runs on main and change `/`'s level to `error` only if the
+// median passes with margin. Every other assertion is a hard gate.
 const base = process.env.LHCI_BASE_URL || "http://localhost:3100";
 const paths = ["/", "/book", "/about", "/data"];
 const min = (key, fallback) => Number(process.env[key] || fallback);

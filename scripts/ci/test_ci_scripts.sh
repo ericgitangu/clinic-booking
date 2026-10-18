@@ -314,6 +314,16 @@ bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
 expect "prune: a failing revision lookup exits non-zero" "$([ "$rc" -ne 0 ] && echo failed)" failed
 expect "prune: a failing revision lookup deletes nothing and removes no tag" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
 rm -f "$FX/revfail"
+prune_fx undigested
+echo "[$(img sha256:bbb sha-b),$(img sha256:aaa ""),$(img sha256:ooo "")]" > "$FX/images.json"
+jq -n '{"rev-b":"r/clinic-api@sha256:bbb","rev-p":"us-east4-docker.pkg.dev/p/clinic/clinic-api:latest","rev-a":"r/clinic-api@sha256:aaa","rev-o":"r/clinic-api@sha256:ooo"}' > "$FX/revision_images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a kept revision of our image with no digest fails closed (exit 1, says why)" "$rc:$(grep -c 'does not resolve to a digest' "$FX/out")" "1:1"
+expect "prune: ...and deletes nothing, removes no tag" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
+jq -n '{"rev-b":"r/clinic-api@sha256:bbb","rev-p":"","rev-a":"r/clinic-api@sha256:aaa","rev-o":"r/clinic-api@sha256:ooo"}' > "$FX/revision_images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a kept revision that reports no image fails closed (exit 1)" "$rc:$(grep -c 'reports no image' "$FX/out")" "1:1"
+expect "prune: ...and deletes nothing" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
 bash "$HERE/prune.sh" --bogus >/dev/null 2>&1
 expect "prune: an unknown flag is a usage error (exit 2)" "$?" 2
 

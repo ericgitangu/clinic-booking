@@ -79,6 +79,8 @@ else
   rm -rf "$LH_DIR/.lighthouseci"
   pnpm --dir "$LH_DIR" install --frozen-lockfile --ignore-scripts
   pnpm --dir "$LH_DIR" exec lhci autorun --config="$ROOT/scripts/ci/lighthouserc.cjs" || rc=$?
+  # Report only: the table in the log is for people; the budgets were judged by lhci above, so a
+  # failure to print it must not change the result.
   node "$LH_DIR/summary.mjs" "$LHCI_OUTPUT_DIR" || true
 fi
 exit "$rc"

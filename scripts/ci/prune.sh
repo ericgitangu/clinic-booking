@@ -41,11 +41,20 @@ die() { echo "prune: $* (nothing was changed)" >&2; exit 1; }
 change() { # run a mutating gcloud call, or only say so under --dry-run
   if [ "$DRY" = 1 ]; then echo "dry-run: would run: gcloud $* --project $PROJECT"; else g "$@"; fi
 }
-digest_of_revision() { # the sha256:... a revision runs; empty when it runs something else
+REGISTRY_PREFIX="${REPO%/*}/"   # everything in our Artifact Registry repository starts with this
+digest_of_revision() { # the sha256:... a revision runs
+  # Fail closed: a revision of OUR image that does not resolve to a digest cannot be protected, so
+  # the whole prune stops. Only an image from another registry (the hello placeholder of the first
+  # release) is allowed to have no digest here: it is not ours to delete and not a candidate.
   local image
   image="$(g run revisions describe "$1" --region "$REGION" --format='value(spec.containers[0].image)')" \
     || die "cannot read revision $1"
-  case "$image" in *@*) printf '%s' "${image##*@}" ;; esac
+  [ -n "$image" ] || die "revision $1 reports no image"
+  case "$image" in
+    *@sha256:*) printf '%s' "${image##*@}" ;;
+    "$REGISTRY_PREFIX"*) die "revision $1 runs $image, which does not resolve to a digest" ;;
+    *) echo "prune: revision $1 runs a foreign image ($image); it is not ours to delete" >&2 ;;
+  esac
 }
 
 state="$(cat "$OUT/state" 2>/dev/null || true)"
