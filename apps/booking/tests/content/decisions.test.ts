@@ -15,6 +15,22 @@ describe("decisions content", () => {
     expect(new Set(DECISIONS.map((d) => d.id)).size).toBe(DECISIONS.length);
   });
 
+  it("keeps the anchor ids stable, because the README, docs and scripts link to them", () => {
+    expect(DECISIONS.map((d) => d.id)).toEqual([
+      "double-booking",
+      "one-api",
+      "time",
+      "rest-and-errors",
+      "polling-then-push",
+      "thin-web-layer",
+      "hosting-and-cost",
+      "go",
+      "one-hour-rule",
+      "veto-and-lock",
+    ]);
+    for (const d of DECISIONS) expect(d.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+
   it("gives every written entry all four parts", () => {
     expect(FILLED.length).toBeGreaterThan(0);
     for (const d of FILLED) {

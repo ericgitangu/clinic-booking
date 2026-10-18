@@ -83,9 +83,13 @@ test("the header and the footer both reach /decisions", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("the footer no longer points into docs/adr", async ({ page }) => {
+test("the footer sends decision readers to this page, not into the repo tree", async ({
+  page,
+}) => {
   await page.goto("/decisions");
-  await expect(page.locator('footer a[href*="docs/adr"]')).toHaveCount(0);
+  await expect(page.locator('footer a[href*="/tree/main/docs"]')).toHaveCount(
+    0,
+  );
 });
 
 test("is in the sitemap and carries its own title and canonical", async ({

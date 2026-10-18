@@ -7,7 +7,7 @@
 #
 # Exit 0 when the revision is healthy, 1 when it is not (the caller rolls back).
 #
-# The gateway runs at most two instances with one stream each (docs/adr/0021), and /health needs an
+# The gateway runs at most two instances with one stream each (/decisions#go), and /health needs an
 # instance like any other request. When two people have the live feed open, Cloud Run has nowhere
 # to send /health and answers it itself: 429, or 500/503 "no available instance". That is a full
 # service, not a broken one, so:

@@ -514,7 +514,7 @@ live_checks() {
         c5_head="$(ar_headroom_bytes "$c5_size" "$c5_go" "$SECRET_VERSIONS_LIVE")"
         pass "C5 AR repository sizeBytes=$c5_size, headroom $c5_head B under the $c5_ceil B ceiling ($SECRET_VERSIONS_LIVE live secret versions leave \$$(dollars $((COST_CEILING_MICRODOLLARS - SECRET_VERSIONS_LIVE * SECRET_VERSION_MICRODOLLARS))) of the \$$(dollars "$COST_CEILING_MICRODOLLARS") total; go images in repository: $c5_go, projected add: $([ "$c5_go" = yes ] && echo 0 || echo $((AR_GO_VERSIONS * AR_GO_IMAGE_BYTES))) B)"
       else
-        fail "C5 AR the approved total \$$(dollars "$COST_CEILING_MICRODOLLARS") a month cannot hold: $SECRET_VERSIONS_LIVE live secret versions cost \$$(dollars $((SECRET_VERSIONS_LIVE * SECRET_VERSION_MICRODOLLARS))) and the registry's $c5_size B about \$$(dollars "$c5_ar_micro"), over the $c5_ceil B ceiling (Go images already pushed: $c5_go; if not, $((AR_GO_VERSIONS * AR_GO_IMAGE_BYTES)) B are added). The engineer decides: reclaim storage, drop a secret version, or raise the approved total in COST_CEILING_MICRODOLLARS with an ADR note."
+        fail "C5 AR the approved total \$$(dollars "$COST_CEILING_MICRODOLLARS") a month cannot hold: $SECRET_VERSIONS_LIVE live secret versions cost \$$(dollars $((SECRET_VERSIONS_LIVE * SECRET_VERSION_MICRODOLLARS))) and the registry's $c5_size B about \$$(dollars "$c5_ar_micro"), over the $c5_ceil B ceiling (Go images already pushed: $c5_go; if not, $((AR_GO_VERSIONS * AR_GO_IMAGE_BYTES)) B are added). The engineer decides: reclaim storage, drop a secret version, or raise the approved total in COST_CEILING_MICRODOLLARS with a dated note in README section 10."
       fi
     fi
   fi

@@ -1,4 +1,4 @@
-// Command realtime is the admin live-feed gateway (docs/adr/0021).
+// Command realtime is the admin live-feed gateway (/decisions#go).
 package main
 
 import (

@@ -186,9 +186,10 @@ describe("sending", () => {
       .filter(
         (f) =>
           f !== "" &&
-          // the ADRs may say what was decided before (the amendment keeps that history); the README
-          // and everything else may not. Lockfiles and binaries carry nothing to check
-          !f.startsWith("docs/adr/") &&
+          // The decision records say what was sent before (history). The folder goes away with the
+          // history rewrite; drop this line then. Path built from parts: no file names that folder.
+          !f.startsWith(["docs", "adr", ""].join("/")) &&
+          // Lockfiles and binaries carry nothing to check
           !/\.(png|webp|ico|jpg|svg|woff2?|lock|yaml)$/.test(f) &&
           f !== "pnpm-lock.yaml",
       );

@@ -108,7 +108,7 @@ step_service() {
       --add-custom-audiences=clinic-api \
       --quiet
   fi
-  # The live-feed gateway (docs/adr/0021), in the shape ship-realtime deploys and cost_check pins:
+  # The live-feed gateway (/decisions#go), in the shape ship-realtime deploys and cost_check pins:
   # scale from zero to at most two instances, one stream each, 0.25 vCPU, request-based billing.
   # Needs the runtime SA from terraform apply (infra/terraform/realtime.tf).
   if exists gcloud run services describe clinic-realtime --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then

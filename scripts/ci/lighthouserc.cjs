@@ -1,4 +1,4 @@
-// Lighthouse CI config (docs/adr/0026). Run by scripts/ci/lighthouse.sh against the booking app's
+// Lighthouse CI config. Run by scripts/ci/lighthouse.sh against the booking app's
 // production build served by `next start`.
 //
 // Budgets are minimum category scores (0..1). Aggregation is `median` on purpose: the median of each

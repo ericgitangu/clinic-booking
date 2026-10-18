@@ -1,6 +1,6 @@
 # Runbook: the admin app and who may use it
 
-The admin app (`apps/admin`, Vercel project `clinic-admin`, host `clinic-admin.ericgitangu.com`) shows the clinic dashboard. Who may open it is decided by role: `owner`, `admin` or `viewer` (see ADR-0030). The owner is the address in `ADMIN_EMAILS`; everyone else is added by the owner on the Access page.
+The admin app (`apps/admin`, Vercel project `clinic-admin`, host `clinic-admin.ericgitangu.com`) shows the clinic dashboard. Who may open it is decided by role: `owner`, `admin` or `viewer` (roles are checked on every request, as the [thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer) says). The owner is the address in `ADMIN_EMAILS`; everyone else is added by the owner on the Access page.
 
 ## Variables
 

@@ -11,7 +11,7 @@ because the machine's active account is a different one:
 ```bash
 export PROJECT=sil-clinic-booking
 export GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com
-export WEB=https://clinic.ericgitangu.com   # the booking app (ADR-0028); the admin app is https://clinic-admin.ericgitangu.com
+export WEB=https://clinic.ericgitangu.com   # the booking app; the admin app is https://clinic-admin.ericgitangu.com
 export PUBLIC_API="$WEB/api"
 ```
 
@@ -43,7 +43,7 @@ second so the two never disagree.
 
 ## Database
 
-Migrations are expand-only (ADR-0015), so rolling the API back never needs a schema rollback:
+Migrations are expand-only (the app role has no DDL rights), so rolling the API back never needs a schema rollback:
 old code runs against the newer schema. Do not run `alembic downgrade` against prod. A bad
 data change is fixed forward with a new migration.
 

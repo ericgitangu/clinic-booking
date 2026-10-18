@@ -51,7 +51,7 @@ current state; may succeed later or in another state.
 | DB_UNAVAILABLE | 503 | db-unavailable | Database unavailable | Connection failure or pool timeout. Retry after a short delay. |
 | INTERNAL_ERROR | 500 | internal-error | Internal error | An unexpected error. Any ck_* violation lands here as a bug. |
 
-Idempotency (ADR-0013): `Idempotency-Key` is read on `POST /appointments` and
+Idempotency: `Idempotency-Key` is read on `POST /appointments` and
 `POST /internal/me/appointments`, scoped to the patient. The same key with the same doctor and
 time replays the booking with `Idempotent-Replayed: true`; a different doctor or time is
 `IDEMPOTENCY_KEY_REUSED`; a key whose appointment has left `booked` is

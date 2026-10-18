@@ -796,7 +796,7 @@ jobs:
           destination: playwright-booking
           when: always
       - run:
-          name: Lighthouse budgets on / /book /about /data (production build, docs/adr/0026)
+          name: Lighthouse budgets on / /book /about /data (production build)
           command: |
             # Same build and API as the scenarios above; chromium is the Playwright one. lhci is
             # pinned inside the script. The result is recorded, not raised, so the reports are
@@ -1069,7 +1069,7 @@ jobs:
       - run:
           name: IAM deny-proof, direct run.app (403 anonymous, 401 junk bearer; no credentials)
           command: |
-            # Written as a redacted record and kept as an artifact (docs/adr/0016 proof, docs/evidence).
+            # Written as a redacted record and kept as an artifact (the saved WIF-deny and context-deny logs the keyless deploy rule asks for, see docs/evidence).
             mkdir -p /tmp/evidence
             bash scripts/ci/deny_probe.sh run-app /tmp/evidence/iam-deny-run-app.txt
       - store_artifacts:
@@ -1078,7 +1078,7 @@ jobs:
           when: always
 
   zap-prod:
-    # ZAP baseline against the live site once the release is verified (docs/adr/0017). Passive only,
+    # ZAP baseline against the live site once the release is verified (security testing). Passive only,
     # read-only against production: it spiders for one minute and inspects responses. Same image
     # digest and rules file as the PR dast job; exit 0/2 pass, 1/3 fail.
     machine:
@@ -1116,7 +1116,7 @@ jobs:
 
   wif-deny-probe:
     # Runs only on the test/wif-deny branch (workflow wif-deny), on the empty oidc-probe context:
-    # the token exchange must be refused and no deploy variable may be present (docs/adr/0016).
+    # the token exchange must be refused and no deploy variable may be present (the keyless deploy rule, /decisions#keyless-deploy).
     docker:
       - image: mirror.gcr.io/cimg/base:current
     resource_class: small

@@ -34,7 +34,7 @@ plain text here because the page does not exist on main until #69 merges.
 
 | Claim | Checked against |
 |---|---|
-| The brief offers FastAPI or Go | The assessment line quoted in the original gateway ADR ("REST API in FastAPI, DRF or Go"); the brief itself is not in the repository, so the engineer should confirm the wording. |
+| The brief offers FastAPI or Go | The assessment line quoted when the gateway was first designed ("REST API in FastAPI, DRF or Go"); the brief itself is not in the repository, so the engineer should confirm the wording. |
 | Every write stays in FastAPI | Migration `backend/migrations/versions/0014_realtime_reader_role.py` grants SELECT only; `backend/tests/integration/test_realtime_role.py` logs in as `clinic_realtime` and gets SQLSTATE 42501 for every insert, update, delete, DDL and for every column or table outside the grant; `services/realtime/internal/store/readonly_test.go` fails if any Go source sends a non-SELECT statement or calls a writing driver method (mutation-checked). |
 | Patient events carry no personal data | `backend/app/schemas/events.py` (`SlotEvent`: `extra="forbid"`, fields `doctor_id`, `local_date`, `starts_at`, `kind`, `seq`), `contracts/events/slot-event.v1.schema.json`, and the banned-name check in `backend/tests/unit/test_realtime_domain.py`. |
 | The old Ably admin channel carries no personal data either | `AdminEvent` in the same file. It is still published by the relay and nothing subscribes to it now; turning that publish off would save Ably messages. |

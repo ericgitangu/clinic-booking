@@ -1,6 +1,6 @@
 # Architecture overview
 
-Diagrams for the system as built, checked against the code and the ADRs. Names in the diagrams are the real ones (jobs in `.circleci/config.yml`, services in `infra/`, modules under `backend/app/`). Status of each part is in the table after the container diagram, because three parts are described in ADRs and pull requests that may not be running yet.
+Diagrams for the system as built, checked against the code. Names in the diagrams are the real ones (jobs in `.circleci/config.yml`, services in `infra/`, modules under `backend/app/`). Status of each part is in the table after the container diagram, because three parts are described in pull requests and may not be running yet.
 
 ## 1. Context
 
@@ -57,22 +57,22 @@ flowchart LR
 
 Reading it:
 
-- **The browser never calls Cloud Run.** The only public entry points are the two Vercel projects. Cloud Run has no `allUsers` invoker; a direct request gets a 403 ([ADR-0023](../adr/0023-zero-cost-edge-front-door.md)).
+- **The browser never calls Cloud Run.** The only public entry points are the two Vercel projects. Cloud Run has no `allUsers` invoker; a direct request gets a 403 ([the hosting and cost decision](https://clinic.ericgitangu.com/decisions#hosting-and-cost)).
 - **Vercel to Cloud Run uses federation, not a key.** The app exchanges Vercel's OIDC token at Google STS and then calls IAM `generateIdToken` for the `clinic-api` audience (`packages/api/src/proxy/gcp-id-token.ts`). The token is cached until five minutes before it expires.
-- **Two layers on `/internal/*`.** The ID token gets the request past IAM. A second, signed assertion (`X-Internal-Assertion`, `packages/api/src/assertion.ts`) says who the caller is and with which role; the API checks it and checks the role again in the database ([ADR-0030](../adr/0030-staff-roles-and-access.md)).
+- **Two layers on `/internal/*`.** The ID token gets the request past IAM. A second, signed assertion (`X-Internal-Assertion`, `packages/api/src/assertion.ts`) says who the caller is and with which role; the API checks it and checks the role again in the database ([the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)).
 - **The public `/api` proxy** forwards the brief's REST endpoints, denies `/internal` in every spelling, and rate-limits per client at 120 requests a minute per instance (`packages/api/src/proxy/rate-limit.ts`).
 
 ### What is running and what is declared
 
 | Part | Status | Where it is described |
 |---|---|---|
-| FastAPI service, Neon, the two Vercel apps, Google sign-in, reCAPTCHA per action | Running | ADRs 0002, 0014, 0023, 0024, 0029 |
-| Idempotency keys, shell-only PWA, 15 second polling | Running | ADRs 0013, 0010, 0009 |
-| Resend email and reminders | Merged (PR 27); booking and cancellation emails verified live 2026-10-18, the daily reminder's first send unconfirmed | [ADR-0025](../adr/0025-email-with-resend.md) |
-| Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
-| Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
-| Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | ADRs 0007, 0026, 0017 |
-| Go gateway for the staff live feed (README 3.7) | Merged (PR 71) and deployed: `clinic-realtime` is Ready in Cloud Run (0.25 vCPU, at most 2 instances, concurrency 1, read on 2026-10-19); the cost per connected hour is not yet measured | [ADR-0021](../adr/0021-go-realtime-gateway.md) |
+| FastAPI service, Neon, the two Vercel apps, Google sign-in, reCAPTCHA per action | Running | [one API](https://clinic.ericgitangu.com/decisions#one-api), [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost), [thin web layer](https://clinic.ericgitangu.com/decisions#thin-web-layer) |
+| Idempotency keys, shell-only PWA, 15 second polling | Running | [thin web layer](https://clinic.ericgitangu.com/decisions#thin-web-layer), [polling then push](https://clinic.ericgitangu.com/decisions#polling-then-push) |
+| Resend email and reminders | Merged (PR 27); booking and cancellation emails verified live 2026-10-18, the daily reminder's first send unconfirmed | README section 4.3 |
+| Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [polling then push](https://clinic.ericgitangu.com/decisions#polling-then-push) |
+| Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [polling then push](https://clinic.ericgitangu.com/decisions#polling-then-push) |
+| Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors) |
+| Go gateway for the staff live feed (README 3.7) | Merged (PR 71) and deployed: `clinic-realtime` is Ready in Cloud Run (0.25 vCPU, at most 2 instances, concurrency 1, read on 2026-10-19); the cost per connected hour is not yet measured | [the Go decision](https://clinic.ericgitangu.com/decisions#go) |
 
 ## 3. Booking, with an idempotency key and the unique index
 
@@ -108,7 +108,7 @@ sequenceDiagram
   W-->>B: confirmation, or the typed error
 ```
 
-The server action sends the same attempt key for every retry of one attempt and a new key when the doctor or time changes, because the API binds a key to the doctor and time it first came with (`apps/booking/src/components/booking/use-attempt-key.ts`). There is no "is the slot free?" query before the insert: the partial unique index is the arbiter ([ADR-0003](../adr/0003-double-booking-partial-unique-index.md), [ADR-0013](../adr/0013-idempotency-keys.md), `backend/app/services/booking.py`).
+The server action sends the same attempt key for every retry of one attempt and a new key when the doctor or time changes, because the API binds a key to the doctor and time it first came with (`apps/booking/src/components/booking/use-attempt-key.ts`). There is no "is the slot free?" query before the insert: the partial unique index is the arbiter ([the double booking decision](https://clinic.ericgitangu.com/decisions#double-booking), `backend/app/services/booking.py`).
 
 ## 4. A booked slot reaching other open pages
 
@@ -167,16 +167,16 @@ sequenceDiagram
   C->>V: smoke-public, then cost-check
 ```
 
-Only `main` can deploy: the deploy contexts are restricted to the branch, and so is the workload identity federation condition, so editing the config on a branch gains nothing ([ADR-0016](../adr/0016-cicd-circleci-keyless-deploy.md)). The release also prunes Artifact Registry to the serving image and the rollback image (the first real run on 2026-10-18 kept exactly those two). The admin half of the web deploy, its rollback and the public checks that follow need `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context (PR 46 split the Vercel token per project); until it is added they have not run on a release. Rollback refuses to go to the placeholder image or when something else has moved traffic ([`docs/runbooks/rollback.md`](../runbooks/rollback.md)).
+Only `main` can deploy: the deploy contexts are restricted to the branch, and so is the workload identity federation condition, so editing the config on a branch gains nothing. The release also prunes Artifact Registry to the serving image and the rollback image (the first real run on 2026-10-18 kept exactly those two). The admin half of the web deploy, its rollback and the public checks that follow need `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context (PR 46 split the Vercel token per project); until it is added they have not run on a release. Rollback refuses to go to the placeholder image or when something else has moved traffic ([`docs/runbooks/rollback.md`](../runbooks/rollback.md)).
 
 ## 6. Data handling
 
 | Data | Where | Why | Notes |
 |---|---|---|---|
-| Patient name, optional phone and email, appointments, cancellation reason | Neon Postgres | The product | `appointment_events` is the audit trail; logs carry a `request_id` and no PII ([ADR-0019](../adr/0019-observability.md)) |
-| Google subject, verified email, display name | Neon (`patient_accounts`, `staff_access`); a stateless session cookie in the browser | Sign-in and ownership of appointments | Better Auth keeps no auth database ([ADR-0024](../adr/0024-google-sign-in-with-better-auth.md)) |
-| reCAPTCHA token | Sent to Google for an assessment, never stored by the app | The human check on book, cancel and reschedule | No secret is stored: the call uses the Vercel identity ([ADR-0029](../adr/0029-booking-flow.md)) |
+| Patient name, optional phone and email, appointments, cancellation reason | Neon Postgres | The product | `appointment_events` is the audit trail; logs carry a `request_id` and no PII |
+| Google subject, verified email, display name | Neon (`patient_accounts`, `staff_access`); a stateless session cookie in the browser | Sign-in and ownership of appointments | Better Auth keeps no auth database ([the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)) |
+| reCAPTCHA token | Sent to Google for an assessment, never stored by the app | The human check on book, cancel and reschedule | No secret is stored: the call uses the Vercel identity |
 | Slot events: doctor, local date, start time, `taken` or `freed`, a sequence id | Ably | Live slot lists | No appointment or patient identifier; contract in `contracts/events/`. Running |
-| Patient name, doctor and time, sent to the signed-in patient's own verified address | Resend | Acknowledgements and a reminder the evening before, from `reminders@mail.ericgitangu.com` (a verified subdomain) | Only linked, verified accounts are mailed; Resend keeps sent-mail records under its own retention ([ADR-0025](../adr/0025-email-with-resend.md)). Merged (PR 27); booking and cancellation emails verified live 2026-10-18 |
+| Patient name, doctor and time, sent to the signed-in patient's own verified address | Resend | Acknowledgements and a reminder the evening before, from `reminders@mail.ericgitangu.com` (a verified subdomain) | Only linked, verified accounts are mailed; Resend keeps sent-mail records under its own retention. Merged (PR 27); booking and cancellation emails verified live 2026-10-18 |
 
-The public REST API has no patient authentication: the brief is silent on it and I kept the public API open so Swagger's Try it out works. Anyone holding an appointment or patient UUID can read or change it there ([ADR-0012](../adr/0012-identity-and-abuse-controls-deferred.md)); the README's section 10 states this.
+The public REST API has no patient authentication: the brief is silent on it and I kept the public API open so Swagger's Try it out works. Anyone holding an appointment or patient UUID can read or change it there ([the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)); the README's section 10 states this.

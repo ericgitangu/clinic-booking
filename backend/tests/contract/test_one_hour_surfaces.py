@@ -3,7 +3,7 @@
 422 BOOKING_TOO_SOON is for a too-soon slot: a booking, or a reschedule's NEW time (validated as a
 fresh booking). 409 CHANGE_TOO_LATE is for changing or cancelling a visit whose CURRENT start is
 within the hour. An earlier draft said a reschedule's new slot is a 409; this fails if any surface
-(README, docs, the ADRs, the apps' copy, the landing page evidence, the OpenAPI contract, the
+(README, docs, the apps' copy, the landing page evidence, the OpenAPI contract, the
 catalogue) says that again. A sentence (or a whole wrapped paragraph) that talks about moving or
 rescheduling to a new time and carries a 409 / CHANGE_TOO_LATE / "conflict" must also name the
 422 / BOOKING_TOO_SOON it contrasts with; paraphrases, word order and line wraps do not get past it,
@@ -64,7 +64,9 @@ BANNED = (
 
 
 def _docs() -> list[pathlib.Path]:
-    out = [p for p in (ROOT / "docs").rglob("*.md") if "internal" not in p.parts]
+    # "adr" is the decision-record folder: history that goes away with the history rewrite, so it
+    # is not scanned (a stale sentence there cannot reach a reader of the README or the site).
+    out = [p for p in (ROOT / "docs").rglob("*.md") if not {"internal", "adr"} & set(p.parts)]
     return sorted(out)
 
 
@@ -168,22 +170,13 @@ def violations(surfaces: list[tuple[str, str]]) -> list[str]:
     bad: list[str] = []
     for name, text in surfaces:
         for phrase in BANNED:
-            if phrase in text and not _is_dated_history(name, text, phrase):
+            if phrase in text:
                 bad.append(f"{name}: banned phrase {phrase!r}")
         segments = _code_segments(text) if name.endswith(CODE_SUFFIXES) else []
         for seg in segments + _segments(text):
             if _paraphrase(seg):
                 bad.append(f"{name}: new slot paired with 409/CHANGE_TOO_LATE: {seg[:120]!r}")
     return bad
-
-
-def _is_dated_history(name: str, text: str, phrase: str) -> bool:
-    """The ADRs are history: an old sentence may stay if a dated amendment (2026-10-19 or later)
-    corrects it. None of the banned phrases is allowed in the amendment itself."""
-    if not name.startswith("docs/adr/"):
-        return False
-    head, _, amendment = text.partition("(2026-10-19)")
-    return bool(amendment) and phrase not in amendment and phrase in head
 
 
 def test_no_surface_says_a_reschedules_new_slot_is_a_409() -> None:
@@ -199,8 +192,6 @@ def test_the_rule_is_stated_the_same_way_where_it_is_described() -> None:
     )
     api_errors = (ROOT / "docs/api-errors.md").read_text()
     assert "422 BOOKING_TOO_SOON" in api_errors and "409 CHANGE_TOO_LATE" in api_errors
-    adr = (ROOT / "docs/adr/0008-appointment-lifecycle-and-reschedule.md").read_text()
-    assert "its new start stays `422 BOOKING_TOO_SOON`" in adr
 
 
 def test_the_checker_catches_the_old_wording() -> None:
@@ -217,7 +208,7 @@ def test_the_checker_catches_the_old_wording() -> None:
             "its current start and the new start) begins less than 60 minutes from now.",
         ),
         ("docs/api-errors.md", "Cancel, or reschedule from or to, a time under 60 minutes away."),
-        ("docs/adr/0008-x.md", "The contract in one line is **422 on book, 409 on change**."),
+        ("docs/engineering/x.md", "The contract in one line is **422 on book, 409 on change**."),
     ]
     for name, text in old:
         assert violations([(name, text)]), name

@@ -13,7 +13,7 @@ const insertEvent = `INSERT INTO appointment_events
   (appointment_id, doctor_id, event_type, to_starts_at, local_date)
   VALUES ($1, $2, 'booked', now() + interval '2 days', current_date + 2) RETURNING id`
 
-// docs/adr/0009 / docs/adr/0018: identity ids are assigned at write time, not commit time. Transaction A
+// The commit-safe cursor and the race-proof testing rule: identity ids are assigned at write time, not commit time. Transaction A
 // writes first (lower id, lower txid) and commits last. A naive `id > last` reader that has seen
 // B's row skips A forever; the horizon cursor withholds B until A has finished and then delivers
 // both, in order, exactly once.
