@@ -40,9 +40,7 @@ export default async function BookPage() {
               className="lift-card flex flex-col rounded-xl border border-border bg-card p-5"
             >
               <div className="flex items-center gap-4">
-                <span aria-hidden="true">
-                  <DoctorAvatar doctorId={d.id} name={d.full_name} size={56} />
-                </span>
+                <DoctorAvatar doctorId={d.id} name={d.full_name} size={56} />
                 <div>
                   <h2 className="font-heading text-xl font-semibold">
                     {d.full_name}
@@ -62,6 +60,9 @@ export default async function BookPage() {
           ))}
         </ul>
       )}
+      <p className="mt-8 text-sm text-muted-foreground">
+        The doctors are fictional. Their portraits are AI-generated.
+      </p>
     </section>
   );
 }

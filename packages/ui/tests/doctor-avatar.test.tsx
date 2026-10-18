@@ -11,6 +11,8 @@ import {
   DOCTOR_AVATARS,
   doctorAvatarSrc,
   doctorInitials,
+  doctorPhoto,
+  PORTRAIT_DISCLOSURE,
 } from "../src/lib/doctor-avatar";
 
 // The seed is the truth: backend/app/scripts/seed.py (uuid5 of "doctor:<key>").
@@ -32,14 +34,30 @@ describe("avatar map", () => {
     );
   });
 
-  it("has one source file per id, and a byte-identical static copy in each app", () => {
+  it("has a portrait (both sizes) and a fallback illustration for every seeded id", () => {
+    for (const id of Object.keys(SEEDED)) {
+      expect(doctorPhoto(id), id).toEqual({
+        src: `/doctors/${id}-256.webp`,
+        srcSet: `/doctors/${id}-256.webp 1x, /doctors/${id}-512.webp 2x`,
+      });
+    }
+    expect(doctorPhoto("nope")).toBeNull();
+    expect(doctorPhoto("constructor")).toBeNull();
+  });
+
+  it("has one source set per id, and a byte-identical static copy of every file in each app", () => {
     const dir = fileURLToPath(new URL("../assets/doctors/", import.meta.url));
     const files = readdirSync(dir).filter((f) =>
       /\.(svg|webp|png|jpe?g|avif)$/.test(f),
     );
-    expect(files.map((f) => f.replace(/\.[^.]+$/, "")).sort()).toEqual(
+    const idOf = (f: string) => f.replace(/(-(256|512))?\.[^.]+$/, "");
+    expect([...new Set(files.map(idOf))].sort()).toEqual(
       Object.keys(DOCTOR_AVATARS).sort(),
     );
+    for (const id of Object.keys(SEEDED)) {
+      for (const f of [`${id}.svg`, `${id}-256.webp`, `${id}-512.webp`])
+        expect(files, f).toContain(f);
+    }
     for (const app of ["booking", "admin"]) {
       const pub = fileURLToPath(
         new URL(`../../../apps/${app}/public/doctors/`, import.meta.url),
@@ -55,9 +73,13 @@ describe("avatar map", () => {
   });
 
   it("never inlines image bytes", () => {
-    for (const src of Object.values(DOCTOR_AVATARS)) {
+    for (const src of [
+      ...Object.values(DOCTOR_AVATARS),
+      ...Object.keys(SEEDED).map((id) => doctorPhoto(id)!.srcSet),
+    ]) {
+      expect(src).not.toContain("data:");
       expect(src.startsWith("/doctors/")).toBe(true);
-      expect(src.length).toBeLessThan(60);
+      expect(src.length).toBeLessThan(140);
     }
   });
 
@@ -86,7 +108,12 @@ describe("DoctorAvatar", () => {
     expect(html).toContain('width="48"');
     expect(html).toContain('height="48"');
     expect(html).toContain("rounded-full");
-    expect(html).toContain(`src="/doctors/${id}.svg"`);
+    expect(html).toContain(`src="/doctors/${id}-256.webp"`);
+    expect(html).toContain(
+      `srcSet="/doctors/${id}-256.webp 1x, /doctors/${id}-512.webp 2x"`,
+    );
+    // The disclosure is the image's description (title), not part of the alt text.
+    expect(html).toContain(`title="${PORTRAIT_DISCLOSURE}"`);
   });
 
   it("falls back to initials for an unknown id", () => {
@@ -103,7 +130,7 @@ describe("DoctorAvatar", () => {
     const ok = DoctorAvatarView({
       name,
       size: 40,
-      src: doctorAvatarSrc(id),
+      src: doctorPhoto(id)!.src,
       onError: () => {},
     });
     expect(

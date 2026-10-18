@@ -280,6 +280,24 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Cost disclosure.** The GCP project shares a billing account with other projects, whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers, so this project bills about $0.34 a month there (accepted; the Artifact Registry size bound is 450 MB, see the 2026-10-18 amendment in ADR-0014); Cloud Run compute and egress stay within the free tier. I approved a ceiling of about $0.34 a month. A $3 Cloud Run spend cap is set in the cloud console (status Configured, recorded in [`docs/evidence/spend-cap-2026-10-18.md`](docs/evidence/spend-cap-2026-10-18.md)), and `cost_check.sh --live` checks that the two budgets exist (it needs a billing login, so it runs locally); that the cap action is on can only be confirmed in the console. Ably's free package needs no payment method ([evidence](docs/evidence/ably-no-payment-method-2026-10-18.md)). The $0 rule was my own constraint, not the brief's. The reasoning, the region audit and the recount are in [ADR-0014](docs/adr/0014-hosting-region-and-cost.md) and [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md); `cost_check.sh` is the guard.
 
+### Doctor portraits (AI-generated)
+
+The portraits of the five seeded doctors are **AI-generated images of fictional people**. They are not photographs of anyone real, and the doctors do not exist. Patients never get a generated face: a patient's avatar is their Google picture, or their initials.
+
+- **Model and run.** Z-Image-Turbo (`Tongyi-MAI/Z-Image-Turbo`) through the Hugging Face Space `mcp-tools/Z-Image-Turbo` (gradio `/generate`), on 2026-10-18. 1024x1024, steps 8, shift 3.0, fixed seed 2026. The files served are WebP at 256 and 512 px with EXIF stripped; the 1024 px originals are not kept in the repository.
+- **Licence.** Apache License 2.0. The model card header reads `license: apache-2.0` ([model card](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)); the card is not gated and adds no terms about generated images. Apache 2.0 allows commercial use and does not restrict outputs.
+- **Prompt template** (verbatim): "Professional corporate headshot photograph, {who}, wearing a crisp white doctor's coat over {wear}, stethoscope around neck, warm genuine smile, looking at camera, soft even studio lighting, plain light grey background, head and shoulders, centered, sharp focus, photorealistic, 85mm lens"
+
+| Doctor | {who} | {wear} |
+| --- | --- | --- |
+| Dr. Achieng Otieno | a Kenyan Black woman in her late 30s, general practitioner, short natural hair, small gold stud earrings | navy blouse |
+| Dr. Brian Kamau | a Kenyan Black man in his mid 30s, paediatrician, short cropped hair, friendly expression | light blue shirt |
+| Dr. Chebet Rotich | a Kenyan Black woman in her early 30s, dermatologist, neat braids tied back, clear radiant skin | teal scrubs |
+| Dr. David Mwangi | a Kenyan Black man in his late 40s, obstetrician gynaecologist, short greying hair, trimmed beard, reassuring expression | white shirt and dark tie |
+| Dr. Esther Njeri | a Kenyan Black woman in her early 40s, dentist, shoulder-length relaxed hair, bright smile | lilac scrubs |
+
+Fallbacks if a portrait fails to load: the CC0 illustration, then initials. Regenerate with `make avatars` ([`scripts/avatars/portraits.py`](scripts/avatars/portraits.py)); details and sources in [`packages/ui/assets/doctors/README.md`](packages/ui/assets/doctors/README.md) and [`docs/third-party.md`](docs/third-party.md).
+
 ## 11. AI reflection
 
 ### What I used AI for

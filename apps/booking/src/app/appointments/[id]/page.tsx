@@ -80,9 +80,7 @@ export default async function AppointmentPage({
         data-status={a.status}
         className="mt-6 flex items-start gap-4 rounded-xl border border-border bg-card p-5"
       >
-        <span aria-hidden="true">
-          <DoctorAvatar doctorId={a.doctor_id} name={doctorName} size={56} />
-        </span>
+        <DoctorAvatar doctorId={a.doctor_id} name={doctorName} size={56} />
         <div>
           <p className="text-xl font-semibold">{when}</p>
           <p className="mt-1 text-base text-muted-foreground">

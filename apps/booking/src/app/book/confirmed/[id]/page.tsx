@@ -72,13 +72,11 @@ export default async function Confirmed({
       </div>
       <div className="mt-6 flex items-start gap-4 rounded-xl border border-border bg-card p-5">
         {doctor.ok ? (
-          <span aria-hidden="true">
-            <DoctorAvatar
-              doctorId={appt.data.doctor_id}
-              name={doctor.data.full_name}
-              size={56}
-            />
-          </span>
+          <DoctorAvatar
+            doctorId={appt.data.doctor_id}
+            name={doctor.data.full_name}
+            size={56}
+          />
         ) : null}
         <div>
           <p className="text-xl font-semibold">

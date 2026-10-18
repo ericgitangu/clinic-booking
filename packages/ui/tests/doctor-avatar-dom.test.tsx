@@ -9,12 +9,30 @@ const NAME = "Dr. Achieng Otieno";
 afterEach(cleanup);
 
 describe("DoctorAvatar (stateful)", () => {
-  it("shows the image, then the initials once the image errors", () => {
+  it("shows the portrait, then the illustration, then the initials as each fails", () => {
     render(<DoctorAvatar doctorId={ID} name={NAME} size={48} />);
-    const img = screen.getByRole("img", { name: NAME });
-    expect(img.tagName).toBe("IMG");
+    const photo = screen.getByRole("img", { name: NAME });
+    expect(photo.tagName).toBe("IMG");
+    expect(photo.getAttribute("src")).toBe(`/doctors/${ID}-256.webp`);
+    expect(photo.getAttribute("srcset")).toBe(
+      `/doctors/${ID}-256.webp 1x, /doctors/${ID}-512.webp 2x`,
+    );
+    expect(photo.getAttribute("title")).toBe(
+      "AI-generated portrait of a fictional doctor",
+    );
+    expect(photo.getAttribute("width")).toBe("48");
 
-    fireEvent.error(img);
+    fireEvent.error(photo);
+
+    const svg = screen.getByRole("img", { name: NAME });
+    expect(svg.tagName).toBe("IMG");
+    expect(svg.getAttribute("src")).toBe(`/doctors/${ID}.svg`);
+    expect(svg.getAttribute("srcset")).toBeNull();
+    expect(svg.getAttribute("title")).toBe(
+      "Illustration of a fictional doctor",
+    );
+
+    fireEvent.error(svg);
 
     const fallback = screen.getByRole("img", { name: NAME });
     expect(fallback.tagName).toBe("SPAN");
@@ -31,8 +49,10 @@ describe("DoctorAvatar (stateful)", () => {
         name="Dr. Brian Kamau"
       />,
     );
-    expect(screen.getByRole("img", { name: "Dr. Brian Kamau" }).tagName).toBe(
-      "IMG",
+    const next = screen.getByRole("img", { name: "Dr. Brian Kamau" });
+    expect(next.tagName).toBe("IMG");
+    expect(next.getAttribute("src")).toBe(
+      "/doctors/412e6793-68f2-5c62-832d-cb7839acae9d-256.webp",
     );
   });
 });

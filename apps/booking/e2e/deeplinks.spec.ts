@@ -390,3 +390,54 @@ test("a booked visit whose time has passed is read-only", async ({
 
   await closeAll(me.context);
 });
+
+test("a doctor portrait that fails to load falls back to the illustration, then to initials", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
+  const page = await context.newPage();
+  await page.route("**/doctors/*.webp", (r) => r.abort());
+  await page.goto("/book");
+  const first = page.locator("li img").first();
+  await expect(first).toHaveAttribute("src", /\/doctors\/[0-9a-f-]{36}\.svg$/);
+  await expect(first).toHaveAttribute(
+    "title",
+    "Illustration of a fictional doctor",
+  );
+
+  await page.route("**/doctors/*.svg", (r) => r.abort());
+  await page.reload();
+  await expect(page.locator("li img")).toHaveCount(0);
+  await expect(page.getByRole("img", { name: /^Dr\. / }).first()).toBeVisible();
+  await context.close();
+});
+
+test("the photo disclosure is on the doctor list and in each portrait's description", async ({
+  page,
+}) => {
+  await page.goto("/book");
+  await expect(
+    page.getByText(
+      "The doctors are fictional. Their portraits are AI-generated.",
+    ),
+  ).toBeVisible();
+  const img = page.locator("li img").first();
+  await expect(img).toHaveAttribute(
+    "title",
+    "AI-generated portrait of a fictional doctor",
+  );
+  await expect(img).toHaveAttribute(
+    "srcset",
+    /-256\.webp 1x, .*-512\.webp 2x$/,
+  );
+  await expect(img).toHaveAttribute("alt", /^Dr\. /);
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "How they were made" }),
+  ).toHaveAttribute(
+    "href",
+    /README\.md#doctor-portraits-ai-generated$|#doctor-portraits-ai-generated$/,
+  );
+});

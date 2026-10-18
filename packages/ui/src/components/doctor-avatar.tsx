@@ -2,13 +2,23 @@
 
 import { useState } from "react";
 import { cn } from "@clinic/ui/lib/utils";
-import { doctorAvatarSrc, doctorInitials } from "@clinic/ui/lib/doctor-avatar";
+import {
+  ILLUSTRATION_DISCLOSURE,
+  PORTRAIT_DISCLOSURE,
+  doctorAvatarSrc,
+  doctorInitials,
+  doctorPhoto,
+} from "@clinic/ui/lib/doctor-avatar";
 
 type ViewProps = {
   name: string;
   size: number;
   /** null renders the initials fallback. */
   src: string | null;
+  /** 1x/2x candidates for src (the portrait). */
+  srcSet?: string;
+  /** Said on hover and as the image's description, not part of the alt text. */
+  title?: string;
   onError?: () => void;
   className?: string;
 };
@@ -19,6 +29,8 @@ export function DoctorAvatarView({
   name,
   size,
   src,
+  srcSet,
+  title,
   onError,
   className,
 }: ViewProps) {
@@ -44,7 +56,9 @@ export function DoctorAvatarView({
     // Plain img: the source is an inline data URI, so next/image has nothing to optimise.
     <img
       src={src}
+      srcSet={srcSet}
       alt={name}
+      title={title}
       width={size}
       height={size}
       decoding="async"
@@ -53,6 +67,10 @@ export function DoctorAvatarView({
     />
   );
 }
+
+// What failed to load, so the chain is portrait, then the illustration, then the initials. The
+// doctor id is kept with it, so a different doctor starts again from the portrait.
+type Failure = { id: string; level: "photo" | "svg" };
 
 export function DoctorAvatar({
   doctorId,
@@ -65,16 +83,32 @@ export function DoctorAvatar({
   size?: number;
   className?: string;
 }) {
-  const src = doctorAvatarSrc(doctorId);
-  // Remember which src failed rather than a boolean, so a new doctorId gets a fresh attempt.
-  const [failed, setFailed] = useState<string | null>(null);
+  const photo = doctorPhoto(doctorId);
+  const svg = doctorAvatarSrc(doctorId);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const failed = failure?.id === doctorId ? failure.level : null;
+  const showPhoto = photo !== null && failed === null;
+  const showSvg = svg !== null && failed !== "svg" && !showPhoto;
+  const props = showPhoto
+    ? {
+        src: photo.src,
+        srcSet: photo.srcSet,
+        title: PORTRAIT_DISCLOSURE,
+        onError: () => setFailure({ id: doctorId, level: "photo" }),
+      }
+    : showSvg
+      ? {
+          src: svg,
+          title: ILLUSTRATION_DISCLOSURE,
+          onError: () => setFailure({ id: doctorId, level: "svg" }),
+        }
+      : { src: null };
   return (
     <DoctorAvatarView
       name={name}
       size={size}
-      src={src !== null && failed !== src ? src : null}
-      onError={src === null ? undefined : () => setFailed(src)}
       className={className}
+      {...props}
     />
   );
 }

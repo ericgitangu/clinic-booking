@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin
+        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin avatars
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -97,6 +97,10 @@ shared-headroom: ## Read-only 30-day usage of the other projects on the shared b
 
 cost-selftest: ## Prove the cost guard by mutation (no cloud)
 	bash scripts/cost_check_selftest.sh
+
+avatars: ## Regenerate the AI doctor portraits (needs a cached Hugging Face login; calls a third-party Space) and sync them
+	uv run --with gradio_client --with huggingface_hub python scripts/avatars/portraits.py
+	node scripts/avatars/sync.mjs
 
 ci-test: ## Test the CI helper scripts against fakes (no cloud)
 	bash scripts/ci/test_ci_scripts.sh

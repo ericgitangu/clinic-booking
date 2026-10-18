@@ -83,13 +83,11 @@ export default async function MyAppointments({
                     href={`/appointments/${a.id}`}
                     className="flex items-start gap-4 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
                   >
-                    <span aria-hidden="true">
-                      <DoctorAvatar
-                        doctorId={a.doctor_id}
-                        name={a.doctor.full_name}
-                        size={48}
-                      />
-                    </span>
+                    <DoctorAvatar
+                      doctorId={a.doctor_id}
+                      name={a.doctor.full_name}
+                      size={48}
+                    />
                     <span>
                       <span className="block text-lg font-semibold underline-offset-4 hover:underline">
                         {formatWhen(a.starts_at)}

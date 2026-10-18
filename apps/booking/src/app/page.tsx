@@ -225,6 +225,13 @@ export default function Home() {
           </a>
           .
         </p>
+        <p className="mt-3 max-w-[65ch] text-sm text-muted-foreground">
+          Doctor portraits are AI-generated fictional people.{" "}
+          <a className={LINK} href={`${README}#doctor-portraits-ai-generated`}>
+            How they were made
+          </a>
+          .
+        </p>
       </section>
     </>
   );
