@@ -298,7 +298,7 @@ test("when polling has paused the page says so in the words the hint uses", asyn
   await ctx.close();
 });
 
-test("losing the race on a move (a confirmed 409) shows that time as an inactive chip, in place", async ({
+test("losing the race on a move (a confirmed 409) shows that time as Just taken, in place", async ({
   browser,
 }, testInfo) => {
   const { doctorId, day, slots } = await farCell(
@@ -321,6 +321,6 @@ test("losing the race on a move (a confirmed 409) shows that time as an inactive
   ).toContainText("That time was just taken.");
   const lost = chip(me.page, slots[3]);
   await expect(lost).toBeDisabled();
-  await expect(lost).toHaveAccessibleName(/Booked/); // the API lists it as taken, which wins
+  await expect(lost).toHaveAccessibleName(/Just taken/); // the 409 confirmed it; that wins over the listed "Booked"
   await closeAll(me.context, other.context);
 });

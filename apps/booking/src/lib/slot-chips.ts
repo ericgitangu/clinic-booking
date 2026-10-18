@@ -83,8 +83,8 @@ export function buildChips(input: {
 
   // Earlier facts first; later ones win, so the order below is the order of importance.
   for (const iso of input.seen) put(iso, "gone");
-  for (const iso of input.confirmedTaken ?? []) put(iso, "just-taken");
   for (const iso of input.taken ?? []) put(iso, "booked");
+  for (const iso of input.confirmedTaken ?? []) put(iso, "just-taken");
   for (const s of input.slots) {
     const held = heldAt(input.own, s.starts_at);
     put(s.starts_at, held ? "yours-elsewhere" : "free");

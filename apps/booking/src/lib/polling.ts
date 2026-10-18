@@ -2,6 +2,8 @@
 
 /** Refetch availability this often while the tab is visible. */
 export const POLL_MS = 15_000;
+/** The safety-net poll while the push stream is live. */
+export const LIVE_POLL_MS = 60_000;
 /** Stop polling after this long without pointer or keyboard input. */
 export const IDLE_MS = 10 * 60_000;
 
