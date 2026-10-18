@@ -28,7 +28,7 @@ const COPY: Record<string, string> = {
   APPOINTMENT_ALREADY_CANCELLED: "This appointment is already cancelled.",
   APPOINTMENT_ALREADY_STARTED: "This appointment has already started.",
   CHANGE_TOO_LATE:
-    "This visit starts in less than an hour, so it can no longer be cancelled or moved.",
+    "Changes need an hour's notice: a visit starting in less than an hour cannot be cancelled or moved, and cannot be moved to a time less than an hour away.",
   SLOT_TAKEN: "That time was just taken. Pick another.",
   SLOT_IN_PAST: "That time has passed. Pick a later one.",
   BOOKING_TOO_SOON: "That time is too soon to book. Pick a later one.",

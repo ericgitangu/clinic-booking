@@ -85,3 +85,5 @@ Section 1 "key decisions, trade-offs": who may change a patient's appointment, h
 ## Review trigger
 
 Per-clinic scoping (roles and invites are global to the single clinic), a second owner, email volume near the caps, or patient consent before staff changes. Then revisit the invite rules, the notification path and the outbox debt first.
+
+**Note (2026-10-19): the one-hour rule.** [ADR-0008](0008-appointment-lifecycle-and-reschedule.md) now refuses a cancel or a reschedule of a visit under 60 minutes away (`409 CHANGE_TOO_LATE`), for staff too. Any staff exemption from that rule lands with the staff-write work described here, together with its audit record; until then staff follow the rule.

@@ -80,7 +80,6 @@ export const REQUIRED: Evidence[] = [
       { status: 409, code: "SLOT_TAKEN" },
       { status: 409, code: "APPOINTMENT_ALREADY_CANCELLED" },
       { status: 409, code: "CHANGE_TOO_LATE" },
-      { status: 422, code: "BOOKING_TOO_SOON" },
     ],
     screen: MINE,
   },

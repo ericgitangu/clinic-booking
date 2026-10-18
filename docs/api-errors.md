@@ -26,7 +26,7 @@ current state; may succeed later or in another state.
 | SLOT_TAKEN | 409 | slot-taken | Slot taken | Another booking holds this doctor slot (uq_appt_doctor_slot_booked). |
 | PATIENT_DOUBLE_BOOKED | 409 | patient-double-booked | Patient double-booked | The patient already has a booking at this time (uq_appt_patient_slot_booked). |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | appointment-already-cancelled | Appointment already cancelled | Cancel or reschedule of an already-cancelled appointment. |
-| CHANGE_TOO_LATE | 409 | change-too-late | Change too late | Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes). |
+| CHANGE_TOO_LATE | 409 | change-too-late | Change too late | Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away. |
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
@@ -90,5 +90,8 @@ a reschedule that already happened (same new start) still returns the appointmen
 
 What a client should do: do not retry, and do not offer cancel or reschedule for an appointment
 inside the window. Tell the person in plain words that the visit is too close to change and to
-contact the clinic. The new start of a reschedule, and a new booking, are held to the same
-60 minutes with `422 BOOKING_TOO_SOON`.
+contact the clinic.
+
+The contract in one line: **422 on book, 409 on change.** A new booking under 60 minutes away is
+`422 BOOKING_TOO_SOON`; every change (cancel, or reschedule from or to a time under 60 minutes away)
+is `409 CHANGE_TOO_LATE`.

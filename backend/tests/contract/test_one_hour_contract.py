@@ -36,9 +36,20 @@ def test_cancel_and_reschedule_declare_409_change_too_late_with_an_example() -> 
         assert (ex["status"], ex["code"]) == (409, "CHANGE_TOO_LATE")
 
 
-def test_reschedule_description_names_both_the_current_and_the_new_start() -> None:
-    desc = _spec()["paths"]["/appointments/{appointment_id}/reschedule"]["patch"]["description"]
-    assert "current start" in desc and "new start" in desc and "422 BOOKING_TOO_SOON" in desc
+def test_422_on_book_409_on_change() -> None:
+    """The contract in one line: a booking under 60 minutes is 422, every change is 409."""
+    paths = _spec()["paths"]
+    book = paths["/appointments"]["post"]["description"]
+    assert "422 BOOKING_TOO_SOON" in book and "409" not in book
+    for path in (
+        "/appointments/{appointment_id}/cancel",
+        "/appointments/{appointment_id}/reschedule",
+    ):
+        desc = paths[path]["patch"]["description"]
+        assert "409 CHANGE_TOO_LATE" in desc, path
+        assert "422" not in desc and "BOOKING_TOO_SOON" not in desc, path
+    resched = paths["/appointments/{appointment_id}/reschedule"]["patch"]["description"]
+    assert "current start" in resched and "new start" in resched
 
 
 def test_booking_declares_422_booking_too_soon_with_an_example() -> None:

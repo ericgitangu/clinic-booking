@@ -98,7 +98,7 @@ export const cancelAppointmentAppointmentsAppointmentIdCancelPatchMutation = (op
 /**
  * Reschedule Appointment
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
+ * Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleAppointmentAppointmentsAppointmentIdReschedulePatchMutation = (options?: Partial<Options<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData>>): UseMutationOptions<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData>> => {
     const mutationOptions: UseMutationOptions<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData>> = {
@@ -397,7 +397,7 @@ export const getLineageInternalAdminAppointmentsAppointmentIdLineageGetOptions =
 /**
  * Reschedule For Patient
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
+ * Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchMutation = (options?: Partial<Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>>): UseMutationOptions<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>> => {
     const mutationOptions: UseMutationOptions<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>> = {
@@ -584,7 +584,7 @@ export const cancelMineInternalMeAppointmentsAppointmentIdCancelPatchMutation = 
 /**
  * Reschedule Mine
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does. Both its current start and the new start must be at least 60 minutes ahead. Repeating a reschedule that already happened (same new start) returns the appointment.
+ * Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.
  */
 export const rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchMutation = (options?: Partial<Options<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData>>): UseMutationOptions<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData>> => {
     const mutationOptions: UseMutationOptions<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData>> = {
