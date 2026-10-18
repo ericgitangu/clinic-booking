@@ -29,8 +29,33 @@ def test_both_apps_use_the_apis_lead_time() -> None:
         assert _app_constant(path) == api, path
 
 
-def test_no_deploy_file_overrides_the_lead_time() -> None:
-    for name in (".circleci/config.yml", "docker-compose.yml", "infra/bootstrap.sh"):
-        path = ROOT / name
-        if path.exists():
-            assert "BOOKING_MIN_LEAD_MINUTES" not in path.read_text(), name
+SKIP_DIRS = {"node_modules", ".next", ".venv", ".git", "test-results", "__pycache__"}
+# Where a deployed value could be set: workflow, compose, Terraform, scripts, env, Dockerfiles.
+CONFIG_SUFFIXES = {".yml", ".yaml", ".tf", ".tfvars", ".sh", ".env", ".example", ".toml", ".json"}
+
+
+def _config_files() -> list[pathlib.Path]:
+    found: list[pathlib.Path] = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file() or SKIP_DIRS & set(path.relative_to(ROOT).parts):
+            continue
+        rel = path.relative_to(ROOT).as_posix()
+        if rel.startswith(("docs/", "contracts/", "backend/app/", "backend/tests/")):
+            continue  # prose and the contract mention the name; the code defines the default
+        if path.name.startswith("Dockerfile") or path.suffix in CONFIG_SUFFIXES:
+            found.append(path)
+    return found
+
+
+def test_no_config_file_sets_a_different_lead_time() -> None:
+    """A file may document the default (``BOOKING_MIN_LEAD_MINUTES=60``); none may set another."""
+    files = _config_files()
+    assert any(f.name == "config.yml" for f in files), "the scan found the CircleCI config"
+    api = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db").BOOKING_MIN_LEAD_MINUTES
+    for path in files:
+        try:
+            text = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        for match in re.finditer(r"BOOKING_MIN_LEAD_MINUTES\W{0,4}(\d+)", text):
+            assert int(match.group(1)) == api, (path.relative_to(ROOT), match.group(0))

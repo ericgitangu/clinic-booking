@@ -73,7 +73,10 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "BOOKING_TOO_SOON",
         422,
         "Booking too soon",
-        "starts_at is less than the minimum lead time ahead of now.",
+        (
+            "A booking, or a reschedule's new time, starts less than the minimum lead time "
+            "(60 minutes) ahead of now."
+        ),
     ),
     ErrorSpec(
         "DATE_OUT_OF_RANGE",
@@ -122,8 +125,8 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         409,
         "Change too late",
         (
-            "Cancel, or reschedule from or to, a time less than the minimum lead time "
-            "(60 minutes) away."
+            "Changing or cancelling a visit that starts less than the minimum lead time "
+            "(60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead."
         ),
     ),
     ErrorSpec(

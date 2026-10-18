@@ -35,7 +35,7 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
   },
   CHANGE_TOO_LATE: {
     message:
-      "Changes need an hour's notice: a visit starting in less than an hour can no longer be cancelled or moved, and a visit cannot be moved to a time less than an hour away. Please contact the clinic.",
+      "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.",
     severity: "warning",
   },
   APPOINTMENT_ALREADY_STARTED: {

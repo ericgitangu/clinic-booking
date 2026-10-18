@@ -254,9 +254,7 @@ async def reschedule(
             for wh in await doctor_repo.working_hours_for(session, appt.doctor_id)
             if wh.weekday == weekday
         ]
-        validate_slot(
-            new_starts_at, windows, tz, now, lead, settings.BOOKING_HORIZON_DAYS, ChangeTooLate
-        )
+        validate_slot(new_starts_at, windows, tz, now, lead, settings.BOOKING_HORIZON_DAYS)
         old_starts = appt.starts_at
         appt.starts_at = new_starts_at
         appt.ends_at = new_starts_at + SLOT

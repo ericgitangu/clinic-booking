@@ -106,8 +106,8 @@ async def get_appointment(
             409,
             "CHANGE_TOO_LATE",
             "Change too late",
-            "Cancel, or reschedule from or to, a time less than the minimum lead time "
-            "(60 minutes) away.",
+            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
+            "lead time (60 minutes).",
             "/appointments/{appointment_id}/cancel",
         ),
     },
@@ -139,8 +139,8 @@ async def cancel_appointment(
             409,
             "CHANGE_TOO_LATE",
             "Change too late",
-            "Cancel, or reschedule from or to, a time less than the minimum lead time "
-            "(60 minutes) away.",
+            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
+            "lead time (60 minutes).",
             "/appointments/{appointment_id}/reschedule",
         ),
     },

@@ -49,7 +49,7 @@ Option 2.
 | SLOT_TAKEN | 409 | `uq_appt_doctor_slot_booked` |
 | PATIENT_DOUBLE_BOOKED | 409 | `uq_appt_patient_slot_booked` |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | cancel or reschedule of a cancelled appointment |
-| CHANGE_TOO_LATE | 409 | cancel, or reschedule from, an appointment starting in under 60 minutes (ADR-0008 amendment) |
+| CHANGE_TOO_LATE | 409 | changing or cancelling a visit that starts within 60 minutes (ADR-0008 amendment) |
 | APPOINTMENT_ALREADY_STARTED | 409 | cancel or reschedule when starts_at <= now |
 | PATIENT_PHONE_EXISTS | 409 | `uq_patients_phone` |
 | CONCURRENT_UPDATE | 409 | deadlock or serialization failure that persists after one retry |
@@ -76,3 +76,7 @@ Option 2.
 ## Review trigger
 
 A client that needs localized messages. That means i18n of `title`, keyed by `code`.
+
+## Amendment (2026-10-19): which code fires for the one-hour rule
+
+`BOOKING_TOO_SOON` (422) is for a too-soon slot: a booking, or a reschedule's new time, validated as for a fresh booking. `CHANGE_TOO_LATE` (409) is for changing or cancelling a visit whose current start is within the hour. A too-soon new time can only get worse, so it is a 422; the visit's nearness is state that changes the answer over time, so it is a 409. See [ADR-0008](0008-appointment-lifecycle-and-reschedule.md).

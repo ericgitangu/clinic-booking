@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { pick } from "./api";
+import { hhmm, pick } from "./api";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
 
@@ -13,8 +13,9 @@ import { newPerson, sessionCookies } from "./support/auth";
 async function bookedPerson(
   browser: import("@playwright/test").Browser,
   doctor: number,
+  week = 0,
 ) {
-  const { doctorId, slots } = await pick(0, { doctor });
+  const { doctorId, slots } = await pick(week, { doctor });
   const person = newPerson();
   const context = await browser.newContext();
   await context.addCookies(await sessionCookies(person));
@@ -26,7 +27,7 @@ async function bookedPerson(
   await expect(
     page.getByRole("heading", { name: "You are booked" }),
   ).toBeVisible();
-  return { context, page, startsAt: slots[0], doctorId };
+  return { context, page, startsAt: slots[0], doctorId, slots };
 }
 
 // The next :00 or :30 boundary that is 20 to 50 minutes away: on the grid, inside the window.
@@ -103,3 +104,56 @@ test("a cancel that slips through the window is refused in plain words", async (
   await context.close();
 });
 
+
+const alertOf = (page: import("@playwright/test").Page) =>
+  page.locator('[role="alert"]:not(#__next-route-announcer__)');
+
+test("moving a visit to a time under an hour away says so in plain words (BOOKING_TOO_SOON)", async ({
+  browser,
+}) => {
+  const { context, page, slots } = await bookedPerson(browser, 0, 1);
+  await page.goto("/appointments");
+  await page.getByRole("link", { name: "Reschedule" }).click();
+  await expect(page.getByRole("heading", { name: "Reschedule" })).toBeVisible();
+  // The grid never offers a too-soon time, so swap the chosen one for a time 30 minutes away in the
+  // request, the way a hand-made request would.
+  const picked = slots[2];
+  const tooSoon = new Date(Date.now() + 30 * 60_000).toISOString();
+  await page.route("**/appointments/**", async (route) => {
+    const req = route.request();
+    const raw = req.postDataBuffer();
+    if (req.method() === "POST" && req.headers()["next-action"] && raw) {
+      const body = raw.toString("utf8");
+      expect(body, "the request carries the picked time").toContain(picked);
+      return route.continue({ postData: body.replaceAll(picked, tooSoon) });
+    }
+    return route.continue();
+  });
+  await page.getByText(hhmm(slots[2]), { exact: true }).click();
+  await page.getByRole("button", { name: "Move appointment" }).click();
+  await expect(alertOf(page)).toContainText(
+    "Appointments need at least an hour's notice. Pick a later time.",
+  );
+  await context.close();
+});
+
+test("moving a visit that now starts within the hour says so in plain words (CHANGE_TOO_LATE)", async ({
+  browser,
+}) => {
+  const { context, page, startsAt, doctorId, slots } = await bookedPerson(
+    browser,
+    1,
+    1,
+  );
+  await page.goto("/appointments");
+  await page.getByRole("link", { name: "Reschedule" }).click();
+  await expect(page.getByRole("heading", { name: "Reschedule" })).toBeVisible();
+  await page.getByText(hhmm(slots[2]), { exact: true }).click();
+  // The page was drawn while the visit was still far off; it enters the last hour now.
+  await moveIntoWindow(startsAt, doctorId);
+  await page.getByRole("button", { name: "Move appointment" }).click();
+  await expect(alertOf(page)).toContainText(
+    "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.",
+  );
+  await context.close();
+});

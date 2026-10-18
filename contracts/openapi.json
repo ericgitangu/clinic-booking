@@ -1846,7 +1846,7 @@
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 422,
                       "title": "Booking too soon",
-                      "type": "/problems/booking-too-soon"
+                      "type": "https://clinic.ericgitangu.com/api/problems/booking-too-soon"
                     }
                   }
                 }
@@ -1963,12 +1963,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/appointments/{appointment_id}/cancel",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }
@@ -1991,7 +1991,7 @@
     },
     "/appointments/{appointment_id}/reschedule": {
       "patch": {
-        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.",
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_appointment_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -2040,12 +2040,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }
@@ -2695,12 +2695,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/internal/admin/appointments/{appointment_id}/cancel",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }
@@ -2780,7 +2780,7 @@
     },
     "/internal/admin/appointments/{appointment_id}/reschedule": {
       "patch": {
-        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.",
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_for_patient_internal_admin_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -2841,12 +2841,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/internal/admin/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }
@@ -3359,12 +3359,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/me/appointments/{appointment_id}/cancel",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }
@@ -3387,7 +3387,7 @@
     },
     "/internal/me/appointments/{appointment_id}/reschedule": {
       "patch": {
-        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a reschedule that already happened (same new start) returns the appointment.",
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_mine_internal_me_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -3448,12 +3448,12 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from or to, a time less than the minimum lead time (60 minutes) away.",
+                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
                       "instance": "/me/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "/problems/change-too-late"
+                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
                     }
                   }
                 }

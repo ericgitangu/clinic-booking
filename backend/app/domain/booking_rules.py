@@ -32,9 +32,10 @@ RULE_CANCEL = (
     "(BOOKING_MIN_LEAD_MINUTES)."
 )
 RULE_RESCHEDULE = (
-    "Refused with 409 CHANGE_TOO_LATE when the appointment (both its current start and the new "
-    "start) begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Repeating a "
-    "reschedule that already happened (same new start) returns the appointment."
+    "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 "
+    "minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new "
+    "start does, exactly as for a fresh booking. Repeating a reschedule that already happened "
+    "(same new start) returns the appointment."
 )
 RULE_AVAILABILITY = "Slots starting within 60 minutes are never offered."
 
@@ -57,14 +58,13 @@ def validate_slot(
     now: datetime,
     lead: timedelta,
     horizon_days: int,
-    lead_error: type[DomainError] = BookingTooSoon,
 ) -> None:
     starts_at = starts_at.astimezone(UTC)
     now = now.astimezone(UTC)
 
     if starts_at <= now:
         raise SlotInPast()
-    require_lead_time(starts_at, now, lead, lead_error)
+    require_lead_time(starts_at, now, lead, BookingTooSoon)
 
     local = starts_at.astimezone(tz)
     local_today = now.astimezone(tz).date()

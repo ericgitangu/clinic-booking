@@ -1,8 +1,8 @@
 """The one-hour rule on every change, at 59, 60 and 61 minutes, with a controlled clock.
 
 An appointment (or a new time) less than 60 minutes away is refused; exactly 60 is allowed.
-422 on book, 409 on change: a booking answers 422 BOOKING_TOO_SOON; cancel and a reschedule (its
-current start and its new start) answer 409 CHANGE_TOO_LATE; staff are held to the same rule;
+A booking and a reschedule's new start answer 422 BOOKING_TOO_SOON; cancel and a reschedule's
+current start answer 409 CHANGE_TOO_LATE; staff are held to the same rule;
 availability never offers a slot inside the window; and a repeat of a change that already
 happened still returns its result.
 """
@@ -113,7 +113,7 @@ async def test_reschedule_boundary_on_the_new_start(
         f"/appointments/{appt}/reschedule", json={"starts_at": NEAR.isoformat()}
     )
     if minutes < 60:
-        assert (resp.status_code, resp.json()["code"]) == (409, "CHANGE_TOO_LATE")
+        assert (resp.status_code, resp.json()["code"]) == (422, "BOOKING_TOO_SOON")
     else:
         assert resp.status_code == 200, resp.text
 
