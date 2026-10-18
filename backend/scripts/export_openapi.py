@@ -11,9 +11,11 @@ import pathlib
 
 from app.core.config import Settings
 from app.main import create_app
+from app.schemas.events import event_json_schemas
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT = REPO_ROOT / "contracts" / "openapi.json"
+EVENTS_DIR = REPO_ROOT / "contracts" / "events"
 
 FIXED_SETTINGS = Settings(
     PUBLIC_BASE_URL="https://api.example",
@@ -27,6 +29,11 @@ def main() -> None:
     spec = app.openapi()
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n")
+    EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+    for stem, schema in event_json_schemas().items():
+        (EVENTS_DIR / f"{stem}.schema.json").write_text(
+            json.dumps(schema, indent=2, sort_keys=True) + "\n"
+        )
 
 
 if __name__ == "__main__":

@@ -27,6 +27,19 @@ function clientIp(req: Request): string | null {
   return null; // not behind Vercel's edge: rate-limited as an untrusted client, not a shared one
 }
 
+// The live-updates token route is anonymous and cheap to call from another site's page, so a
+// browser request must come from this site. The check is made here, where the Origin header is
+// still visible, and Origin is passed on (for this route only) so the API can check it as well.
+const TOKEN_PATH = "realtime/token/patient";
+
+function crossSiteTokenRequest(req: Request, path: string[]): boolean {
+  if (req.method !== "POST" || path.join("/") !== TOKEN_PATH) return false;
+  const origin = req.headers.get("origin");
+  // No Origin: not a browser (a browser always sends it on a cross-site POST); the address
+  // limits still apply. A present Origin must be this site's own.
+  return origin !== null && origin !== new URL(req.url).origin;
+}
+
 async function handler(
   req: Request,
   ctx: { params: Promise<{ path?: string[] }> },
@@ -39,6 +52,13 @@ async function handler(
   if (upstream.kind === "redirect") {
     return Response.redirect(new URL(upstream.to, req.url), 308);
   }
+  if (crossSiteTokenRequest(req, path)) {
+    return problem(
+      403,
+      "FORBIDDEN",
+      "This site may not ask for a live-updates token",
+    );
+  }
   const ip = clientIp(req);
   const rl = checkRateLimit(ip);
   if (!rl.ok) {
@@ -46,6 +66,7 @@ async function handler(
       status: 429,
       headers: {
         "content-type": "application/problem+json",
+        "cache-control": "no-store",
         "retry-after": String(rl.retryAfter),
       },
     });
@@ -80,8 +101,11 @@ async function handler(
     baseUrl: upstream.baseUrl,
     upstreamPath: upstream.upstreamPath,
     token,
-    clientIp: ip,
+    // Behind Vercel the edge always supplies the client address. Off Vercel (local development and
+    // the end-to-end runs) there is none, and the browser is on this machine.
+    clientIp: ip ?? (process.env.VERCEL ? null : "127.0.0.1"),
     timeoutMs: upstream.timeoutMs,
+    extraRequestHeaders: path.join("/") === TOKEN_PATH ? ["origin"] : [],
   });
 }
 

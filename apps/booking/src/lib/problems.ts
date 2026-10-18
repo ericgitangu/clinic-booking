@@ -130,6 +130,15 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "Something broke on our side. Try again in a moment.",
     severity: "critical",
   },
+  CLIENT_ADDRESS_UNKNOWN: {
+    message: "We could not check this request. Reload the page and try again.",
+    severity: "warning",
+  },
+  REALTIME_UNAVAILABLE: {
+    message:
+      "Live updates are off right now. The page still refreshes by itself.",
+    severity: "warning",
+  },
   RATE_LIMITED: {
     message: "Too many requests. Wait a minute and try again.",
     severity: "warning",

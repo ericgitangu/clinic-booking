@@ -38,7 +38,9 @@ services:
     environment:
       # Runtime role: SELECT/INSERT/UPDATE only.
       DATABASE_URL: postgresql+asyncpg://clinic_app:clinic_app_local@db:5432/clinic
-      WEB_ORIGIN: http://localhost:3000
+      # The site that may ask for live-updates tokens (and the CORS origin). The end-to-end runs
+      # serve the app on 3100 and set WEB_ORIGIN accordingly.
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
       PUBLIC_BASE_URL: http://localhost:8080
       LOG_LEVEL: info
       PORT: "8080"
@@ -46,6 +48,8 @@ services:
       INTERNAL_SIGNING_KEY: ${INTERNAL_SIGNING_KEY:-}
       # Comma-separated owner emails for the admin app; the same value as the app's ADMIN_EMAILS.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Empty (the default) means push is off and clients poll; set your own Ably app key to try live updates.
+      ABLY_API_KEY: ${ABLY_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:

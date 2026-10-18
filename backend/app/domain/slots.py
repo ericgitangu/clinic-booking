@@ -49,6 +49,35 @@ def grid_for_date(
     return starts
 
 
+def _overlaps(
+    start: datetime, end: datetime, intervals: Sequence[tuple[datetime, datetime]]
+) -> bool:
+    return any(b0 < end and b1 > start for b0, b1 in intervals)
+
+
+def _utc_intervals(booked: Iterable[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:
+    return [(b0.astimezone(UTC), b1.astimezone(UTC)) for b0, b1 in booked]
+
+
+def taken_starts(
+    windows: Sequence[Window],
+    booked: Iterable[tuple[datetime, datetime]],
+    tz: ZoneInfo,
+    local_date: date,
+    slot: timedelta = SLOT,
+) -> list[datetime]:
+    """Starts (UTC) of the day's grid slots that overlap a booked interval.
+
+    The same overlap rule the free-slot filter uses, applied to the whole grid (lead time and the
+    past do not matter: a booked time stays booked). A slot is in this list or in the free list
+    of ``generate_slots``, never both. Starts only: nothing says who holds them.
+    """
+    intervals = _utc_intervals(booked)
+    return [
+        s for s in grid_for_date(windows, tz, local_date, slot) if _overlaps(s, s + slot, intervals)
+    ]
+
+
 def generate_slots(
     windows: Sequence[Window],
     booked: Iterable[tuple[datetime, datetime]],
@@ -66,14 +95,14 @@ def generate_slots(
     differs from the length the bookings were made with. Production wires only the 30-minute
     ``SLOT``; the parameter is part of the function's contract, not of the public API.
     """
-    intervals = [(b0.astimezone(UTC), b1.astimezone(UTC)) for b0, b1 in booked]
+    intervals = _utc_intervals(booked)
     threshold = now.astimezone(UTC) + lead
     out: list[Slot] = []
     for start in grid_for_date(windows, tz, local_date, slot):
         end = start + slot
         if start < threshold:
             continue
-        if any(b0 < end and b1 > start for b0, b1 in intervals):
+        if _overlaps(start, end, intervals):
             continue
         out.append(Slot(starts_at=start, ends_at=end))
     return out

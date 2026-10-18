@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_clock, get_session, get_settings
@@ -74,18 +75,44 @@ async def get_doctor(
     return await _to_schema(session, doctor, windows)
 
 
+def _etag(body: Availability) -> str:
+    """A weak validator over what a client renders (everything but the cursor, which moves with
+    every write anywhere): equal slots give an equal tag, so a poll can be answered with a 304."""
+    digest = hashlib.sha256(body.model_dump_json(exclude={"cursor"}).encode()).hexdigest()
+    return f'W/"{digest[:32]}"'
+
+
+def _matches(if_none_match: str | None, tag: str) -> bool:
+    if if_none_match is None:
+        return False
+    wanted = tag.removeprefix("W/")
+    return any(
+        candidate.strip() == "*" or candidate.strip().removeprefix("W/") == wanted
+        for candidate in if_none_match.split(",")
+    )
+
+
 @router.get(
     "/doctors/{doctor_id}/availability",
     response_model=Availability,
-    responses=problem_responses(404, 422),
+    responses={
+        **problem_responses(404, 422),
+        304: {"description": "The slots have not changed since the ETag in If-None-Match"},
+    },
 )
 async def doctor_availability(
     doctor_id: uuid.UUID,
+    request: Request,
     response: Response,
     date: date = Query(...),  # noqa: A002  # matches the ?date= query param name
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
-) -> Availability:
+) -> Availability | Response:
     response.headers.update(_NO_STORE)
-    return await get_availability(session, clock, settings, doctor_id, date)
+    body = await get_availability(session, clock, settings, doctor_id, date)
+    tag = _etag(body)
+    if _matches(request.headers.get("if-none-match"), tag):
+        return Response(status_code=304, headers={"ETag": tag, **_NO_STORE})
+    response.headers["ETag"] = tag
+    return body
