@@ -24,6 +24,8 @@ trustPolicyExclude:
   # audited line by line; drop this entry once reselect publishes with provenance again.
   - reselect@5.1.1
 allowBuilds:
+  '@swc/core': false
+  esbuild: false
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/env@16.4.2'
