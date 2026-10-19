@@ -275,15 +275,12 @@ test.describe("owner dashboard", () => {
       .locator("tbody tr")
       .filter({ has: page.locator(`a[href$="/${id}"]`) });
     await expect(row.getByText(/^\s*(Booked|Cancelled)\s*$/)).toBeVisible();
-    // Click the doctor cell, not the link: the whole row is the target. The link's overlay sits
-    // on top of the cell, so a real mouse click at the cell's centre is what a person does. The
-    // point is worked out by Playwright in the same step as the click (force skips only its
-    // "would another element take this click" wait, which the overlay always trips), so there is no
-    // measure-then-click gap for the page to move in.
-    // The row's link is only a handler once React has attached to it: before that a click does
-    // nothing the test could see, so wait for that (a state of the page, not a pause), then click.
+    // Click what a person clicks: the row's link. No force: Playwright waits for the link to be
+    // stable and to receive the click (nothing over it, not moving), which is the same condition a
+    // hand needs. The link only does something once React has attached to it, so wait for that (a
+    // state of the page, not a pause) first.
     await hydrated(row.getByRole("link"));
-    await row.locator("td").nth(2).click({ force: true });
+    await row.getByRole("link").click();
     await expect(page.getByTestId("sheet-patient")).toBeVisible();
     // The sheet must be for that row's id, whatever else is on the page.
     await expect(
