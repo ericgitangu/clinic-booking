@@ -252,7 +252,9 @@ async def accept(
         )
         await repo.consume_invite(session, invite_id=row["id"], now=now)
         # Audited like creating and revoking one (and streamed to the live feed from here). The
-        # actor is the person who accepted, in the role they now hold; the address stays a hash.
+        # actor is the person who accepted, in the role they now hold, so actor_email holds their
+        # address in plain text, as it does for every staff actor in this table (they are staff
+        # now). Only `after` keeps the address as a hash, as the other invite rows do.
         await repo.insert_audit(
             session,
             actor_email=address,

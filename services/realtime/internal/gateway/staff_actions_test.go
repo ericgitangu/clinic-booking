@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -151,6 +152,56 @@ func TestStaffBookAndCancelNameTheActor(t *testing.T) {
 	if m["actor_email"] != nil || m["actor_role"] != nil || m["staff_reason"] != nil {
 		t.Fatalf("a patient's booking names an actor: %v", m)
 	}
+}
+
+// A booking, a reschedule and a cancellation made by staff through the real API reach a viewer as
+// the same events (matched by seq against the owner's stream) with no patient name, no staff
+// address and no reason anywhere in the frame.
+func TestStaffBookRescheduleCancelReachViewersWithoutPeople(t *testing.T) {
+	h := start(t, twoStreams)
+	viewerSchema := compile(t, "admin-event.v1.schema.json")
+	api := h.env.NewAPI(t)
+	testenv.GrantStaff(t, h.env, apiAdmin.Email, "admin")
+	doctor := api.Doctor()
+	patient, name := api.Patient()
+	slot := api.FreeSlot(doctor)
+
+	owner := h.hello(asOwner, q())
+	viewer := h.hello(asView, q())
+	sameSeq := func(seq string) func(map[string]any) bool {
+		return func(m map[string]any) bool { return m["seq"] == seq }
+	}
+	check := func(kind, id, reason string) {
+		t.Helper()
+		_, om := owner.until(t, kind, forAppointment(id))
+		if str(om, "actor_email") != apiAdmin.Email || str(om, "staff_reason") != reason {
+			t.Fatalf("owner %s = %v", kind, om)
+		}
+		vf, _ := viewer.until(t, kind, sameSeq(str(om, "seq")))
+		valid(t, viewerSchema, vf.Data)
+		noneOf(t, vf, name, apiAdmin.Email, reason, id)
+	}
+
+	var made struct {
+		ID string `json:"id"`
+	}
+	const bookReason = "Booked by phone at the desk"
+	api.Staff(apiAdmin, http.MethodPost, "/internal/admin/appointments", map[string]any{
+		"doctor_id": doctor, "patient_id": patient, "starts_at": slot.Format(time.RFC3339),
+		"reason": bookReason,
+	}, http.StatusCreated, &made)
+	check("booked", made.ID, bookReason)
+
+	to := api.FreeSlot(doctor)
+	const moveReason = "Patient asked for a later day"
+	api.Staff(apiAdmin, http.MethodPatch, "/internal/admin/appointments/"+made.ID+"/reschedule",
+		map[string]any{"starts_at": to.Format(time.RFC3339), "reason": moveReason}, http.StatusOK, nil)
+	check("rescheduled", made.ID, moveReason)
+
+	const cancelReason = "Patient is travelling that week"
+	api.Staff(apiAdmin, http.MethodPatch, "/internal/admin/appointments/"+made.ID+"/cancel",
+		map[string]any{"reason": cancelReason}, http.StatusOK, nil)
+	check("cancelled", made.ID, cancelReason)
 }
 
 // Attendance marks, written as the API writes them: the event and its audit row in one
@@ -302,14 +353,22 @@ func TestAppointmentFilterIsStrictAndSigned(t *testing.T) {
 	doctor := api.Doctor()
 	mine := api.Book(doctor)
 
-	for _, bad := range []string{"not-a-uuid", strings.ToUpper(mine.ID), mine.ID + "0", ""} {
-		target := "/stream?appointment=" + bad
-		h.grant(asOwner)
-		s := h.openRaw(target, header(asOwner, target, nil))
-		if s.resp.StatusCode != http.StatusUnprocessableEntity {
-			t.Fatalf("appointment=%q: status %d, want 422", bad, s.resp.StatusCode)
+	h.grant(asView)
+	for _, w := range []who{asOwner, asView} {
+		for _, bad := range []string{"not-a-uuid", strings.ToUpper(mine.ID), mine.ID + "0", "",
+			"{" + mine.ID + "}", strings.ReplaceAll(mine.ID, "-", "")} {
+			target := "/stream?appointment=" + url.QueryEscape(bad)
+			s := h.openRaw(target, header(w, target, nil))
+			if s.resp.StatusCode != http.StatusUnprocessableEntity {
+				t.Fatalf("%s appointment=%q: status %d, want 422", w.role, bad, s.resp.StatusCode)
+			}
+			s.close()
 		}
-		s.close()
+	}
+	// Two filters in one request are refused too, not resolved to either.
+	two := "/stream?appointment=" + mine.ID + "&appointment=" + mine.ID
+	if s := h.openRaw(two, header(asView, two, nil)); s.resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("two filters: status %d, want 422", s.resp.StatusCode)
 	}
 	// Signed for one appointment, sent for another: refused before anything is read.
 	signed := "/stream?appointment=" + mine.ID

@@ -379,6 +379,10 @@ expect_fail "realtime: no service account" "run deploy missing --service-account
 expect_fail "realtime: another region" "region outside us-east4/us-east1" rt_sub 's/--region us-east4/--region europe-west3/ if /deploy clinic-realtime/'
 expect_fail "realtime: the deploy line is gone" "clinic-realtime deploy not pinned" rt_sub 's/gcloud run deploy clinic-realtime/gcloud run services describe clinic-realtime/'
 expect_pass "realtime: 0.5 vCPU is the documented fallback" rt_sub 's/--cpu 0.25/--cpu 0.5/ if /deploy clinic-realtime/'
+# The bootstrap shell (infra/bootstrap.sh service) is held to the same shape, and it does not stand
+# in for the release pipeline's own deploy (the "line is gone" case above still fails with it there).
+expect_fail "realtime bootstrap shell: --max-instances 3" "clinic-realtime deploy not pinned: infra/bootstrap.sh" mutate_sub infra/bootstrap.sh 's/--max-instances 2 --concurrency 1/--max-instances 3 --concurrency 1/'
+expect_fail "realtime bootstrap shell: concurrency 80" "clinic-realtime deploy not pinned: infra/bootstrap.sh" mutate_sub infra/bootstrap.sh 's/--concurrency 1 /--concurrency 80 /'
 
 echo "== live C1 / C2 judgements for the gateway (no project needed) =="
 c1() { # <name> <want PASS|FAIL> <row>

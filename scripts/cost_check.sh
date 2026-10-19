@@ -114,7 +114,8 @@ while (my $row = <STDIN>) {
       # one stream per instance (concurrency 1, which is also what Cloud Run requires below 1 vCPU),
       # at most a quarter or a half vCPU, request-based billing (no --no-cpu-throttling, checked
       # above), the 15-minute request timeout, and no public access.
-      $realtime_deploys++;
+      # The release pipeline must deploy it exactly once; the bootstrap shell is pinned the same way.
+      $realtime_deploys++ if $file =~ m{^\.circleci/};
       my $ok = $line =~ /--min-instances[= ]+0(?!\d)/
             && $line =~ /--max-instances[= ]+2(?!\d)/
             && $line =~ /--concurrency[= ]+1(?!\d)/

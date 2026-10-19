@@ -88,7 +88,11 @@ gcloud secrets versions destroy <old> --secret=<secret> \
 
 ## Optional realtime feature: `clinic_realtime`
 
-Only if the realtime gateway ships. As `clinic_owner`, before its migration is merged:
+Only if the realtime gateway ships. Run order: `terraform apply` (realtime.tf), then this section,
+then `bash infra/bootstrap.sh service invoker`, then the merge that runs migration 0014
+(`docs/runbooks/bootstrap-gcp.md`, step 5). The role must exist **before** `ship-api` runs
+migration 0014: the migration only grants to a role that exists, and otherwise raises a NOTICE and
+grants nothing. As `clinic_owner`, before the migration is merged:
 
 ```bash
 export RT_PW=$(openssl rand -hex 24)
@@ -112,8 +116,9 @@ psql "postgresql://clinic_owner:${OWNER_PW}@${NEON_HOST}/clinic?sslmode=require"
 
 Confirm `SHOW max_prepared_transactions` is `0`; record it in the PR description.
 
-The gateway is a Go service, so its secret holds a plain `postgres://` URL for the **direct**
-(non-pooler) endpoint, not the asyncpg form:
+The gateway is a Go service (pgx), so its secret holds a plain `postgres://…?sslmode=require` URL
+for the **direct** (non-pooler) endpoint, not the `postgresql+asyncpg://` form the API's secrets
+use:
 
 ```bash
 RT_URL="postgres://clinic_realtime:${RT_PW}@${NEON_HOST}/clinic?sslmode=require"

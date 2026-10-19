@@ -5,7 +5,8 @@
 #
 #   project   create the project, link billing, enable the APIs Terraform itself needs
 #   state     create the Terraform state bucket (us-east1)
-#   service   create the Cloud Run service shell      (AFTER terraform apply: needs the runtime SA)
+#   service   create the Cloud Run service shells, clinic-api and clinic-realtime, when missing
+#             (AFTER terraform apply: needs the runtime SAs)
 #   invoker   grant run.invoker: web, admin and smoke on clinic-api; admin and smoke only on
 #             clinic-realtime  (AFTER terraform apply: needs those SAs)
 #
@@ -91,22 +92,39 @@ step_state() {
 }
 
 step_service() {
-  echo ">>> service: Cloud Run service shell (hello image; replaced by the first release)"
-  # Created once and never redeployed from here: re-running must not roll a live service back
-  # to the hello image. Terraform must NOT manage this service.
+  echo ">>> service: Cloud Run service shells (hello image; replaced by the first release)"
+  # Each is created once and never redeployed from here: re-running must not roll a live service
+  # back to the hello image. Terraform must NOT manage these services.
   if exists gcloud run services describe clinic-api --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then
     echo "    clinic-api exists; leaving it untouched"
-    return
+  else
+    run gcloud run deploy clinic-api \
+      --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
+      --image us-docker.pkg.dev/cloudrun/container/hello \
+      --region "$REGION" \
+      --service-account "clinic-api-runtime@${PROJECT}.iam.gserviceaccount.com" \
+      --no-allow-unauthenticated \
+      --min-instances 0 --max-instances 3 \
+      --add-custom-audiences=clinic-api \
+      --quiet
   fi
-  run gcloud run deploy clinic-api \
-    --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
-    --image us-docker.pkg.dev/cloudrun/container/hello \
-    --region "$REGION" \
-    --service-account "clinic-api-runtime@${PROJECT}.iam.gserviceaccount.com" \
-    --no-allow-unauthenticated \
-    --min-instances 0 --max-instances 3 \
-    --add-custom-audiences=clinic-api \
-    --quiet
+  # The live-feed gateway (docs/adr/0021), in the shape ship-realtime deploys and cost_check pins:
+  # scale from zero to at most two instances, one stream each, 0.25 vCPU, request-based billing.
+  # Needs the runtime SA from terraform apply (infra/terraform/realtime.tf).
+  if exists gcloud run services describe clinic-realtime --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then
+    echo "    clinic-realtime exists; leaving it untouched"
+  else
+    run gcloud run deploy clinic-realtime \
+      --account "$GCLOUD_ACCOUNT" --project "$PROJECT" \
+      --image us-docker.pkg.dev/cloudrun/container/hello \
+      --region "$REGION" \
+      --service-account "clinic-realtime-runtime@${PROJECT}.iam.gserviceaccount.com" \
+      --no-allow-unauthenticated \
+      --min-instances 0 --max-instances 2 --concurrency 1 \
+      --cpu 0.25 --memory 256Mi --execution-environment gen1 --timeout 900 \
+      --add-custom-audiences=clinic-realtime \
+      --quiet
+  fi
 }
 
 step_invoker() {
