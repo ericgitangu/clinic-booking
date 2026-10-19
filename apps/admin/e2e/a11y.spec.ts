@@ -5,11 +5,12 @@
 // findings are printed in full so a failure says which element and which rule.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { expect, seeded, tap, test } from "./support/fixtures";
+import { expect, seeded, settle, tap, test } from "./support/fixtures";
 
 const SCHEMES = ["light", "dark"] as const;
 
 async function audit(page: Page) {
+  await settle(page);
   const { violations } = await new AxeBuilder({ page })
     .withTags([
       "wcag2a",
@@ -25,11 +26,9 @@ async function audit(page: Page) {
   );
 }
 
-// axe reads colours as drawn at that instant; a dialog still fading in is half transparent.
+// axe reads colours as drawn at that instant, so every scan first waits for the page to rest.
 async function settled(page: Page) {
-  await page.waitForFunction(() =>
-    document.getAnimations().every((a) => a.playState !== "running"),
-  );
+  await settle(page);
 }
 
 function report(violations: Awaited<ReturnType<typeof audit>>): string {

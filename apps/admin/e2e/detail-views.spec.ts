@@ -11,7 +11,7 @@ import {
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { internal, OWNER, publicApi } from "./support/stack";
-import { expect, seeded, tap, test } from "./support/fixtures";
+import { expect, seeded, settle, tap, test } from "./support/fixtures";
 import type { Page } from "@playwright/test";
 
 const owner = { email: OWNER, role: "owner" };
@@ -315,9 +315,7 @@ for (const scheme of ["light", "dark"] as const) {
         await expect(page.locator("html")).toHaveClass(
           new RegExp(`\\b${scheme}\\b`),
         );
-        await page.waitForFunction(() =>
-          document.getAnimations().every((a) => a.playState !== "running"),
-        );
+        await settle(page);
         const { violations } = await new AxeBuilder({ page })
           .withTags([
             "wcag2a",
@@ -371,14 +369,13 @@ test("the viewer's appointment sheet has no serious axe findings", async ({
 }) => {
   const page = await as("viewer");
   await openDashboard(page);
-  await tap(page.getByRole("button", { name: /^Fill rate\b/ }));
+  // Upcoming visits always exist (the seeding books them), so the sheet is never empty.
+  await tap(page.getByRole("button", { name: /^Upcoming booked\b/ }));
   const first = page.getByTestId("drill-list").locator("li a").first();
-  test.skip((await first.count()) === 0, "no booked visits in the range");
+  await expect(first).toBeVisible();
   await tap(first);
   await expect(page.getByTestId("sheet-patient")).toBeVisible();
-  await page.waitForFunction(() =>
-    document.getAnimations().every((a) => a.playState !== "running"),
-  );
+  await settle(page);
   const { violations } = await new AxeBuilder({ page })
     .withTags([
       "wcag2a",

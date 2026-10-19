@@ -89,3 +89,28 @@ export async function tap(locator: Locator): Promise<void> {
     .toBe(true);
   await locator.click();
 }
+
+/**
+ * Waits for the real condition before a colour scan, not for a pause: the page is in the theme the
+ * browser asked for (the class on <html> matches prefers-color-scheme), the fonts are in, nothing
+ * is animating or transitioning, and two frames have passed, so axe reads colours as they rest and
+ * never half way through a change of theme or a fade.
+ */
+export async function settle(page: Page): Promise<void> {
+  const dark = await page.evaluate(
+    () => matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  await expect(page.locator("html")).toHaveClass(
+    new RegExp(`\\b${dark ? "dark" : "light"}\\b`),
+  );
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running"),
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}

@@ -11,7 +11,7 @@ import {
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { expect, signIn, tap, test } from "./support/fixtures";
+import { expect, settle, signIn, tap, test } from "./support/fixtures";
 
 const owner = { email: OWNER, role: "owner" };
 const admin = { email: EMAIL.admin, role: "admin" };
@@ -432,9 +432,7 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto("/dashboard?days=7");
       await expect(page.getByTestId("heatmap")).toBeVisible();
       await expect(page.getByTestId("reasons-list")).toBeVisible();
-      await page.waitForFunction(() =>
-        document.getAnimations().every((a) => a.playState !== "running"),
-      );
+      await settle(page);
       const { violations } = await new AxeBuilder({ page })
         .withTags([
           "wcag2a",
@@ -466,9 +464,7 @@ test("the access, audit and invitation pages have no serious axe findings", asyn
   for (const path of ["/access", "/audit"]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.waitForFunction(() =>
-      document.getAnimations().every((a) => a.playState !== "running"),
-    );
+    await settle(page);
     const { violations } = await new AxeBuilder({ page })
       .withTags([
         "wcag2a",

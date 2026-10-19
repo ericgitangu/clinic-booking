@@ -95,3 +95,14 @@ body::before {
     color: #000;
   }
 }
+
+/* A floor under every control: no button, radio or tab is smaller than 24 CSS pixels either way
+   (WCAG 2.5.8), whatever size variant a component picks. The real targets are 44px; this only stops
+   a small variant from slipping under the minimum. */
+[data-slot="button"],
+[role="radio"],
+[role="tab"],
+[role="menuitem"] {
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+}
