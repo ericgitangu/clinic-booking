@@ -80,6 +80,42 @@ async function live(page: import("@playwright/test").Page) {
 }
 
 test.describe("live feed", () => {
+  test("the appointments table does not move when events arrive", async ({
+    as,
+  }) => {
+    const page = await as("owner");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await live(page);
+    const feed = page.getByTestId("live-feed");
+    const table = page.getByTestId("appointments-table");
+    const row = table.locator("tbody tr").first();
+    await expect(row).toBeVisible();
+    // Rows come and go as the list refreshes, so the fixed points are the panel and the table's
+    // own top edge: if either moves, every row under the pointer moves with it.
+    const before = {
+      feed: await feed.boundingBox(),
+      table: await table.boundingBox(),
+      row: await row.boundingBox(),
+    };
+    expect(before.feed && before.table && before.row).toBeTruthy();
+    const names = [1, 2, 3].map((n) => `Steady Layout ${n} ${Date.now()}`);
+    for (const name of names) {
+      await book(name);
+      await expect(
+        page.getByTestId("live-event").filter({ hasText: name }),
+      ).toBeVisible({ timeout: 2000 });
+      const feedNow = await feed.boundingBox();
+      const tableNow = await table.boundingBox();
+      expect(feedNow).toEqual(before.feed);
+      expect(tableNow?.y).toBe(before.table!.y);
+      expect(tableNow?.x).toBe(before.table!.x);
+    }
+    // The list refreshes a couple of seconds after the last event; the first row stays where it was.
+    await expect(async () => {
+      expect((await row.boundingBox())?.y).toBe(before.row!.y);
+    }).toPass();
+  });
+
   test("an owner sees a booking appear within 2 seconds, with the patient and a link to it", async ({
     as,
   }) => {

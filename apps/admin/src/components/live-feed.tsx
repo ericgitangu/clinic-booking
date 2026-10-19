@@ -63,6 +63,17 @@ const STATUS_TEXT: Record<LiveStatus, string> = {
 };
 
 /**
+ * The panel sits above the appointments table, so its height must not depend on what is in it:
+ * a panel that grew as events arrived (or as "Connecting" became "Live" or a Resume button
+ * appeared) pushed the rows down under a hand already on its way to click one, and opened the
+ * wrong patient. The header row and the event area are therefore fixed in height from the first
+ * paint, whatever the state, and a long list scrolls inside its own area.
+ */
+export const FEED_HEADER_CLASS =
+  "flex min-h-11 flex-nowrap items-center justify-between gap-3";
+export const FEED_BODY_CLASS = "h-60 overflow-y-auto";
+
+/**
  * Bookings, reschedules, cancellations and staff actions (vetoes, attendance, reminders,
  * invitations) as they happen. The numbers above and the list below
  * follow: each event asks for a fresh page, at most once every two seconds.
@@ -123,14 +134,14 @@ export function LiveFeed({
   return (
     <Card data-testid="live-feed">
       <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className={FEED_HEADER_CLASS}>
           <CardTitle className="font-heading text-lg">Live feed</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <span
               data-testid="live-status"
               data-status={status}
               role="status"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground"
+              className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
             >
               <span
                 aria-hidden
@@ -164,45 +175,54 @@ export function LiveFeed({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {events.length === 0 ? (
-          <p className="text-muted-foreground" data-testid="live-empty">
-            {status === "live"
-              ? "Waiting for the next booking."
-              : "Nothing yet. Changes appear here once the feed is live."}
-          </p>
-        ) : (
-          <ul className="space-y-2" aria-live="polite">
-            {events.map((ev) => {
-              const Icon = ICON[ev.kind];
-              const text = describe(
-                ev,
-                ev.doctorId ? names.get(ev.doctorId) : undefined,
-                role,
-              );
-              return (
-                <li
-                  key={ev.seq}
-                  data-testid="live-event"
-                  data-kind={ev.kind}
-                  className="flex items-start gap-3"
-                >
-                  <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
-                  {ev.appointmentId ? (
-                    <AppointmentLink
-                      id={ev.appointmentId}
-                      canAct={canAct}
-                      className="underline-offset-4 hover:underline"
-                    >
-                      {text}
-                    </AppointmentLink>
-                  ) : (
-                    <span>{text}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {/* Scrollable, so it is a focus stop and a named region (keyboard users can scroll it). */}
+        <div
+          role="region"
+          aria-label="Recent events"
+          tabIndex={0}
+          data-testid="live-scroll"
+          className={FEED_BODY_CLASS}
+        >
+          {events.length === 0 ? (
+            <p className="text-muted-foreground" data-testid="live-empty">
+              {status === "live"
+                ? "Waiting for the next booking."
+                : "Nothing yet. Changes appear here once the feed is live."}
+            </p>
+          ) : (
+            <ul className="space-y-2" aria-live="polite">
+              {events.map((ev) => {
+                const Icon = ICON[ev.kind];
+                const text = describe(
+                  ev,
+                  ev.doctorId ? names.get(ev.doctorId) : undefined,
+                  role,
+                );
+                return (
+                  <li
+                    key={ev.seq}
+                    data-testid="live-event"
+                    data-kind={ev.kind}
+                    className="flex items-start gap-3"
+                  >
+                    <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
+                    {ev.appointmentId ? (
+                      <AppointmentLink
+                        id={ev.appointmentId}
+                        canAct={canAct}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {text}
+                      </AppointmentLink>
+                    ) : (
+                      <span>{text}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
