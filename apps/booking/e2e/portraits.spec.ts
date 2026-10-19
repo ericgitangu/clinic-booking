@@ -4,15 +4,20 @@ import { farCell } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // The doctor's portrait shows on every page that names the doctor, found the way a person finds it:
-// an image whose accessible name is the doctor's name. Real stack. Instance i = repeat owns cell 80 + i.
+// an image whose accessible name says it is an AI-generated portrait of that (fictional) doctor. Real stack. Instance i = repeat owns cell 80 + i.
 const cellOf = (repeat: number) => 80 + repeat;
 
 let nextIp = 0;
 const ip = () =>
   `10.${test.info().workerIndex % 256}.${(Math.floor(nextIp / 250) % 40) + 140}.${(nextIp++ % 250) + 1}`;
 
+const portraitAlt = (name: string) =>
+  `${/^dr\.?\s/i.test(name) ? name : `Dr. ${name}`}, AI-generated portrait of a fictional doctor`;
+
 async function expectPortrait(page: Page, name: string, size: number) {
-  const img = page.getByRole("img", { name, exact: true }).first();
+  const img = page
+    .getByRole("img", { name: portraitAlt(name), exact: true })
+    .first();
   await expect(img).toBeVisible();
   await expect(img).toHaveAttribute("width", String(size));
   await expect(img).toHaveAttribute("height", String(size));
