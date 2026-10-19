@@ -81,22 +81,31 @@ export function GapsToFill({
               data-testid="gap"
               className="flex min-h-14 flex-wrap items-center gap-3 px-3 py-2"
             >
-              <span aria-hidden="true" className="contents">
-                <DoctorAvatar
-                  doctorId={g.doctorId}
-                  name={g.doctorName}
-                  size={36}
-                />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">
-                  {g.doctorName}
+              <SlotsSheet
+                slots={g.slots}
+                hours={gaps.hours}
+                truncated={false}
+                canBook={canBook}
+                title={`${g.doctorName}, ${formatSlot(g.starts_at)}`}
+                triggerClassName="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <span aria-hidden="true" className="contents">
+                  <DoctorAvatar
+                    doctorId={g.doctorId}
+                    name={g.doctorName}
+                    size={36}
+                  />
                 </span>
-                <span className="block text-sm tabular-nums text-muted-foreground">
-                  {formatSlot(g.starts_at)} to {formatTime(g.ends_at)},{" "}
-                  {g.slots.length} {g.slots.length === 1 ? "slot" : "slots"}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {g.doctorName}
+                  </span>
+                  <span className="block text-sm tabular-nums text-muted-foreground">
+                    {formatSlot(g.starts_at)} to {formatTime(g.ends_at)},{" "}
+                    {g.slots.length} {g.slots.length === 1 ? "slot" : "slots"}
+                  </span>
                 </span>
-              </span>
+              </SlotsSheet>
               {canBook && (
                 <BookOnBehalf
                   doctorId={g.doctorId}

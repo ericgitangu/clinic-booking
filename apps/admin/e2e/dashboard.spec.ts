@@ -28,6 +28,15 @@ test.describe("owner dashboard", () => {
   test("shows the numbers the API reports", async ({ as }) => {
     const page = await as("owner");
     await page.goto("/dashboard?days=7");
+    // The upcoming figure is cached for a minute; ask for the API's own before comparing with it.
+    const button = page.getByTestId("refresh-metrics");
+    const finished = Number(await button.getAttribute("data-refreshes"));
+    await tap(button);
+    await expect(button).toHaveAttribute(
+      "data-refreshes",
+      String(finished + 1),
+    );
+    await expect(button).toBeEnabled();
     const week = lastDays(new Date(), 7);
     const m = await internal<Metrics>(
       "GET",
@@ -265,11 +274,15 @@ test.describe("owner dashboard", () => {
         cell!.x + cell!.width / 2,
         cell!.y + cell!.height / 2,
       );
-      await expect(page).toHaveURL(
-        /\/dashboard\/appointments\/[0-9a-f-]{36}$/,
-        { timeout: 2500 },
-      );
+      await expect(page.getByTestId("sheet-patient")).toBeVisible({
+        timeout: 2500,
+      });
     }).toPass({ timeout: 15_000 });
+    // A click opens the appointment in a sheet over the dashboard, with the same patient; the full
+    // page is one link away.
+    await expect(page.getByTestId("sheet-patient")).toHaveText(patient.trim());
+    await page.getByRole("link", { name: "Open the full page" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/appointments\/[0-9a-f-]{36}$/);
     await expect(page.getByTestId("appointment-patient")).toHaveText(
       patient.trim(),
     );
@@ -628,8 +641,12 @@ test.describe("owner dashboard", () => {
     await expect(rows.nth(1)).toBeFocused();
     await page.keyboard.press("k");
     await expect(rows.nth(0)).toBeFocused();
+    // Enter on the focused row opens its detail; Escape closes it and focus goes back to the row.
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/dashboard\/appointments\//);
+    await expect(page.getByTestId("sheet-patient")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("sheet-patient")).toHaveCount(0);
+    await expect(rows.nth(0)).toBeFocused();
   });
 
   test("keyboard: search opens with /, never eats typed letters, runs a command", async ({

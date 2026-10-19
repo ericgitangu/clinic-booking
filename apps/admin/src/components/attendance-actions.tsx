@@ -14,15 +14,28 @@ const WORD = { arrived: "arrived", no_show: "no-show" } as const;
 export function AttendanceActions({
   appointmentId,
   mark,
+  onDone,
 }: {
   appointmentId: string;
   mark: "booked" | "arrived" | "no_show";
+  /** Called after a mark was recorded, for a sheet that has to read the appointment again. */
+  onDone?: () => void;
 }) {
   if (mark === "booked") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Mark appointmentId={appointmentId} to="arrived" change={false} />
-        <Mark appointmentId={appointmentId} to="no_show" change={false} />
+        <Mark
+          appointmentId={appointmentId}
+          to="arrived"
+          change={false}
+          onDone={onDone}
+        />
+        <Mark
+          appointmentId={appointmentId}
+          to="no_show"
+          change={false}
+          onDone={onDone}
+        />
       </div>
     );
   }
@@ -31,6 +44,7 @@ export function AttendanceActions({
       appointmentId={appointmentId}
       to={mark === "arrived" ? "no_show" : "arrived"}
       change
+      onDone={onDone}
     />
   );
 }
@@ -39,10 +53,12 @@ function Mark({
   appointmentId,
   to,
   change,
+  onDone,
 }: {
   appointmentId: string;
   to: "arrived" | "no_show";
   change: boolean;
+  onDone?: () => void;
 }) {
   const word = WORD[to];
   const Icon = to === "arrived" ? UserCheckIcon : UserXIcon;
@@ -71,6 +87,7 @@ function Mark({
       }
       confirmLabel={change ? `Change to ${word}` : `Mark ${word}`}
       run={(reason) => markAttendance(appointmentId, to, reason)}
+      onDone={onDone}
     />
   );
 }

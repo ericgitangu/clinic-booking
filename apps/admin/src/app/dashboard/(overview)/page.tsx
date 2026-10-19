@@ -31,6 +31,7 @@ import {
   shareDelta,
 } from "@/lib/kpi-delta";
 import type { DrillConfig } from "@/lib/drill";
+import { RESCHEDULE_GAP } from "@/lib/figure-gaps";
 import { can } from "@/lib/roles";
 import { requireStaff } from "@/lib/session";
 
@@ -151,6 +152,7 @@ export default async function Dashboard({
       <GapsToFill gaps={dash.gaps} canBook={mayAct} />
 
       <KpiStrip
+        canAct={mayAct}
         comparedWith={`the ${days} days before`}
         items={[
           {
@@ -290,6 +292,17 @@ export default async function Dashboard({
             label: "Reschedules",
             value: String(k.reschedules.value ?? 0),
             note: `in the last ${days} days`,
+            figure: {
+              title: "Reschedules",
+              description: `Visits moved in the last ${days} days, against the ${days} days before.`,
+              gap: RESCHEDULE_GAP,
+              body: (
+                <p className="tabular-nums" data-testid="figure-reschedules">
+                  {k.reschedules.value ?? 0} now, {k.reschedules.previous ?? 0}{" "}
+                  before.
+                </p>
+              ),
+            },
             delta: countDelta(
               k.reschedules.value ?? 0,
               k.reschedules.previous ?? 0,
@@ -305,6 +318,7 @@ export default async function Dashboard({
           doctors={dash.range.per_doctor}
           days={days}
           range={range}
+          canAct={mayAct}
         />
       </div>
 
@@ -347,6 +361,7 @@ export default async function Dashboard({
         <AppointmentsList
           items={page.items}
           view={page.view}
+          canAct={mayAct}
           status={status}
           nextHref={
             page.next_cursor ? link({ cursor: page.next_cursor }) : null

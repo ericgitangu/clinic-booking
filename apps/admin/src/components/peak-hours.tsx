@@ -28,12 +28,14 @@ export function PeakHours({
   selected,
   days,
   range,
+  canAct = false,
 }: {
   data: Heatmap;
   doctors: readonly { id: string; name: string }[];
   selected: string | null;
   days: number;
   range: { from: string; to: string };
+  canAct?: boolean;
 }) {
   const count = new Map(
     data.cells.map((c) => [`${c.weekday}-${c.hour}`, c.count]),
@@ -130,6 +132,7 @@ export function PeakHours({
                                   doctorId: selected ?? undefined,
                                 },
                                 slot: { weekday: n, hour: h },
+                                canAct,
                               }}
                             >
                               {c}

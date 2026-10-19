@@ -21,13 +21,40 @@ const COMPOSE_ARGS = [
   COMPOSE_FILE,
 ];
 
-function run(
+// The slot a visit is moved to is found, not assumed: the first half hour (and doctor) with no booked
+// visit already there, so specs never collide on the one-booked-visit-per-doctor-slot rule whatever
+// ran before. The search starts at the half hour the caller prefers and works through the others;
+// a caller that needs the desk-attendance window (a visit begun within the last two hours) only
+// gets half hours inside it. Doctors are tried from the end of the alphabet, so the doctor most
+// specs book first keeps its slots.
+function runPast(
   id: string,
-  start: string,
-  anyStatus = false,
-  lastDoctor = false,
+  prefer: number,
+  window: boolean,
+  anyStatus: boolean,
 ): void {
-  execFileSync(
+  const hi = window ? 3 : 8;
+  const base = `(date_trunc('hour', now())
+        + CASE WHEN extract(minute FROM now()) >= 30 THEN interval '30 minutes' ELSE interval '0' END)`;
+  const sql = `
+    WITH cand AS (
+      SELECT d.id AS doctor_id, ${base} - k * interval '30 minutes' AS s
+      FROM doctors d, generate_series(0, ${hi}) k
+      WHERE NOT EXISTS (
+        SELECT 1 FROM appointments o
+        WHERE o.doctor_id = d.id AND o.status = 'booked' AND o.id <> '${id}'
+          AND o.starts_at = ${base} - k * interval '30 minutes')
+      ORDER BY (k <> ${prefer}), k, d.full_name DESC
+      LIMIT 1)
+    UPDATE appointments a
+       SET starts_at = cand.s, ends_at = cand.s + interval '30 minutes', doctor_id = cand.doctor_id
+      FROM cand
+     WHERE a.id = '${id}'${anyStatus ? "" : " AND a.status = 'booked'"}`;
+  execute(sql, id);
+}
+
+function execute(sql: string, id: string): void {
+  const out = execFileSync(
     "docker",
     [
       ...COMPOSE_ARGS,
@@ -42,45 +69,45 @@ function run(
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      `UPDATE appointments SET starts_at = ${start}, ends_at = ${start} + interval '30 minutes'${
-        lastDoctor
-          ? ", doctor_id = (SELECT id FROM doctors ORDER BY full_name DESC LIMIT 1)"
-          : ""
-      }
-         WHERE id = '${id}'${anyStatus ? "" : " AND status = 'booked'"}`,
+      sql,
     ],
     { stdio: "pipe" },
-  );
+  ).toString();
+  if (!/UPDATE 1/.test(out)) {
+    throw new Error(
+      `no free half hour to move ${id} to (psql said: ${out.trim()})`,
+    );
+  }
 }
 
-/** The half hour that began at most 30 minutes ago, minus `back` further half hours (0 to 8). */
+/**
+ * Moves a booked visit to a half hour that began in the last few hours, on the first free doctor and
+ * slot. `back` (0 to 8) is the preferred number of half hours before the latest one; a value of 3 or
+ * less keeps the visit inside the desk window (begun within two hours), and the search then stays
+ * inside it. `lastDoctor` is kept for callers that name it and no longer changes anything.
+ */
 export function moveToPastHalfHour(
   id: string,
   back = 0,
   anyStatus = false,
-  /** Also hand the visit to the last doctor, whom no other spec books, to avoid sharing a slot. */
   lastDoctor = false,
 ): void {
+  void lastDoctor;
   if (!Number.isInteger(back) || back < 0 || back > 8) {
     throw new Error("back must be 0 to 8");
   }
-  run(
-    id,
-    `(date_trunc('hour', now())
-        + CASE WHEN extract(minute FROM now()) >= 30 THEN interval '30 minutes' ELSE interval '0' END
-        - interval '${back * 30} minutes')`,
-    anyStatus,
-    lastDoctor,
-  );
+  runPast(id, back, back <= 3, anyStatus);
 }
 
 /** The next half hour that is at least 20 minutes away: inside the last hour before the visit. */
 export function moveToNextHalfHour(id: string): void {
-  run(
-    id,
-    `(date_trunc('hour', now() + interval '50 minutes')
+  const start = `(date_trunc('hour', now() + interval '50 minutes')
         + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
-               THEN interval '30 minutes' ELSE interval '0' END)`,
+               THEN interval '30 minutes' ELSE interval '0' END)`;
+  execute(
+    `UPDATE appointments SET starts_at = ${start}, ends_at = ${start} + interval '30 minutes'
+       WHERE id = '${id}' AND status = 'booked'`,
+    id,
   );
 }
 

@@ -184,8 +184,8 @@ test.describe("key number cards", () => {
       await first.locator("span.truncate").first().innerText()
     ).trim();
     await first.click();
-    await expect(page).toHaveURL(/\/dashboard\/appointments\/[0-9a-f-]{36}$/);
-    await expect(page.getByTestId("appointment-patient")).toHaveText(name);
+    // The row opens that appointment in its own sheet over the list.
+    await expect(page.getByTestId("sheet-patient")).toHaveText(name);
   });
 
   test("on a 360px phone the sheet is a bottom sheet that fits the screen", async ({

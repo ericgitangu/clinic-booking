@@ -1,6 +1,8 @@
 "use client";
 
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { FigureSheet } from "@/components/figure-sheet";
+import { ACTIVITY_GAP } from "@/lib/figure-gaps";
 import {
   ChartContainer,
   ChartLegend,
@@ -152,7 +154,23 @@ export function ActivityChart({ rows }: { rows: ActivityRow[] }) {
                           scope="row"
                           className="py-1.5 pr-2 text-left font-normal"
                         >
-                          {r.label}
+                          <FigureSheet
+                            className="min-h-6 rounded-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            title={`Activity on ${r.label}`}
+                            description="Bookings, moves and cancellations made that day."
+                            gap={ACTIVITY_GAP}
+                            trigger={
+                              <span data-testid="activity-day">{r.label}</span>
+                            }
+                          >
+                            <p
+                              className="tabular-nums"
+                              data-testid="figure-activity"
+                            >
+                              {r.booked} booked, {r.rescheduled} rescheduled,{" "}
+                              {r.cancelled} cancelled.
+                            </p>
+                          </FigureSheet>
                         </th>
                         <td className="pr-2">{r.booked}</td>
                         <td className="pr-2">{r.rescheduled}</td>

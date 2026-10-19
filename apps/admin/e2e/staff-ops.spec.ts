@@ -172,9 +172,15 @@ test.describe("invitations", () => {
     await expect(
       page.getByText(`Invitation made for ${invitee}.`),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: `Revoke the invitation for ${invitee}` })
-      .click();
+    await tap(
+      page.getByRole("button", {
+        name: `Revoke the invitation for ${invitee}`,
+      }),
+    );
+    // Like every action it asks first; this one takes no reason from the API.
+    const ask = page.getByRole("dialog", { name: "Revoke this invitation?" });
+    await expect(ask.getByLabel("Reason")).toHaveCount(0);
+    await ask.getByRole("button", { name: "Revoke invitation" }).click();
     await expect(page.getByText("Invitation revoked.")).toBeVisible();
     await expect(
       page.getByTestId("invite-list").locator("li", { hasText: invitee }),
@@ -362,8 +368,9 @@ test.describe("marking attendance from the appointment page", () => {
     await expect(
       row.getByRole("button", { name: "Veto and lock" }),
     ).toHaveCount(0);
+    // Marked no-show, so the one change on offer is back to arrived.
     await expect(
-      row.getByRole("button", { name: "Change to no-show" }),
+      row.getByRole("button", { name: "Change to arrived" }),
     ).toBeVisible();
   });
 

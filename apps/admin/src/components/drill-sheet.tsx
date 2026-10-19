@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useMemo,
@@ -21,6 +20,7 @@ import {
   SheetTrigger,
 } from "@clinic/ui/components/ui/sheet";
 import { Skeleton } from "@clinic/ui/components/ui/skeleton";
+import { AppointmentLink } from "@/components/appointment-sheet";
 import { StatusBadge } from "@/components/status-badge";
 import { formatSlot } from "@/lib/clinic-time";
 import {
@@ -265,6 +265,7 @@ export function DrillSheet({
                   r={r}
                   view={data.view}
                   lead={config.showLead}
+                  canAct={config.canAct ?? false}
                 />
               ))}
             </ul>
@@ -279,15 +280,18 @@ function DrillItem({
   r,
   view,
   lead,
+  canAct,
 }: {
   r: DrillRow;
   view: "full" | "minimised";
   lead?: boolean;
+  canAct: boolean;
 }) {
   return (
     <li>
-      <Link
-        href={`/dashboard/appointments/${r.id}`}
+      <AppointmentLink
+        id={r.id}
+        canAct={canAct}
         className="flex min-h-14 items-center gap-3 px-3 py-2 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
       >
         <span aria-hidden="true" className="contents">
@@ -303,7 +307,7 @@ function DrillItem({
           </span>
         </span>
         <StatusBadge status={r.status} attendance={r.attendance} />
-      </Link>
+      </AppointmentLink>
     </li>
   );
 }

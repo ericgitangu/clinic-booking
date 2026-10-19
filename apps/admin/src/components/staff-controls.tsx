@@ -13,6 +13,7 @@ export function StaffControls({
   locked,
   canVeto,
   compact = false,
+  onDone,
 }: {
   appointmentId: string;
   locked: boolean;
@@ -20,6 +21,8 @@ export function StaffControls({
   canVeto: boolean;
   /** Smaller and wrapping, for a row on the Today board. */
   compact?: boolean;
+  /** Called after the change, for a sheet that has to read the appointment again. */
+  onDone?: () => void;
 }) {
   return (
     <div
@@ -38,6 +41,7 @@ export function StaffControls({
           description="The patient will be able to change it again."
           confirmLabel="Unlock appointment"
           run={(reason) => unlockAppointment(appointmentId, reason)}
+          onDone={onDone}
         />
       ) : canVeto ? (
         <ConfirmAction
@@ -50,6 +54,7 @@ export function StaffControls({
           description="Their most recent move is reversed and the appointment is locked, so they cannot change it again until you unlock it."
           confirmLabel="Veto and lock"
           run={(reason) => vetoAppointment(appointmentId, reason)}
+          onDone={onDone}
         />
       ) : null}
     </div>

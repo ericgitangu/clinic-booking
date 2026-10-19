@@ -21,10 +21,12 @@ export function DoctorUtilisation({
   doctors,
   days,
   range,
+  canAct = false,
 }: {
   doctors: Metrics["per_doctor"];
   days: number;
   range: { from: string; to: string };
+  canAct?: boolean;
 }) {
   return (
     <Card className="bg-card/80 shadow-sm backdrop-blur-sm">
@@ -87,6 +89,7 @@ export function DoctorUtilisation({
                             status: "booked",
                             doctorId: d.doctor_id,
                           },
+                          canAct,
                         }}
                       >
                         <span data-testid="load-drill">

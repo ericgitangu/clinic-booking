@@ -29,12 +29,19 @@ export function SlotsSheet({
   hours,
   truncated,
   canBook,
+  title = "Free slots",
+  children,
+  triggerClassName,
 }: {
   slots: readonly SlotRow[];
   hours: number;
   /** The API's own cut. */
   truncated: boolean;
   canBook: boolean;
+  title?: string;
+  /** What the trigger shows; without it the trigger reads "See all N free slots". */
+  children?: React.ReactNode;
+  triggerClassName?: string;
 }) {
   const [doctorId, setDoctorId] = useState("");
   const doctors = useMemo(() => {
@@ -49,10 +56,18 @@ export function SlotsSheet({
         <button
           type="button"
           aria-haspopup="dialog"
-          className="inline-flex min-h-11 items-center rounded-md px-1 text-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          data-testid="slots-open"
+          className={
+            triggerClassName ??
+            "inline-flex min-h-11 items-center rounded-md px-1 text-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          }
+          data-testid={children ? "gap-open" : "slots-open"}
         >
-          See all {slots.length} free {slots.length === 1 ? "slot" : "slots"}
+          {children ?? (
+            <>
+              See all {slots.length} free{" "}
+              {slots.length === 1 ? "slot" : "slots"}
+            </>
+          )}
         </button>
       </SheetTrigger>
       <SheetContent
@@ -60,9 +75,11 @@ export function SlotsSheet({
         className="mx-auto max-h-[88dvh] w-full gap-3 overflow-hidden rounded-t-2xl p-0 sm:max-w-3xl"
       >
         <SheetHeader className="px-4 pt-4 pr-12">
-          <SheetTitle className="font-heading text-lg">Free slots</SheetTitle>
+          <SheetTitle className="font-heading text-lg">{title}</SheetTitle>
           <SheetDescription>
-            Every free half hour in the next {hours} hours, soonest first.
+            Free half hours
+            {children ? " in this gap" : ` in the next ${hours} hours`}, soonest
+            first.
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-1 px-4">

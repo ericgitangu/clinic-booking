@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@clinic/ui/components/ui/table";
+import { AppointmentLink } from "@/components/appointment-sheet";
 import { StatusBadge } from "@/components/status-badge";
 import { formatSlot } from "@/lib/clinic-time";
 import type { StatusFilterValue } from "@/lib/filters";
@@ -42,12 +43,15 @@ const FOCUS =
 export function AppointmentsList({
   items,
   view = "full",
+  canAct = false,
   status,
   nextHref,
   firstHref,
 }: {
   items: readonly AdminAppointment[];
   view?: "full" | "minimised";
+  /** Owner and admin: a row opens a sheet that carries the actions. */
+  canAct?: boolean;
   status: StatusFilterValue;
   nextHref: string | null;
   firstHref: string | null;
@@ -95,15 +99,16 @@ export function AppointmentsList({
                 </TableCell>
                 <TableCell className="font-medium">
                   {/* The link's ::after covers the row, so a click anywhere on it opens it. */}
-                  <Link
-                    href={`/dashboard/appointments/${a.id}`}
+                  <AppointmentLink
+                    id={a.id}
+                    canAct={canAct}
                     data-row-link
                     data-row-label={rowLabel(a, view)}
                     className={`rounded-sm after:absolute after:inset-0 ${FOCUS}`}
                   >
                     {shownName(a.patient_name, view)}
                     <span className="sr-only">{`, appointment on ${formatSlot(a.starts_at)}`}</span>
-                  </Link>
+                  </AppointmentLink>
                 </TableCell>
                 <TableCell>
                   <span className="flex items-center gap-2">
@@ -135,8 +140,9 @@ export function AppointmentsList({
       <ul className="space-y-3 md:hidden" data-testid="appointments-cards">
         {items.map((a) => (
           <li key={a.id}>
-            <Link
-              href={`/dashboard/appointments/${a.id}`}
+            <AppointmentLink
+              id={a.id}
+              canAct={canAct}
               data-row-link
               data-row-label={rowLabel(a, view)}
               className={`flex min-h-16 items-center gap-3 rounded-xl border border-border bg-card/80 p-3 motion-safe:transition-[transform,background-color] motion-safe:active:scale-[0.985] hover:bg-card ${FOCUS}`}
@@ -164,7 +170,7 @@ export function AppointmentsList({
                 className="size-5 shrink-0 text-muted-foreground"
                 aria-hidden
               />
-            </Link>
+            </AppointmentLink>
           </li>
         ))}
       </ul>

@@ -14,6 +14,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
 
+vi.mock("@/lib/detail-actions", () => ({
+  loadDetail: async () => ({ ok: false, message: "" }),
+}));
+
 vi.mock("@/lib/drill-actions", () => ({
   loadDrill: async () => ({ ok: false, message: "" }),
 }));

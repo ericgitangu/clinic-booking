@@ -27,6 +27,8 @@ export interface DrillConfig {
   showLead?: boolean;
   /** The number the sheet was opened from. If the list is cut short, the sheet says "of N". */
   expected?: number;
+  /** Owner and admin: a row opens a sheet that carries the actions. Viewers get detail only. */
+  canAct?: boolean;
 }
 
 export interface DrillRow {

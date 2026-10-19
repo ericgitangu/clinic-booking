@@ -306,6 +306,8 @@ test.describe("live feed", () => {
     const row = page.getByTestId("live-event").filter({ hasText: name });
     await expect(row).toBeVisible({ timeout: 2000 });
     await row.getByRole("link").click();
+    await expect(page.getByTestId("sheet-patient")).toHaveText(name);
+    await page.getByRole("link", { name: "Open the full page" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/dashboard/appointments/${made.id}$`),
     );

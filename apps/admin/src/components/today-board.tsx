@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { Button } from "@clinic/ui/components/ui/button";
+import { AppointmentLink } from "@/components/appointment-sheet";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { AttendanceActions } from "@/components/attendance-actions";
 import { DrillSheet } from "@/components/drill-sheet";
@@ -89,6 +90,7 @@ export function TodayBoard({
                 spec: { from: date, to: addDays(date, 1), status: "all" },
                 visit,
                 expected: n,
+                canAct,
               }}
             >
               {n} {word}
@@ -156,6 +158,7 @@ export function TodayBoard({
                           status: "all",
                           doctorId: d.doctor_id,
                         },
+                        canAct,
                       }}
                     >
                       <span data-testid="today-drill">
@@ -191,8 +194,9 @@ export function TodayBoard({
                         canAct && a.status === "booked" && future;
                       return (
                         <li key={a.id} data-testid="today-visit">
-                          <Link
-                            href={`/dashboard/appointments/${a.id}`}
+                          <AppointmentLink
+                            id={a.id}
+                            canAct={canAct}
                             data-row-link
                             data-row-label={`${shownName(a.patient_name, board.view)}, ${formatSlot(a.starts_at)}, ${a.status}`}
                             className="flex min-h-11 items-center gap-3 rounded-md py-2 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -210,7 +214,7 @@ export function TodayBoard({
                               )}
                             </span>
                             <StatusBadge status={a.status} />
-                          </Link>
+                          </AppointmentLink>
                           {canAct && (
                             <div className="flex flex-wrap gap-2 pb-2 sm:pl-14">
                               {mayMark && (

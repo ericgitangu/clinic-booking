@@ -28,12 +28,15 @@ export function AppointmentActions({
   doctorId,
   today,
   compact = false,
+  onDone,
 }: {
   appointmentId: string;
   doctorId: string;
   today: string;
   /** Side by side and smaller, for a row on the Today board. */
   compact?: boolean;
+  /** Called after the change, for a sheet that has to read the appointment again. */
+  onDone?: () => void;
 }) {
   return (
     <div
@@ -45,6 +48,7 @@ export function AppointmentActions({
         appointmentId={appointmentId}
         doctorId={doctorId}
         today={today}
+        onDone={onDone}
       />
       <ConfirmAction
         trigger={
@@ -56,6 +60,7 @@ export function AppointmentActions({
         description="The slot is released and the patient is not told automatically. Say why; it is kept with the appointment."
         confirmLabel="Cancel appointment"
         run={(reason) => cancelAppointment(appointmentId, reason)}
+        onDone={onDone}
       />
     </div>
   );
@@ -65,10 +70,12 @@ function RescheduleAction({
   appointmentId,
   doctorId,
   today,
+  onDone,
 }: {
   appointmentId: string;
   doctorId: string;
   today: string;
+  onDone?: () => void;
 }) {
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
@@ -107,6 +114,7 @@ function RescheduleAction({
         setDate("");
         setSlot("");
         setSlots(null);
+        onDone?.();
       }}
       extra={
         <>
