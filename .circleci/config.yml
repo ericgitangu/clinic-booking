@@ -813,6 +813,37 @@ jobs:
           command: docker compose logs api | tail -80
           when: on_fail
 
+  api-check:
+    # The reviewer collection (docs/api/) with newman against the compose stack: the whole booking
+    # journey, every problem code it covers, and every body against the contract's schema. Also
+    # fails when the committed collection no longer matches a build from contracts/openapi.json.
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ docs/api/ scripts/api_check.sh scripts/api_collection.mjs scripts/cost_check.sh scripts/ci/ docker-compose.yml .circleci/
+      - run:
+          name: Collection against the compose stack (newman, pinned image)
+          command: REPORT_DIR=/tmp/newman bash scripts/api_check.sh local
+      - store_test_results:
+          path: /tmp/newman
+      - run:
+          name: Install ripgrep
+          command: |
+            # a third-party PPA index can 503; ripgrep is in the main archive
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq ripgrep
+      - run:
+          name: Static cost guards
+          command: bash scripts/cost_check.sh --static
+      - run:
+          name: CI script tests
+          command: bash scripts/ci/test_ci_scripts.sh
+
   admin-e2e:
     # The admin app's Playwright scenarios against its production build, the real API and the real
     # Postgres from docker-compose (migrations and seed included). Only Google's own sign-in is
@@ -1176,6 +1207,7 @@ workflows:
       - e2e-real:
           context: ably-ci
       - admin-e2e
+      - api-check
       - cost-static
 
   wif-deny:
@@ -1206,6 +1238,7 @@ workflows:
       - e2e-real:
           context: ably-ci
       - admin-e2e
+      - api-check
       - cost-static
       - build-scan-push:
           context: gcp-deploy

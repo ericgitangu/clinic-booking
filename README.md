@@ -10,6 +10,7 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Click.** <https://clinic.ericgitangu.com/book> for the patient flow (Google sign-in), <https://clinic.ericgitangu.com/docs> for Swagger UI against the real API (no sign-in, as the brief asks).
 - **Read first.** [3.4 The concurrency guarantee](#34-the-concurrency-guarantee) and the two ADRs behind it, [ADR-0003](docs/adr/0003-double-booking-partial-unique-index.md) and [ADR-0018](docs/adr/0018-testing-strategy.md). If that logic is wrong, nothing else matters.
 - **Run.** [Section 2](#2-verify-the-claims-in-10-minutes) is a copy-paste path against production: 20 simultaneous bookings of one slot, then cancelling twice.
+- **Try the API.** `make api-check` runs a Postman collection of the whole booking journey against a local stack; the same files import into Postman or Insomnia ([Try the API](#try-the-api)).
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and an [ADR](docs/adr/README.md) that names what it costs. [`docs/architecture/overview.md`](docs/architecture/overview.md) has the diagrams (context, containers, booking, push, release, data handling), [`docs/engineering/decisions.md`](docs/engineering/decisions.md) the long decisions index, and [`docs/engineering/verification.md`](docs/engineering/verification.md) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](docs/runbooks/admin-access.md)), so a reviewer cannot sign in. I can grant access if you want to see it.
 - **Reviewer access.** The API side of [ADR-0033](docs/adr/0033-staff-crud-veto-and-invites.md) (invitations, roles, audit trail) is built and is in pull request #63; the invitation email and the admin screens that use it are separate pull requests (#68 and the admin revamp) and are not live until they merge. Once they are, the owner invites the reviewer as admin through `/access`; the invitation expires in 72 hours and must be accepted with the same Google email it was sent to. Until then, ask me and I grant access by hand.
@@ -88,6 +89,20 @@ Observed: the first returns `200`. The second returns `409` as `application/prob
 **Rerunning locally.** `make e2e` always starts from a fresh database (it runs `docker compose down -v && docker compose up -d --build --wait` first), so rerun it as often as you like. The fresh-database rule matters only if you run Playwright directly (`pnpm -C apps/booking test:e2e`) against a stack you kept, or `KEEP_STACK=1 make e2e-admin`: then run `make down` first (it runs `docker compose down -v`; `make down -v` would only print Make's version).
 
 **The full script.** `make verify URL=$API` runs the end-to-end claims check (`scripts/verify_claims.py`) and needs `uv`. Observed on 2026-10-18, the script printed `17/17 passed` against production. The release pipeline runs the same script against each new revision before it gets traffic, and runs `cost_check.sh --live` after the deploy.
+
+### Try the API
+
+A Postman collection in [`docs/api/`](docs/api/README.md) walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot under an hour away (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change within the hour (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
+
+One command, Docker only (its own compose stack, removed afterwards):
+
+```bash
+make api-check
+```
+
+Observed on 2026-10-19: 39 requests, 212 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production (12 requests, 62 assertions, 0 failed on 2026-10-19); the booking writes need `API_WRITES=1`.
+
+To click through it instead: in Postman, Import the three files in `docs/api/` and pick the `local` or `production` environment; in Insomnia, Import the collection file (it reads the Postman format) and set `baseUrl`, though Insomnia runs only part of Postman's test scripts. No request needs a key.
 
 ## 3. System design
 
