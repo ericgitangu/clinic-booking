@@ -132,23 +132,21 @@ export async function rescheduleAppointment(
 export async function markAttendance(
   id: string,
   kind: "arrived" | "no_show",
-  reason?: string,
+  reason: string,
 ): Promise<ActionResult> {
   const staff = await authorise("manage-appointments");
   if (!staff) return DENIED;
-  const text = reason?.trim();
-  const res = await mark(
-    callerFor(staff, staff.role),
-    id,
-    kind,
-    text ? text : undefined,
-  );
+  // Every mark carries a reason, the first one too (the API only requires it to change a mark).
+  const text = validReason(reason);
+  if (!text)
+    return { ok: false, message: "Give a reason of at least 3 characters." };
+  const res = await mark(callerFor(staff, staff.role), id, kind, text);
   if (!res.ok) return describe(res, "Give a reason of at least 3 characters.");
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return {
     ok: true,
-    message: kind === "arrived" ? "Marked as arrived." : "Marked as no-show.",
+    message: kind === "arrived" ? "Marked arrived." : "Marked no-show.",
   };
 }
 

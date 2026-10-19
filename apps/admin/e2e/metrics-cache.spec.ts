@@ -78,7 +78,7 @@ test("an admin's cancel shows on the dashboard at once, with no refresh and no w
 
   await page.goto(`/dashboard/appointments/${id}`);
   await page.getByRole("button", { name: "Cancel appointment" }).click();
-  const dialog = page.getByRole("alertdialog");
+  const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Reason").fill("patient called to cancel");
   await dialog.getByRole("button", { name: "Cancel appointment" }).click();
   await expect(page.getByText("Appointment cancelled.")).toBeVisible();

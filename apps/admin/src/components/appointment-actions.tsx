@@ -1,29 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CalendarClockIcon, XIcon } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@clinic/ui/components/ui/alert-dialog";
 import { Button } from "@clinic/ui/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@clinic/ui/components/ui/dialog";
 import { Input } from "@clinic/ui/components/ui/input";
 import { Label } from "@clinic/ui/components/ui/label";
 import {
@@ -33,24 +12,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@clinic/ui/components/ui/select";
-import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { notify } from "@clinic/ui/lib/notify";
+import { ConfirmAction } from "@/components/confirm-action";
 import {
   cancelAppointment,
   loadSlots,
   rescheduleAppointment,
-  type ActionResult,
 } from "@/lib/actions";
 import { formatTime } from "@/lib/clinic-time";
 
-function report(result: ActionResult): boolean {
-  if (result.ok) notify.success(result.message);
-  else notify.error(result.message);
-  return result.ok;
-}
-
-// Cancel or move an appointment for a patient. The page only renders this for roles that may;
-// the server action checks the role again.
+// Cancel or move an appointment for a patient, each through the one confirmation dialog. The page
+// only renders this for roles that may; the server action checks the role again.
 export function AppointmentActions({
   appointmentId,
   doctorId,
@@ -69,77 +41,27 @@ export function AppointmentActions({
         compact ? "flex flex-wrap gap-2" : "flex flex-col gap-3 sm:flex-row"
       }
     >
-      <RescheduleDialog
+      <RescheduleAction
         appointmentId={appointmentId}
         doctorId={doctorId}
         today={today}
       />
-      <CancelDialog appointmentId={appointmentId} />
+      <ConfirmAction
+        trigger={
+          <Button variant="destructive" className="min-h-11">
+            <XIcon aria-hidden /> Cancel appointment
+          </Button>
+        }
+        title="Cancel this appointment?"
+        description="The slot is released and the patient is not told automatically. Say why; it is kept with the appointment."
+        confirmLabel="Cancel appointment"
+        run={(reason) => cancelAppointment(appointmentId, reason)}
+      />
     </div>
   );
 }
 
-function CancelDialog({ appointmentId }: { appointmentId: string }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [pending, start] = useTransition();
-
-  function confirm() {
-    start(async () => {
-      const ok = report(await cancelAppointment(appointmentId, reason));
-      if (ok) {
-        setOpen(false);
-        setReason("");
-        router.refresh();
-      }
-    });
-  }
-
-  return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button variant="destructive" className="min-h-11">
-          <XIcon aria-hidden /> Cancel appointment
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Cancel this appointment?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The slot is released and the patient is not told automatically. Say
-            why; it is kept with the appointment.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="cancel-reason">Reason</Label>
-          <Textarea
-            id="cancel-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={450}
-            rows={3}
-          />
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="min-h-11">Keep it</AlertDialogCancel>
-          <AlertDialogAction
-            className="min-h-11"
-            disabled={pending || reason.trim().length < 3}
-            onClick={(e) => {
-              e.preventDefault();
-              confirm();
-            }}
-          >
-            {pending ? "Cancelling" : "Cancel appointment"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function RescheduleDialog({
+function RescheduleAction({
   appointmentId,
   doctorId,
   today,
@@ -148,13 +70,10 @@ function RescheduleDialog({
   doctorId: string;
   today: string;
 }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
   const [slot, setSlot] = useState("");
-  const [reason, setReason] = useState("");
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
 
   function pickDate(value: string) {
     setDate(value);
@@ -172,31 +91,25 @@ function RescheduleDialog({
     });
   }
 
-  function confirm() {
-    start(async () => {
-      if (report(await rescheduleAppointment(appointmentId, slot, reason))) {
-        setOpen(false);
-        setReason("");
-        router.refresh();
-      }
-    });
-  }
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ConfirmAction
+      trigger={
         <Button variant="outline" className="min-h-11">
           <CalendarClockIcon aria-hidden /> Reschedule
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Move this appointment</DialogTitle>
-          <DialogDescription>
-            Pick a day, then a free time with the same doctor.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
+      }
+      title="Move this appointment"
+      description="Pick a day, then a free time with the same doctor. Say why; it is kept with the appointment."
+      confirmLabel="Move appointment"
+      extraReady={!!slot}
+      run={(reason) => rescheduleAppointment(appointmentId, slot, reason)}
+      onDone={() => {
+        setDate("");
+        setSlot("");
+        setSlots(null);
+      }}
+      extra={
+        <>
           <div className="space-y-2">
             <Label htmlFor="move-date">Day</Label>
             <Input
@@ -235,30 +148,8 @@ function RescheduleDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="move-reason">Reason</Label>
-            <Textarea
-              id="move-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              maxLength={450}
-              rows={2}
-            />
-            <p className="text-sm text-muted-foreground">
-              Kept with the appointment.
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            className="min-h-11"
-            disabled={pending || !slot || reason.trim().length < 3}
-            onClick={confirm}
-          >
-            {pending ? "Working" : "Move appointment"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    />
   );
 }

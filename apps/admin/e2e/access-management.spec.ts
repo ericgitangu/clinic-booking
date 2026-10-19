@@ -69,7 +69,7 @@ test("adds, changes and revokes someone, with confirmation, and the database fol
   expect(await entry(email)).toMatchObject({ role: "admin" });
 
   await page.getByRole("button", { name: `Revoke access of ${email}` }).click();
-  await expect(page.getByRole("alertdialog")).toContainText(email);
+  await expect(page.getByRole("dialog")).toContainText(email);
   await page
     .getByRole("button", { name: "Revoke access", exact: true })
     .click();

@@ -705,7 +705,7 @@ test.describe("desk actions", () => {
     await tap(row.getByRole("button", { name: "Mark arrived" }));
     const ask = page.getByRole("dialog", { name: "Mark as arrived?" });
     await expect(ask).toBeVisible();
-    await expect(ask.getByLabel("Note (optional)")).toBeVisible();
+    await expect(ask.getByLabel("Reason")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(ask).toHaveCount(0);
     const today = localDate(new Date());
@@ -718,8 +718,9 @@ test.describe("desk actions", () => {
     );
     expect(unmarked.body.items.find((a) => a.id === id)?.attendance).toBeNull();
     await tap(row.getByRole("button", { name: "Mark arrived" }));
-    await ask.getByRole("button", { name: "Confirm arrived" }).click();
-    await expect(page.getByText("Marked as arrived.")).toBeVisible();
+    await ask.getByLabel("Reason").fill("patient is at the desk");
+    await ask.getByRole("button", { name: "Mark arrived" }).click();
+    await expect(page.getByText("Marked arrived.")).toBeVisible();
     await expect(row.getByText(/^\s*Arrived\s*$/)).toBeVisible();
     const after = await internal<{
       items: { id: string; attendance: string | null }[];
@@ -739,7 +740,7 @@ test.describe("desk actions", () => {
     await expect(confirm).toBeDisabled();
     await dialog.getByLabel("Reason").fill("patient left before being seen");
     await confirm.click();
-    await expect(page.getByText("Marked as no-show.")).toBeVisible();
+    await expect(page.getByText("Marked no-show.")).toBeVisible();
     await expect(row.getByText(/^\s*No-show\s*$/)).toBeVisible();
   });
 
@@ -913,7 +914,7 @@ test.describe("acting for a patient", () => {
     const page = await as("admin");
     await page.goto(`/dashboard/appointments/${id}`);
     await tap(page.getByRole("button", { name: "Cancel appointment" }));
-    const dialog = page.getByRole("alertdialog");
+    const dialog = page.getByRole("dialog");
     const confirm = dialog.getByRole("button", { name: "Cancel appointment" });
     await expect(confirm).toBeDisabled();
     await dialog.getByLabel("Reason").fill("patient called to cancel");

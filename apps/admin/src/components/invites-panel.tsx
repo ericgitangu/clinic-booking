@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@clinic/ui/components/ui/select";
 import { notify } from "@clinic/ui/lib/notify";
+import { ConfirmAction } from "@/components/confirm-action";
 import { createInvite, revokeInvite } from "@/lib/actions";
 import { formatSlot } from "@/lib/clinic-time";
 import { ROLE_HELP, ROLE_LABEL, type GrantableRole } from "@/lib/roles";
@@ -43,18 +44,6 @@ export function InvitesPanel({ invites }: { invites: readonly Invite[] }) {
         notify.success(res.message);
         setLink(res.link);
         setEmail("");
-        router.refresh();
-      } else {
-        notify.error(res.message);
-      }
-    });
-  }
-
-  function revoke(id: string) {
-    start(async () => {
-      const res = await revokeInvite(id);
-      if (res.ok) {
-        notify.success(res.message);
         router.refresh();
       } else {
         notify.error(res.message);
@@ -179,16 +168,23 @@ export function InvitesPanel({ invites }: { invites: readonly Invite[] }) {
                 {STATUS_LABEL[i.status]}
               </Badge>
               {i.status === "open" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-11 text-destructive"
-                  disabled={pending}
-                  onClick={() => revoke(i.id)}
-                  aria-label={`Revoke the invitation for ${i.email}`}
-                >
-                  Revoke
-                </Button>
+                <ConfirmAction
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11 text-destructive"
+                      aria-label={`Revoke the invitation for ${i.email}`}
+                    >
+                      Revoke
+                    </Button>
+                  }
+                  title="Revoke this invitation?"
+                  description={`The link sent to ${i.email} stops working.`}
+                  confirmLabel="Revoke invitation"
+                  withReason={false}
+                  run={() => revokeInvite(i.id)}
+                />
               )}
             </li>
           ))}

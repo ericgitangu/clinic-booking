@@ -339,17 +339,18 @@ test.describe("marking attendance from the appointment page", () => {
     const page = await as("admin");
     await page.goto(`/dashboard/appointments/${id}`);
     await tap(page.getByRole("button", { name: "Mark arrived" }));
-    await page
-      .getByRole("dialog", { name: "Mark as arrived?" })
-      .getByRole("button", { name: "Confirm arrived" })
-      .click();
-    await expect(page.getByText("Marked as arrived.")).toBeVisible();
+    {
+      const ask = page.getByRole("dialog", { name: "Mark as arrived?" });
+      await ask.getByLabel("Reason").fill("patient is at the desk");
+      await ask.getByRole("button", { name: "Mark arrived" }).click();
+    }
+    await expect(page.getByText("Marked arrived.")).toBeVisible();
     await expect(page.getByText(/^\s*Arrived\s*$/)).toBeVisible();
     await tap(page.getByRole("button", { name: "Change to no-show" }));
     const dialog = page.getByRole("dialog", { name: "Change to no-show?" });
     await dialog.getByLabel("Reason").fill("left before being seen");
     await dialog.getByRole("button", { name: "Change to no-show" }).click();
-    await expect(page.getByText("Marked as no-show.")).toBeVisible();
+    await expect(page.getByText("Marked no-show.")).toBeVisible();
     await expect(page.getByText(/^\s*No-show\s*$/)).toBeVisible();
 
     await page.setViewportSize({ width: 1280, height: 900 });

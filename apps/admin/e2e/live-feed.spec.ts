@@ -372,11 +372,12 @@ test.describe("live feed", () => {
     const adminPage = await ctx.newPage();
     await adminPage.goto(`/dashboard/appointments/${made.id}`);
     await tap(adminPage.getByRole("button", { name: "Mark arrived" }));
-    await adminPage
-      .getByRole("dialog", { name: "Mark as arrived?" })
-      .getByRole("button", { name: "Confirm arrived" })
-      .click();
-    await expect(adminPage.getByText("Marked as arrived.")).toBeVisible();
+    {
+      const ask = adminPage.getByRole("dialog", { name: "Mark as arrived?" });
+      await ask.getByLabel("Reason").fill("patient is at the desk");
+      await ask.getByRole("button", { name: "Mark arrived" }).click();
+    }
+    await expect(adminPage.getByText("Marked arrived.")).toBeVisible();
 
     await expect(badge).toHaveText(/Arrived/, { timeout: 2000 });
     await ctx.close();

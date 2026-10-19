@@ -30,7 +30,7 @@ test("inside the last hour staff can still cancel, with a reason, and a patient 
   await expect(page.getByText(/starts in less than an hour/i)).toHaveCount(0);
 
   await cancel.click();
-  const dialog = page.getByRole("alertdialog");
+  const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Reason").fill("clinic closed early today");
   await dialog.getByRole("button", { name: "Cancel appointment" }).click();
   await expect(page.getByText("Appointment cancelled.")).toBeVisible();
