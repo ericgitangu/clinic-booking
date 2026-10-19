@@ -78,7 +78,7 @@ a reschedule that already happened (same new start) still returns the appointmen
 
 What a client should do: do not retry, and do not offer cancel or reschedule for an appointment
 inside the window. Tell the person in plain words that the visit is too close to change in the app and to
-call the clinic (staff are held to the same rule in the app; a phone call is how a visit that close is changed).
+call the clinic (a phone call is how a patient changes a visit that close; the staff routes do not apply this rule).
 
 The contract in one line: **`422 BOOKING_TOO_SOON` on book and on a reschedule's new start (a new
 time is validated as a fresh booking); `409 CHANGE_TOO_LATE` on cancel and on a reschedule's current

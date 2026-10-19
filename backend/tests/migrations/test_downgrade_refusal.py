@@ -77,11 +77,13 @@ def test_an_audit_row_from_0010_blocks_the_downgrade(database: object) -> None:
             "VALUES ('a@clinic.example', 'admin', 'arrived', 'marked at the desk')"
         )
     )
+    before = asyncio.run(_scalar("SELECT version_num FROM alembic_version"))
     result = alembic("downgrade", "0009")
     assert result.returncode != 0
     assert "refusing to downgrade 0010" in result.stderr + result.stdout
     assert asyncio.run(_scalar("SELECT count(*) FROM staff_action_audit")) == 1
-    assert asyncio.run(_scalar("SELECT version_num FROM alembic_version")) == "0010"
+    # Unchanged, whatever the head is (a later migration may sit above 0010).
+    assert asyncio.run(_scalar("SELECT version_num FROM alembic_version")) == before
 
 
 def test_an_attendance_row_blocks_the_downgrade(database: object) -> None:
@@ -110,10 +112,12 @@ def test_an_attendance_row_blocks_the_downgrade(database: object) -> None:
     ]
     for sql, args in statements:
         asyncio.run(_exec(sql, *args))
+    before = asyncio.run(_scalar("SELECT version_num FROM alembic_version"))
     result = alembic("downgrade", "0009")
     assert result.returncode != 0
     assert "refusing to downgrade 0010" in result.stderr + result.stdout
     assert asyncio.run(_scalar("SELECT count(*) FROM appointment_attendance")) == 1
+    assert asyncio.run(_scalar("SELECT version_num FROM alembic_version")) == before
 
 
 def test_an_empty_database_downgrades_cleanly(database: object) -> None:
@@ -128,12 +132,13 @@ def test_an_audit_row_blocks_the_0009_downgrade(database: object) -> None:
             "VALUES ('a@clinic.example', 'admin', 'invite_create', 'Invited as viewer')"
         )
     )
-    assert alembic("downgrade", "0009").returncode == 0  # 0010 holds nothing of its own
+    assert alembic("downgrade", "0009").returncode == 0  # nothing above 0009 holds data here
+    before = asyncio.run(_scalar("SELECT version_num FROM alembic_version"))
     result = alembic("downgrade", "0008")
     assert result.returncode != 0
     assert "refusing to downgrade 0009" in result.stderr + result.stdout
     assert asyncio.run(_scalar("SELECT count(*) FROM staff_action_audit")) == 1
-    assert asyncio.run(_scalar("SELECT version_num FROM alembic_version")) == "0009"
+    assert asyncio.run(_scalar("SELECT version_num FROM alembic_version")) == before == "0009"
 
 
 def test_an_invitation_row_blocks_the_0009_downgrade(database: object) -> None:
