@@ -562,7 +562,9 @@ jobs:
             SMOKE_SA="clinic-smoke@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
             URL="$(gcloud run services describe clinic-realtime --region us-east4 --format='value(status.url)')"
             TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SMOKE_SA" --audiences=clinic-realtime)"
-            if ! curl -fsS --max-time 30 -H "X-Serverless-Authorization: Bearer ${TOKEN}" "$URL/health"; then
+            # Retries /health for about 60 s; a service full of real streams passes only if the
+            # Cloud Run API reports the promoted revision Ready and serving (see the script).
+            if ! URL="$URL" TOKEN="$TOKEN" SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/realtime_live_check.sh; then
               echo "FAIL: the promoted revision does not answer /health; rolling back"
               SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/rollback.sh || true
               exit 1

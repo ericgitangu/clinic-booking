@@ -1023,6 +1023,142 @@ expect "api check: no other tracked file names a newman image" \
 expect "api check: docs/api is mounted read-only into the newman container" \
   "$(grep -c 'docs/api:/etc/newman:ro' "$HERE/../api_check.sh")" 1
 
+# =========================================================================================
+# realtime_live_check.sh: a gateway full of real streams is not a failed release; a broken one is.
+# A fake curl answers /health from a script of responses, a fake sleep records the backoff, and the
+# fake gcloud above answers the stream-free probe (services describe) from a fixture.
+# =========================================================================================
+LC="$WORK/lc"; mkdir -p "$LC/bin"
+cat > "$LC/bin/curl" <<'FAKE'
+#!/usr/bin/env bash
+# Answers from $LC/responses, one "code|body" line per call; the last line repeats.
+echo "$*" >> "$LC/argv"
+n=$(( $(cat "$LC/n" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$LC/n"
+line="$(sed -n "${n}p" "$LC/responses")"; [ -n "$line" ] || line="$(tail -n 1 "$LC/responses")"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '%s' "${line#*|}" > "$out"
+printf '%s' "${line%%|*}"
+FAKE
+cat > "$LC/bin/sleep" <<'FAKE'
+#!/usr/bin/env bash
+echo "$1" >> "$LC/sleeps"
+FAKE
+chmod +x "$LC/bin/curl" "$LC/bin/sleep"
+export LC
+lc_run() { # <name> <responses...>; leaves rc and output in $FX/lc.out
+  new_fx "lc.$1"; shift
+  rm -f "$LC/n" "$LC/argv" "$LC/sleeps"; printf '%s\n' "$@" > "$LC/responses"
+  mkdir -p "$FX/promoted-rt"; echo promoted > "$FX/promoted-rt/state"
+  echo '{"revisions":["rev-n","rev-p"],"current":"rev-n","previous":"rev-p"}' > "$FX/promoted-rt/keep.json"
+  [ -f "$FX/service_after.json" ] || echo '{"status":{"latestReadyRevisionName":"rev-n","conditions":[{"type":"Ready","status":"True"}],"traffic":[{"revisionName":"rev-n","percent":100,"tag":"sha-n"},{"revisionName":"rev-p","percent":0}]}}' > "$FX/service_after.json"
+  touch "$FX/promoted"
+  ( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=tok-secret-123 PROMOTE_DIR="$FX/promoted-rt" \
+      bash "$HERE/realtime_live_check.sh" ) >"$FX/lc.out" 2>&1; rc=$?
+}
+lc_calls() { cat "$LC/n" 2>/dev/null || echo 0; }
+lc_describes() { grep -c 'run services describe clinic-realtime' "$FX/calls.all" 2>/dev/null || echo 0; }
+FULL429='429|Rate exceeded.'
+NOINST='500|<html>The request was aborted because there was no available instance.</html>'
+
+lc_run ok '200|{"status":"ok"}'
+expect "live check: a healthy /health passes on the first try" "$rc:$(lc_calls)" "0:1"
+expect "live check: ...and asks the Cloud Run API nothing" "$(lc_describes)" 0
+expect "live check: /health goes through IAM with the token, never printed" \
+  "$(grep -c 'X-Serverless-Authorization: Bearer tok-secret-123 https://rt.example/health' "$LC/argv"):$(grep -c 'tok-secret-123' "$FX/lc.out")" "1:0"
+
+lc_run busy-then-ok "$FULL429" "$NOINST" '200|{"status":"ok"}'
+expect "live check: busy, busy, then healthy passes on the third try" "$rc:$(lc_calls)" "0:3"
+expect "live check: ...backing off 2 s then 4 s" "$(tr '\n' ' ' < "$LC/sleeps")" "2 4 "
+
+lc_run full-ready "$FULL429"
+expect "live check: full for the whole minute, revision Ready and serving -> passes" "$rc" 0
+expect "live check: ...after about 60 s of backoff (2+4+8+16+16+16)" "$(awk '{s+=$1} END {print s}' "$LC/sleeps"):$(lc_calls)" "62:7"
+expect "live check: ...because the stream-free probe said so" "$(lc_describes):$(grep -c 'Ready and serves all traffic' "$FX/lc.out")" "1:1"
+
+new_fx lc.full-noinstance-notready
+echo '{"status":{"latestReadyRevisionName":"rev-p","conditions":[{"type":"Ready","status":"False"}],"traffic":[{"revisionName":"rev-n","percent":100}]}}' > "$FX/service_after.json"
+SAVED_FX="$FX"
+lc_run_keep() { # like lc_run, reusing the fixture already in $FX
+  rm -f "$LC/n" "$LC/argv" "$LC/sleeps"; printf '%s\n' "$@" > "$LC/responses"
+  mkdir -p "$FX/promoted-rt"; echo '{"revisions":["rev-n","rev-p"],"current":"rev-n","previous":"rev-p"}' > "$FX/promoted-rt/keep.json"
+  touch "$FX/promoted"
+  ( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=tok-secret-123 PROMOTE_DIR="$FX/promoted-rt" \
+      bash "$HERE/realtime_live_check.sh" ) >"$FX/lc.out" 2>&1; rc=$?
+}
+lc_run_keep "$NOINST"
+expect "live check: sustained 'no available instance' and the revision is NOT ready -> fails (rollback)" "$rc" 1
+expect "live check: ...after asking the Cloud Run API" "$(lc_describes)" 1
+
+new_fx lc.full-other-serving
+echo '{"status":{"latestReadyRevisionName":"rev-n","conditions":[{"type":"Ready","status":"True"}],"traffic":[{"revisionName":"rev-p","percent":100},{"revisionName":"rev-n","percent":0}]}}' > "$FX/service_after.json"
+lc_run_keep "$FULL429"
+expect "live check: sustained 429 while traffic is on another revision -> fails" "$rc" 1
+
+new_fx lc.describe-fails
+echo 'not json' > "$FX/service_after.json"
+lc_run_keep "$FULL429"
+expect "live check: sustained 429 and an unreadable Cloud Run answer -> fails closed" "$rc" 1
+FX="$SAVED_FX"
+
+lc_run broken '500|upstream connect error'
+expect "live check: a 500 that is not 'no available instance' fails, even after retrying" "$rc" 1
+expect "live check: ...and is never excused by the stream-free probe" "$(lc_describes)" 0
+
+lc_run crash-then-full '503|Service Unavailable' "$FULL429" '503|Service Unavailable'
+expect "live check: the last answer decides: a broken revision that was briefly 'full' still fails" "$rc:$(lc_describes)" "1:0"
+
+lc_run denied '403|Forbidden'
+expect "live check: 403 fails at once (waiting cannot fix the identity)" "$rc:$(lc_calls)" "1:1"
+
+lc_run nokeep '200|{"status":"ok"}'
+rm -f "$FX/promoted-rt/keep.json"
+( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=t PROMOTE_DIR="$FX/promoted-rt" bash "$HERE/realtime_live_check.sh" ) >/dev/null 2>&1; rc=$?
+expect "live check: no keep.json (no promoted revision named) fails closed" "$rc" 1
+
+# The release job wires it, and still rolls back when it fails.
+LCSTEP="$(awk '/Live check after promotion/,/persist_to_workspace/' "$HERE/../../.circleci/config.yml")"
+expect "live check: ship-realtime runs realtime_live_check.sh after promotion" "$(grep -c 'bash scripts/ci/realtime_live_check.sh' <<<"$LCSTEP")" 1
+expect "live check: ...and rolls back when it fails" "$(grep -c 'rollback.sh' <<<"$LCSTEP")" 1
+expect "live check: ...with no bare one-shot /health curl left behind" "$(grep -c 'curl -fsS --max-time 30' <<<"$LCSTEP")" 0
+
+# =========================================================================================
+# sse_probe.py (the release smoke's stream reads): curl --max-time 5, headers on stdin, the first
+# bytes parsed, and a stream the server did not close reported as timed out.
+# =========================================================================================
+SP="$WORK/sp"; mkdir -p "$SP"
+cat > "$SP/curl" <<'FAKE'
+#!/usr/bin/env bash
+echo "$*" > "$SP/argv"; cat > "$SP/stdin"
+case "$*" in
+  *cursor=*) printf 'id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nid: 5.9\nevent: booked\ndata: {"seq":"5.9"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n' ;;
+  *hang*) printf 'id: 5.0\nevent: hello\ndata: {}\n\n: hb\n\n'; printf 'probe-http-status:200\n' >&2; exit 28 ;;
+  *) printf 'id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n' ;;
+esac
+printf 'probe-http-status:200\n' >&2
+FAKE
+chmod +x "$SP/curl"
+sp_py() { SP="$SP" SSE_PROBE_CURL="$SP/curl" python3 - "$HERE" "$@" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import sse_probe
+url = sys.argv[2]
+p = sse_probe.probe(url, {"X-Internal-Assertion": "v1.assert-secret", "X-Serverless-Authorization": "Bearer tok-secret"}, 5)
+hello = p.frames[0] if p.frames else {}
+end = p.first("reconnect") or {}
+booked = p.first("booked") or {}
+print(p.status, p.body.startswith("id: "), hello.get("event"), hello.get("id"), "probe" in end.get("data", ""), p.timed_out, booked.get("id", "-"))
+PY
+}
+expect "sse probe: the first bytes are the hello frame, and the server's probe close is seen" "$(sp_py https://rt.example/stream)" "200 True hello 5.0 True False -"
+expect "sse probe: curl is bounded by --max-time 5 and reads headers from stdin" "$(grep -c -- '-N --max-time 5 -H @-' "$SP/argv")" 1
+expect "sse probe: the assertion and token go on stdin, never on the command line" \
+  "$(grep -c 'secret' "$SP/argv"):$(grep -c 'X-Internal-Assertion: v1.assert-secret' "$SP/stdin")" "0:1"
+expect "sse probe: a resume reads the booked event behind the cursor" "$(sp_py 'https://rt.example/stream?cursor=5.0' | awk '{print $7}')" "5.9"
+expect "sse probe: a stream the server never closed is reported as timed out" "$(sp_py https://rt.example/hang | awk '{print $5, $6}')" "False True"
+expect "realtime smoke: every stream read is the bounded probe (no long-held httpx stream)" \
+  "$(grep -c '\.stream(' "$HERE/realtime_smoke.py"):$(grep -c '^STREAM_SECONDS = 5 ' "$HERE/realtime_smoke.py")" "0:1"
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
