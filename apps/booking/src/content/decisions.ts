@@ -1,14 +1,10 @@
-// ALL the copy for /decisions lives in this file. Edit it directly; the page only lays it out.
+// All the copy for /decisions lives in this file; the page only lays it out.
 //
-// STATUS: DRAFT. Every entry below was drafted for the engineer to rewrite in his own words
-// (first person, short sentences, concrete). Nothing here is signed off yet.
-// To publish: reword what you want to change, then set DECISIONS_DRAFT to false. That one flag
-// removes the "Draft pending the engineer's edit" banner from the page.
-//
-// Rules the unit test checks: 8 to 10 entries, four non-empty parts each (an entry marked `placeholder`
-// is the one exception; none is in use now), no em dashes. Entry ids become the anchors in the page's contents list.
+// Rules the unit test checks: 8 to 10 entries, four non-empty parts each (an entry marked
+// `placeholder` is the one exception; none is in use now), no em dashes. Entry ids become the anchors
+// in the page's contents list. Set DECISIONS_DRAFT to true to show the draft banner again.
 
-export const DECISIONS_DRAFT = true;
+export const DECISIONS_DRAFT = false;
 
 export type Decision = {
   id: string;
@@ -54,17 +50,6 @@ export const DECISIONS: readonly Decision[] = [
       "If cold starts show up for real users. I would keep one instance warm before I split anything.",
   },
   {
-    id: "computed-slots",
-    title: "Free slots are worked out, not stored",
-    decision:
-      "When someone asks for a day, I take the doctor's working hours, cut them into 30 minute steps, and remove the times already booked.",
-    gaveUp:
-      "There is no slot row to lock. So the uniqueness rule has to live on the appointment, not on the slot.",
-    why: "Nothing to generate ahead of time and nothing to clean up. If working hours change, the slots change straight away. Two indexed queries answer each request.",
-    revisit:
-      "If slot length varied by doctor or the calculation got hard to reason about.",
-  },
-  {
     id: "time",
     title: "Time is stored in UTC, the clinic zone is data",
     decision:
@@ -90,10 +75,10 @@ export const DECISIONS: readonly Decision[] = [
     id: "polling-then-push",
     title: "Polling first, push on top",
     decision:
-      "A patient's page asks for fresh slots every 15 seconds while it is visible. Live push through Ably sits on top of that, and polling still works if push fails.",
+      "A patient's page asks for fresh slots every 60 seconds while live push through Ably is healthy, and every 15 seconds when push is off or has dropped. It stops after 10 idle minutes.",
     gaveUp:
-      "A slot can look free for up to 15 seconds after someone takes it. Ably is a third party that sees slot events. They carry no patient data.",
-    why: "Correctness never depends on push, because the database refuses the second booking anyway. A stream that stays open would keep servers and the database awake, and I want this to cost nothing.",
+      "If a push message is lost, a slot can look free for up to a minute. Ably is a third party that sees slot events, which carry no patient data.",
+    why: "Correctness never depends on push, because the database refuses the second booking anyway. Push makes the page feel live; the poll is the safety net that keeps it right.",
     revisit:
       "If I need push without a third party, or the free limits stop fitting.",
   },
@@ -112,33 +97,44 @@ export const DECISIONS: readonly Decision[] = [
     id: "hosting-and-cost",
     title: "Hosting close to the database, kept near zero",
     decision:
-      "The API runs on Cloud Run in us-east4, next to the Neon database. Only the Vercel project can reach it. I stay inside free tiers wherever I can.",
+      "The API runs on Cloud Run in us-east4, next to the Neon database. Only the web apps' Google identities can call it. I stay inside free tiers wherever I can, and a script checks the limits on every release.",
     gaveUp:
-      "I estimate 100 to 150 ms more per warm request for people in Kenya than a Frankfurt layout would add. I have not measured that. The shared billing account also carries about $0.34 a month.",
+      "I estimate 100 to 150 ms more per warm request for people in Kenya than a Frankfurt layout would add. I have not measured that. The shared billing account's free tiers were already used up, so this project costs about $0.35 a month, under a $0.50 ceiling I set.",
     why: "The API and the database should be close, because each booking makes several queries. With no public address on Cloud Run, there is one front door to watch.",
     revisit:
       "When latency is a real complaint, or real traffic puts the free tiers at risk.",
   },
   {
-    id: "keyless-deploy",
-    title: "Deploys with no stored cloud key",
-    decision:
-      "CircleCI signs in to Google Cloud with a short-lived token through workload identity federation. A release goes live by tag after a smoke test, and it rolls back on its own if the check fails.",
-    gaveUp:
-      "The Vercel token is still long-lived. A pipeline on main takes about 10 to 12 minutes, which is an estimate.",
-    why: "There is no cloud key to leak, rotate or forget. A bad release should undo itself before I notice.",
-    revisit:
-      "If Vercel offers a token-less deploy, or the pipeline time starts to slow me down.",
-  },
-  {
     id: "go",
     title: "A small Go service for the staff live feed",
     decision:
-      "I added a small Go service that streams the booking log to the staff dashboard. It only reads. Its database role can select a few columns and nothing else, and every write still goes through FastAPI.",
+      "A small Go service streams the booking log to the staff dashboard. It only reads: its database role can select a few columns and nothing else, and every write still goes through FastAPI. It is deployed and serving the live feed.",
     gaveUp:
-      "A second runtime to build, scan and deploy. Cloud Run bills while a stream is open, and below 1 vCPU it allows one stream per instance. So the service runs from zero to two instances and back to zero, and two staff can watch live at once. A third sees 'Live feed busy' and the page refreshes every 30 seconds instead. One connected hour is about 900 vCPU-seconds. The measured figure: to be measured after the first deploy.",
-    why: "Booking rules and the double booking guarantee stay in one codebase with one test suite. Go only does the job it suits, many long-lived streams that sit idle and use little memory. Patient events carry no personal data, so Ably is fine for them. Staff events carry patient names and cancellation reasons. That stays inside our Google Cloud boundary: Go reads Postgres and streams to the admin app behind IAM. I first designed Go, then the plan moved everything to Ably without my sign-off. I reversed that on 2026-10-19.",
+      "A second runtime to build, scan and deploy. Below 1 vCPU, Cloud Run allows one stream per instance, and I cap it at two instances to stay at zero cost. So two staff can watch live at once. Each browser shares one stream across all its tabs, and a third person sees a busy notice while the page refreshes every 30 seconds.",
+    why: "Staff events carry patient names and cancellation reasons, so they stay inside our Google Cloud boundary instead of going through a third party. A separate service means open streams can never use up the API's capacity and slow down booking. Go gives a small image and a fast cold start, which matter on a service that scales to zero.",
     revisit:
-      "When more than two staff need the live view at once, or when there is more than one clinic. Then I move to pooled pub/sub inside Google Cloud, Pub/Sub or Redis, so a connection does not hold an instance.",
+      "When more than two staff need the live view at once, or there is more than one clinic. Then fan-out moves to Pub/Sub or Redis inside Google Cloud, so a viewer no longer holds an instance.",
+  },
+  {
+    id: "one-hour-rule",
+    title: "The one-hour rule, with two different errors",
+    decision:
+      "A patient cannot book or move to a slot less than an hour away, and cannot change or cancel a visit that starts within the hour. Booking too soon is a 422 BOOKING_TOO_SOON; changing too late is a 409 CHANGE_TOO_LATE. Staff are exempt.",
+    gaveUp:
+      "Two codes for what looks like one rule, and a client has to handle both.",
+    why: "They mean different things. A 422 says the request itself is wrong, so pick another time. A 409 says the request was fine but the appointment's state no longer allows it. The UI gives each its own message.",
+    revisit:
+      "If the clinic wants a different window per doctor or per kind of visit.",
+  },
+  {
+    id: "veto-and-lock",
+    title: "Staff can veto a patient's change, and it is audited",
+    decision:
+      "When a patient reschedules or cancels, staff can veto it. The change is undone and the appointment is locked, so the patient cannot change it again. Every staff action needs a reason, which goes into an append-only audit table, and shows on the live feed.",
+    gaveUp:
+      "A locked visit can only be changed by staff, so a patient with a real reason has to call. The audit table only grows.",
+    why: "A clinic needs to stop a patient bumping a visit it has planned around, and needs to know who did what and why. Append-only means the record cannot be quietly edited.",
+    revisit:
+      "If patients need a way to ask for a change on a locked visit from the app.",
   },
 ];

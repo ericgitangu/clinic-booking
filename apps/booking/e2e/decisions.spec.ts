@@ -59,11 +59,9 @@ test("the landing page links to the Go entry, which exists", async ({
   ).toHaveText("A small Go service for the staff live feed");
 });
 
-test("shows the draft banner while the draft flag is on", async ({ page }) => {
+test("shows no draft banner once the copy is published", async ({ page }) => {
   await page.goto("/decisions");
-  await expect(page.getByTestId("draft-banner")).toHaveText(
-    "Draft pending the engineer's edit",
-  );
+  await expect(page.getByTestId("draft-banner")).toHaveCount(0);
 });
 
 test("the header and the footer both reach /decisions", async ({ page }) => {
