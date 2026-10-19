@@ -1011,6 +1011,18 @@ expect "measure: --update-readme rewrites only the text between the markers" "$(
 printf 'no markers here\n' > "$WORK/rm/none.md"
 expect "measure: --update-readme refuses a README without the markers" "$(README="$WORK/rm/none.md" EVIDENCE="$WORK/ev.json" bash "$MEASURE" --update-readme >/dev/null 2>&1; echo $?)" 1
 
+# =========================================================================================
+# api_check.sh: the newman image is pinned by digest, and no other file names a newman image,
+# so the pin is the one place to change it. The collection mount is read-only.
+# =========================================================================================
+newman_pin="$(sed -n 's/^NEWMAN_IMAGE="\(.*\)"$/\1/p' "$HERE/../api_check.sh")"
+expect "api check: newman is pinned to a tag and a sha256 digest" \
+  "$(printf '%s' "$newman_pin" | grep -cE '^postman/newman:[0-9.]+-alpine@sha256:[0-9a-f]{64}$')" 1
+expect "api check: no other tracked file names a newman image" \
+  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' | tr '\n' ' ')" "scripts/api_check.sh "
+expect "api check: docs/api is mounted read-only into the newman container" \
+  "$(grep -c 'docs/api:/etc/newman:ro' "$HERE/../api_check.sh")" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
