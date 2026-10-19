@@ -3,6 +3,7 @@ import {
   MAX_EVENTS,
   addEvent,
   after,
+  concernsAppointment,
   describe as sentence,
   isAboutAppointment,
   parseLiveEvent,
@@ -103,6 +104,53 @@ describe("parseLiveEvent", () => {
     ]) {
       expect(parseLiveEvent(bad, "owner")).toBeNull();
     }
+  });
+});
+
+describe("concernsAppointment (the appointment page's filter on the shared stream)", () => {
+  const appt = { id: APPT, doctorId: DOCTOR };
+  const OTHER = "11111111-2222-4333-8444-555555555555";
+
+  it("staff match on the appointment itself, nothing else", () => {
+    const mine = parseLiveEvent(JSON.stringify(staff()), "admin")!;
+    const theirs = parseLiveEvent(
+      JSON.stringify(staff({ appointment_id: OTHER })),
+      "admin",
+    )!;
+    expect(concernsAppointment(mine, appt, "admin")).toBe(true);
+    expect(concernsAppointment(theirs, appt, "owner")).toBe(false);
+    const action = parseLiveEvent(JSON.stringify(staffAction()), "owner")!;
+    expect(concernsAppointment(action, appt, "owner")).toBe(true);
+  });
+
+  it("a viewer (no appointment id in the shape) matches the same doctor's appointment events", () => {
+    const same = parseLiveEvent(JSON.stringify(viewer()), "viewer")!;
+    const other = parseLiveEvent(
+      JSON.stringify(viewer({ doctor_id: OTHER })),
+      "viewer",
+    )!;
+    expect(same.appointmentId).toBeNull();
+    expect(concernsAppointment(same, appt, "viewer")).toBe(true);
+    expect(concernsAppointment(other, appt, "viewer")).toBe(false);
+  });
+
+  it("invitations never belong on an appointment page", () => {
+    const invite = parseLiveEvent(
+      JSON.stringify(
+        staffAction({
+          kind: "invite_created",
+          doctor_id: null,
+          starts_at: null,
+          appointment_id: null,
+          patient_name: null,
+          invite_email: "new@clinic.example",
+          invite_role: "viewer",
+        }),
+      ),
+      "owner",
+    );
+    expect(invite).not.toBeNull();
+    expect(concernsAppointment(invite!, appt, "owner")).toBe(false);
   });
 });
 

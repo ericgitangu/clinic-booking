@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BUSY_REFRESH_MS,
-  BUSY_RETRY_MS,
+  BUSY_RETRY_BASE_MS,
+  BUSY_RETRY_MAX_MS,
   HIDDEN_CLOSE_MS,
   LiveStream,
   type LiveStatus,
@@ -34,7 +35,11 @@ function sse() {
 
 function setup(
   responses: (Response | "network")[],
-  over: { hidden?: () => boolean; appointment?: string } = {},
+  over: {
+    hidden?: () => boolean;
+    cursor?: string;
+    random?: () => number;
+  } = {},
 ) {
   const urls: string[] = [];
   const streams: ReturnType<typeof sse>[] = [];
@@ -50,17 +55,21 @@ function setup(
     },
   );
   const events: string[] = [];
+  const hellos: string[] = [];
   const statuses: LiveStatus[] = [];
   const refresh = vi.fn();
   const live = new LiveStream({
     fetchImpl: fetchImpl as unknown as typeof fetch,
     onEvent: (id, event) => events.push(`${id}:${event}`),
+    onHello: (id, data) => hellos.push(`${id}:${data}`),
     onStatus: (s) => statuses.push(s),
     onRefresh: refresh,
     isHidden: over.hidden,
-    appointment: over.appointment,
+    cursor: over.cursor,
+    // No jitter unless a test asks for it: the midpoint of 0.8..1.2 is exactly 1.
+    random: over.random ?? (() => 0.5),
   });
-  return { live, urls, events, statuses, refresh, streams };
+  return { live, urls, events, hellos, statuses, refresh, streams };
 }
 
 const tick = (ms = 0) => vi.advanceTimersByTimeAsync(ms);
@@ -130,18 +139,68 @@ describe("LiveStream", () => {
     expect(t.refresh).not.toHaveBeenCalled();
   });
 
-  it("never retries sooner than a minute, whatever Retry-After says", async () => {
-    const busy = new Response("{}", {
-      status: 429,
-      headers: { "retry-after": "1" },
-    });
-    const t = setup([busy, "network"]);
+  it("retries a busy gateway with a growing delay: 30 s, 60 s, 120 s, 240 s, then 240 s", async () => {
+    const busy = () =>
+      new Response("{}", { status: 429, headers: { "retry-after": "1" } });
+    const t = setup([busy(), busy(), busy(), busy(), busy(), busy()]);
     t.live.start();
     await tick();
-    await tick(BUSY_RETRY_MS - 1000);
-    expect(t.live.attempts).toBe(1);
-    await tick(1500);
-    expect(t.live.attempts).toBe(2);
+    let at = 0;
+    for (const wait of [30_000, 60_000, 120_000, 240_000, 240_000]) {
+      await tick(wait - 1);
+      expect(t.live.attempts).toBe(1 + at);
+      await tick(1);
+      at += 1;
+      expect(t.live.attempts).toBe(1 + at);
+    }
+    expect(BUSY_RETRY_BASE_MS).toBe(30_000);
+    expect(BUSY_RETRY_MAX_MS).toBe(240_000);
+    // ...refreshing every 30 s throughout: 690 s of busy is 23 refreshes.
+    expect(t.refresh).toHaveBeenCalledTimes(23);
+    expect(t.live.current).toBe("busy");
+    t.live.stop();
+  });
+
+  it("jitters the busy retry by up to 20 %, and never goes below Retry-After", async () => {
+    const busy = (after: string) =>
+      new Response("{}", { status: 429, headers: { "retry-after": after } });
+    const low = setup([busy("1"), "network"], { random: () => 0 });
+    low.live.start();
+    await tick();
+    await tick(24_000 - 1);
+    expect(low.live.attempts).toBe(1);
+    await tick(1);
+    expect(low.live.attempts).toBe(2);
+    low.live.stop();
+
+    const told = setup([busy("100"), "network"], { random: () => 0 });
+    told.live.start();
+    await tick();
+    await tick(100_000 - 1);
+    expect(told.live.attempts).toBe(1);
+    await tick(1);
+    expect(told.live.attempts).toBe(2);
+    told.live.stop();
+  });
+
+  it("the streak resets once live: the next refusal waits 30 s again", async () => {
+    const busy = () => new Response("{}", { status: 429 });
+    const a = sse();
+    const t = setup([busy(), busy(), a.response, busy(), "network"]);
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    await tick(30_000);
+    await tick(60_000);
+    expect(t.live.current).toBe("live");
+    a.push('event: reconnect\ndata: {"reason":"lifetime"}\n\n');
+    a.end();
+    await tick();
+    expect(t.live.current).toBe("busy");
+    expect(t.live.attempts).toBe(4);
+    await tick(30_000);
+    expect(t.live.attempts).toBe(5);
+    t.live.stop();
   });
 
   it("an unavailable gateway (503) is treated the same way", async () => {
@@ -249,22 +308,19 @@ describe("LiveStream", () => {
     expect(t.live.attempts).toBe(1);
   });
 
-  it("the appointment page asks for its own appointment, and resumes with the filter kept", async () => {
-    const id = "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8";
+  it("starts from a given cursor (a new leader tab), reports hello, and never asks for an appointment filter", async () => {
     const a = sse();
-    const b = sse();
-    const t = setup([a.response, b.response], { appointment: id });
-    t.streams.push(a, b);
+    const t = setup([a.response], { cursor: "7.3" });
+    t.streams.push(a);
     t.live.start();
     await tick();
-    a.push("id: 5.0\nevent: hello\ndata: {}\n\n");
-    a.push('event: reconnect\ndata: {"reason":"lifetime"}\n\n');
-    a.end();
+    a.push('id: 7.3\nevent: hello\ndata: {"role":"owner"}\n\n');
+    a.push("id: 7.4\nevent: booked\ndata: {}\n\n");
     await tick();
-    expect(t.urls).toEqual([
-      `/live/stream?appointment=${id}`,
-      `/live/stream?appointment=${id}&cursor=5.0`,
-    ]);
+    expect(t.urls).toEqual(["/live/stream?cursor=7.3"]);
+    expect(t.hellos).toEqual(['7.3:{"role":"owner"}']);
+    expect(t.events).toEqual(["7.4:booked"]);
+    expect(t.live.cursor).toBe("7.4");
     t.live.stop();
   });
 

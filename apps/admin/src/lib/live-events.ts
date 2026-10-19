@@ -239,6 +239,24 @@ export function isAboutAppointment(ev: LiveEvent): boolean {
   return !INVITES.includes(ev.kind);
 }
 
+/**
+ * Whether an event on the shared stream belongs on this appointment's page. The page reads the
+ * same stream as the dashboard, already shaped for the role by the gateway, so nothing reaches it
+ * that the dashboard would not show. Owners and admins match on the appointment itself. A viewer's
+ * events carry no appointment id (minimisation), so a viewer's page matches every appointment
+ * event for the same doctor: at worst a refresh too many, and the refresh reads only what the
+ * viewer may see.
+ */
+export function concernsAppointment(
+  ev: LiveEvent,
+  appt: { id: string; doctorId: string },
+  role: Role,
+): boolean {
+  if (!isAboutAppointment(ev)) return false;
+  if (canSeePeople(role)) return ev.appointmentId === appt.id;
+  return ev.doctorId === appt.doctorId;
+}
+
 function inviteLine(ev: LiveEvent, people: boolean): string {
   const role = ev.inviteRole ? ` (${ev.inviteRole})` : "";
   if (!people || !ev.inviteEmail) return verb(ev.kind);
