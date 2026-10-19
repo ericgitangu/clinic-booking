@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+export const INVITE_HEADERS = [
+  { key: "Referrer-Policy", value: "no-referrer" },
+  { key: "Cache-Control", value: "no-store" },
+  { key: "X-Robots-Tag", value: "noindex" },
+];
+
 // Cost: no image optimization (it bills), no rewrites.
 const nextConfig: NextConfig = {
   images: {
@@ -12,6 +18,16 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@clinic/ui", "@clinic/api"],
   // Lets pages answer 403 with forbidden() and render forbidden.tsx.
   experimental: { authInterrupts: true },
+  // The invite link carries a secret in its path. Keep it out of the Referer sent to any other site
+  // and out of every cache. (The page itself is built with the admin redesign.)
+  async headers() {
+    return [
+      {
+        source: "/invite/:token",
+        headers: INVITE_HEADERS,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
