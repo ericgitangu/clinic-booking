@@ -37,12 +37,18 @@ test.describe("veto and lock", () => {
     );
     const target = avail.body.slots[1];
     test.skip(!target, "no free time the next day to move to");
+    // Before the patient has changed anything there is nothing to veto, so the button is not there.
+    const page = await as("admin");
+    await page.goto(`/dashboard/appointments/${id}`);
+    await expect(page.getByTestId("staff-actions")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Veto and lock" }),
+    ).toHaveCount(0);
     const moved = await publicApi("PATCH", `/appointments/${id}/reschedule`, {
       starts_at: target!.starts_at,
     });
     expect(moved.status).toBe(200);
 
-    const page = await as("admin");
     await page.goto(`/dashboard/appointments/${id}`);
     await tap(page.getByRole("button", { name: "Veto and lock" }));
     const dialog = page.getByRole("dialog", {
@@ -321,7 +327,7 @@ test.describe("why visits were cancelled, and when the clinic is busy", () => {
 });
 
 test.describe("marking attendance from the appointment page", () => {
-  test("an admin marks arrived, then changes it to no-show with a reason, and sees Veto on the board row", async ({
+  test("an admin marks arrived, then changes it to no-show with a reason, and sees no Veto on the board row", async ({
     as,
   }) => {
     test.skip(
@@ -351,8 +357,12 @@ test.describe("marking attendance from the appointment page", () => {
     const row = page.getByTestId("today-visit").filter({
       has: page.locator(`a[href$="/dashboard/appointments/${id}"]`),
     });
+    // The board does not offer Veto: only the appointment page knows a patient change is waiting.
     await expect(
       row.getByRole("button", { name: "Veto and lock" }),
+    ).toHaveCount(0);
+    await expect(
+      row.getByRole("button", { name: "Change to no-show" }),
     ).toBeVisible();
   });
 

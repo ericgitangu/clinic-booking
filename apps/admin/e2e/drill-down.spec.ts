@@ -357,7 +357,7 @@ test.describe("actions are visible where the work is", () => {
     ).toBe(403);
   });
 
-  test("an admin sees Reschedule, Cancel, Veto and lock on the appointment page", async ({
+  test("an admin sees Reschedule and Cancel, and no Veto while the patient has changed nothing", async ({
     as,
   }) => {
     const id = await bookOneStraightThroughTheApi();
@@ -365,8 +365,12 @@ test.describe("actions are visible where the work is", () => {
     await page.goto(`/dashboard/appointments/${id}`);
     const actions = page.getByTestId("staff-actions");
     await expect(actions).toBeVisible();
-    for (const name of ["Reschedule", "Cancel appointment", "Veto and lock"]) {
+    for (const name of ["Reschedule", "Cancel appointment"]) {
       await expect(actions.getByRole("button", { name })).toBeVisible();
     }
+    // Nothing the patient did is waiting to be undone, so there is no Veto to offer.
+    await expect(
+      actions.getByRole("button", { name: "Veto and lock" }),
+    ).toHaveCount(0);
   });
 });

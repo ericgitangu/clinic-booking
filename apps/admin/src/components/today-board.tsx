@@ -205,11 +205,16 @@ export function TodayBoard({
                                   today={date}
                                 />
                               )}
-                              <StaffControls
-                                appointmentId={a.id}
-                                locked={a.locked}
-                                compact
-                              />
+                              {/* Only Unlock here: whether a patient change is waiting to be undone is
+                                  known on the appointment page, not in the board's data. */}
+                              {a.locked && (
+                                <StaffControls
+                                  appointmentId={a.id}
+                                  locked
+                                  canVeto={false}
+                                  compact
+                                />
+                              )}
                             </div>
                           )}
                         </li>

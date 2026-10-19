@@ -14,6 +14,7 @@ import { loadAppointmentRow, loadLineage } from "@/lib/dashboard-data";
 import { getAppointment } from "@/lib/api";
 import { shownName } from "@/lib/shown-name";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
+import { canVeto } from "@/lib/veto";
 import { can } from "@/lib/roles";
 import { requireStaff } from "@/lib/session";
 
@@ -125,6 +126,11 @@ export default async function AppointmentPage({
             <StaffControls
               appointmentId={appt.id}
               locked={row?.staff_locked ?? false}
+              canVeto={canVeto(
+                lineage.events,
+                appt.status,
+                row?.staff_locked ?? false,
+              )}
             />
           </div>
         </section>

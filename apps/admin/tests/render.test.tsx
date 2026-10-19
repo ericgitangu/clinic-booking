@@ -123,6 +123,7 @@ describe("today board", () => {
       "Cancel appointment",
       "Reschedule",
       "Veto and lock",
+      "Unlock",
       "day-sheet",
     ]) {
       expect(html).not.toContain(word);
@@ -135,7 +136,9 @@ describe("today board", () => {
     expect(html).toContain("Mark no-show");
     expect(html).toContain("Change to no-show"); // the visit already marked arrived
     expect(html).toContain("Cancel appointment");
-    expect(html).toContain("Veto and lock");
+    // The board offers Unlock on a locked visit and no Veto: it cannot tell a patient change is waiting.
+    expect(html).toContain("Unlock");
+    expect(html).not.toContain("Veto and lock");
     expect(html).toContain("day-sheet");
   });
 

@@ -28,10 +28,13 @@ import {
 export function StaffControls({
   appointmentId,
   locked,
+  canVeto,
   compact = false,
 }: {
   appointmentId: string;
   locked: boolean;
+  /** There is a patient change to undo (see lib/veto.ts); without one, Veto is not offered. */
+  canVeto: boolean;
   /** Smaller and wrapping, for a row on the Today board. */
   compact?: boolean;
 }) {
@@ -53,7 +56,7 @@ export function StaffControls({
           confirm="Unlock appointment"
           run={(reason) => unlockAppointment(appointmentId, reason)}
         />
-      ) : (
+      ) : canVeto ? (
         <ReasonDialog
           trigger={
             <>
@@ -65,7 +68,7 @@ export function StaffControls({
           confirm="Veto and lock"
           run={(reason) => vetoAppointment(appointmentId, reason)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
