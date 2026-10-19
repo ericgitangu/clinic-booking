@@ -11,7 +11,7 @@ has made the new API live. It checks, in order, that:
    by resuming from that cursor, in the minimised shape (the smoke identity sees synthetic events
    only, so no personal data is involved), and is then cancelled.
 
-Every stream read is a curl with --max-time STREAM_SECONDS (sse_probe.py), and the gateway closes
+Every stream read is a bounded read of STREAM_SECONDS (sse_probe.py), and the gateway closes
 the smoke's streams after their catch-up, so no stream outlives its step. On 2026-10-19 this smoke
 held a stream open for 242 s (Cloud Run never told the instance it had gone), and the live check
 after promotion found no free instance and rolled the release back.

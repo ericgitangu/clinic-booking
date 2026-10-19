@@ -1123,39 +1123,84 @@ expect "live check: ...and rolls back when it fails" "$(grep -c 'rollback.sh' <<
 expect "live check: ...with no bare one-shot /health curl left behind" "$(grep -c 'curl -fsS --max-time 30' <<<"$LCSTEP")" 0
 
 # =========================================================================================
-# sse_probe.py (the release smoke's stream reads): curl --max-time 5, headers on stdin, the first
-# bytes parsed, and a stream the server did not close reported as timed out.
+# sse_probe.py (the release smoke's stream reads): http.client over TLS to a *.run.app host, a
+# deadline and socket timeout, the first bytes parsed, a stream the server did not close reported as
+# timed out, and a URL that does not qualify never requested. A stand-in server on a free port
+# (plain HTTP through the connect seam) plays the gateway.
 # =========================================================================================
-SP="$WORK/sp"; mkdir -p "$SP"
-cat > "$SP/curl" <<'FAKE'
-#!/usr/bin/env bash
-echo "$*" > "$SP/argv"; cat > "$SP/stdin"
-case "$*" in
-  *cursor=*) printf 'id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nid: 5.9\nevent: booked\ndata: {"seq":"5.9"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n' ;;
-  *hang*) printf 'id: 5.0\nevent: hello\ndata: {}\n\n: hb\n\n'; printf 'probe-http-status:200\n' >&2; exit 28 ;;
-  *) printf 'id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n' ;;
-esac
-printf 'probe-http-status:200\n' >&2
-FAKE
-chmod +x "$SP/curl"
-sp_py() { SP="$SP" SSE_PROBE_CURL="$SP/curl" python3 - "$HERE" "$@" <<'PY'
-import sys
+python3 - "$HERE" > "$WORK/sp.out" 2>&1 <<'PY'
+import http.client, sys, threading, time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, sys.argv[1])
 import sse_probe
-url = sys.argv[2]
-p = sse_probe.probe(url, {"X-Internal-Assertion": "v1.assert-secret", "X-Serverless-Authorization": "Bearer tok-secret"}, 5)
-hello = p.frames[0] if p.frames else {}
-end = p.first("reconnect") or {}
-booked = p.first("booked") or {}
-print(p.status, p.body.startswith("id: "), hello.get("event"), hello.get("id"), "probe" in end.get("data", ""), p.timed_out, booked.get("id", "-"))
-PY
+
+seen = []          # (path, headers) of every request the stand-in received
+class H(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    def log_message(self, *a): pass
+    def do_GET(self):
+        seen.append((self.path, dict(self.headers)))
+        self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.send_header("Transfer-Encoding", "chunked"); self.end_headers()
+        def send(s):
+            b = s.encode(); self.wfile.write(b"%x\r\n%s\r\n" % (len(b), b)); self.wfile.flush()
+        try:
+            if "cursor=" in self.path:
+                send('id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nid: 5.9\nevent: booked\ndata: {"seq":"5.9"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n')
+            elif "hang" in self.path:
+                send('id: 5.0\nevent: hello\ndata: {}\n\n: hb\n\n')
+                time.sleep(30)                     # never closes within the probe's deadline
+            else:
+                send('id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n')
+            self.wfile.write(b"0\r\n\r\n"); self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+srv = ThreadingHTTPServer(("127.0.0.1", 0), H); srv.daemon_threads = True
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+port = srv.server_port
+plain = lambda h, p, timeout: http.client.HTTPConnection(h, p, timeout=timeout)
+loop = lambda h: h == "127.0.0.1"
+U = "https://127.0.0.1:%d" % port
+HDR = {"X-Internal-Assertion": "v1.assert-fixture", "X-Serverless-Authorization": "Bearer fixture-token"}
+out = []
+def check(name, ok): out.append("%s|%s" % (name, "PASS" if ok else "FAIL"))
+
+p = sse_probe.probe(U + "/stream", HDR, 5, connect=plain, host_ok=loop)
+hello = p.frames[0] if p.frames else {}; end = p.first("reconnect") or {}
+check("the first bytes are the hello frame and the server's probe close is seen", (p.status, p.body.startswith("id: "), hello.get("event"), hello.get("id"), "probe" in end.get("data", ""), p.timed_out) == (200, True, "hello", "5.0", True, False))
+check("the assertion and token reached the server as headers", seen[0][1].get("X-Internal-Assertion") == "v1.assert-fixture" and seen[0][1].get("X-Serverless-Authorization") == "Bearer fixture-token" and seen[0][1].get("Accept") == "text/event-stream")
+p = sse_probe.probe(U + "/stream?cursor=5.0", HDR, 5, connect=plain, host_ok=loop)
+check("a resume reads the booked event behind the cursor", (p.first("booked") or {}).get("id") == "5.9")
+t0 = time.monotonic(); p = sse_probe.probe(U + "/hang", HDR, 1.0, connect=plain, host_ok=loop); el = time.monotonic() - t0
+check("a stream the server never closes is reported as timed out", p.timed_out and p.status == 200 and (p.first("hello") or {}).get("id") == "5.0")
+check("...and the read is bounded by the deadline (1 second asked, under 3 taken, the server held it for 30)", el < 3.0)
+n = len(seen)
+bad = {
+    "a plain http URL": "http://127.0.0.1:%d/stream" % port,
+    "a host that is not a run.app address": "https://example.com/stream",
+    "a URL with whitespace": "https://127.0.0.1:%d/stre am" % port,
+    "a URL with a newline": "https://127.0.0.1:%d/stream\nX-Evil: 1" % port,
+    "a URL with a control character": "https://127.0.0.1:%d/stream\x01" % port,
+    "a URL with credentials": "https://user:pw@127.0.0.1:%d/stream" % port,
+    "an empty URL": "",
+    "a URL with no host": "https:///stream",
 }
-expect "sse probe: the first bytes are the hello frame, and the server's probe close is seen" "$(sp_py https://rt.example/stream)" "200 True hello 5.0 True False -"
-expect "sse probe: curl is bounded by --max-time 5 and reads headers from stdin" "$(grep -c -- '-N --max-time 5 -H @-' "$SP/argv")" 1
-expect "sse probe: the assertion and token go on stdin, never on the command line" \
-  "$(grep -c 'secret' "$SP/argv"):$(grep -c 'X-Internal-Assertion: v1.assert-secret' "$SP/stdin")" "0:1"
-expect "sse probe: a resume reads the booked event behind the cursor" "$(sp_py 'https://rt.example/stream?cursor=5.0' | awk '{print $7}')" "5.9"
-expect "sse probe: a stream the server never closed is reported as timed out" "$(sp_py https://rt.example/hang | awk '{print $5, $6}')" "False True"
+for name, url in bad.items():
+    q = sse_probe.probe(url, HDR, 2, connect=plain, host_ok=loop if "example" not in url else None)
+    check("%s is rejected without a request" % name, q.status == 0 and q.body == "" and not q.timed_out)
+check("...and the server saw none of those requests", len(seen) == n)
+q = sse_probe.probe("https://rt-fixture---clinic-realtime-abc123-uk.a.run.app/stream", HDR, 1, connect=lambda h, p, timeout: (_ for _ in ()).throw(OSError("unreachable")))
+check("a run.app host passes the check by default (and an unreachable one gives status 0)", q.status == 0)
+check("the default host rule is the run.app pattern", sse_probe._RUN_APP.fullmatch("sha-abc1234---clinic-realtime-2shno7sa7q-uk.a.run.app") is not None and sse_probe._RUN_APP.fullmatch("run.app.evil.com") is None and sse_probe._RUN_APP.fullmatch("evilrun.app") is None)
+check("a refused connection is status 0, not an exception", sse_probe.probe("https://127.0.0.1:1/stream", HDR, 1, connect=plain, host_ok=loop).status == 0)
+print("\n".join(out))
+print("OUTPUT-HAS-SECRET" if ("fixture-token" in "\n".join(out) or "assert-fixture" in "\n".join(out)) else "OUTPUT-CLEAN")
+PY
+while IFS='|' read -r name verdict; do
+  [ -n "$verdict" ] || continue
+  expect "sse probe: $name" "$verdict" PASS
+done < <(grep '|' "$WORK/sp.out")
+expect "sse probe: nothing it prints holds the assertion or the token" "$(grep -c '^OUTPUT-CLEAN$' "$WORK/sp.out")" 1
+expect "sse probe: it is plain http.client, no subprocess and no curl" "$(grep -cE '^import subprocess|^from subprocess|curl' "$HERE/sse_probe.py")" 0
 expect "realtime smoke: every stream read is the bounded probe (no long-held httpx stream)" \
   "$(grep -c '\.stream(' "$HERE/realtime_smoke.py"):$(grep -c '^STREAM_SECONDS = 5 ' "$HERE/realtime_smoke.py")" "0:1"
 
