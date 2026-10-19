@@ -191,17 +191,172 @@ expect_fail "a different budget id"          "does not name budget id" mutate_su
 fresh; out="$(cd "$DIR" && bash scripts/cost_check.sh --static 2>&1)"
 if grep -F "C11" <<<"$out" | grep -qF "cap status not readable via API; see docs/evidence/spend-cap-2026-10-18.md"; then ok "the pass line says the status is not readable via API and points at the evidence"; else bad "C11 pass wording"; fi
 
-echo "== Artifact Registry size bound (C5: parsing and threshold only, no registry involved) =="
-ar_size() { ( cd "$PRISTINE" && bash scripts/cost_check.sh --ar-size "$1" 2>&1 ) || true; }  # exits 1 on a FAIL; the text is what is judged
-for n in 0 417198000 449999999; do
-  if ar_size "$n" | grep -q "^PASS  C5 size $n < 450000000"; then ok "C5: $n bytes is under the 450 MB bound"; else bad "C5: $n bytes should pass"; fi
+echo "== Artifact Registry gate (C5) =="
+ar() { ( cd "$PRISTINE" && bash scripts/cost_check.sh "$@" 2>&1 ) || true; }  # exits 1 on a FAIL; the text is judged
+KEPT=200000000; GO=50000000   # 2 Go images at the 25 MB cap, not yet pushed
+# The ceiling is derived from the live secret version count: ($0.50 - n x $0.06) / $0.10 per GiB.
+for pair in "4 2791728742" "5 2147483648" "6 1503238553" "7 858993459" "9 0"; do
+  set -- $pair
+  if [ "$(ar --ar-ceiling "$1" | head -1)" = "$2" ]; then ok "C5: $1 live secret versions leave a ceiling of $2 B"; else bad "C5: $1 secret versions should leave $2 B (got '$(ar --ar-ceiling "$1" | head -1)')"; fi
 done
-for n in 450000000 450000001 536870912; do
-  if ar_size "$n" | grep -q "^FAIL  C5 size '$n' is not under 450000000"; then ok "C5: $n bytes is not under the bound"; else bad "C5: $n bytes should fail"; fi
+CEIL5=2147483648; CEIL4=2791728742; CEIL6=1503238553
+for n in 0 128198964 $((CEIL5 - GO - 1)); do
+  if ar --ar-size "$n" no 5 | grep -q "^PASS  C5 repository size $n (go in repository: no, secret versions: 5) leaves $((CEIL5 - n - GO)) B"; then ok "C5: $n B passes with the Go cap projected and the exact headroom"; else bad "C5: $n B (go no, 5 versions) should pass with headroom $((CEIL5 - n - GO))"; fi
 done
-for n in "" "abc" "-5" "4.5e8"; do
-  if ar_size "$n" | grep -q "^FAIL  C5 size"; then ok "C5: unreadable size '$n' fails, never passes"; else bad "C5: unreadable size '$n' should fail"; fi
+if ar --ar-size $((CEIL5 - GO)) no 5 | grep -q "^FAIL  C5"; then ok "C5: exactly at the ceiling after the Go projection fails"; else bad "C5: at the ceiling (go no) should fail"; fi
+if ar --ar-size $((CEIL5 - 1)) yes 5 | grep -q "^PASS  C5"; then ok "C5: one byte under with the Go images already pushed passes"; else bad "C5: CEIL-1 (go yes) should pass"; fi
+if ar --ar-size "$CEIL5" yes 5 | grep -q "^FAIL  C5"; then ok "C5: exactly at the ceiling fails"; else bad "C5: at the ceiling (go yes) should fail"; fi
+if ar --ar-size 543337040 yes 5 | grep -q "^PASS  C5"; then ok "C5: the measured 543,337,040 B passes with 5 secret versions under the \$0.50 ceiling"; else bad "C5: 543337040 with 5 versions should pass"; fi
+for pair in "4 $CEIL4" "5 $CEIL5" "6 $CEIL6"; do
+  set -- $pair
+  if ar --ar-size $(($2 - 1)) yes "$1" | grep -q "^PASS  C5"; then ok "C5: one byte under the ceiling passes with $1 secret versions"; else bad "C5: $(($2 - 1)) with $1 versions should pass"; fi
+  if ar --ar-size "$2" yes "$1" | grep -q "^FAIL  C5"; then ok "C5: exactly the ceiling fails with $1 secret versions"; else bad "C5: $2 with $1 versions should fail"; fi
+  if ar --ar-size $(($2 + 1)) yes "$1" | grep -q "^FAIL  C5"; then ok "C5: one byte over the ceiling fails with $1 secret versions"; else bad "C5: $(($2 + 1)) with $1 versions should fail"; fi
 done
+if ar --ar-size "$CEIL5" yes 4 | grep -q "^PASS  C5"; then ok "C5: the size that fails with 5 versions passes with 4 (the ceiling follows the live count)"; else bad "C5: CEIL5 with 4 versions should pass"; fi
+if ar --ar-size 1 yes 9 | grep -q "^FAIL  C5"; then ok "C5: with 9 secret versions nothing is left for the registry"; else bad "C5: 9 versions should fail"; fi
+for n in 0 128198964 178200000 199999999 200000000; do
+  [ "$n" = 0 ] && continue
+  if ar --ar-kept "$n" | grep -q "^PASS  C5 kept images $n <= $KEPT"; then ok "C5: kept images total $n is within the bound"; else bad "C5: kept images total $n should pass"; fi
+done
+if ar --ar-kept 0 | grep -q "^FAIL  C5 kept images"; then ok "C5: a kept-images total of 0 fails (an empty list is not a pass)"; else bad "C5: a kept-images total of 0 should fail"; fi
+for n in 200000001 250000000; do
+  if ar --ar-kept "$n" | grep -q "^FAIL  C5 kept images"; then ok "C5: kept images total $n is over the bound"; else bad "C5: kept images total $n should fail"; fi
+done
+# unreadable input never passes: empty, text, sign, exponent, space, hex, leading zeros (octal traps), overflow
+for bad_in in "" abc -5 4.5e8 "1 2" 0x10 08 09 0777 00 9223372036854775807 99999999999999999 1000000000000000; do
+  if ar --ar-size "$bad_in" yes 5 | grep -q "^FAIL  C5"; then ok "C5 --ar-size: '$bad_in' fails, never passes"; else bad "C5 --ar-size: '$bad_in' should fail"; fi
+  if ar --ar-kept "$bad_in" | grep -q "^FAIL  C5"; then ok "C5 --ar-kept: '$bad_in' fails, never passes"; else bad "C5 --ar-kept: '$bad_in' should fail"; fi
+done
+for bad_v in "" 08 abc -1 99999999999999999; do
+  if ar --ar-size 1000 yes "$bad_v" | grep -q "^FAIL  C5"; then ok "C5 --ar-size: secret version count '$bad_v' fails"; else bad "C5 --ar-size: secret version count '$bad_v' should fail"; fi
+done
+
+# ---- the live C5 run end to end, against stand-in gcloud and curl (third-party tools; the logic under test is ours) ----
+STUB="$WORK/livestub"; mkdir -p "$STUB/bin"
+cat > "$STUB/bin/gcloud" <<'FAKE'
+#!/usr/bin/env bash
+case "$*" in
+  *"auth print-access-token"*) printf '%s\n' "${STUB_TOKEN-SECRETTOKEN123}" ;;
+  *"repositories describe clinic"*) echo '{"cleanupPolicies":{"delete-old":{},"delete-untagged":{},"keep-2":{}}}' ;;
+  *"packages list"*) printf '%s\n' "projects/p/locations/us-east4/repositories/clinic/packages/clinic-api" ${STUB_GO:+projects/p/locations/us-east4/repositories/clinic/packages/clinic-realtime} ;;
+  *"docker images list"*)
+    if [ -n "${STUB_IMAGES_ERR:-}" ]; then echo "ERROR: (gcloud.artifacts.docker.images.list) PERMISSION_DENIED: deployer@sil-clinic-booking.iam.gserviceaccount.com lacks permission" >&2; exit 1; fi
+    cat "$STUB_IMAGES" ;;
+  *"secrets list"*) [ -n "${STUB_LIST_FAIL:-}" ] && exit 1; [ -n "${STUB_LIST_EMPTY:-}" ] && exit 0; for i in $(seq 1 "${STUB_SECRETS:-5}"); do echo "s$i"; done ;;
+  *"secrets versions list"*)
+    [ -n "${STUB_VERSIONS_FAIL:-}" ] && exit 1
+    [ -n "${STUB_VERSIONS_JUNK:-}" ] && { echo "not json"; exit 0; }
+    if [ -n "${STUB_VERSIONS_N:-}" ]; then printf '[%s]\n' "$(seq 1 "$STUB_VERSIONS_N" | paste -sd, -)"; else echo '[{"name":"v1"}]'; fi ;;
+  *"secrets describe"*) echo '{"replication":{"automatic":{}}}' ;;
+  *) exit 1 ;;
+esac
+FAKE
+cat > "$STUB/bin/curl" <<'FAKE'
+#!/usr/bin/env bash
+echo "ARGV: $*" >> "$STUB_DIR/curl.argv"
+out=""; want_code=""; prev=""
+for a in "$@"; do [ "$prev" = -o ] && out="$a"; [ "$prev" = -w ] && want_code=1; prev="$a"; done
+if [ ! -t 0 ]; then cat >> "$STUB_DIR/curl.stdin" 2>/dev/null; fi
+case "$*" in
+  *artifactregistry.googleapis.com*) [ -n "$out" ] && printf '{"sizeBytes":"%s"}' "${STUB_SIZE-}" > "$out"; code="${STUB_HTTP:-200}" ;;
+  *) [ -n "$out" ] && echo '{}' > "$out"; code=000 ;;
+esac
+[ -n "$want_code" ] && printf '%s' "$code"
+exit 0
+FAKE
+chmod +x "$STUB/bin/gcloud" "$STUB/bin/curl"
+printf '[{"metadata":{"imageSizeBytes":"64099567"}},{"metadata":{"imageSizeBytes":"64099397"}}]' > "$STUB/images.json"
+printf '[]' > "$STUB/empty.json"
+live_run() { # <script> <env assignments...> ; prints the C5 / C7 / C12 lines
+  local script="$1"; shift
+  rm -f "$STUB/curl.argv" "$STUB/curl.stdin"
+  ( cd "$PRISTINE" && env PATH="$STUB/bin:$PATH" STUB_DIR="$STUB" STUB_IMAGES="$STUB/images.json" CIRCLECI=true \
+      COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14" PROJECT=p "$@" bash "$script" --live 2>&1 ) | grep -E "C5|C7|C12|^note" || true
+}
+L="scripts/cost_check.sh"
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=543337040 STUB_SECRETS=5)"
+if grep -q "^PASS  C5 AR repository sizeBytes=543337040, headroom $((CEIL5 - 543337040)) B" <<<"$out"; then ok "C5 live: 543,337,040 B with 5 versions and the Go images pushed passes with the exact headroom"; else bad "C5 live: 543 MB / 5 versions / go pushed should pass (got: $(grep C5 <<<"$out" | head -2 | tr '\n' '|'))"; fi
+out="$(live_run "$L" STUB_SIZE=$((CEIL5 - 40000000)) STUB_SECRETS=5)"
+if grep -q "^FAIL  C5 AR the approved total" <<<"$out" && grep -q "cannot hold" <<<"$out" && grep -q "engineer decides" <<<"$out"; then ok "C5 live: a size that only fits without the Go cap projected fails and says the approved total does not hold"; else bad "C5 live: projected Go cap should fail plainly"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=$((CEIL5 + 1)) STUB_SECRETS=4)"
+if grep -q "^PASS  C5 AR repository" <<<"$out"; then ok "C5 live: with 4 secrets the ceiling follows the live count"; else bad "C5 live: 4 secrets should pass just above the 5-secret ceiling"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=$CEIL5 STUB_SECRETS=5)"
+if grep -q "^FAIL  C5 AR the approved total" <<<"$out"; then ok "C5 live: exactly the ceiling fails"; else bad "C5 live: exactly the ceiling should fail"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=543337040 STUB_HTTP=401)"
+if grep -q "^FAIL  C5 AR repository read refused or failed (HTTP 401)" <<<"$out"; then ok "C5 live: an HTTP 401 is reported as a refused call, not a missing field"; else bad "C5 live: HTTP 401 should be named"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE="")"
+if grep -q "^FAIL  C5 AR repository sizeBytes is 'missing from an HTTP 200 response'" <<<"$out"; then ok "C5 live: a missing sizeBytes in a 200 is a failure of its own kind"; else bad "C5 live: missing sizeBytes should fail"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=0420000000)"
+if grep -q "^FAIL  C5 AR repository sizeBytes is '0420000000'" <<<"$out"; then ok "C5 live: a leading-zero size is not accepted"; else bad "C5 live: a leading-zero size should fail"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_TOKEN=)"
+if grep -q "^FAIL  C5 AR could not mint an access token" <<<"$out"; then ok "C5 live: a failed token fetch is named as such"; else bad "C5 live: an empty token should be named"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_IMAGES="$STUB/empty.json")"
+if grep -q "^FAIL  C5 AR the registry returned no images at all" <<<"$out" && ! grep -q "^PASS  C5 AR kept images" <<<"$out"; then ok "C5 live: an empty image list fails and never passes as 0 B"; else bad "C5 live: an empty image list should fail"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_IMAGES_ERR=1)"
+if grep -q "^FAIL  C5 AR the CI identity may not list docker images" <<<"$out" && grep -q "artifactregistry.dockerimages.list" <<<"$out" && ! grep -q "@" <<<"$out"; then ok "C5 live: a permission error names the missing permission and prints no account"; else bad "C5 live: a permission error should name the permission and hide the account (got: $(grep 'FAIL  C5' <<<"$out" | head -1))"; fi
+# A count that cannot be read is never 0: every failure fails C5 and C7, whatever the registry says.
+for scen in "STUB_LIST_FAIL=1|listing the secrets failed" "STUB_LIST_EMPTY=1|the secret list is empty" "STUB_VERSIONS_FAIL=1|listing the versions of a secret failed" "STUB_VERSIONS_JUNK=1|were not a list" "STUB_VERSIONS_N=12000|not a number"; do
+  env_part="${scen%%|*}"; want="${scen#*|}"
+  out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 "$env_part")"
+  if grep -q "^FAIL  C5 AR the registry ceiling cannot be worked out: .*$want" <<<"$out" && grep -q "^FAIL  C7 active secret versions cannot be counted" <<<"$out" && ! grep -q "^PASS  C5 AR repository" <<<"$out" && ! grep -q "^PASS  C7" <<<"$out"; then ok "secret count: '$env_part' fails C5 and C7 (never a count of 0)"; else bad "secret count: '$env_part' should fail C5 and C7 (got: $(grep -E 'C5|C7' <<<"$out" | head -3 | tr '\n' '|'))"; fi
+done
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_SECRETS=1)"
+if grep -q "^PASS  C7 active secret versions=1" <<<"$out" && grep -q "^PASS  C5 AR repository" <<<"$out"; then ok "secret count: a one-secret project is read normally"; else bad "secret count: one secret should pass"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_VERSIONS_N=1000 STUB_SECRETS=1)"
+if grep -q "^FAIL  C7 active secret versions=1000 > 6" <<<"$out"; then ok "secret count: 1,000 versions is read as 1,000 and fails C7's bound"; else bad "secret count: 1,000 should fail C7's bound (got: $(grep C7 <<<"$out" | head -2 | tr '\n' '|'))"; fi
+if ar --ar-ceiling 0005 | grep -q "bad secret version count '0005'" && ar --ar-ceiling 12345 | grep -q "^[0-9]*$" ; then ok "secret count: a leading-zero count is rejected by the ceiling helper"; else bad "secret count: leading zeros should be rejected"; fi
+
+# the access token never appears on a command line (C5 and C12), only on stdin
+live_run "$L" STUB_GO=1 STUB_SIZE=420000000 >/dev/null
+if [ -s "$STUB/curl.argv" ] && ! grep -q "SECRETTOKEN123" "$STUB/curl.argv" && grep -q "Authorization: Bearer SECRETTOKEN123" "$STUB/curl.stdin" && [ "$(grep -c 'Authorization: Bearer' "$STUB/curl.stdin")" -ge 2 ]; then ok "the token is sent on stdin for both the registry (C5) and the monitoring (C12) call, and is in no curl argv"; else bad "the token must be on stdin for C5 and C12 and in no argv"; fi
+# a threshold hidden anywhere in the live C5 is caught by behaviour, whatever its spelling
+live_mutant() { # <name> <perl expression> [size] [pristine PASS count] [mutant PASS count]
+  local size="${3:-420000000}" want_good="${4:-1}" want_bad="${5:-0}"
+  local f="$PRISTINE/scripts/cost_check.mut.sh"; cp "$PRISTINE/scripts/cost_check.sh" "$f"; perl -pi -e "$2" "$f"
+  if cmp -s "$f" "$PRISTINE/scripts/cost_check.sh"; then bad "C5 mutation '$1': the mutation changed nothing"; rm -f "$f"; return; fi
+  local good bad_out
+  good="$(live_run "scripts/cost_check.sh" STUB_GO=1 STUB_SIZE="$size" STUB_SECRETS=5 | grep -c '^PASS  C5 AR repository')"
+  bad_out="$(live_run "scripts/cost_check.mut.sh" STUB_GO=1 STUB_SIZE="$size" STUB_SECRETS=5 | grep -c '^PASS  C5 AR repository')"
+  local dbg; dbg="$(live_run "scripts/cost_check.mut.sh" STUB_GO=1 STUB_SIZE="$size" STUB_SECRETS=5 | grep 'C5 AR repository\|C5 AR the' | head -2 | cut -c1-200)"
+  rm -f "$f"
+  if [ "$good" = "$want_good" ] && [ "$bad_out" = "$want_bad" ]; then ok "C5 mutation caught by behaviour: $1"; else bad "C5 mutation '$1' was NOT caught (pristine $good, mutant $bad_out): $dbg"; fi
+}
+live_mutant "400 MB literal in front of the helper" 's/^(\s*)if ar_repo_within_budget "\$c5_size"/$1if [ "\${c5_size:-0}" -ge "\$((3 << 27))" ]; then c5_x=1; fi; if [ "\${c5_size:-0}" -ge "\$((3 << 27))" ]; then false; elif ar_repo_within_budget "\$c5_size"/'
+live_mutant "(( )) arithmetic with a product" 's/^(\s*)if ar_repo_within_budget "\$c5_size"/$1if (( c5_size >= 400*999*999 )); then false; elif ar_repo_within_budget "\$c5_size"/'
+live_mutant "plain 400000000 literal" 's/^(\s*)if ar_repo_within_budget "\$c5_size"/$1if [ "\$c5_size" -ge 400000000 ]; then false; elif ar_repo_within_budget "\$c5_size"/'
+live_mutant "ceiling pinned to four secrets" 's/ar_budget_ceiling_bytes "\$SECRET_VERSIONS_LIVE"/ar_budget_ceiling_bytes 4/; s/"\$c5_go" "\$SECRET_VERSIONS_LIVE"; then/"\$c5_go" 4; then/' $((CEIL5 + 1000000)) 0 1
+f="$PRISTINE/scripts/cost_check.mut.sh"; cp "$PRISTINE/scripts/cost_check.sh" "$f"; perl -pi -e 's/-lt 1 \]; then/-lt 0 ]; then/' "$f"
+if ! cmp -s "$f" "$PRISTINE/scripts/cost_check.sh" \
+   && [ "$(live_run scripts/cost_check.sh STUB_GO=1 STUB_SIZE=420000000 STUB_IMAGES="$STUB/empty.json" | grep -c '^FAIL  C5 AR the registry returned no images')" = 1 ] \
+   && [ "$(live_run scripts/cost_check.mut.sh STUB_GO=1 STUB_SIZE=420000000 STUB_IMAGES="$STUB/empty.json" | grep -c '^FAIL  C5 AR the registry returned no images')" = 0 ]; then ok "C5 mutation caught by behaviour: empty image list passes again"; else bad "C5 mutation 'empty image list passes again' was NOT caught"; fi
+rm -f "$f"
+
+# The structural check stays as a second, cheaper line of defence (it is a regex and can be bypassed;
+# the behavioural tests above are the real protection).
+live_c5_block() { awk '/^  # C5: cleanup policies/,/^  # C6:/' "$1"; }
+live_c5_ok() { # <cost_check.sh>
+  local b; b="$(live_c5_block "$1")"
+  [ "$(wc -l <<<"$b")" -gt 12 ] || return 1
+  grep -qE 'if ar_repo_within_budget "\$c5_size" "\$c5_go" "\$SECRET_VERSIONS_LIVE"; then' <<<"$b" || return 1
+  grep -qE 'if ar_kept_within_bound "\$c5_kept"; then' <<<"$b" || return 1
+  ! grep -vE '^[[:space:]]*#' <<<"$b" | grep -qE '[0-9]{4,}|[0-9][eE][0-9]|0[xX][0-9a-fA-F]|(^|[^<])<<([^<]|$)|[*+-][[:space:]]*[0-9]{2,}[[:space:]]*[*)]' || return 1
+}
+if live_c5_ok "$PRISTINE/scripts/cost_check.sh"; then ok "C5 structure: the live check uses the helpers and has no numeric literal"; else bad "C5 structure: the live check lost the helpers or gained a literal"; fi
+
+echo "== unverified checks are never a quiet pass (C11 budgets, C13, C14) =="
+v() { ( cd "$PRISTINE" && bash scripts/cost_check.sh --verdict "$1" "$2" 2>&1; echo "exit=$?" ); }
+out="$(v "C11-budgets C14" "C11-budgets C13 C14")"
+if grep -q "PARTIAL, not OK" <<<"$out" && grep -q "C11-budgets C14" <<<"$out" && grep -q "exit=0" <<<"$out" && ! grep -q "cost-check --verdict: OK" <<<"$out"; then ok "unverified: allowlisted ones end PARTIAL, named, never OK"; else bad "unverified: allowlisted run should end PARTIAL (got: $(tr '\n' '|' <<<"$out"))"; fi
+out="$(v "C11-budgets C99" "C11-budgets C13 C14")"
+if grep -q "not allowlisted" <<<"$out" && grep -q "exit=3" <<<"$out"; then ok "unverified: a check outside the allowlist fails the run (exit 3)"; else bad "unverified: an unlisted check should fail (got: $(tr '\n' '|' <<<"$out"))"; fi
+out="$(v "C14" "")"
+if grep -q "exit=3" <<<"$out"; then ok "unverified: with no allowlist any unverified check fails the run"; else bad "unverified: empty allowlist should fail"; fi
+out="$(v "" "")"
+if grep -q "verdict: OK" <<<"$out" && grep -q "exit=0" <<<"$out"; then ok "unverified: nothing unverified ends OK"; else bad "unverified: a clean run should end OK"; fi
+# the live code reports skips as UNVERIFIED and never prints a bare SKIP
+if ! grep -q 'echo "SKIP' "$PRISTINE/scripts/cost_check.sh" && [ "$(grep -c '^  *unverified C' "$PRISTINE/scripts/cost_check.sh")" -ge 3 ]; then ok "unverified: the live checks report C11 budgets, C13 and C14 through unverified()"; else bad "unverified: a live check still prints a bare SKIP"; fi
+if grep -q 'COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14"' "$PRISTINE/.circleci/config.yml"; then ok "unverified: CI lists exactly the three checks it cannot run"; else bad "unverified: the CI allowlist is missing or wrong"; fi
 
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }
