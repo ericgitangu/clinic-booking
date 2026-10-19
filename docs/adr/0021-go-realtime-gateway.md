@@ -77,6 +77,7 @@ Option 2, as `services/realtime` (`clinic-realtime`).
 - Bad: a second language and deploy unit: a Go CI job, `govulncheck` and `gosec` (ADR-0017), its own image scan, `ship-realtime` (ADR-0016), and Go conventions
 - Bad: per-instance polling scales linearly with instances, and stream caps are per instance.
 - Bad ($0 audit): with one stream per instance and max 2 instances, at most 2 admin streams exist at once. The Go memory argument above (many idle streams per instance) is not used at this scale; we keep Go for the small image, fast start and standard-library SSE, and the concurrency can go back up if the CPU allowance stops being the binding limit.
+- Good (observed on production 649103c, 2026-10-20, in a real browser): a patient's booking reached the admin live feed about 4 s later with no reload; the patient's reschedule (13:30 to 14:00) streamed as "Rescheduled ... (was 13:30)"; the owner's veto with its reason streamed as "Vetoed by ..." and the row showed "Locked by staff", while the patient side went back to 13:30.
 - **What breaks at 10x and 100x.** At 10x (around 20 instances) the DB sees about 20 cursor queries per second and 20-40 held connections against Neon Free's limits, and Neon never suspends while anyone watches. At 100x the per-instance poll load and connection count dominate. The fix is a single relay: one poller publishing to Upstash Redis pub/sub (or Pub/Sub) and instances subscribing, keeping the same cursor as the event id.
 
 ## Assessment line
