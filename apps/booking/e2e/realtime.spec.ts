@@ -221,10 +221,25 @@ test("(f) an unchanged poll renders the grid zero times, one event renders it on
   await calls.settled();
   await a.page.waitForTimeout(300);
   expect(await renders()).toBe(settled);
+  // The 61 s jump fires every timer the page had pending. The push stream must still be the live
+  // one before the event is sent: if it was dropped here, a missed event would look like a render
+  // bug, and the fake clock means no poll could cover for it.
+  await expect(
+    marker(a.page),
+    "the push stream must still be live after the clock jump",
+  ).toHaveAttribute("data-stream", "live");
 
   const b = await patient(browser);
   await bookOn(b.page, doctorId, slots[1]);
-  await expectInactive(a.page, slots[1], undefined);
+  try {
+    await expectInactive(a.page, slots[1], undefined);
+  } catch (e) {
+    // Say what the page believed when the event did not arrive (CI keeps no browser artifacts).
+    const stream = await marker(a.page).getAttribute("data-stream");
+    throw new Error(
+      `the pushed event was not applied; data-stream=${stream}, availability calls=${calls.length}\n${String(e)}`,
+    );
+  }
   expect(await renders()).toBe(settled + 1);
   await closeAll(a.context, b.context);
 });
