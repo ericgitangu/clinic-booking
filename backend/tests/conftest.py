@@ -37,6 +37,11 @@ APP_PASSWORD = os.environ.get("TEST_APP_PASSWORD", "clinic_app_local")
 
 TEST_PUBLIC_BASE_URL = "http://testserver"
 FIXED_NOW = datetime(2026, 10, 19, 4, 0, tzinfo=UTC)  # Mon 07:00 EAT
+# For checking that a test does not depend on how far the wall clock is from FIXED_NOW: run it with
+# TEST_FIXED_NOW set to the database's own time. Most tests need the Monday above, so use this on
+# a chosen test, not the whole suite.
+if "TEST_FIXED_NOW" in os.environ:
+    FIXED_NOW = datetime.fromisoformat(os.environ["TEST_FIXED_NOW"])
 
 # Set by the fixtures that open the shared database, so the end-of-session cleanup only ever
 # touches a database this run actually used.

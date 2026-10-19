@@ -856,6 +856,11 @@ vt_run admin VERCEL_TOKEN=booking-secret-value VERCEL_ADMIN_TOKEN=admin-secret-v
 expect "vercel token: an admin job uses the admin token as VERCEL_TOKEN and hides the admin variable" \
   "$rc:$VT_OUT" "0:token=admin-secret-value admin=unset"
 expect "vercel token: ...and never prints a token value" "$(grep -c 'secret-value' "$WORK/vt.out")" 0
+# a step's shell sources BASH_ENV, then `bash scripts/...` sources it again in a child shell
+VT_NESTED="$(env -u VERCEL_TOKEN -u VERCEL_ADMIN_TOKEN VERCEL_TOKEN=booking-secret-value VERCEL_ADMIN_TOKEN=admin-secret-value \
+  BASH_ENV="$VT_ENV" bash -c 'bash -c "echo token=\${VERCEL_TOKEN-unset} admin=\${VERCEL_ADMIN_TOKEN-unset}"')"
+expect "vercel token: a child shell that sources BASH_ENV again still has the admin token" \
+  "$VT_NESTED" "token=admin-secret-value admin=unset"
 vt_run booking VERCEL_TOKEN=booking-secret-value VERCEL_ADMIN_TOKEN=admin-secret-value
 expect "vercel token: a booking job keeps its own token and the admin token is gone from its environment" \
   "$rc:$VT_OUT" "0:token=booking-secret-value admin=unset"

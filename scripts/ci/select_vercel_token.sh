@@ -29,7 +29,10 @@ case "$app" in
       exit 1
     fi
     {
-      echo 'export VERCEL_TOKEN="$VERCEL_ADMIN_TOKEN"'
+      # BASH_ENV is sourced by every bash, including the child shell a step starts with
+      # `bash scripts/...`. By then VERCEL_ADMIN_TOKEN is unset, so the assignment must keep the
+      # value the step's shell already chose rather than overwrite it with an empty string.
+      echo 'export VERCEL_TOKEN="${VERCEL_ADMIN_TOKEN:-$VERCEL_TOKEN}"'
       echo 'unset VERCEL_ADMIN_TOKEN'
     } >> "$BASH_ENV"
     echo "vercel token: admin job uses VERCEL_ADMIN_TOKEN as VERCEL_TOKEN"
