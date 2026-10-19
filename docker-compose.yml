@@ -32,6 +32,31 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # The live-feed gateway (services/realtime). Optional: `docker compose --profile realtime up`.
+  # It reads the event log as the read-only clinic_realtime role and answers only a signed staff
+  # assertion made with INTERNAL_SIGNING_KEY, so that key and ADMIN_EMAILS must be set.
+  realtime:
+    profiles: ["realtime"]
+    build:
+      context: ./services/realtime
+    environment:
+      DATABASE_URL: postgres://clinic_realtime:clinic_realtime_local@db:5432/clinic
+      INTERNAL_SIGNING_KEY: ${INTERNAL_SIGNING_KEY:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      PORT: "8080"
+      # The e2e revokes a person and expects the stream to end; production re-checks every 30 s.
+      ROLE_RECHECK: 2s
+    ports:
+      - "${REALTIME_HOST_PORT:-8090}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/realtime", "healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: ./backend

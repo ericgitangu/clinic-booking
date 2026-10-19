@@ -43,6 +43,19 @@ commands:
           paths:
             - ~/.cache/trivy
 
+  owner_emails:
+    description: >-
+      The one place the owner addresses are set (ADMIN_EMAILS for clinic-api and clinic-realtime,
+      which must agree: both resolve the owner role from it). Exported as OWNER_EMAILS.
+    steps:
+      - run:
+          name: Owner addresses (ADMIN_EMAILS, shared by the API and the gateway)
+          command: |
+            owners="developer.ericgitangu@gmail.com"
+            # gcloud --set-env-vars splits on commas; a second owner needs a custom delimiter there.
+            case "$owners" in *,*) echo "OWNER_EMAILS holds a comma: change the deploy delimiter first" >&2; exit 1 ;; esac
+            echo "export OWNER_EMAILS=$owners" >> "$BASH_ENV"
+
   create_app_role:
     description: Create the clinic_app role in the CI Postgres (local/CI only).
     steps:
@@ -66,6 +79,17 @@ executors:
   backend_db:
     docker:
       - image: mirror.gcr.io/cimg/python:3.12
+      - image: mirror.gcr.io/cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic
+    resource_class: medium
+    working_directory: ~/repo
+
+  go_db:
+    docker:
+      - image: mirror.gcr.io/cimg/go:1.26
       - image: mirror.gcr.io/cimg/postgres:17.11
         environment:
           POSTGRES_USER: clinic
@@ -144,6 +168,54 @@ jobs:
           path: backend/test-results
       - store_artifacts:
           path: backend/coverage.xml
+
+  go-quality:
+    description: services/realtime, the Go live-feed gateway. gofmt, vet, staticcheck, golangci-lint, gosec, govulncheck and the race-enabled tests against a real Postgres and the real API.
+    executor: go_db
+    steps:
+      - checkout
+      - run:
+          name: Install uv and sync the backend (the tests book through the real API)
+          command: |
+            curl -LsSf https://astral.sh/uv/0.11.28/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            export PATH="$HOME/.local/bin:$PATH"
+            cd backend && uv sync --frozen
+      - create_app_role
+      - run:
+          name: A fresh signing key for this run (the API and the staff-action tests share it)
+          command: echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
+      - run:
+          name: migrate + seed, then start the API the tests book through
+          command: |
+            cd backend
+            export DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic
+            uv run alembic upgrade head
+            uv run python -m app.scripts.seed
+            DATABASE_URL=postgresql+asyncpg://clinic_app:clinic_app_local@localhost:5432/clinic \
+              nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8080 > /tmp/api.log 2>&1 &
+            for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
+            curl -fsS http://127.0.0.1:8080/health
+      - run:
+          name: make lint-go (gofmt, go vet, staticcheck, golangci-lint; strict, no baseline; the pre-push hook runs it too)
+          command: make lint-go
+      - run:
+          name: gosec and govulncheck (any finding fails)
+          command: |
+            cd services/realtime
+            go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet ./...
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run:
+          name: go test -race against the real database and API
+          command: |
+            cd services/realtime
+            export TEST_OWNER_DSN=postgres://clinic:clinic@127.0.0.1:5432/clinic
+            export TEST_REALTIME_DSN=postgres://clinic_realtime:clinic_realtime_local@127.0.0.1:5432/clinic
+            export TEST_API_URL=http://127.0.0.1:8080
+            export TEST_API_SIGNING_KEY="$INTERNAL_SIGNING_KEY"
+            go test -race -count=1 ./...
+      - store_artifacts:
+          path: /tmp/api.log
 
   backend-contract:
     executor: backend_db
@@ -345,14 +417,16 @@ jobs:
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
             gcloud run jobs deploy clinic-migrate --image "$IMAGE_REF" --region us-east4 --service-account "clinic-migrate@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-migrate:latest --task-timeout 600s --max-retries 0 --command sh --args="-c,alembic upgrade head && python -m app.scripts.seed" --quiet
             gcloud run jobs execute clinic-migrate --region us-east4 --wait
+      - owner_emails
       - run:
           name: Deploy a tagged revision with no traffic
           command: |
+            : "${OWNER_EMAILS:?the owner_emails step did not run}"
             : "${PUBLIC_BASE_URL:?gcp-deploy context is missing PUBLIC_BASE_URL}"
             : "${WEB_ORIGIN:?gcp-deploy context is missing WEB_ORIGIN}"
             : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
-            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest,ABLY_API_KEY=clinic-ably-api-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=developer.ericgitangu@gmail.com" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
+            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest,ABLY_API_KEY=clinic-ably-api-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=${OWNER_EMAILS}" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
       - run:
           name: Tag-URL smoke behind the C19 egress gate
           command: |
@@ -383,6 +457,131 @@ jobs:
       - run:
           name: Deploy marker, failed
           command: circleci run release update ship-api --status=FAILED --failure-reason="ship-api failed" || echo "WARNING - the deploy marker was not updated"
+          when: on_fail
+
+  build-scan-push-realtime:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: WIF login + Artifact Registry docker auth
+          command: |
+            bash scripts/ci/gcp_login.sh
+            gcloud auth configure-docker "us-east4-docker.pkg.dev" --quiet
+      - run:
+          name: Build the gateway image (one manifest -> one Artifact Registry version) and hold it to 25 MB
+          command: |
+            IMAGE="us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-realtime:sha-${CIRCLE_SHA1:0:7}"
+            docker buildx build --provenance=false --sbom=false --load -t "$IMAGE" services/realtime
+            echo "export IMAGE=$IMAGE" >> "$BASH_ENV"
+            SIZE="$(docker image inspect --format '{{.Size}}' "$IMAGE")"
+            echo "clinic-realtime image: ${SIZE} bytes"
+            test "$SIZE" -lt 25000000 || { echo "FAIL: the gateway image is ${SIZE} bytes, over the 25 MB cost guard"; exit 1; }
+      - trivy_cache_restore
+      - run:
+          name: Trivy scan before push (HIGH/CRITICAL, fixed only)
+          command: |
+            VERSION=0.76.0
+            curl -sSL "https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz" | tar -xz trivy
+            ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+      - trivy_cache_save
+      - run:
+          name: Push and record the digest
+          command: |
+            docker push "$IMAGE"
+            DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")"
+            mkdir -p /tmp/ws
+            printf %s "$DIGEST" > /tmp/ws/image_ref_realtime
+      - persist_to_workspace:
+          root: /tmp/ws
+          paths:
+            - image_ref_realtime
+
+  ship-realtime:
+    description: Deploy the live-feed gateway the way ship-api deploys the API (a tagged revision with no traffic, a smoke on that revision, promotion only if this commit is still main's head). Scales from zero to at most two instances on demand and back to zero when idle.
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Deploy marker, planned (CircleCI Deploys)
+          command: |
+            circleci run release plan ship-realtime --environment-name=production \
+              --component-name=clinic-realtime --namespace=clinic --target-version="sha-${CIRCLE_SHA1:0:7}" || echo "WARNING - the deploy marker was not recorded"
+      - run:
+          name: WIF login
+          command: bash scripts/ci/gcp_login.sh
+      - run:
+          name: Deploy marker, running
+          command: circleci run release update ship-realtime --status=running || echo "WARNING - the deploy marker was not updated"
+      - run:
+          name: Prerequisites a human sets once (a clear failure here, not a mysterious one later)
+          command: bash scripts/ci/realtime_prereqs.sh
+      - owner_emails
+      - run:
+          name: Deploy a tagged revision with no traffic (min 0, max 2, concurrency 1, request-based billing)
+          command: |
+            : "${OWNER_EMAILS:?the owner_emails step did not run}"
+            : "${PUBLIC_BASE_URL:?gcp-deploy context is missing PUBLIC_BASE_URL}"
+            : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
+            IMAGE_REF="$(cat /tmp/ws/image_ref_realtime)"
+            gcloud run deploy clinic-realtime --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-realtime-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-realtime:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PROBLEMS_BASE_URL=${PUBLIC_BASE_URL},ADMIN_EMAILS=${OWNER_EMAILS},MAX_STREAMS_PER_INSTANCE=1,MAX_STREAMS_PER_PERSON=1,MAX_CONNECTION=290s,IDLE_TIMEOUT=240s" --min-instances 0 --max-instances 2 --concurrency 1 --cpu 0.25 --memory 256Mi --execution-environment gen1 --cpu-boost --timeout 900 --add-custom-audiences=clinic-realtime --no-allow-unauthenticated --quiet
+      - run:
+          name: The invoker bindings exist (only the admin app and the smoke identity)
+          command: bash scripts/ci/realtime_prereqs.sh --after-deploy
+      - run:
+          name: Tag-URL smoke behind the C19 egress gate
+          command: |
+            set +x
+            TAG_URL="$(gcloud run services describe clinic-realtime --region us-east4 --format=json | jq -r '.status.traffic[]|select(.tag=="sha-'"${CIRCLE_SHA1:0:7}"'")|.url')"
+            test -n "$TAG_URL" || { echo 'FAIL: tag URL not found'; exit 1; }
+            API_URL="$(gcloud run services describe clinic-api --region us-east4 --format='value(status.url)')"
+            test -n "$API_URL" || { echo 'FAIL: the live API URL was not found'; exit 1; }
+            test "$(curl -s --max-time 5 https://ipinfo.io/country)" = US || { echo 'FAIL C19: CircleCI egress outside North America; tag-URL smoke skipped, nothing promoted'; exit 1; }
+            python3 -m pip install --quiet httpx
+            SMOKE_SA="clinic-smoke@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
+            export REALTIME_URL="$TAG_URL" API_URL
+            export REALTIME_TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SMOKE_SA" --audiences=clinic-realtime)"
+            export API_TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SMOKE_SA" --audiences=clinic-api)"
+            export SMOKE_SIGNING_KEY="$(gcloud secrets versions access latest --secret=clinic-smoke-signing-key --project="${GOOGLE_PROJECT_ID}")"
+            python3 scripts/ci/realtime_smoke.py
+      - run:
+          name: Promote only if this commit is still main's head
+          command: SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/promote.sh "sha-${CIRCLE_SHA1:0:7}"
+      - run:
+          name: Live check after promotion, and back to the previous revision at once if it fails
+          command: |
+            grep -qx promoted /tmp/promoted-realtime/state || { echo "not promoted; nothing to check"; exit 0; }
+            SMOKE_SA="clinic-smoke@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
+            URL="$(gcloud run services describe clinic-realtime --region us-east4 --format='value(status.url)')"
+            TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SMOKE_SA" --audiences=clinic-realtime)"
+            if ! curl -fsS --max-time 30 -H "X-Serverless-Authorization: Bearer ${TOKEN}" "$URL/health"; then
+              echo "FAIL: the promoted revision does not answer /health; rolling back"
+              SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/rollback.sh || true
+              exit 1
+            fi
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - promoted-realtime/state
+            - promoted-realtime/keep.json
+      - run:
+          name: Prune superseded revisions and images (a failed lookup deletes nothing; cost-check C5/C6 still count)
+          command: SERVICE=clinic-realtime AR_PACKAGE="us-east4-docker.pkg.dev/${GOOGLE_PROJECT_ID}/clinic/clinic-realtime" PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/prune.sh || echo "WARN prune failed; the next cost-check will report any extra versions"
+      - run:
+          name: Deploy marker, success
+          command: circleci run release update ship-realtime --status=SUCCESS || echo "WARNING - the deploy marker was not updated"
+          when: on_success
+      - run:
+          name: Deploy marker, failed
+          command: circleci run release update ship-realtime --status=FAILED --failure-reason="ship-realtime failed" || echo "WARNING - the deploy marker was not updated"
           when: on_fail
 
   build-app:
@@ -627,7 +826,7 @@ jobs:
       - checkout
       - run:
           name: Skip when nothing this job covers changed (fails closed)
-          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
+          command: bash scripts/ci/skip_unless_changed.sh apps/ packages/ backend/ contracts/ services/realtime/ docker-compose.yml pnpm-lock.yaml pnpm-workspace.yaml package.json .circleci/
       - run:
           name: Throwaway keys for this run (the API checks signed assertions, the app signs sessions)
           command: |
@@ -636,8 +835,8 @@ jobs:
             # the one admin e-mail the API and the app both trust; the specs sign in as it
             echo "export ADMIN_EMAILS=owner@clinic.example" >> "$BASH_ENV"
       - run:
-          name: API and database (compose runs the migrations and the seed)
-          command: docker compose up -d --build --wait
+          name: API, database and live-feed gateway (compose runs the migrations and the seed)
+          command: docker compose --profile realtime up -d --build --wait
       - run:
           name: Build the admin app and run its scenarios against the real API
           command: |
@@ -651,7 +850,7 @@ jobs:
             pnpm install --frozen-lockfile --ignore-scripts
             pnpm -C apps/admin build
             pnpm -C apps/admin exec playwright install --with-deps chromium
-            E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
+            E2E_API_URL=http://127.0.0.1:8080 E2E_REALTIME_URL=http://127.0.0.1:8090 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
       - run:
           name: API logs
           command: docker compose logs api | tail -80
@@ -718,6 +917,28 @@ jobs:
           root: /tmp/ws
           paths:
             - rollback_state
+
+  rollback-realtime:
+    docker:
+      - image: mirror.gcr.io/cimg/python:3.12
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Halt unless the public check failed
+          command: |
+            if ! grep -qx failed /tmp/ws/result 2>/dev/null; then
+              echo "The public check passed; nothing to roll back."
+              circleci-agent step halt
+            fi
+      - run:
+          name: Put the live-feed gateway back on its previous revision (nothing to do if this release did not promote it)
+          command: |
+            bash scripts/ci/gcp_login.sh
+            SERVICE=clinic-realtime PROMOTE_DIR=/tmp/ws/promoted-realtime bash scripts/ci/rollback.sh
 
   rollback-app:
     parameters:
@@ -943,6 +1164,7 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - go-quality
       - ably-real:
           context: ably-ci
       - secrets
@@ -973,6 +1195,7 @@ workflows:
       - backend-quality
       - backend-test
       - backend-contract
+      - go-quality
       - ably-real:
           context: ably-ci
       - secrets
@@ -991,6 +1214,7 @@ workflows:
             - backend-quality
             - backend-test
             - backend-contract
+            - go-quality
             - secrets
             - sast
             - sca
@@ -1001,6 +1225,18 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - build-scan-push
+      - build-scan-push-realtime:
+          context: gcp-deploy
+          requires:
+            - go-quality
+            - cost-static
+            - backend-quality
+      - ship-realtime:
+          context: gcp-deploy
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - ship-api
+            - build-scan-push-realtime
       - build-app:
           name: build-booking
           app: booking
@@ -1042,6 +1278,12 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - verify-release
+      - rollback-realtime:
+          context: gcp-deploy
+          serial-group: << pipeline.project.slug >>/deploy-prod
+          requires:
+            - verify-release
+            - ship-realtime
       - rollback-app:
           name: rollback-booking
           app: booking

@@ -1,0 +1,150 @@
+{
+  "$id": "https://clinic.example/contracts/events/staff-event.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The same event for an owner or admin on the live feed: it adds the appointment (to link to\nit), the patient's name and, for a cancellation, the reason. Only the Go gateway\n(``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels\nthrough the push service. A viewer gets ``AdminEvent`` instead.",
+  "properties": {
+    "actor_email": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The staff member who made the change; null for a patient's own change.",
+      "title": "Actor Email"
+    },
+    "actor_role": {
+      "anyOf": [
+        {
+          "enum": [
+            "owner",
+            "admin",
+            "viewer"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Actor Role"
+    },
+    "appointment_id": {
+      "format": "uuid",
+      "title": "Appointment Id",
+      "type": "string"
+    },
+    "cancellation_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Cancellation Reason"
+    },
+    "doctor_id": {
+      "format": "uuid",
+      "title": "Doctor Id",
+      "type": "string"
+    },
+    "event_type": {
+      "enum": [
+        "booked",
+        "rescheduled",
+        "cancelled",
+        "vetoed",
+        "unlocked",
+        "arrived",
+        "no_show"
+      ],
+      "title": "Event Type",
+      "type": "string"
+    },
+    "from_local_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "From Local Date"
+    },
+    "from_starts_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "From Starts At"
+    },
+    "local_date": {
+      "format": "date",
+      "title": "Local Date",
+      "type": "string"
+    },
+    "patient_name": {
+      "title": "Patient Name",
+      "type": "string"
+    },
+    "seq": {
+      "description": "\"<txid>.<id>\" of the event.",
+      "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "staff_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The reason the staff member recorded (veto, unlock, attendance, staff booking, reschedule or cancel); null for a patient's own change.",
+      "title": "Staff Reason"
+    },
+    "to_starts_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "To Starts At"
+    }
+  },
+  "required": [
+    "event_type",
+    "doctor_id",
+    "local_date",
+    "from_local_date",
+    "from_starts_at",
+    "to_starts_at",
+    "seq",
+    "appointment_id",
+    "patient_name",
+    "cancellation_reason",
+    "actor_email",
+    "actor_role",
+    "staff_reason"
+  ],
+  "title": "StaffEvent",
+  "type": "object"
+}

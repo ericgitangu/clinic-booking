@@ -30,6 +30,7 @@ AUDIENCE = "clinic-api/internal"
 HEADER = "X-Internal-Assertion"
 VERSION = "v1"
 MAX_TTL_SECONDS = 60
+TIME_BOUND = 2**40
 SKEW_SECONDS = 5
 
 
@@ -109,6 +110,10 @@ def verify(
     if not isinstance(iat, int) or isinstance(iat, bool):
         raise InvalidAssertion("bad times")
     if not isinstance(exp, int) or isinstance(exp, bool):
+        raise InvalidAssertion("bad times")
+    # Epoch seconds a long way from now are refused before any arithmetic, so no verifier (the Go
+    # gateway uses int64) can overflow on them; 2**40 s is about 34,800 years.
+    if abs(iat) > TIME_BOUND or abs(exp) > TIME_BOUND:
         raise InvalidAssertion("bad times")
     if exp - iat > MAX_TTL_SECONDS or exp < iat:
         raise InvalidAssertion("lifetime too long")
