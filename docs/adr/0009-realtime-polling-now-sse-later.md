@@ -7,7 +7,7 @@
 
 Accepted. This revision supersedes this ADR's own earlier decision to defer SSE entirely: patient polling is unchanged, and an admin-only SSE feed is stretch item S1, built only after Gate B.
 
-**Build status (2026-10-18, main 748d7d8): Shipped for patients; the admin feed is descoped.** Shipped: the 409 `SLOT_TAKEN` path, patient polling with TanStack Query (15 s, exponential backoff, `Retry-After`, a 10 minute idle stop, #33), server-side publishing through Ably (#39) and the booking page hook that subscribes to the push stream and polls every 60 s while it is live (#44). Descoped for this submission: the admin live feed, whose dashboard uses server revalidation (ADR-0032).
+**Build status (2026-10-19): Shipped for patients; the admin feed is built with the Go gateway (PR 71).** Shipped: the 409 `SLOT_TAKEN` path, patient polling with TanStack Query (15 s, exponential backoff, `Retry-After`, a 10 minute idle stop, #33), server-side publishing through Ably (#39) and the booking page hook that subscribes to the push stream and polls every 60 s while it is live (#44). The admin live feed was descoped on 2026-10-18 (ADR-0032) and reinstated on 2026-10-19: the dashboard streams from the Go gateway of ADR-0021, built in PR 71.
 
 ## Context
 

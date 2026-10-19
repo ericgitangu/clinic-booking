@@ -139,8 +139,29 @@ DRY_RUN=1 bash infra/bootstrap.sh service invoker
 bash infra/bootstrap.sh service invoker
 ```
 
-`run.invoker` is granted to `clinic-web`, `clinic-admin` and `clinic-smoke` only (never `allUsers`), on
-`clinic-api` and, if it exists, `clinic-realtime`. Capture the service URL:
+`service` creates each missing shell on the hello image and leaves an existing service untouched:
+`clinic-api`, and `clinic-realtime` (the live-feed gateway, ADR-0021) with exactly the shape
+`ship-realtime` deploys and `cost_check` pins: `--min-instances 0 --max-instances 2 --concurrency 1
+--cpu 0.25 --memory 256Mi --execution-environment gen1 --timeout 900`, service account
+`clinic-realtime-runtime`, custom audience `clinic-realtime`, no public access.
+
+`run.invoker` is granted to `clinic-web`, `clinic-admin` and `clinic-smoke` on `clinic-api`, and to
+`clinic-admin` and `clinic-smoke` only on `clinic-realtime` (never `allUsers`, never `clinic-web` on
+the gateway).
+
+**Run order for the live-feed gateway**, each step needing the one before:
+
+1. `terraform apply` with `infra/terraform/realtime.tf` (the runtime service account, the secret
+   container `clinic-database-url-realtime`, its accessors, the deployer's act-as).
+2. Create the `clinic_realtime` login on Neon and add the secret version in the plain
+   `postgres://…?sslmode=require` form, not the asyncpg one (`docs/runbooks/neon.md`, "Optional
+   realtime feature"). The role must exist **before** `ship-api` runs migration 0014, or the
+   migration grants nothing (a NOTICE) and `scripts/ops/realtime_grants.sql` must be re-applied.
+3. `bash infra/bootstrap.sh service invoker` (the shell, then the two invoker bindings).
+4. Merge: `ship-api` runs migration 0014, then `ship-realtime` replaces the hello image.
+5. Set `REALTIME_URL` (the `clinic-realtime` run.app URL) on the `clinic-admin` Vercel project.
+
+Capture the API's service URL:
 
 ```bash
 export RUN_APP_URL=$(gcloud run services describe clinic-api --account "$GCLOUD_ACCOUNT" \

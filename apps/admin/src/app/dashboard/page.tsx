@@ -3,6 +3,7 @@ import { ActivityChart, type ActivityRow } from "@/components/activity-chart";
 import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
 import { KpiStrip } from "@/components/kpi-strip";
+import { LiveFeed } from "@/components/live-feed";
 import { RangeNav } from "@/components/range-nav";
 import { RefreshButton } from "@/components/refresh-button";
 import { StaffBar } from "@/components/staff-bar";
@@ -113,6 +114,14 @@ export default async function Dashboard({
               note: `of working slots, last ${days} days`,
             },
           ]}
+        />
+
+        <LiveFeed
+          role={staff.role}
+          doctors={dash.range.per_doctor.map((d) => ({
+            id: d.doctor_id,
+            name: d.name,
+          }))}
         />
 
         <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">

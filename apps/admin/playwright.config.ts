@@ -29,6 +29,7 @@ export default defineConfig({
         "**/dashboard.spec.ts",
         "**/metrics-cache.spec.ts",
         "**/one-hour-rule.spec.ts",
+        "**/live-feed.spec.ts",
       ],
     },
     {
@@ -49,6 +50,13 @@ export default defineConfig({
       testMatch: "**/one-hour-rule.spec.ts",
       dependencies: ["metrics-cache"],
     },
+    // The live feed books and cancels while dashboards are open, which moves the clinic-wide numbers
+    // and fills the metrics cache; it runs last so no other spec starts from those numbers.
+    {
+      name: "live-feed",
+      testMatch: "**/live-feed.spec.ts",
+      dependencies: ["one-hour-rule"],
+    },
   ],
   use: {
     baseURL: ORIGIN,
@@ -68,6 +76,8 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       API_URL: process.env.E2E_API_URL ?? "",
+      // The live-feed gateway from docker compose (profile "realtime").
+      REALTIME_URL: process.env.E2E_REALTIME_URL ?? "",
       INTERNAL_SIGNING_KEY: process.env.INTERNAL_SIGNING_KEY ?? "",
       ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",

@@ -50,6 +50,28 @@ export const zAccountLinked = z.object({
 });
 
 /**
+ * AdminActionEvent
+ *
+ * A staff action that changed no appointment (a reminder sent now, "running late", an
+ * invitation), for a viewer of the live feed: what happened and, for the two patient
+ * notifications, the doctor and the visit time. No person, no reason, no address. Streamed only
+ * by the Go gateway from ``staff_action_audit``; it never travels through the push service.
+ */
+export const zAdminActionEvent = z.object({
+    delay_minutes: z.int().nullable(),
+    doctor_id: z.uuid().nullable(),
+    kind: z.enum([
+        'reminder_now',
+        'running_late',
+        'invite_created',
+        'invite_revoked',
+        'invite_accepted'
+    ]),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
+    starts_at: z.iso.datetime({ offset: true }).nullable()
+});
+
+/**
  * AdminAppointment
  */
 export const zAdminAppointment = z.object({
@@ -154,7 +176,8 @@ export const zAuditEntry = z.object({
         'reminder_now',
         'running_late',
         'invite_create',
-        'invite_revoke'
+        'invite_revoke',
+        'invite_accept'
     ]),
     actor_email: z.string(),
     actor_role: z.enum([
@@ -889,6 +912,37 @@ export const zSlotEvent = z.object({
 });
 
 /**
+ * StaffActionEvent
+ *
+ * The same staff action for an owner or admin: who did it, why, the patient (for a reminder
+ * or "running late") and the invited address and role (for an invitation).
+ */
+export const zStaffActionEvent = z.object({
+    actor_email: z.string(),
+    actor_role: z.enum([
+        'owner',
+        'admin',
+        'viewer'
+    ]),
+    appointment_id: z.uuid().nullable(),
+    delay_minutes: z.int().nullable(),
+    doctor_id: z.uuid().nullable(),
+    invite_email: z.string().nullable(),
+    invite_role: z.enum(['admin', 'viewer']).nullable(),
+    kind: z.enum([
+        'reminder_now',
+        'running_late',
+        'invite_created',
+        'invite_revoked',
+        'invite_accepted'
+    ]),
+    patient_name: z.string().nullable(),
+    reason: z.string(),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
+    starts_at: z.iso.datetime({ offset: true }).nullable()
+});
+
+/**
  * StaffAppointmentChange
  *
  * The changed appointment plus what the web app needs to tell the patient.
@@ -927,6 +981,42 @@ export const zStaffCreateAppointment = z.object({
     patient_id: z.uuid().nullish(),
     reason: z.string().min(3).max(500),
     starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * StaffEvent
+ *
+ * The same event for an owner or admin on the live feed: it adds the appointment (to link to
+ * it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+ * (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+ * through the push service. A viewer gets ``AdminEvent`` instead.
+ */
+export const zStaffEvent = z.object({
+    actor_email: z.string().nullable(),
+    actor_role: z.enum([
+        'owner',
+        'admin',
+        'viewer'
+    ]).nullable(),
+    appointment_id: z.uuid(),
+    cancellation_reason: z.string().nullable(),
+    doctor_id: z.uuid(),
+    event_type: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled',
+        'vetoed',
+        'unlocked',
+        'arrived',
+        'no_show'
+    ]),
+    from_local_date: z.iso.date().nullable(),
+    from_starts_at: z.iso.datetime({ offset: true }).nullable(),
+    local_date: z.iso.date(),
+    patient_name: z.string(),
+    seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
+    staff_reason: z.string().nullable(),
+    to_starts_at: z.iso.datetime({ offset: true }).nullable()
 });
 
 /**

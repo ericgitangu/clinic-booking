@@ -44,7 +44,9 @@ Option 2, plus enforcement of expand-only migrations. Option 4 if stretch S1 shi
 
 **Amendment (2026-10-18): migrations as built.** The versions in `backend/migrations/versions/` are `0001_initial`, `0002_admin_indexes`, `0003_staff_access` and `0004_patient_accounts`. Migration `0003_event_cursor`, named in the stretch S1 bullet above, was only the S1 plan: S1 is not built, so there is no `0003_event_cursor`, no `clinic_realtime` role and no realtime secret. If S1 is built, its event-cursor migration takes the next free number after `0004`, not `0003`. The tolerance rule described for the S1 grants (skip with a `NOTICE` when the role is missing) is unchanged as a design.
 
-**Amendment (2026-10-18).** The read-only `clinic_realtime` role, its secret `clinic-database-url-realtime` and `02-realtime-role.sql` are no longer needed: realtime push is relayed from `clinic-api` to Ably ([ADR-0031](0031-realtime-push-via-ably-sse.md)), so there is no Go gateway to hold a database role. Option 4 and the S1 bullets above stay as the record. The relay's outbox is an expand-only migration, `0006_realtime_outbox`, shipped in PR #39.
+**Amendment (2026-10-19): the role is needed again.** The Go gateway is built (ADR-0021, PR 71). Migration `0014_realtime_reader_role` pins the grants of `clinic_realtime` (column-level SELECT on `appointment_events`, `appointments`, `patients` and `staff_access`, no write, no default privileges), `02-realtime-role.sql` creates the login locally and in CI, and `scripts/ops/realtime_grants.sql` re-applies the grants. The event-cursor column it reads is `0006_realtime_outbox`.
+
+**Amendment (2026-10-18; reversed by the one above).** The read-only `clinic_realtime` role, its secret `clinic-database-url-realtime` and `02-realtime-role.sql` were thought no longer needed: realtime push is relayed from `clinic-api` to Ably ([ADR-0031](0031-realtime-push-via-ably-sse.md)), so there is no Go gateway to hold a database role. Option 4 and the S1 bullets above stay as the record. The relay's outbox is an expand-only migration, `0006_realtime_outbox`, shipped in PR #39.
 
 ## Consequences
 

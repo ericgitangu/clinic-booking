@@ -8,7 +8,7 @@
 
 Accepted
 
-**Build status (2026-10-18, main 748d7d8): Shipped.** FastAPI is the single system of record, layered as decided, with no `/v1` prefix and no Go in the repository. The optional Go gateway is superseded by ADR-0031 and will not be built.
+**Build status (2026-10-19): Shipped.** FastAPI is the single system of record, layered as decided, with no `/v1` prefix. The only Go in the repository is the read-only live-feed gateway `services/realtime/` (ADR-0021, reinstated by the engineer on 2026-10-19, built in PR 71): its database role has SELECT only and no code path in it writes.
 
 ## Context
 

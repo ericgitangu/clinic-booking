@@ -24,6 +24,7 @@ StaffActionName = Literal[
     "running_late",
     "invite_create",
     "invite_revoke",
+    "invite_accept",
 ]
 
 
