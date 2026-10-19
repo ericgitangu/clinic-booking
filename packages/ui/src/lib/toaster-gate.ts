@@ -3,15 +3,20 @@
 // toaster is on the page, so a toast raised early (a confirmation page raises one as it opens) is
 // shown, not lost.
 let mounted = false;
+// A request is remembered: a page's effects run before the toaster's own (it sits after the page in
+// the tree), so a toast raised as the page opens asks before anyone is listening.
+let requested = false;
 const waiting: (() => void)[] = [];
 const wanters = new Set<() => void>();
 
 export function requestToaster(): void {
+  requested = true;
   for (const w of wanters) w();
 }
 
 export function onToasterRequested(fn: () => void): () => void {
   wanters.add(fn);
+  if (requested) fn();
   return () => void wanters.delete(fn);
 }
 
