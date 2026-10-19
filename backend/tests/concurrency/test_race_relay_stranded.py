@@ -361,3 +361,40 @@ async def test_a_failure_in_a_later_pass_keeps_what_the_earlier_pass_sent(
     assert len({m.id for m in publisher.messages}) == 4  # each of the four exactly once
     assert await owner_conn.fetchval("SELECT used FROM realtime_publish_budget") == 4  # no re-debit
     assert await _cursor_at_last(owner_conn)
+
+
+@pytest.mark.race
+async def test_an_event_that_commits_during_the_holders_last_empty_pass_is_still_sent(
+    realtime_clean: None, owner_conn: asyncpg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The holder's final pass finds nothing and still holds the cursor row when another booking
+    commits its event; that booking's relay is refused the row and returns. Nothing triggers
+    again, yet both events must be published by the time the first request is done."""
+    publisher = RecordingPublisher()
+    patients = await _patients(owner_conn, 2)
+    app = make_realtime_app(publisher)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    real = relay_module._relay_in
+    state = {"calls": 0, "inside": False}
+
+    async def _relay_in(*args: object, **kwargs: object) -> relay_module.RelayResult:
+        result = await real(*args, **kwargs)  # type: ignore[arg-type]  # forwarded as received
+        if state["inside"]:
+            return result
+        state["calls"] += 1
+        if state["calls"] == 2:  # the holder's empty pass: the row is still locked
+            assert result.consumed == 0 and not result.contended
+            state["inside"] = True
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+                resp, _ = await _book(c, patients[1], SLOTS[1])
+            state["inside"] = False
+            assert resp.status_code == 201
+        return result
+
+    monkeypatch.setattr(relay_module, "_relay_in", _relay_in)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        first, _ = await _book(client, patients[0], SLOTS[0])
+    assert first.status_code == 201
+    assert state["calls"] >= 2
+    _published_once(publisher, 2)
+    assert await _cursor_at_last(owner_conn)

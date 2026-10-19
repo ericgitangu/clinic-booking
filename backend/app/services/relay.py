@@ -97,6 +97,18 @@ _MARK_DEBITED = text(
     WHERE singleton
     """
 )
+# The cursor row WITHOUT the lock, and whether any visible event sorts after it: the holder's last
+# look, taken after it released the cursor row (see ``_pending_after_release``).
+_PENDING = text(
+    """
+    SELECT EXISTS (
+        SELECT 1 FROM appointment_events e, event_relay_cursor c
+        WHERE c.singleton
+          AND e.txid < pg_snapshot_xmin(pg_current_snapshot())
+          AND (e.txid, e.id) > (c.txid, c.id)
+    )
+    """
+)
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
 # A holder starts another pass only when the time left covers the slowest pass so far with this
 # margin, and never less than the floor. A pass is never started to be cancelled mid-publish.
@@ -290,6 +302,15 @@ class Relay:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
         return progress.published
 
+    async def _pending_after_release(self) -> bool:
+        """The holder's last look. A loser that was refused the cursor row while the holder's empty
+        pass held it committed its event BEFORE the holder released the row, so a fresh snapshot
+        taken after the release sees it (the ``xmin`` guard aside). The look takes no lock, so it
+        opens no new window of its own, and it works whichever process the loser ran in. A pass that
+        found something is followed by another pass anyway; only an empty pass needs the look."""
+        async with self.sessionmaker() as session:
+            return bool((await session.execute(_PENDING)).scalar_one())
+
     async def _drain(self, clock: Clock, progress: _Progress) -> None:
         """One trigger. A loser returns at once. A holder passes again from a fresh snapshot after
         every pass that moved the cursor, until a pass finds nothing, ``MAX_PASSES``, or too little
@@ -309,8 +330,18 @@ class Relay:
             )
             slowest = max(slowest, loop.time() - begun)
             progress.published += result.published
+            _log.debug(
+                "realtime relay pass %s: contended=%s consumed=%s published=%s failed=%s",
+                attempt,
+                result.contended,
+                result.consumed,
+                result.published,
+                result.failed,
+            )
             if result.failed:
                 progress.failed = True
                 return
-            if result.contended or result.consumed == 0:
+            if result.contended:
+                return
+            if result.consumed == 0 and not await self._pending_after_release():
                 return
