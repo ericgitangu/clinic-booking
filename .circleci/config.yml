@@ -692,7 +692,11 @@ jobs:
             cp -R "/tmp/ws/.vercel/output-<< parameters.app >>" .vercel/output
             cp -R "/tmp/ws/apps/<< parameters.app >>/.next" "apps/<< parameters.app >>/.next"
             export VERCEL_APP="<< parameters.app >>"
-            URL="$(npm_config_ignore_scripts=true vercel deploy --prebuilt --prod | tail -1)"
+            # stdout is a bare URL, or JSON when the CLI sees an agent environment: scripts/ci/deploy_url.sh
+            # takes the url field (or the last deployment URL line) and fails closed if there is none.
+            npm_config_ignore_scripts=true vercel deploy --prebuilt --prod > /tmp/deploy.out
+            URL="$(bash scripts/ci/deploy_url.sh < /tmp/deploy.out)"
+            rm -f /tmp/deploy.out
             echo "deployed $URL"
             NEW="$(bash scripts/ci/vercel_prod.sh id-of "$URL")"
             # A rollback switches off automatic alias assignment, so make sure the public alias

@@ -393,8 +393,10 @@ git remote set-url origin "$WORK/origin.git"
 # =========================================================================================
 cat > "$WORK/bin/vercel" <<'FAKE'
 #!/usr/bin/env bash
+[ "${1:-}" = "--version" ] && { echo "Vercel CLI 59.5.0"; exit 0; }
 [ "${1:-}" = "api" ] || { echo "fake vercel: unhandled: $*" >&2; exit 99; }
 [ -f "$FX/denied" ] && { echo "Error: Not authorized" >&2; exit 1; }
+[ -f "$FX/denied_msg" ] && { cat "$FX/denied_msg" >&2; exit 1; }
 case "${2:-}" in *until=*) f="$FX/env_json_2" ;; *) f="$FX/env_json" ;; esac
 cat "$f"
 exit "$(cat "$FX/rc" 2>/dev/null || echo 0)"
@@ -423,6 +425,135 @@ env_table production 0 $ALL OTHER
 out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
 expect "env check: passes when every name is set for production" "$rc" 0
 expect "env check: never prints a value" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
+
+# Fake secrets are built here at run time from a seeded generator, so no secret-shaped literal exists
+# in the tracked file (secret scanners rightly flag such literals, even in tests).
+rnd() { python3 -c "import random, string, sys; r = random.Random(int(sys.argv[2])); a = string.ascii_letters + string.digits; print(''.join(r.choice(a) for _ in range(int(sys.argv[1]))))" "$1" "$2"; }
+FK_PARAM="$(rnd 16 11)"; FK_PARAM2="$(rnd 16 12)"; FK_OPAQUE1="$(rnd 22 13)"; FK_OPAQUE2="$(rnd 27 14)"
+FK_BASIC="$(printf '%s' "$(rnd 21 15)" | base64 | tr -d '=\n')"; FK_LEAK="leak-$(rnd 14 16)"; FK_ENVTOK="vc""p_$(rnd 20 17)"; FK_URLTOK="vc""p_$(rnd 40 18)"
+# ---- what an error prints: a validated code and nothing else from Vercel ----
+env_err() { # <denied_msg content>: runs the check against a CLI that refuses with it; output in $out, status in $rc
+  new_fx env_err_case
+  printf '%s\n' "$1" > "$FX/denied_msg"
+  out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+}
+env_err '{"error":{"code":"forbidden","message":"Not authorized: scope eric-gitangus-projects tok'"en=$FK_PARAM"'"}}'
+expect "env check: a JSON error prints its validated code and the exit status" "$rc:$(grep -c 'exit 1, forbidden$' <<<"$out")" "1:1"
+expect "env check: ...and nothing of the message" "$(grep -c "Not authorized\|eric-gitangus\|$FK_PARAM" <<<"$out")" 0
+env_err 'Error: not_authorized'
+expect "env check: a whole 'Error: <code>' line prints its code" "$(grep -c 'exit 1, not_authorized$' <<<"$out")" 1
+env_err '  "code": "invalid_token",'
+expect "env check: a whole '\"code\": \"...\"' line prints its code" "$(grep -c 'exit 1, invalid_token$' <<<"$out")" 1
+# anything that is not a validated code prints only the size, exactly as before
+for bad in 'Error: Not authorized: Trying to access resource under scope "x". You must re-authenticate.' \
+           'Error: Forbidden' 'Error: not authorized' 'Error: not_authorized_but_this_code_is_far_too_long_to_be_valid' \
+           '{"error":{"code":"Forbidden","message":"x"}}' '{"error":{"code":"a b","message":"x"}}' '{"error":{"code":"é_code","message":"x"}}' \
+           '{"error":{"code":"","message":"'"$FK_LEAK"'"}}' '{"error":"'"$FK_LEAK"'"}' "something odd $FK_LEAK"; do
+  env_err "$bad"
+  expect "env check: not a validated code, so size only and nothing of it: ${bad:0:40}" "$(grep -c 'unreadable response (' <<<"$out")$(grep -c "$FK_LEAK\|Not authorized\|Forbidden\|authorized" <<<"$out")" 10
+done
+# a code of exactly 40 characters is valid, 41 is not
+c40="$(python3 -c "print('a' * 40)")"; c41="$(python3 -c "print('a' * 41)")"
+env_err "Error: $c40"; expect "env check: a 40-character code is printed" "$(grep -c "exit 1, $c40\$" <<<"$out")" 1
+env_err "Error: $c41"; expect "env check: a 41-character code is not" "$(grep -c "$c41" <<<"$out")" 0
+# the three findings that ended redaction: key=value parameters, 20 to 31 character opaque tokens, Basic credentials
+env_err "Error: denied tok""en=$FK_PARAM2 for you"
+expect "env check: a token= parameter is not printed" "$(grep -c "$FK_PARAM2\|token=" <<<"$out")" 0
+env_err "Error: denied $FK_OPAQUE1 and $FK_OPAQUE2"
+expect "env check: 20 to 31 character opaque tokens are not printed" "$(grep -c "$FK_OPAQUE1\|$FK_OPAQUE2" <<<"$out")" 0
+env_err "Error: denied Authorization: Bas""ic $FK_BASIC== now"
+expect "env check: Basic credentials are not printed" "$(grep -c "$FK_BASIC\|Basic" <<<"$out")" 0
+new_fx env_version
+env_table production 0 $ALL OTHER
+out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"
+expect "env check: the pinned CLI version is printed" "$(grep -c 'vercel_env_check: Vercel CLI 59.5.0' <<<"$out")" 1
+new_fx env_no_second_way
+printf '%s\n' 'Error: forbidden' > "$FX/denied_msg"
+out="$(VERCEL_TOKEN="$FK_ENVTOK" bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
+expect "env check: a refusal is reported once and the token in the environment is never printed" "$rc:$(grep -c "$FK_ENVTOK" <<<"$out")" "1:0"
+
+# ---- fuzz: no substring of 6 or more characters of what Vercel says is ever printed ----
+# Deterministic (seed 20261019). In-process for the extractor, and end to end through the script.
+python3 - "$HERE" "$WORK" <<'PY' > "$WORK/fuzz.out" 2>&1
+import base64, json, os, random, re, string, subprocess, sys
+here, work = sys.argv[1], sys.argv[2]
+sys.path.insert(0, here)
+from vercel_error_code import error_code
+STRICT = re.compile(r"[a-z][a-z0-9_]{0,39}")   # the pattern a printed code must match, written out here on purpose
+
+rng = random.Random(20261019)
+ALNUM = string.ascii_letters + string.digits
+def word(n, alpha=ALNUM): return "".join(rng.choice(alpha) for _ in range(n))
+def tok(): return word(rng.randint(6, 64))
+def b64(): return base64.b64encode(word(rng.randint(6, 40)).encode()).decode()
+def uni(n): return "".join(chr(rng.choice([rng.randint(0x20, 0x7e), rng.randint(0xa1, 0x24f), rng.randint(0x400, 0x4ff), rng.randint(0x4e00, 0x4e80)])) for _ in range(n))
+SHAPES = [
+    lambda: "token=" + tok(), lambda: "access_token=" + tok(), lambda: "Authorization: Basic " + b64(),
+    lambda: "Authorization: Bearer " + tok(), lambda: "Bearer: " + tok(), lambda: "BEARER " + tok(),
+    lambda: "vcp_" + tok(), lambda: "VCP_" + tok(), lambda: "x" + "tok_" + tok(), lambda: "pat_" + tok(),
+    lambda: ".".join(tok() for _ in range(3)), lambda: ".".join(word(rng.randint(2, 6)) for _ in range(rng.randint(3, 5))),
+    lambda: "https://%s:%s@host.example/%s" % (word(8), tok(), word(5)), lambda: "%s@%s.io" % (word(7), word(6)),
+    lambda: "team_" + tok(), lambda: "prj_" + tok(), lambda: "dpl_" + tok(), lambda: "scope \"%s-%s-projects\"" % (word(6), word(7)),
+    lambda: "key=" + tok(), lambda: "password: " + tok(), lambda: tok(), lambda: uni(rng.randint(6, 40)),
+]
+def body():
+    parts = []
+    for _ in range(rng.randint(1, 5)):
+        parts.append(rng.choice(SHAPES)())
+        parts.append(rng.choice([" ", ", ", " - ", "\n", ": ", " and ", ""]))
+    return "".join(parts)
+def valid_code(): return rng.choice(["forbidden", "not_authorized", "invalid_token", "rate_limited", "bad_request"])
+def case():
+    k = rng.randint(0, 7)
+    if k == 0: return body()
+    if k == 1: return "Error: " + body()
+    if k == 2: return json.dumps({"error": {"code": rng.choice([valid_code(), body(), "A" + word(5)]), "message": body()}})
+    if k == 3: return json.dumps({"error": {"code": valid_code(), "message": body()}}, ensure_ascii=rng.random() < 0.5)
+    if k == 4: return "Error: %s\n%s" % (valid_code(), body())
+    if k == 5: return "".join(chr(rng.randint(0x20, 0x7e)) for _ in range(rng.randint(0, 200)))
+    if k == 6: return uni(rng.randint(0, 120)) + body()
+    return '  "code": "%s",\n  "message": "%s"' % (rng.choice([valid_code(), body().replace('"', "")]), body().replace('"', ""))
+def grams(s, n=6): return {s[i:i + n] for i in range(len(s) - n + 1)}
+FIXED = re.compile(r"vercel_env_check: [^\n]*?(could not read the project variables: |FAIL, cannot verify[^\n]*)|exit \d+, |unreadable response \(\d+ bytes\)|Vercel CLI \d+\.\d+\.\d+")
+leaks, n_in, n_e2e = [], 0, 0
+cases = [case() for _ in range(1200)]
+for text in cases:
+    n_in += 1
+    code = error_code(text)
+    if code is not None and not STRICT.fullmatch(code):
+        leaks.append(("in-process: printed code is not a strict code", code[:80]))
+        continue
+    shown = ("exit 1, %s" % code) if code else "exit 1, unreadable response (%d bytes)" % len(text.encode())
+    left = FIXED.sub("", shown)
+    if code: left = left.replace(code, "")
+    if grams(text) & grams(left):
+        leaks.append(("in-process", text[:80]))
+# end to end through the real script, with the fake CLI refusing with the case's text
+fake = os.path.join(work, "bin", "vercel")
+for text in cases[:80]:
+    n_e2e += 1
+    fx = os.path.join(work, "fx.fuzz"); os.makedirs(fx, exist_ok=True)
+    open(os.path.join(fx, "denied_msg"), "w", encoding="utf-8").write(text + "\n")
+    for f in ("denied", "rc"):
+        try: os.remove(os.path.join(fx, f))
+        except FileNotFoundError: pass
+    env = dict(os.environ, FX=fx, VERCEL_PROJECT_ID="prj_x", VERCEL_ORG_ID="team_x")
+    run = subprocess.run(["bash", os.path.join(here, "vercel_env_check.sh"), "admin", "production"], env=env, capture_output=True, text=True, errors="replace")
+    out = run.stdout + run.stderr
+    code = error_code(text)
+    if code is not None and not STRICT.fullmatch(code):
+        leaks.append(("end-to-end: printed code is not a strict code", code[:80]))
+        continue
+    left = FIXED.sub("", out)
+    left = re.sub(r"vercel_env_check: [^\n]*", lambda m: "", left)
+    if code: left = left.replace(code, "")
+    if grams(text) & grams(left):
+        leaks.append(("end-to-end", text[:80]))
+print("FUZZ in_process=%d end_to_end=%d leaks=%d" % (n_in, n_e2e, len(leaks)))
+for kind, t in leaks[:5]: print("LEAK", kind, repr(t))
+PY
+expect "fuzz: 1,200 generated inputs, in process and 80 through the script, leak no 6-character substring" "$(grep -c '^FUZZ in_process=1200 end_to_end=80 leaks=0$' "$WORK/fuzz.out")" 1
+if grep -q '^LEAK' "$WORK/fuzz.out"; then grep '^LEAK' "$WORK/fuzz.out" | head -3; fi
 
 new_fx env_missing
 env_table production 0 BETTER_AUTH_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET INTERNAL_SIGNING_KEY API_URL
@@ -479,13 +610,13 @@ new_fx env_garbage
 printf 'Error: something odd\n' > "$FX/env_json"
 out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
 expect "env check: unreadable response fails closed" "$([ "$rc" -ne 0 ] && echo refused)" refused
-expect "env check: unreadable response says what the CLI said" "$(grep -c 'something odd' <<<"$out")" 1
+expect "env check: unreadable response reports the size, not what the CLI said" "$(grep -c 'something odd' <<<"$out")$(grep -c 'unreadable response (' <<<"$out")" 01
 
 new_fx env_err_body
 printf '%s\n' '{"error":{"code":"forbidden","message":"Not authorized for this project"},"envs":[{"key":"X","value":"SECRET-VALUE-MUST-NOT-LEAK"}]}' > "$FX/env_json"
 echo 1 > "$FX/rc"
 out="$(bash "$HERE/vercel_env_check.sh" admin production 2>&1)"; rc=$?
-expect "env check: an API error prints code and message only" "$(grep -c 'forbidden: Not authorized for this project' <<<"$out")" 1
+expect "env check: an API error prints its code only" "$(grep -c 'exit 1, forbidden$' <<<"$out")$(grep -c 'Not authorized for this project' <<<"$out")" 10
 expect "env check: a value-bearing error body never leaks" "$(grep -c SECRET-VALUE-MUST-NOT-LEAK <<<"$out")" 0
 expect "env check: an API error body fails closed" "$([ "$rc" -ne 0 ] && echo refused)" refused
 
@@ -1243,6 +1374,28 @@ expect "retired names: admin-only mode checks only the admin surfaces" "$(bash "
 kill "$RN_PID" 2>/dev/null
 rn_run "http://127.0.0.1:9"
 expect "retired names: an unreachable site fails" "$rc" 1
+
+# =========================================================================================
+# deploy_url.sh: the deployment URL from `vercel deploy` output (a bare URL, or JSON in an agent
+# environment where `tail -1` returned the closing brace).
+# =========================================================================================
+du() { printf '%s' "$1" | bash "$HERE/deploy_url.sh" 2>"$WORK/du.err"; }
+expect "deploy url: a bare URL line" "$(du 'https://clinic-abc-team.vercel.app')" "https://clinic-abc-team.vercel.app"
+expect "deploy url: the last deployment URL among noise" "$(du $'Vercel CLI 59.5.0\nhttps://a.vercel.app\nInspect: https://vercel.com/x/y\nhttps://b.vercel.app\ndone\n')" "https://b.vercel.app"
+expect "deploy url: a one-line JSON object" "$(du '{"status":"ok","url":"https://c.vercel.app"}')" "https://c.vercel.app"
+expect "deploy url: multi-line JSON with extra fields, noise before and after" \
+  "$(du $'warning: something\n{\n  "status": "ok",\n  "deployment": {"id": "dpl_x"},\n  "url": "https://d.vercel.app",\n  "n": [1, 2]\n}\ntrailing text\n')" "https://d.vercel.app"
+expect "deploy url: a JSON url without a scheme gets https://" "$(du '{"url":"e.vercel.app"}')" "https://e.vercel.app"
+expect "deploy url: the project's own public host is accepted" "$(du 'https://clinic.ericgitangu.com')" "https://clinic.ericgitangu.com"
+expect "deploy url: JSON with an unrelated url is not accepted" "$(du '{"url":"https://evil.example.com"}' ; echo "rc=$?")" "rc=1"
+expect "deploy url: a URL on a foreign host is not accepted" "$(du 'https://evil.example.com' ; echo "rc=$?")" "rc=1"
+du '' >/dev/null; expect "deploy url: empty output is a failure (exit 1, says nothing was promoted)" "$?:$(grep -c 'nothing was promoted' "$WORK/du.err")" "1:1"
+du '}' >/dev/null; expect "deploy url: a lone closing brace (what tail -1 returned) is a failure" "$?" 1
+du "noise with token $FK_URLTOK"$'\nno url here' >/dev/null
+expect "deploy url: a failure prints the size only, never the output" "$(grep -c "$FK_URLTOK" "$WORK/du.err")$(grep -c 'bytes' "$WORK/du.err")" 01
+# the ship step uses it, and no longer takes the last line of the output
+expect "deploy url: the ship step reads the URL through deploy_url.sh" "$(grep -c 'deploy_url.sh < /tmp/deploy.out' "$HERE/../../.circleci/config.yml")" 1
+expect "deploy url: the ship step no longer pipes the deploy through tail -1" "$(grep -c 'vercel deploy --prebuilt --prod | tail -1' "$HERE/../../.circleci/config.yml")" 0
 
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
