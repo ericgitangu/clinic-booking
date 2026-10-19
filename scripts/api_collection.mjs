@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { clinicDayAhead, naiveStart, nightStart, offGridStart } from "./api_collection_dates.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SPEC = JSON.parse(readFileSync(join(ROOT, "contracts/openapi.json"), "utf8"));
@@ -494,7 +495,8 @@ pm.test("cancelled with the reason given", () => {
         name: "Time without a UTC offset",
         op: ["POST", "/appointments"],
         body: { doctor_id: "{{doctorId}}", patient_id: "{{otherPatientId}}", starts_at: "{{naiveStart}}" },
-        prerequest: js`pm.collectionVariables.set("naiveStart", pm.collectionVariables.get("slotStartNew").slice(0, 19));`,
+        prerequest: js`${naiveStart}
+pm.collectionVariables.set("naiveStart", naiveStart(pm.collectionVariables.get("slotStartNew")));`,
         expect: [422, "TIMEZONE_REQUIRED"],
       },
       {
@@ -511,16 +513,20 @@ pm.collectionVariables.set("pastStart", t.toISOString());`,
         op: ["POST", "/appointments"],
         body: { doctor_id: "{{doctorId}}", patient_id: "{{otherPatientId}}", starts_at: "{{offGridStart}}" },
         prerequest: js`// Seven minutes after a free slot: inside working hours, off the grid.
-pm.collectionVariables.set("offGridStart", new Date(new Date(pm.collectionVariables.get("slotStartNew")).getTime() + 7 * 60000).toISOString());`,
+${offGridStart}
+pm.collectionVariables.set("offGridStart", offGridStart(pm.collectionVariables.get("slotStartNew")));`,
         expect: [422, "SLOT_MISALIGNED"],
       },
       {
         name: "Time outside working hours",
         op: ["POST", "/appointments"],
         body: { doctor_id: "{{doctorId}}", patient_id: "{{otherPatientId}}", starts_at: "{{nightStart}}" },
-        prerequest: js`// 03:00 clinic time on the day the slots came from, with the offset the API used for them.
+        prerequest: js`// 03:00 clinic time two clinic days from today, with the offset the API used for the slots. Not the
+// slots' day: that can be the clinic's today, where 03:00 is inside the lead time, which is checked first.
+${clinicDayAhead}
+${nightStart}
 const start = pm.collectionVariables.get("slotStartNew");
-pm.collectionVariables.set("nightStart", pm.collectionVariables.get("slotDay") + "T03:00:00" + start.slice(19));`,
+pm.collectionVariables.set("nightStart", nightStart(Date.now(), start.slice(19)));`,
         expect: [422, "OUTSIDE_WORKING_HOURS"],
       },
       {
