@@ -70,13 +70,43 @@ async function DoctorList() {
               className="lift-card flex flex-col rounded-xl border border-border bg-card p-5"
             >
               <div className="flex items-center gap-4">
-                <DoctorAvatar
-                  doctorId={d.id}
-                  name={d.full_name}
-                  size={56}
-                  lazy={i >= 2}
-                  defer={i >= 2}
-                />
+                {/* The first row is never deferred. The grid has one column below sm (640 px) and two
+                    from sm up, so the second card is in the first row only from sm up: it gets a twin
+                    pair, one shown per width. A hidden lazy image is not fetched, and a hidden
+                    deferred one is never observed, so each width fetches exactly one. */}
+                {i === 0 ? (
+                  <DoctorAvatar
+                    doctorId={d.id}
+                    name={d.full_name}
+                    size={56}
+                    lazy={false}
+                    priority
+                  />
+                ) : i === 1 ? (
+                  <>
+                    <DoctorAvatar
+                      doctorId={d.id}
+                      name={d.full_name}
+                      size={56}
+                      defer
+                      className="sm:hidden"
+                    />
+                    <DoctorAvatar
+                      doctorId={d.id}
+                      name={d.full_name}
+                      size={56}
+                      lazy
+                      className="hidden sm:inline-block"
+                    />
+                  </>
+                ) : (
+                  <DoctorAvatar
+                    doctorId={d.id}
+                    name={d.full_name}
+                    size={56}
+                    defer
+                  />
+                )}
                 <div>
                   <h2 className="font-heading text-xl font-semibold">
                     {d.full_name}

@@ -6,6 +6,7 @@ import {
   doctorAvatarSrc,
   doctorInitials,
   doctorPhoto,
+  doctorPortraitAlt,
 } from "../src/lib/doctor-avatar";
 
 // The seed is the truth: backend/app/scripts/seed.py (uuid5 of "doctor:<key>").
@@ -84,6 +85,17 @@ describe("avatar map", () => {
   it("returns null for an unknown id, including prototype keys", () => {
     expect(doctorAvatarSrc("nope")).toBeNull();
     expect(doctorAvatarSrc("constructor")).toBeNull();
+  });
+});
+
+describe("alt text", () => {
+  it("is the full sentence, without a doubled title", () => {
+    const want = "Dr. Brian Kamau, AI-generated portrait of a fictional doctor";
+    expect(doctorPortraitAlt("Dr. Brian Kamau")).toBe(want);
+    expect(doctorPortraitAlt("Brian Kamau")).toBe(want);
+    expect(doctorPortraitAlt("Dr Brian Kamau")).toBe(
+      "Dr Brian Kamau, AI-generated portrait of a fictional doctor",
+    );
   });
 });
 

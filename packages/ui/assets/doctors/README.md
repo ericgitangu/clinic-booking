@@ -63,13 +63,12 @@ The generated SVGs carry the CC0 rights notice in their own metadata.
 
 ## How the apps use them
 
-The files here are the source of truth: per doctor id, `<id>-128.webp`, `<id>-256.webp` and `<id>-512.webp` (the portrait,
-1x and 2x) and `<id>.svg` (the fallback). `node scripts/avatars/sync.mjs` copies them to
-`apps/booking/public/doctors/` and `apps/admin/public/doctors/` (served as `/doctors/<file>`, so no image
+The files here are the source of truth: per doctor id, `<id>-128.webp`, `<id>-256.webp` and `<id>-512.webp` (the portrait at three sizes) and `<id>.svg` (the fallback). `node scripts/avatars/sync.mjs` copies them to
+`apps/booking/public/doctors/` (served as `/doctors/<file>`, so no image
 bytes are inlined into any JavaScript chunk) and writes the manifest `packages/ui/src/lib/doctor-avatar-data.ts`
 that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 128 w, 256 w and 512 w with `sizes` set to the displayed width, explicit width and
-height), then the SVG if the portrait fails, then initials. Portraits below the first row of the doctor list are deferred: no image is requested until they scroll into view (`defer`). A unit test fails if the sources, the manifest and
-the app copy drift apart. To change a portrait, replace both WebP sizes and run the sync.
+height), then the SVG if the portrait fails, then initials. The portrait's alt text is `Dr. <name>, AI-generated portrait of a fictional doctor`. Portraits below the first row of the doctor list are deferred: no image is requested until they scroll into view (`defer`); the first row (one card below 640 px, two from 640 px) never is, and the first card is fetched with high priority. A unit test fails if the sources, the manifest and
+the app copy drift apart. To change a portrait, replace all three WebP sizes (128, 256 and 512) and run the sync.
 
 ## Regenerate
 

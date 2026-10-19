@@ -37,6 +37,21 @@ export const PORTRAIT_DISCLOSURE =
   "AI-generated portraits of fictional doctors";
 export const ILLUSTRATION_DISCLOSURE = "Illustration of a fictional doctor";
 
+function titled(name: string): string {
+  const n = name.trim();
+  return /^dr\.?\s/i.test(n) ? n : `Dr. ${n}`;
+}
+
+/** Alt text of the portrait: says plainly that it is AI-generated and fictional. */
+export function doctorPortraitAlt(name: string): string {
+  return `${titled(name)}, AI-generated portrait of a fictional doctor`;
+}
+
+/** Alt text of the fallback illustration. */
+export function doctorIllustrationAlt(name: string): string {
+  return `${titled(name)}, illustration of a fictional doctor`;
+}
+
 /** "Dr. Achieng Otieno" -> "AO". Skips the title; falls back to "?" for an empty name. */
 export function doctorInitials(name: string): string {
   const words = name

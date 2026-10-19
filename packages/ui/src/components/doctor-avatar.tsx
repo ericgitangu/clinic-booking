@@ -6,8 +6,10 @@ import {
   ILLUSTRATION_DISCLOSURE,
   PORTRAIT_DISCLOSURE,
   doctorAvatarSrc,
+  doctorIllustrationAlt,
   doctorInitials,
   doctorPhoto,
+  doctorPortraitAlt,
 } from "@clinic/ui/lib/doctor-avatar";
 
 type ViewProps = {
@@ -15,10 +17,14 @@ type ViewProps = {
   size: number;
   /** null renders the initials fallback. */
   src: string | null;
-  /** 256 w and 512 w candidates for src (the portrait). */
+  /** 128 w, 256 w and 512 w candidates for src (the portrait). */
   srcSet?: string;
   /** The displayed width, so the browser picks the smallest candidate that is sharp enough. */
   sizes?: string;
+  /** The image's alt text; defaults to the name. */
+  alt?: string;
+  /** The one portrait that matters for first paint: fetched ahead of other images. */
+  priority?: boolean;
   /** Said on hover and as the image's description, not part of the alt text. */
   title?: string;
   onError?: () => void;
@@ -39,6 +45,8 @@ export function DoctorAvatarView({
   srcSet,
   sizes,
   title,
+  alt,
+  priority,
   onError,
   imgRef,
   boxRef,
@@ -72,12 +80,13 @@ export function DoctorAvatarView({
       src={src}
       srcSet={srcSet}
       sizes={srcSet ? sizes : undefined}
-      alt={name}
+      alt={alt ?? name}
       title={title}
       width={size}
       height={size}
       decoding="async"
       loading={lazy ? "lazy" : undefined}
+      fetchPriority={priority ? "high" : undefined}
       onError={onError}
       className={cn(base, "object-cover", className)}
     />
@@ -94,6 +103,7 @@ export function DoctorAvatar({
   size = 40,
   lazy,
   defer,
+  priority,
   className,
 }: {
   doctorId: string;
@@ -105,6 +115,8 @@ export function DoctorAvatar({
    * the first screen: the browser's own lazy loading still fetches anything within a screen or two.
    */
   defer?: boolean;
+  /** Fetch this portrait ahead of other images (the first card, the page header). */
+  priority?: boolean;
   className?: string;
 }) {
   const [near, setNear] = useState(!defer);
@@ -137,12 +149,14 @@ export function DoctorAvatar({
       ? {
           src: photo.src,
           srcSet: photo.srcSet,
+          alt: doctorPortraitAlt(name),
           title: PORTRAIT_DISCLOSURE,
           onError: () => setFailure({ id: doctorId, level: "photo" }),
         }
       : showSvg
         ? {
             src: svg,
+            alt: doctorIllustrationAlt(name),
             title: ILLUSTRATION_DISCLOSURE,
             onError: () => setFailure({ id: doctorId, level: "svg" }),
           }
@@ -166,6 +180,7 @@ export function DoctorAvatar({
       imgRef={imgRef}
       boxRef={boxRef}
       lazy={lazy}
+      priority={priority}
       sizes={`${size}px`}
       {...props}
     />
