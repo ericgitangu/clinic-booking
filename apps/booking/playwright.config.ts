@@ -75,7 +75,10 @@ export default defineConfig({
       ? [
           {
             command: "pnpm exec next dev -p 3101",
-            url: "http://localhost:3101/robots.txt",
+            // A page, not robots.txt: the server is ready once the proxy, the shell and the booking
+            // pages have compiled, so the first compile (slow on a shared runner) is not charged to
+            // the scenario that opens a page on it.
+            url: "http://localhost:3101/book",
             reuseExistingServer: false,
             timeout: 120_000,
             env: {

@@ -131,40 +131,33 @@ test("the menu opens from the keyboard, shows who and where, and the focus ring 
   await context.close();
 });
 
-test("axe finds nothing serious with the avatar (picture or initials), menu closed and open, light and dark", async ({
-  browser,
-}) => {
-  for (const [scheme, image] of [
-    ["light", PICTURE],
-    ["dark", PICTURE],
-    ["light", undefined],
-    ["dark", undefined],
-  ] as const) {
-    const { context, page, person } = await signedIn(
-      browser,
-      PICTURE,
-      "picture",
-    );
+// One scenario per look: each is a sign-in, a page load and two audits, and the four together do not
+// fit the budget of a single scenario on a shared runner.
+for (const [scheme, image] of [
+  ["light", PICTURE],
+  ["dark", PICTURE],
+  ["light", undefined],
+  ["dark", undefined],
+] as const) {
+  const look = `${scheme}, ${image ? "picture" : "initials"}`;
+  test(`axe finds nothing serious with the avatar (${look}), menu closed and open`, async ({
+    browser,
+  }) => {
+    const { context, page, person } = await signedIn(browser, image, "picture");
     await page.emulateMedia({ colorScheme: scheme });
     const audit = async () =>
       (await new AxeBuilder({ page }).analyze()).violations.filter(
         (v) => v.impact === "serious" || v.impact === "critical",
       );
     await expect(trigger(page, person.name)).toBeVisible();
-    expect(
-      await audit(),
-      `${scheme}, ${image ? "picture" : "initials"}, closed`,
-    ).toEqual([]);
+    expect(await audit(), `${look}, closed`).toEqual([]);
     await trigger(page, person.name).click();
     await expect(page.getByRole("menu")).toBeVisible();
     // The menu fades in; axe must read its final colours, not a frame of the fade.
     await page
       .getByRole("menu")
       .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    expect(
-      await audit(),
-      `${scheme}, ${image ? "picture" : "initials"}, open`,
-    ).toEqual([]);
+    expect(await audit(), `${look}, open`).toEqual([]);
     await context.close();
-  }
-});
+  });
+}

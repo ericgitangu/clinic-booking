@@ -56,6 +56,66 @@ test("a signed-in visitor sees their account menu, a visitor does not", async ({
   await ctx.close();
 });
 
+// What a page really downloads: the text of every script the browser fetched, by URL.
+async function scriptsLoadedBy(page: Page, open: () => Promise<void>) {
+  const bodies: { url: string; text: string }[] = [];
+  const reading: Promise<void>[] = [];
+  page.on("response", (res) => {
+    if (res.request().resourceType() !== "script") return;
+    reading.push(
+      res.text().then(
+        (text) => void bodies.push({ url: res.url(), text }),
+        () => undefined, // a response that went away with a navigation has nothing to read
+      ),
+    );
+  });
+  await open();
+  await Promise.all(reading);
+  return bodies;
+}
+
+// The code of the account menu (its label is unique to it) and of the toaster (sonner's container).
+const ACCOUNT_MENU_CODE = "Account menu for";
+const TOASTER_CODE = "data-sonner-toaster";
+
+test("a signed-out visit to /about downloads no account-menu or toaster code; a signed-in one downloads the menu", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
+  const anon = await ctx.newPage();
+  const seen = await scriptsLoadedBy(anon, async () => {
+    await anon.goto("/about");
+    await expect(
+      anon.getByRole("button", { name: "Display settings" }),
+    ).toBeVisible();
+    // Past the idle callback that asks the server for the session, and the network settling after it.
+    await anon.waitForLoadState("networkidle");
+  });
+  expect(seen.length, "the page loaded scripts").toBeGreaterThan(0);
+  expect(
+    seen.filter((s) => s.text.includes(ACCOUNT_MENU_CODE)).map((s) => s.url),
+    "scripts holding the account menu",
+  ).toEqual([]);
+  expect(
+    seen.filter((s) => s.text.includes(TOASTER_CODE)).map((s) => s.url),
+    "scripts holding the toaster",
+  ).toEqual([]);
+
+  // The same check must be able to fail: with a session the menu's chunk does arrive.
+  await ctx.addCookies(await sessionCookies(newPerson()));
+  const signedIn = await ctx.newPage();
+  const withSession = await scriptsLoadedBy(signedIn, async () => {
+    await signedIn.goto("/about");
+    await expect(trigger(signedIn)).toBeVisible();
+  });
+  expect(
+    withSession.filter((s) => s.text.includes(ACCOUNT_MENU_CODE)).length,
+  ).toBeGreaterThan(0);
+  await ctx.close();
+});
+
 test("signing out in one tab signs the other tab's header out", async ({
   browser,
 }) => {
