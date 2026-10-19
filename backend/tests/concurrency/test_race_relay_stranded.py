@@ -59,12 +59,27 @@ async def _book(client: httpx.AsyncClient, patient: str, slot: str) -> tuple[htt
 
 
 async def _race(
-    n: int, hold: float, conn: asyncpg.Connection
-) -> tuple[RecordingPublisher, float, list[float]]:
+    n: int,
+    hold: float,
+    conn: asyncpg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[RecordingPublisher, float, list[tuple[bool, float]]]:
     """n bookers. The first starts a relay that holds the cursor for ``hold`` seconds while it
     publishes; the rest book while it is publishing, so their events commit after its read and
     their relays are refused the lock. Returns the publisher, the time until every response was
-    back, and the losers' response times."""
+    back, and every relay pass as (refused the cursor?, seconds). The relay's own time is what
+    "the losers never wait" is about: a booking's time is not, and on a slow runner five bookings
+    at once take far longer than ``hold`` with no relay involved."""
+    real = relay_module.relay_once
+    passes: list[tuple[bool, float]] = []
+
+    async def _timed(*args: object, **kwargs: object) -> relay_module.RelayResult:
+        begun = time.monotonic()
+        result = await real(*args, **kwargs)  # type: ignore[arg-type]  # forwarded as received
+        passes.append((result.contended, time.monotonic() - begun))
+        return result
+
+    monkeypatch.setattr(relay_module, "relay_once", _timed)
     publisher = RecordingPublisher(delay=hold)
     patients = await _patients(conn, n)
     app = make_realtime_app(publisher)
@@ -72,12 +87,17 @@ async def _race(
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         started = time.monotonic()
         first = asyncio.create_task(_book(client, patients[0], SLOTS[0]))
-        await asyncio.sleep(hold / 2)
+        # Wait until that relay is really publishing (it has read its batch and holds the cursor):
+        # a fixed sleep let a slow first request lose the cursor to a later booker on a slow runner.
+        try:
+            await asyncio.wait_for(publisher.publishing.wait(), timeout=10)
+        except TimeoutError:
+            pytest.fail("the first booker's relay never started publishing within 10 s")
         rest = [asyncio.create_task(_book(client, patients[i], SLOTS[i])) for i in range(1, n)]
         done = await asyncio.gather(first, *rest)
         elapsed = time.monotonic() - started
     assert [r.status_code for r, _ in done] == [201] * n
-    return publisher, elapsed, [t for _, t in done[1:]]
+    return publisher, elapsed, passes
 
 
 def _published_once(publisher: RecordingPublisher, n: int) -> None:
@@ -111,16 +131,25 @@ async def _mint(app: FastAPI, ip: str) -> httpx.Response:
 @pytest.mark.parametrize("hold", [0.1, 0.4, 0.6, 1.0])
 @pytest.mark.parametrize("bookers", [2, 5])
 async def test_every_concurrent_booking_is_published_once_within_the_cap(
-    realtime_clean: None, owner_conn: asyncpg.Connection, bookers: int, hold: float
+    realtime_clean: None,
+    owner_conn: asyncpg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    bookers: int,
+    hold: float,
 ) -> None:
     """When the holder's passes fit in the 2 s budget (publish round trip up to 0.6 s) every event
     is out when the responses are back. At 1.0 s the holder publishes what fits and STOPS before a
     pass the budget would cancel mid-publish; the rest is sent by the next trigger. In every case:
     nothing is lost, nothing goes out twice, the cursor ends at the last event, and the losers
     never wait."""
-    publisher, elapsed, loser_times = await _race(bookers, hold, owner_conn)
+    publisher, elapsed, passes = await _race(bookers, hold, owner_conn, monkeypatch)
     assert elapsed < CAP, elapsed
-    assert max(loser_times) < hold, (hold, loser_times)
+    refused = [t for contended, t in passes if contended]
+    held = [t for contended, t in passes if not contended and t >= hold]
+    assert refused and held, passes  # there were losers, and a holder that kept the cursor
+    # A loser that waited for the holder would take as long as the holder's pass. Compared with
+    # the holder's own pass, not a fixed 0.1 s, so a slow runner cannot fail it.
+    assert max(refused) < min(held), (hold, refused, held)
     fits = hold <= 0.6
     if fits:
         _published_once(publisher, bookers)
@@ -149,7 +178,7 @@ async def test_control_a_holder_that_does_not_drain_leaves_events_behind(
     """The same race with one pass per trigger (no drain): events stay unpublished. If this ever
     stops failing to publish them, the race test above proves nothing."""
     monkeypatch.setattr(relay_module, "MAX_PASSES", 1)
-    publisher, _elapsed, _loser_times = await _race(5, hold, owner_conn)
+    publisher, _elapsed, _passes = await _race(5, hold, owner_conn, monkeypatch)
     booked = sum(1 for m in publisher.messages if m.name == "booked")
     assert booked < 5, "with no drain the losers' events should have been left behind"
 
@@ -169,6 +198,9 @@ async def test_a_loser_returns_at_once_when_the_cursor_is_held(
         PublishBudget(sessionmaker, settings.REALTIME_PUBLISH_CAP_PER_MONTH),
         make_realtime_app(publisher).state.settings,
     )
+    # Warm the pool first: the first checkout pays for opening a connection, which is not the
+    # loser path and made this 50 ms bound flaky on a busy box.
+    assert await relay.run(FakeClock(FIXED_NOW)) == 0
     holder = await asyncpg.connect(owner_dsn())
     tx = holder.transaction()
     await tx.start()
@@ -233,7 +265,8 @@ async def test_nothing_is_published_while_an_older_transaction_is_open(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
     """The xmin guard is unchanged: the drain never publishes early, and once the open transaction
-    ends the next trigger sends everything, once."""
+    ends the next trigger sends everything, once. A transaction that never ends costs a booking at
+    most the bounded wait."""
     publisher = RecordingPublisher()
     patients = await _patients(owner_conn, 2)
     app = make_realtime_app(publisher)
@@ -246,7 +279,8 @@ async def test_nothing_is_published_while_an_older_transaction_is_open(
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
             resp, took = await _book(client, patients[0], SLOTS[0])
             assert resp.status_code == 201
-            assert took < 0.5  # it does not wait for the holder
+            # It waits for the open transaction only up to the relay's bound, never for good.
+            assert took < relay_module.HORIZON_WAIT + 0.5
             assert publisher.messages == []  # not visible yet, so not published
             await tx.commit()
             assert (await _book(client, patients[1], SLOTS[1]))[0].status_code == 201
@@ -397,4 +431,42 @@ async def test_an_event_that_commits_during_the_holders_last_empty_pass_is_still
     assert first.status_code == 201
     assert state["calls"] >= 2
     _published_once(publisher, 2)
+    assert await _cursor_at_last(owner_conn)
+
+
+@pytest.mark.race
+@pytest.mark.parametrize("ends", ["commit", "rollback"])
+async def test_an_event_behind_an_older_open_transaction_is_sent_when_that_transaction_ends(
+    realtime_clean: None, owner_conn: asyncpg.Connection, ends: str
+) -> None:
+    """The ``xmin`` guard holds back an event while an OLDER transaction is still open (it could
+    still commit an earlier event). When that transaction ends by a rollback, as a lost booking
+    race does, nothing triggers a relay, so the event used to wait for the next unrelated trigger.
+    The holder now waits out the older transaction (a short, bounded wait, only when a committed
+    event is owed) and sends it within the same request."""
+    publisher = RecordingPublisher()
+    patients = await _patients(owner_conn, 1)
+    older = await asyncpg.connect(owner_dsn())
+    tx = older.transaction()
+    await tx.start()
+    await older.fetchval("SELECT txid_current()")  # an xid older than the booking's
+
+    async def _end_later() -> None:
+        await asyncio.sleep(0.1)
+        await (tx.commit() if ends == "commit" else tx.rollback())
+
+    app = make_realtime_app(publisher)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    ender = asyncio.create_task(_end_later())
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            started = time.monotonic()
+            resp, _ = await _book(client, patients[0], SLOTS[0])
+            elapsed = time.monotonic() - started
+        await ender
+    finally:
+        await older.close()
+    assert resp.status_code == 201
+    assert elapsed < CAP, elapsed
+    _published_once(publisher, 1)
     assert await _cursor_at_last(owner_conn)
