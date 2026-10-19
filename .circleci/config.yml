@@ -924,6 +924,11 @@ jobs:
           name: Live cost guards
           command: |
             export PROJECT="$GOOGLE_PROJECT_ID"
+            # Three checks cannot run here, and the run says so ("PARTIAL, not OK", each one named):
+            # C11-budgets and C14 need a billing role the deployer must never hold on the shared
+            # account (the engineer runs them locally), and C13 needs neonctl and a Neon API key.
+            # They are listed on purpose: any other unverified check makes this job fail.
+            export COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14"
             bash scripts/cost_check.sh --live
 
 workflows:
