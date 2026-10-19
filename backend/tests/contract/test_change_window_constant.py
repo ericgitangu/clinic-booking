@@ -1,6 +1,7 @@
-"""The apps disable cancel and reschedule inside the last hour using a constant of their own
+"""The patient app disables cancel and reschedule inside the last hour using a constant of its own
 (``CHANGE_LEAD_MINUTES``). The API is the authority (``BOOKING_MIN_LEAD_MINUTES``); this fails if
-the two ever differ, or if a deploy file overrides the setting without the apps knowing."""
+the two ever differ, or if a deploy file overrides the setting without the app knowing. The admin
+app has no copy: staff are exempt from the lead-time rule, so its screens never disable a change."""
 
 from __future__ import annotations
 
@@ -13,7 +14,6 @@ from app.core.config import Settings
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 APP_FILES = [
     ROOT / "apps" / "booking" / "src" / "lib" / "change-window.ts",
-    ROOT / "apps" / "admin" / "src" / "lib" / "change-window.ts",
 ]
 
 
@@ -23,7 +23,7 @@ def _app_constant(path: pathlib.Path) -> int:
     return int(match.group(1))
 
 
-def test_both_apps_use_the_apis_lead_time() -> None:
+def test_the_patient_app_uses_the_apis_lead_time() -> None:
     api = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db").BOOKING_MIN_LEAD_MINUTES
     assert api == 60
     for path in APP_FILES:

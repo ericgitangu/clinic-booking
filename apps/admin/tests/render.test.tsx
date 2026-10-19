@@ -1,9 +1,164 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { TodayBoard } from "@/components/today-board";
+import type { TodayBoard as Board } from "@clinic/api/generated";
 import robots from "@/app/robots";
+import { AppointmentsList } from "@/components/appointments-list";
+import { countDelta } from "@/lib/kpi-delta";
 import { KpiStrip } from "@/components/kpi-strip";
 import { LineageTimeline } from "@/components/lineage-timeline";
 import { metadata } from "@/lib/metadata";
+
+// The action buttons use the app router; a static render has none.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {}, push: () => {} }),
+}));
+
+vi.mock("@/lib/actions", () => ({
+  cancelAppointment: async () => ({ ok: true, message: "" }),
+  rescheduleAppointment: async () => ({ ok: true, message: "" }),
+  loadSlots: async () => ({ ok: true, slots: [] }),
+}));
+
+// Visits are placed relative to now, so the attendance window is the same whenever this runs.
+const NOW = new Date("2098-12-31T10:00:00Z");
+const at = (minutes: number) =>
+  new Date(NOW.getTime() + minutes * 60_000).toISOString();
+
+const board: Board = {
+  view: "full",
+  totals: { booked: 2, arrived: 1, no_show: 0, cancelled: 1 },
+  doctors: [
+    {
+      doctor_id: "d1",
+      name: "Dr. Test Doctor",
+      specialty: "General",
+      date: "2098-12-31",
+      timezone: "Africa/Nairobi",
+      free_slots: 3,
+      next_gap: {
+        starts_at: at(120),
+        ends_at: at(180),
+        slots: 2,
+        timezone: "Africa/Nairobi",
+      },
+      running_behind: { behind: true, minutes: 25, appointment_id: "a1" },
+      appointments: [
+        {
+          id: "a1",
+          patient_changed: true,
+          status: "booked",
+          locked: false,
+          patient_name: "pat one",
+          patient_phone: null,
+          starts_at: at(-25),
+          ends_at: at(5),
+          timezone: "Africa/Nairobi",
+        },
+        {
+          id: "a2",
+          patient_changed: false,
+          status: "arrived",
+          locked: false,
+          patient_name: "pat two",
+          patient_phone: null,
+          starts_at: at(-5),
+          ends_at: at(25),
+          timezone: "Africa/Nairobi",
+        },
+        {
+          id: "a3",
+          patient_changed: false,
+          status: "booked",
+          locked: true,
+          patient_name: "pat three",
+          patient_phone: null,
+          starts_at: at(60),
+          ends_at: at(90),
+          timezone: "Africa/Nairobi",
+        },
+        {
+          id: "a4",
+          patient_changed: true,
+          status: "cancelled",
+          locked: false,
+          patient_name: "pat four",
+          patient_phone: null,
+          starts_at: at(30),
+          ends_at: at(60),
+          timezone: "Africa/Nairobi",
+        },
+      ],
+    },
+  ],
+};
+
+describe("today board", () => {
+  const render = (canAct: boolean, canExport: boolean, b: Board = board) =>
+    renderToStaticMarkup(
+      <TodayBoard
+        board={b}
+        date="2098-12-31"
+        now={NOW}
+        canAct={canAct}
+        canExport={canExport}
+      />,
+    );
+
+  it("shows every status as words, the next free gap and the running-behind flag", () => {
+    const html = render(false, false);
+    for (const word of ["Booked", "Arrived", "Cancelled"])
+      expect(html).toContain(word);
+    expect(html).toContain("Running behind");
+    expect(html).toContain("25 min ago");
+    expect(html).toContain("Next free");
+    expect(html).toContain("Pat One");
+  });
+
+  it("gives viewers no action buttons and no export", () => {
+    const html = render(false, false);
+    for (const word of [
+      "Mark arrived",
+      "Mark no-show",
+      "Cancel appointment",
+      "Reschedule",
+      "Veto and lock",
+      "Unlock",
+      "day-sheet",
+    ]) {
+      expect(html).not.toContain(word);
+    }
+  });
+
+  it("gives owners and admins attendance, move and cancel, and the export", () => {
+    const html = render(true, true);
+    expect(html).toContain("Mark arrived");
+    expect(html).toContain("Mark no-show");
+    expect(html).toContain("Change to no-show"); // the visit already marked arrived
+    expect(html).toContain("Cancel appointment");
+    // Unlock on the locked visit; Veto on the booked one the API says a patient changed (a1), and not
+    // on the cancelled one it also flags (a4): that is two controls in all, one of each.
+    expect(html).toContain("Unlock");
+    expect(html.match(/Veto and lock/g)).toHaveLength(1);
+    expect(html).toContain("day-sheet");
+  });
+
+  it("shows a viewer's initials as the API sent them, untidied", () => {
+    const html = render(false, false, {
+      ...board,
+      view: "minimised",
+      doctors: [
+        {
+          ...board.doctors[0]!,
+          appointments: [
+            { ...board.doctors[0]!.appointments[0]!, patient_name: "A. O." },
+          ],
+        },
+      ],
+    });
+    expect(html).toContain("A. O.");
+  });
+});
 
 describe("dashboard pieces", () => {
   it("draws booked, rescheduled and cancelled in order with the old and new slot", () => {
@@ -51,10 +206,36 @@ describe("dashboard pieces", () => {
 
   it("shows each key number with what it counts", () => {
     const html = renderToStaticMarkup(
-      <KpiStrip items={[{ label: "Today", value: "3", note: "booked" }]} />,
+      <KpiStrip
+        comparedWith="the 7 days before"
+        items={[
+          { label: "Today", value: "3", note: "booked" },
+          {
+            label: "Cancellations",
+            value: "5",
+            note: "last 7 days",
+            delta: countDelta(5, 2, "down"),
+          },
+        ]}
+      />,
     );
     expect(html).toContain("Today");
     expect(html).toContain(">3<");
+    // The change is words, not only an arrow or a colour, and says what it is measured against.
+    expect(html).toContain("Up 3 from 2");
+    expect(html).toContain("Changes compare with the 7 days before.");
+  });
+
+  it("explains an empty appointment list for the chosen filter", () => {
+    const html = renderToStaticMarkup(
+      <AppointmentsList
+        items={[]}
+        status="cancelled"
+        nextHref={null}
+        firstHref={null}
+      />,
+    );
+    expect(html).toContain("No cancellations");
   });
 
   it("keeps crawlers out", () => {

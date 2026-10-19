@@ -6,9 +6,12 @@ export type GrantableRole = Exclude<Role, "owner">;
 
 export type Capability = "view" | "manage-appointments" | "manage-access";
 
+// "manage-access" mirrors the API's CAN_MANAGE_ACCESS gate (owner and admin). What an admin may do
+// to whom (viewers only, never the owner or another admin) is the API's rule, answered as
+// ROLE_ESCALATION or OWNER_PROTECTED; the screens only hide what would be refused.
 const GRANTS: Record<Role, readonly Capability[]> = {
   owner: ["view", "manage-appointments", "manage-access"],
-  admin: ["view", "manage-appointments"],
+  admin: ["view", "manage-appointments", "manage-access"],
   viewer: ["view"],
 };
 

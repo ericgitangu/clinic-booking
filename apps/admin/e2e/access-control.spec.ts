@@ -4,7 +4,7 @@
 import { BASE_URL, EMAIL, internal, OWNER, publicApi } from "./support/stack";
 import { expect, seeded, test } from "./support/fixtures";
 
-const PAGES = ["/dashboard", "/access"] as const;
+const PAGES = ["/dashboard", "/access", "/audit"] as const;
 
 // The next values are deliberately fake. They are forged on purpose, they are not credentials and
 // not secrets: the tests below send them to the real app and the real API, which must reject them
@@ -59,11 +59,11 @@ test.describe("signed out", () => {
 
 test.describe("page access by role", () => {
   const expected = {
-    owner: { "/dashboard": 200, "/access": 200 },
-    admin: { "/dashboard": 200, "/access": 403 },
-    viewer: { "/dashboard": 200, "/access": 403 },
-    revoked: { "/dashboard": 403, "/access": 403 },
-    stranger: { "/dashboard": 403, "/access": 403 },
+    owner: { "/dashboard": 200, "/access": 200, "/audit": 200 },
+    admin: { "/dashboard": 200, "/access": 200, "/audit": 200 },
+    viewer: { "/dashboard": 200, "/access": 403, "/audit": 403 },
+    revoked: { "/dashboard": 403, "/access": 403, "/audit": 403 },
+    stranger: { "/dashboard": 403, "/access": 403, "/audit": 403 },
   } as const;
 
   for (const [who, pages] of Object.entries(expected)) {

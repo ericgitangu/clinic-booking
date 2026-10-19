@@ -36,7 +36,7 @@ export default async function OpenGraphImage() {
         }}
       >
         <div style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.1 }}>
-          Idyllic staff dashboard
+          Idyllic Clinic Admin
         </div>
         <div
           style={{
