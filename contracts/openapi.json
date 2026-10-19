@@ -133,6 +133,73 @@
         "title": "AccountLinked",
         "type": "object"
       },
+      "AdminActionEvent": {
+        "additionalProperties": false,
+        "description": "A staff action that changed no appointment (a reminder sent now, \"running late\", an\ninvitation), for a viewer of the live feed: what happened and, for the two patient\nnotifications, the doctor and the visit time. No person, no reason, no address. Streamed only\nby the Go gateway from ``staff_action_audit``; it never travels through the push service.",
+        "properties": {
+          "delay_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay Minutes"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "kind": {
+            "enum": [
+              "reminder_now",
+              "running_late",
+              "invite_created",
+              "invite_revoked",
+              "invite_accepted"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "seq": {
+            "description": "\"<txid>.<id>\" of the event.",
+            "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+            "title": "Seq",
+            "type": "string"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          }
+        },
+        "required": [
+          "kind",
+          "doctor_id",
+          "starts_at",
+          "delay_minutes",
+          "seq"
+        ],
+        "title": "AdminActionEvent",
+        "type": "object"
+      },
       "AdminAppointment": {
         "properties": {
           "attendance": {
@@ -621,7 +688,8 @@
               "reminder_now",
               "running_late",
               "invite_create",
-              "invite_revoke"
+              "invite_revoke",
+              "invite_accept"
             ],
             "title": "Action",
             "type": "string"
@@ -2812,6 +2880,146 @@
         "title": "SlotEvent",
         "type": "object"
       },
+      "StaffActionEvent": {
+        "additionalProperties": false,
+        "description": "The same staff action for an owner or admin: who did it, why, the patient (for a reminder\nor \"running late\") and the invited address and role (for an invitation).",
+        "properties": {
+          "actor_email": {
+            "title": "Actor Email",
+            "type": "string"
+          },
+          "actor_role": {
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ],
+            "title": "Actor Role",
+            "type": "string"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "delay_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay Minutes"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "invite_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Email"
+          },
+          "invite_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "admin",
+                  "viewer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Role"
+          },
+          "kind": {
+            "enum": [
+              "reminder_now",
+              "running_late",
+              "invite_created",
+              "invite_revoked",
+              "invite_accepted"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "seq": {
+            "description": "\"<txid>.<id>\" of the event.",
+            "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+            "title": "Seq",
+            "type": "string"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          }
+        },
+        "required": [
+          "kind",
+          "doctor_id",
+          "starts_at",
+          "delay_minutes",
+          "seq",
+          "appointment_id",
+          "patient_name",
+          "actor_email",
+          "actor_role",
+          "reason",
+          "invite_email",
+          "invite_role"
+        ],
+        "title": "StaffActionEvent",
+        "type": "object"
+      },
       "StaffAppointmentChange": {
         "description": "The changed appointment plus what the web app needs to tell the patient.\n\n``audit_id`` is the audit row of this write and the patient email's idempotency key; it is null\nonly when nothing changed (a reschedule to the time it already has). The patient fields are\nfull values: these routes are owner and admin only.",
         "properties": {
@@ -2999,6 +3207,154 @@
           "starts_at"
         ],
         "title": "StaffCreateAppointment",
+        "type": "object"
+      },
+      "StaffEvent": {
+        "additionalProperties": false,
+        "description": "The same event for an owner or admin on the live feed: it adds the appointment (to link to\nit), the patient's name and, for a cancellation, the reason. Only the Go gateway\n(``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels\nthrough the push service. A viewer gets ``AdminEvent`` instead.",
+        "properties": {
+          "actor_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The staff member who made the change; null for a patient's own change.",
+            "title": "Actor Email"
+          },
+          "actor_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "owner",
+                  "admin",
+                  "viewer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Role"
+          },
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "event_type": {
+            "enum": [
+              "booked",
+              "rescheduled",
+              "cancelled",
+              "vetoed",
+              "unlocked",
+              "arrived",
+              "no_show"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "from_local_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Local Date"
+          },
+          "from_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Starts At"
+          },
+          "local_date": {
+            "format": "date",
+            "title": "Local Date",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "seq": {
+            "description": "\"<txid>.<id>\" of the event.",
+            "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+            "title": "Seq",
+            "type": "string"
+          },
+          "staff_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reason the staff member recorded (veto, unlock, attendance, staff booking, reschedule or cancel); null for a patient's own change.",
+            "title": "Staff Reason"
+          },
+          "to_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Starts At"
+          }
+        },
+        "required": [
+          "event_type",
+          "doctor_id",
+          "local_date",
+          "from_local_date",
+          "from_starts_at",
+          "to_starts_at",
+          "seq",
+          "appointment_id",
+          "patient_name",
+          "cancellation_reason",
+          "actor_email",
+          "actor_role",
+          "staff_reason"
+        ],
+        "title": "StaffEvent",
         "type": "object"
       },
       "StaffReasonRequest": {

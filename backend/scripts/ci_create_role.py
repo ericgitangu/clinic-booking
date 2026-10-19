@@ -1,4 +1,4 @@
-"""CI/local helper: create the clinic_app role from docker/initdb/01-roles.sql.
+"""CI/local helper: create the clinic_app and clinic_realtime roles from docker/initdb/*.sql.
 
 Run as the Postgres owner. Idempotent enough for CI (role is fresh each run).
 """
@@ -11,7 +11,7 @@ import pathlib
 import asyncpg
 
 OWNER_URL = "postgresql://clinic:clinic@localhost:5432/clinic"
-ROLES_SQL = pathlib.Path(__file__).resolve().parent.parent / "docker" / "initdb" / "01-roles.sql"
+INITDB = pathlib.Path(__file__).resolve().parent.parent / "docker" / "initdb"
 
 
 async def main() -> None:
@@ -24,7 +24,8 @@ async def main() -> None:
     else:
         raise SystemExit("postgres did not become ready")
     try:
-        await conn.execute(ROLES_SQL.read_text())
+        for sql in sorted(INITDB.glob("*.sql")):
+            await conn.execute(sql.read_text())
     finally:
         await conn.close()
 

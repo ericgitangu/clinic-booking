@@ -2,7 +2,7 @@
 
 - Date: 2026-10-18
 - Deciders: engineering, decided by the engineer
-- Supersedes: [ADR-0021](0021-go-realtime-gateway.md)
+- Supersedes: [ADR-0021](0021-go-realtime-gateway.md) for patient push only. ADR-0021 was reinstated for the staff live feed on 2026-10-19.
 - Amends: [ADR-0009](0009-realtime-polling-now-sse-later.md)
 
 ## Status
@@ -13,7 +13,7 @@ Accepted, decided by the engineer 2026-10-18. The server side shipped in PR #39 
 
 ## Context
 
-Problem. A patient looking at free slots should see another patient's booking within seconds, and the admin dashboard should update without a manual refresh. Today the booking UI polls ([ADR-0009](0009-realtime-polling-now-sse-later.md)), and the Go SSE gateway of [ADR-0021](0021-go-realtime-gateway.md) was never built. The constraints are the same as before: total cost must stay at $0 on free tiers, no always-on resource ([ADR-0014](0014-hosting-region-and-cost.md)), no CDN caching of `/api` ([ADR-0023](0023-zero-cost-edge-front-door.md)), and the stream must carry no personal data. Correctness never depends on push: a stale slot that loses the race gets `409 SLOT_TAKEN` and a refetch.
+Problem. A patient looking at free slots should see another patient's booking within seconds, and the admin dashboard should update without a manual refresh. Today the booking UI polls ([ADR-0009](0009-realtime-polling-now-sse-later.md)), and the Go SSE gateway of [ADR-0021](0021-go-realtime-gateway.md) had not been built at that point. The constraints are the same as before: total cost must stay at $0 on free tiers, no always-on resource ([ADR-0014](0014-hosting-region-and-cost.md)), no CDN caching of `/api` ([ADR-0023](0023-zero-cost-edge-front-door.md)), and the stream must carry no personal data. Correctness never depends on push: a stale slot that loses the race gets `409 SLOT_TAKEN` and a refetch.
 
 The engineer decided on 2026-10-18 to use a managed pub/sub provider, and the Ably free package over plain SSE. The figures below were read on 2026-10-18 from the providers' official pages; anything not found on those pages is marked unverified.
 
@@ -46,7 +46,7 @@ Ably, over plain SSE, for patients and admins. Server-side only keys; the browse
 - **Acceptance, run in CI.** The scenarios (a) to (h) of the design passed in the `e2e-real` job 3110 (PR #44) against the real service: a booking by another visitor removes the slot from an open page within seconds without a poll, a cancel returns it after one refetch, a blocked push host falls back to polling, a rate-limited token endpoint shows `refused` and still converges by polling, a StrictMode double mount mints one token, an unchanged safety poll renders the grid zero times, and a patient token cannot read `admin:events`. (g), a re-delivered message applying once, runs only against a local stand-in (`apps/booking/e2e/support/fake-push.mjs`, started only with `E2E_PUSH_LOCAL=1`, never in CI), because the real service drops a repeated message id itself. The stand-in stands in for the third party only.
 - **Production check of the page.** After release 748d7d8 the token endpoint answered 200 (no-store) for the site origin and 403 for a cross-site origin, and a real Chrome on a booking page went from `data-stream="polling"` with `data-polling="armed"` on load to `data-stream="live"` after one scroll and one key press: [docs/evidence/patient-live-push-production-2026-10-18.md](../evidence/patient-live-push-production-2026-10-18.md). That release's `ship-admin` failed for the missing `VERCEL_ADMIN_TOKEN`, so the later jobs have not yet run on a release.
 - **Evidence.** The account is on the Free package with no payment method, and the keys, secret and CI contexts exist: [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md).
-- **Admin feed.** Descoped for this submission, see [ADR-0032](0032-admin-live-feed-descoped.md); the admin channel is defined but nothing subscribes to it.
+- **Admin feed.** Descoped on 2026-10-18 and reinstated on 2026-10-19 (see [ADR-0032](0032-admin-live-feed-descoped.md)): the staff dashboard streams from the Go gateway, because the staff view carries patient names, which stay inside Google Cloud. The `admin:events` channel on Ably carries only the minimised shape and nothing subscribes to it.
 - **Not needed:** WebSockets (SSE fits one-way slot events), a Go service, a read-only database role ([ADR-0015](0015-database-roles-and-migrations.md)) and stream tickets ([ADR-0022](0022-admin-auth-and-bot-protection.md)).
 
 ## Consequences

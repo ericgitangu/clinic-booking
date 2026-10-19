@@ -55,6 +55,8 @@ Option 1.
 
 **IAM.** `clinic-web` (the web project's proxy identity) holds `roles/run.invoker` on `clinic-api` and `clinic-realtime` only. `clinic-smoke` (moved from stretch S3 into the lean core) holds the same two bindings, and the deployer has `roles/iam.serviceAccountTokenCreator` on `clinic-smoke` only, so the CI smoke can call the tag URL. Both invoker bindings are made once by `infra/bootstrap.sh`; CI still never sets IAM. No `allUsers` binding exists on any service, and the `cost-check` job asserts that. Public access without `allUsers` is banned too: `--allow-unauthenticated` and `--no-invoker-iam-check` fail `cost-static`, and the invoker check asserts the `run.googleapis.com/invoker-iam-disabled` annotation is absent or false (cost verifier issue 2).
 
+**Amendment (2026-10-19): how the gateway is reached.** The staff live feed is not proxied by the booking app's `/api/stream`. The admin app's own route `/live/stream` signs the staff assertion and presents the admin app's Google identity, so `clinic-realtime` admits `clinic-admin` and `clinic-smoke` only (never `clinic-web`), made once by `infra/bootstrap.sh invoker`.
+
 **Kill switch.** If the daily egress alert fires, remove the proxy's invoker binding from **both** services. The first draft removed it from `clinic-api` only (superseded), which left `/api/stream` billing through `clinic-realtime` (corrected by the cost verifier, 2026-10-16):
 
 ```bash

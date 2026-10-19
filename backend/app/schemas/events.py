@@ -52,6 +52,59 @@ class AdminEvent(BaseModel):
     seq: str = Field(pattern=CURSOR_PATTERN, description='"<txid>.<id>" of the event.')
 
 
+class StaffEvent(AdminEvent):
+    """The same event for an owner or admin on the live feed: it adds the appointment (to link to
+    it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+    (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+    through the push service. A viewer gets ``AdminEvent`` instead."""
+
+    model_config = ConfigDict(extra="forbid", title="StaffEvent")
+    appointment_id: uuid.UUID
+    patient_name: str
+    cancellation_reason: str | None
+    actor_email: str | None = Field(
+        description="The staff member who made the change; null for a patient's own change."
+    )
+    actor_role: Literal["owner", "admin", "viewer"] | None
+    staff_reason: str | None = Field(
+        description="The reason the staff member recorded (veto, unlock, attendance, staff "
+        "booking, reschedule or cancel); null for a patient's own change."
+    )
+
+
+ActionKind = Literal[
+    "reminder_now", "running_late", "invite_created", "invite_revoked", "invite_accepted"
+]
+
+
+class AdminActionEvent(BaseModel):
+    """A staff action that changed no appointment (a reminder sent now, "running late", an
+    invitation), for a viewer of the live feed: what happened and, for the two patient
+    notifications, the doctor and the visit time. No person, no reason, no address. Streamed only
+    by the Go gateway from ``staff_action_audit``; it never travels through the push service."""
+
+    model_config = ConfigDict(extra="forbid", title="AdminActionEvent")
+    kind: ActionKind
+    doctor_id: uuid.UUID | None
+    starts_at: _dt.datetime | None
+    delay_minutes: int | None
+    seq: str = Field(pattern=CURSOR_PATTERN, description='"<txid>.<id>" of the event.')
+
+
+class StaffActionEvent(AdminActionEvent):
+    """The same staff action for an owner or admin: who did it, why, the patient (for a reminder
+    or "running late") and the invited address and role (for an invitation)."""
+
+    model_config = ConfigDict(extra="forbid", title="StaffActionEvent")
+    appointment_id: uuid.UUID | None
+    patient_name: str | None
+    actor_email: str
+    actor_role: Literal["owner", "admin", "viewer"]
+    reason: str
+    invite_email: str | None
+    invite_role: Literal["admin", "viewer"] | None
+
+
 class RealtimeToken(BaseModel):
     """A short-lived subscribe-only credential for one channel (a signed JWT)."""
 
@@ -68,13 +121,25 @@ class PatientTokenRequest(BaseModel):
     date: _dt.date
 
 
-EVENT_MODELS: dict[str, type[BaseModel]] = {"SlotEvent": SlotEvent, "AdminEvent": AdminEvent}
+EVENT_MODELS: dict[str, type[BaseModel]] = {
+    "SlotEvent": SlotEvent,
+    "AdminEvent": AdminEvent,
+    "StaffEvent": StaffEvent,
+    "AdminActionEvent": AdminActionEvent,
+    "StaffActionEvent": StaffActionEvent,
+}
 
 
 def event_json_schemas() -> dict[str, dict[str, object]]:
     """Standalone JSON Schemas (draft 2020-12) of the pushed messages, by file stem."""
     out: dict[str, dict[str, object]] = {}
-    for stem, model in (("slot-event.v1", SlotEvent), ("admin-event.v1", AdminEvent)):
+    for stem, model in (
+        ("slot-event.v1", SlotEvent),
+        ("admin-event.v1", AdminEvent),
+        ("staff-event.v1", StaffEvent),
+        ("admin-action.v1", AdminActionEvent),
+        ("staff-action.v1", StaffActionEvent),
+    ):
         schema = model.model_json_schema()
         out[stem] = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

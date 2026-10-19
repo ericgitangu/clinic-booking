@@ -223,6 +223,16 @@ async def test_invite_emails_are_compared_after_nfkc_and_casefold(
     assert row == stored
     me = await env.req("GET", "/internal/admin/session", role="viewer", email=signs_in_as)
     assert me.json()["role"] == "viewer"
+    # Accepting is audited like creating and revoking: the person who accepted, a hash of the
+    # address, never the address (the live feed streams this row).
+    rows = await audit_rows(owner_conn)
+    assert [r["action"] for r in rows] == ["invite_create", "invite_accept"]
+    accepted = rows[1]
+    assert (accepted["actor_email"], accepted["actor_role"]) == (stored, "viewer")
+    after = json.loads(accepted["after"])
+    assert after["invite_id"] == created.json()["id"] and after["role"] == "viewer"
+    assert after["email_hash"] == hashlib.sha256(stored.encode()).hexdigest()
+    assert stored not in f"{accepted['before']} {accepted['after']} {accepted['reason']}"
 
 
 async def test_a_lookalike_address_is_still_a_different_person(env: Env) -> None:

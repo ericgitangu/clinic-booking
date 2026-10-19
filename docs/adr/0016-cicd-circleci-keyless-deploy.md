@@ -3,13 +3,13 @@
 - Date: 2026-10-16
 - Deciders: engineering
 - Amended: 2026-10-16, Go jobs, `ship-realtime` and the SSE smoke for stretch S1
-- Amended: 2026-10-16, $0 cost audit: IAM-gated services behind the Vercel front door ([ADR-0023](0023-zero-cost-edge-front-door.md)), region us-east4, a credit budget, self-skipping lanes and the `cost-static` / `cost-check` jobs
+- Amended: 2026-10-16, $0 cost audit: IAM-gated services behind the Vercel front door ([ADR-0023](0023-zero-cost-edge-front-door.md)), region us-east4, a credit budget, self-skipping jobs and the `cost-static` / `cost-check` jobs
 
 ## Status
 
 Accepted
 
-**Build status (2026-10-18, main 748d7d8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime lane is superseded by ADR-0031. Pending: the saved WIF deny-proof logs.
+**Build status (2026-10-18, main 748d7d8): Shipped, text amended.** Keyless deploy to Cloud Run, tag then promote, the cost checks, `ship-booking` and `ship-admin` with `verify-release` and `rollback-*` jobs, the `ably-ci` and `gcp-deploy` contexts, the pinned and checksummed gitleaks installer, `zap-prod`, `admin-e2e`, the Lighthouse budgets and the deny-proof probes (#32), and the flake fixes #43, #45 and #49. Partly done: the per-project Vercel token (#46) waits for the user to add `VERCEL_ADMIN_TOKEN`, so `ship-admin` and the jobs after it have not yet run on a release. The Go realtime jobs are built (PR 71) after being marked superseded on 2026-10-18. Pending: the saved WIF deny-proof logs.
 
 ## Context
 
@@ -78,7 +78,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 4. If `CIRCLE_SHA1` is no longer the head of `origin/main`, skip promotion.
 5. Otherwise `update-traffic --to-tags sha-<7>=100`, and prune tags beyond the last 2 (amended: Artifact Registry keeps 2 versions per package, so a third tag could point at a deleted image), then delete Artifact Registry versions beyond the newest 2.
 
-> **Superseded (2026-10-18) by [ADR-0031](0031-realtime-push-via-ably-sse.md).** The Go realtime lane below (`realtime-quality`, `realtime-test`, `realtime-sec`, `build-scan-push-realtime`, `ship-realtime`, the `clinic-realtime` service and its bootstrap, IAM and smoke) will not be built; realtime push goes through Ably instead. The text stays as the record.
+> **Reinstated (2026-10-19).** The Go realtime jobs below were marked superseded on 2026-10-18 and is built in PR 71 under these job names: `go-quality` (gofmt, vet, staticcheck, golangci-lint, gosec, govulncheck, race tests against the real database and API), `build-scan-push-realtime`, `ship-realtime` (tagged no-traffic revision, smoke, promote, live check, rollback) and `rollback-realtime`. The `clinic-realtime` service is deployed by `gcloud run deploy` like `clinic-api`, not by Terraform; its invoker bindings (the admin app and the smoke identity only) come from `infra/bootstrap.sh invoker`.
 
 **Stretch S1 additions (only if S1 ships).**
 
@@ -92,11 +92,11 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 
 **Rollback.** A failed smoke means traffic never moved. A manual rollback is `gcloud run services update-traffic clinic-api --region us-east4 --to-revisions <prev>=100` (runbook; region amended from europe-west3). Only the previous revision is guaranteed to still have its image (2 versions per package).
 
-**Credit budget (added by the $0 audit; a deduction until measures it).** CircleCI Free gives 30,000 credits a month with no card; at exhaustion personal builds are blocked, never billed (circleci.com/docs/guides/plans-pricing/credits, read 2026-10-16). Our worst-case month (30 PR + 10 main pipelines, every lane running) is about 22,200 credits, 26% headroom, without counting the open-source allowance (whose size the CircleCI pages state inconsistently). Rules that keep it there:
+**Credit budget (added by the $0 audit; a deduction until measures it).** CircleCI Free gives 30,000 credits a month with no card; at exhaustion personal builds are blocked, never billed (circleci.com/docs/guides/plans-pricing/credits, read 2026-10-16). Our worst-case month (30 PR + 10 main pipelines, every job running) is about 22,200 credits, 26% headroom, without counting the open-source allowance (whose size the CircleCI pages state inconsistently). Rules that keep it there:
 
 - `resource_class: small` for `backend-quality`, `secrets`, `sast`, `sca`, `cost-static`, `realtime-quality`, `realtime-sec`; `medium` for the rest; the `dast` machine executor at its default medium. Never `large`, never Gen2 classes. If `sast` runs out of memory on `small`, it moves to `medium` and the budget is recomputed.
 - **No Docker layer caching** (200 credits per job). `restore_cache`/`save_cache` keyed on `uv.lock`, `pnpm-lock.yaml`, `go.sum`, and the Trivy DB keyed by date, kept small for the 2 GB storage allowance.
-- **Self-skipping lanes, not path-filtered workflows.** The web and realtime jobs first run `git diff --name-only origin/main...HEAD` and call `circleci-agent step halt` when their paths are untouched, so a skipped job still reports green and branch protection keeps requiring it. The backend and security lane always runs on PRs. `release` never skips anything.
+- **Self-skipping jobs, not path-filtered workflows.** The web and realtime jobs first run `git diff --name-only origin/main...HEAD` and call `circleci-agent step halt` when their paths are untouched, so a skipped job still reports green and branch protection keeps requiring it. The backend and security jobs always run on PRs. `release` never skips anything.
 - Images are built with `docker buildx build --provenance=false --sbom=false`, so one push is one Artifact Registry version (attestation manifests would add versions, deduced) and the keep-2 rule and the two-version limit hold (cost verifier issue 6). CI never pulls from `*-docker.pkg.dev`: it scans the local build before the push, because Artifact Registry internet egress is billed from byte 0 (issue 5).
 - Short artifact, cache and workspace retention set in Plan → Usage Controls; artifacts limited to JUnit, coverage XML and `zap-report.html`. Amended 2026-10-18, three more artifacts, each a single copy, shipped in PR #32:
 
@@ -111,10 +111,10 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 
 **Amendment (2026-10-18): contexts for Ably ([ADR-0031](0031-realtime-push-via-ably-sse.md)).** Two additions to the Contexts list above:
 
-- `ably-ci`: holds `ABLY_API_KEY`, the key of a CI-only Ably app (free package, capability publish, subscribe and history only). Unrestricted, so PR branches can run the real-Ably e2e lane. Accepted risk: the app is throwaway and holds no clinic data, and fork PRs never trigger pipelines.
+- `ably-ci`: holds `ABLY_API_KEY`, the key of a CI-only Ably app (free package, capability publish, subscribe and history only). Unrestricted, so PR branches can run the real-Ably e2e job. Accepted risk: the app is throwaway and holds no clinic data, and fork PRs never trigger pipelines.
 - `gcp-deploy` additionally holds `ABLY_STATS_KEY`: a key on the production Ably app with the `stats` capability only (Ably docs: "Can retrieve current and historical usage statistics for an app"; it only does something on the wildcard resource), restricted to `main` like the rest of that context. The deployer never reads Secret Manager for it.
 
-**Update, same day (2026-10-18): both contexts are set up.** `ably-ci` (with `ABLY_API_KEY`, the CI app `clinic-booking-ci`'s publish, subscribe and history key, no stats) and `gcp-deploy` (with `ABLY_STATS_KEY`, the production app's `clinic-stats` key, statistics only) exist as reported by the gatekeeper; names and capabilities are recorded in [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md). `ably-ci` is read by the real-Ably tests in `e2e-real`; nothing on main reads `ABLY_STATS_KEY` yet, so the usage check that would use it is not built.
+**Update, same day (2026-10-18): both contexts are set up.** `ably-ci` (with `ABLY_API_KEY`, the CI app `clinic-booking-ci`'s publish, subscribe and history key, no stats) and `gcp-deploy` (with `ABLY_STATS_KEY`, the production app's `clinic-stats` key, statistics only) exist, as observed when they were set up; names and capabilities are recorded in [docs/evidence/ably-no-payment-method-2026-10-18.md](../evidence/ably-no-payment-method-2026-10-18.md). `ably-ci` is read by the real-Ably tests in `e2e-real`; nothing on main reads `ABLY_STATS_KEY` yet, so the usage check that would use it is not built.
 
 **Amendment (2026-10-18): what PR #32 and the flake fixes changed.**
 
@@ -129,7 +129,7 @@ gcloud config set project "${GOOGLE_PROJECT_ID}"
 - Proof required before we claim "branch builds cannot deploy": a saved WIF-deny log and a saved context-deny log.
 - Bad: `VERCEL_TOKEN` is long-lived. It is project-scoped and rotated after grading. With the proxy inside the `web` project (ADR-0023) it is lean core.
 - Good: `cost-check` turns cost drift (an unset max-instances, a growing image repository, an extra secret version, an `allUsers` binding) into a red release, not a surprise invoice.
-- Bad: about 10-12 minutes per main pipeline (estimate). The realtime lane runs in parallel with the web ship jobs; its added wall time is unmeasured.
+- Bad: about 10-12 minutes per main pipeline (estimate). The realtime jobs run in parallel with the web ship jobs; its added wall time is unmeasured.
 - Unverified: whether branch protection requiring CircleCI checks needs a public repo on the current GitHub plan. The repo is public anyway.
 
 ## Assessment line

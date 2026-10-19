@@ -1,0 +1,69 @@
+{
+  "$id": "https://clinic.example/contracts/events/admin-action.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A staff action that changed no appointment (a reminder sent now, \"running late\", an\ninvitation), for a viewer of the live feed: what happened and, for the two patient\nnotifications, the doctor and the visit time. No person, no reason, no address. Streamed only\nby the Go gateway from ``staff_action_audit``; it never travels through the push service.",
+  "properties": {
+    "delay_minutes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Delay Minutes"
+    },
+    "doctor_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Doctor Id"
+    },
+    "kind": {
+      "enum": [
+        "reminder_now",
+        "running_late",
+        "invite_created",
+        "invite_revoked",
+        "invite_accepted"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "seq": {
+      "description": "\"<txid>.<id>\" of the event.",
+      "pattern": "^(0|[1-9][0-9]{0,19})\\.(0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "starts_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Starts At"
+    }
+  },
+  "required": [
+    "kind",
+    "doctor_id",
+    "starts_at",
+    "delay_minutes",
+    "seq"
+  ],
+  "title": "AdminActionEvent",
+  "type": "object"
+}
