@@ -131,7 +131,7 @@ const FOLDERS = [
         op: ["GET", "/problems"],
         expect: [200],
         tests: js`const codes = pm.response.json().map((p) => p.code);
-pm.test("catalogue lists both one-hour codes", () => pm.expect(codes).to.include.members(["BOOKING_TOO_SOON", "CHANGE_TOO_LATE"]));`,
+pm.test("catalogue lists both lead-time codes", () => pm.expect(codes).to.include.members(["BOOKING_TOO_SOON", "CHANGE_TOO_LATE"]));`,
       },
       {
         name: "Error type document",
@@ -384,7 +384,7 @@ pm.test("cancelled with the reason given", () => {
   {
     name: "08 Change inside the lead time",
     description:
-      `Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (${LEAD} minutes), and in the next hour there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (\`BOOKING_MIN_LEAD_MINUTES\`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. \`make api-check\` starts that API and passes \`longLeadBaseUrl\`; without it, the two refusals are skipped.`,
+      `Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (${LEAD} minutes), and inside that lead from now there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (\`BOOKING_MIN_LEAD_MINUTES\`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. \`make api-check\` starts that API and passes \`longLeadBaseUrl\`; without it, the two refusals are skipped.`,
     requests: [
       {
         name: "Book a visit to change",

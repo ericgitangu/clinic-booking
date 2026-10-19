@@ -92,7 +92,7 @@ Observed: the first returns `200`. The second returns `409` as `application/prob
 
 ### Try the API
 
-A Postman collection in [`docs/api/`](docs/api/README.md), run with newman, walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot under an hour away (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change inside the lead time (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
+A Postman collection in [`docs/api/`](docs/api/README.md), run with newman, walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot inside the configured lead time, 60 minutes by default (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change inside the lead time (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
 
 One command, Docker only (its own compose stack, removed afterwards):
 

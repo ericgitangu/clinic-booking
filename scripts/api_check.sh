@@ -47,8 +47,14 @@ case "$TARGET" in
   local)
     PROJECT="${API_CHECK_PROJECT:-clinic-apicheck}"
     RUN_NAME="$PROJECT"
-    export API_HOST_PORT="${API_CHECK_API_PORT:-18180}" DB_HOST_PORT="${API_CHECK_DB_PORT:-15532}"
-    export API_CHECK_LONG_LEAD_PORT="${API_CHECK_LONG_LEAD_PORT:-18181}"
+    # Host ports: API_CHECK_API_PORT, API_CHECK_DB_PORT and API_CHECK_LONG_LEAD_PORT when set,
+    # otherwise the first free port from 18180, 15532 and 18181 (stepping by 10), so two runs on
+    # one machine, or another stack on the defaults, do not collide.
+    in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+    free_port() { local p="$1"; while in_use "$p"; do p=$((p + 10)); done; echo "$p"; }
+    export API_HOST_PORT="${API_CHECK_API_PORT:-$(free_port 18180)}"
+    export DB_HOST_PORT="${API_CHECK_DB_PORT:-$(free_port 15532)}"
+    export API_CHECK_LONG_LEAD_PORT="${API_CHECK_LONG_LEAD_PORT:-$(free_port $((API_HOST_PORT + 1)))}"
     compose() { docker compose -p "$PROJECT" -f docker-compose.yml -f scripts/api_check.compose.yml "$@"; }
     if [ "${KEEP_STACK:-0}" != 1 ]; then CLEANUP+=("compose down -v >/dev/null 2>&1"); fi
     node_check
@@ -58,15 +64,23 @@ case "$TARGET" in
     if ! docker network inspect "${PROJECT}_default" >/dev/null 2>&1; then
       if ! docker network create "${PROJECT}_probe" >/dev/null 2>&1; then
         echo "Docker has no free network address space: $(docker network ls -q | wc -l | tr -d ' ') networks exist." >&2
-        echo "Remove compose stacks you no longer need (docker compose -p <name> down -v), then run this again." >&2
+        echo "Free some: 'docker network prune' removes networks no container uses; 'docker compose -p <name> down -v' removes a stack you no longer need. Then run this again." >&2
         exit 1
       fi
       docker network rm "${PROJECT}_probe" >/dev/null
     fi
     compose up -d --build --wait
+    out="$(mktemp)"; CLEANUP+=("rm -f '$out'")
     newman "${PROJECT}_default" -e local.postman_environment.json \
       --env-var baseUrl=http://api:8080 --env-var writeBaseUrl=http://api:8080 \
-      --env-var longLeadBaseUrl=http://api-long-lead:8080
+      --env-var longLeadBaseUrl=http://api-long-lead:8080 | tee "$out"
+    # Locally every request must run: a skip means an earlier step failed to set what it needed,
+    # and newman alone would still report the run as passed.
+    if grep -q "skipped (" "$out"; then
+      echo "api-check: requests were skipped in a local run:" >&2
+      grep "skipped (" "$out" >&2
+      exit 1
+    fi
     if [ "${KEEP_STACK:-0}" = 1 ]; then
       cat <<EOF
 

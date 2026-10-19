@@ -206,7 +206,7 @@
                   "const schema = {\"items\":{\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"slug\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"}},\"required\":[\"code\",\"slug\",\"title\",\"status\",\"description\"],\"type\":\"object\"},\"type\":\"array\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "const codes = pm.response.json().map((p) => p.code);",
-                  "pm.test(\"catalogue lists both one-hour codes\", () => pm.expect(codes).to.include.members([\"BOOKING_TOO_SOON\", \"CHANGE_TOO_LATE\"]));"
+                  "pm.test(\"catalogue lists both lead-time codes\", () => pm.expect(codes).to.include.members([\"BOOKING_TOO_SOON\", \"CHANGE_TOO_LATE\"]));"
                 ]
               }
             }
@@ -1521,7 +1521,7 @@
     },
     {
       "name": "08 Change inside the lead time",
-      "description": "Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (60 minutes), and in the next hour there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (`BOOKING_MIN_LEAD_MINUTES`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. `make api-check` starts that API and passes `longLeadBaseUrl`; without it, the two refusals are skipped.",
+      "description": "Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (60 minutes), and inside that lead from now there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (`BOOKING_MIN_LEAD_MINUTES`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. `make api-check` starts that API and passes `longLeadBaseUrl`; without it, the two refusals are skipped.",
       "item": [
         {
           "name": "Book a visit to change",
