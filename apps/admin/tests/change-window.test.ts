@@ -35,7 +35,11 @@ describe("clockOffset", () => {
   });
   it("moves on with the browser: 31 minutes later the 90-minute visit is inside", () => {
     const offset = clockOffset(new Date(NOW).toISOString(), NOW - 7_000);
-    expect(insideChangeWindow(visit, NOW - 7_000 + offset + 30 * 60_000)).toBe(false);
-    expect(insideChangeWindow(visit, NOW - 7_000 + offset + 31 * 60_000)).toBe(true);
+    expect(insideChangeWindow(visit, NOW - 7_000 + offset + 30 * 60_000)).toBe(
+      false,
+    );
+    expect(insideChangeWindow(visit, NOW - 7_000 + offset + 31 * 60_000)).toBe(
+      true,
+    );
   });
 });

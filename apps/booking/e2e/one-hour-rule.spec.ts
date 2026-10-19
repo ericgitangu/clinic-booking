@@ -120,7 +120,6 @@ test("a cancel that slips through the window is refused in plain words", async (
   await context.close();
 });
 
-
 const alertOf = (page: import("@playwright/test").Page) =>
   page.locator('[role="alert"]:not(#__next-route-announcer__)');
 
@@ -177,7 +176,11 @@ test("moving a visit that now starts within the hour says so in plain words (CHA
 test("a cancel dialog left open when the visit comes within the hour closes and says why", async ({
   browser,
 }) => {
-  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 4, 2);
+  const { context, page, startsAt, doctorId } = await bookedPerson(
+    browser,
+    4,
+    2,
+  );
   // 70 to 100 minutes away: outside the hour when the page is drawn.
   await moveTo(startsAt, doctorId, 100);
   await page.clock.install({ time: new Date() });
@@ -219,7 +222,11 @@ async function moveById(id: string, minutesAhead: number) {
 test("a reschedule page left open across the boundary draws itself again and says why", async ({
   browser,
 }) => {
-  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 0, 3);
+  const { context, page, startsAt, doctorId } = await bookedPerson(
+    browser,
+    0,
+    3,
+  );
   await moveTo(startsAt, doctorId, 100); // 70 to 100 minutes away when the page is drawn
   await page.clock.install({ time: new Date() });
   await page.goto("/appointments");
@@ -229,7 +236,9 @@ test("a reschedule page left open across the boundary draws itself again and say
   const id = href!.split("/")[2];
   await page.goto(href!);
   await expect(page.getByRole("heading", { name: "Reschedule" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Move appointment" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Move appointment" }),
+  ).toBeVisible();
   // The visit is brought forward in the database (the server will now see it inside the hour) and
   // 45 minutes pass in the browser: the page's own check notices and asks for a fresh render.
   await moveById(id, 30);
@@ -237,6 +246,8 @@ test("a reschedule page left open across the boundary draws itself again and say
   await expect(
     page.getByText(/less than an hour.*call the clinic/i).first(),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Move appointment" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Move appointment" }),
+  ).toHaveCount(0);
   await context.close();
 });

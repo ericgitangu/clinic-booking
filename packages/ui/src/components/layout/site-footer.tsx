@@ -60,7 +60,9 @@ function FooterAnchor({ link }: { link: FooterLink }) {
       ) : null}
     </>
   );
-  const className = "h-11 justify-start gap-2 px-0 text-base sm:text-sm";
+  // A long label wraps instead of pushing the page wider; a short one is still one 44 px line.
+  const className =
+    "h-auto min-h-11 justify-start gap-2 whitespace-normal px-0 py-2 text-left text-base sm:text-sm";
   return (
     <Button asChild variant="link" className={className}>
       {link.external ? (

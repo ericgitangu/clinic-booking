@@ -27,3 +27,9 @@ export function isTestRun(env: Env): boolean {
     isLocalUrl(env.BETTER_AUTH_URL)
   );
 }
+
+// The grid writes how many times it has rendered into a data attribute so the render-count tests can
+// read it. That is a test hook: production never writes it (same definition of a test run as above).
+export function shouldTrackRenders(env: Env): boolean {
+  return isTestRun(env);
+}

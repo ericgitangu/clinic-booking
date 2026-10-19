@@ -8,7 +8,7 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { Separator } from "@clinic/ui/components/ui/separator";
 import { CopyBlock } from "@/components/landing/copy-block";
 import { EvidenceCard } from "@/components/landing/evidence-card";
-import { StatusLine } from "@/components/landing/status-line";
+import { StatusLine, StatusPending } from "@/components/landing/status-line";
 import {
   ADR,
   BONUS,
@@ -183,7 +183,9 @@ export default function Home() {
             How it&rsquo;s built
           </h2>
           <Suspense fallback={null}>
-            <StatusLine />
+            <Suspense fallback={<StatusPending />}>
+              <StatusLine />
+            </Suspense>
           </Suspense>
         </div>
         <dl className="mt-6 grid gap-x-10 gap-y-8 md:grid-cols-2">

@@ -2,7 +2,7 @@
 export const SITE = {
   name: "Idyllic Clinic Admin",
   shortName: "Idyllic Admin",
-  description: "Staff dashboard for Idyllic Clinic Booking.",
+  description: "Staff dashboard for Idyllic Clinic Admin.",
   url: "https://clinic-admin.ericgitangu.com",
   bookingUrl: "https://clinic.ericgitangu.com",
   locale: "en_KE",
