@@ -13,9 +13,22 @@
   font-family: "Clinic Digits";
   src:
     local("-apple-system"), local("BlinkMacSystemFont"), local("Segoe UI"),
-    local("Roboto"), local("Helvetica Neue"), local("Arial");
+    local("Roboto"), local("Helvetica Neue"), local("Arial"),
+    local("Liberation Sans"), local("DejaVu Sans"), local("Noto Sans");
   unicode-range: U+0030-0039;
-  font-weight: 200 800;
+  font-weight: 100 500;
+}
+/* The same digits in bold, so a bold time or date keeps its weight (a regular face would look thin
+   next to bold letters). */
+@font-face {
+  font-family: "Clinic Digits";
+  src:
+    local("Helvetica Neue Bold"), local("Segoe UI Bold"), local("Roboto Bold"),
+    local("Arial Bold"), local("Liberation Sans Bold"),
+    local("DejaVu Sans Bold"), local("Noto Sans Bold"), local("-apple-system"),
+    local("BlinkMacSystemFont");
+  unicode-range: U+0030-0039;
+  font-weight: 600 900;
 }
 
 /* Times and dates line up: tabular figures everywhere in the booking app. (The font draws its zero

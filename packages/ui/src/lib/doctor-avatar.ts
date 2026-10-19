@@ -20,7 +20,7 @@ export function doctorAvatarSrc(doctorId: string): string | null {
     : null;
 }
 
-/** The portrait as src (256 px) and srcSet (256 w and 512 w; the browser picks by the displayed size, see sizes), or null. */
+/** The portrait as src (256 px) and srcSet (128 w, 256 w and 512 w; the 128 keeps small avatars light; the browser picks by the displayed size, see sizes), or null. */
 export function doctorPhoto(
   doctorId: string,
 ): { src: string; srcSet: string } | null {
@@ -28,7 +28,7 @@ export function doctorPhoto(
   const base = `/doctors/${doctorId}`;
   return {
     src: `${base}-256.webp`,
-    srcSet: `${base}-256.webp 256w, ${base}-512.webp 512w`,
+    srcSet: `${base}-128.webp 128w, ${base}-256.webp 256w, ${base}-512.webp 512w`,
   };
 }
 
@@ -36,6 +36,21 @@ export function doctorPhoto(
 export const PORTRAIT_DISCLOSURE =
   "AI-generated portraits of fictional doctors";
 export const ILLUSTRATION_DISCLOSURE = "Illustration of a fictional doctor";
+
+function titled(name: string): string {
+  const n = name.trim();
+  return /^dr\.?\s/i.test(n) ? n : `Dr. ${n}`;
+}
+
+/** Alt text of the portrait: says plainly that it is AI-generated and fictional. */
+export function doctorPortraitAlt(name: string): string {
+  return `${titled(name)}, AI-generated portrait of a fictional doctor`;
+}
+
+/** Alt text of the fallback illustration. */
+export function doctorIllustrationAlt(name: string): string {
+  return `${titled(name)}, illustration of a fictional doctor`;
+}
 
 /** "Dr. Achieng Otieno" -> "AO". Skips the title; falls back to "?" for an empty name. */
 export function doctorInitials(name: string): string {

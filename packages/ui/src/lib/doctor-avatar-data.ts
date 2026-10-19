@@ -1,6 +1,6 @@
 // Written by scripts/avatars/sync.mjs from packages/ui/assets/doctors/. Edit the art there, not this file.
 // Per doctor id: the extension of the fallback file (/doctors/<id>.<ext>) and whether the portrait
-// (/doctors/<id>-256.webp and -512.webp) exists. All are served from each app's public/ directory.
+// (/doctors/<id>-128.webp, -256.webp and -512.webp) exists. All are served from each app's public/ directory.
 export type DoctorAvatarFiles = { fallback: string | null; photo: boolean };
 export const DOCTOR_AVATAR_FILES: Readonly<Record<string, DoctorAvatarFiles>> =
   {

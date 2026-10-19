@@ -10,7 +10,7 @@ huggingface_hub.get_token() and is never written to a file, a log or an error me
 
 Model:    Z-Image-Turbo (Tongyi-MAI/Z-Image-Turbo), via the Space mcp-tools/Z-Image-Turbo (gradio /generate)
 Settings: 1024x1024, steps 8, shift 3.0, fixed seed 2026 (so the run can be repeated)
-Output:   <id>-256.webp and <id>-512.webp in packages/ui/assets/doctors/ (ImageMagick `magick`, quality 82,
+Output:   <id>-128.webp, <id>-256.webp and <id>-512.webp in packages/ui/assets/doctors/ (ImageMagick `magick`, quality 82,
           metadata stripped). The 1024 px originals go to a temporary directory and are deleted; they
           are never committed.
 Licence:  Apache License 2.0. The model card header reads `license: apache-2.0`
@@ -122,7 +122,7 @@ def main(keys: list[str]) -> int:
                 )
                 source = Path(tmp) / f"{key}.png"
                 shutil.copy(result[0], source)
-                for size in (256, 512):
+                for size in (128, 256, 512):
                     subprocess.run(
                         [
                             "magick",
