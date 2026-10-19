@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { parseLiveEvent } from "@/lib/live-events";
-import { LiveStream, type LiveStatus } from "@/lib/live-stream";
+import { concernsAppointment, parseLiveEvent } from "@/lib/live-events";
+import { sharedStream } from "@/lib/live-share";
+import type { LiveStatus } from "@/lib/live-stream";
 import type { Role } from "@/lib/roles";
 
 const TEXT: Record<LiveStatus, string> = {
@@ -16,23 +17,27 @@ const TEXT: Record<LiveStatus, string> = {
 };
 
 /**
- * Keeps an open appointment page current. It holds ONE stream, filtered on the gateway to this
- * appointment (`?appointment=<id>`, signed into the assertion like the cursor), and refreshes the
- * server-rendered history and actions when an event for it arrives (events within 300 ms
- * share one refresh).
+ * Keeps an open appointment page current. It opens no stream of its own: it listens to the one
+ * stream the browser shares (live-share.ts), keeps the events about this appointment
+ * (concernsAppointment) and refreshes the server-rendered history and actions when one arrives
+ * (events within 300 ms share one refresh).
  *
- * Why a filtered stream of its own rather than sharing the dashboard's: the two never live in the
- * same tab (navigating away unmounts the dashboard's feed), so one stream per page is still one
- * stream per tab, and the filter keeps every other appointment's events off this page's wire.
- * It counts against the same budget (one stream per person, two Cloud Run instances): with the
- * dashboard open in another tab it is refused and falls back to refreshing every 30 s.
+ * It used to hold a stream filtered on the gateway (`?appointment=<id>`). With the dashboard open
+ * in another tab that was a second stream for one person, and with two Cloud Run instances that is
+ * the whole service (2026-10-19). The shared stream is the one the dashboard reads, shaped for the
+ * role by the gateway, so filtering it here shows the page nothing the dashboard would not.
  */
 export function AppointmentLive({
   appointmentId,
+  doctorId,
   role,
+  person,
 }: {
   appointmentId: string;
+  doctorId: string;
   role: Role;
+  /** The per-person key the tabs share their stream under (liveKey). */
+  person: string;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<LiveStatus>("connecting");
@@ -42,13 +47,14 @@ export function AppointmentLive({
 
   useEffect(() => {
     const refresh = () => start(() => router.refresh());
-    const s = new LiveStream({
-      appointment: appointmentId,
-      isHidden: () => document.hidden,
+    const appt = { id: appointmentId, doctorId };
+    const off = sharedStream(person).subscribe({
+      role,
       onStatus: setStatus,
       onRefresh: refresh,
       onEvent: (_id, _event, data) => {
-        if (!parseLiveEvent(data, role)) return;
+        const ev = parseLiveEvent(data, role);
+        if (!ev || !concernsAppointment(ev, appt, role)) return;
         setUpdatedAt(new Date().toISOString());
         if (pending.current === null) {
           pending.current = setTimeout(() => {
@@ -58,16 +64,12 @@ export function AppointmentLive({
         }
       },
     });
-    s.start();
-    const onVisibility = () => s.visibilityChanged();
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
+      off();
       if (pending.current !== null) clearTimeout(pending.current);
       pending.current = null;
-      s.stop();
     };
-  }, [appointmentId, role, router]);
+  }, [appointmentId, doctorId, person, role, router]);
 
   return (
     <p

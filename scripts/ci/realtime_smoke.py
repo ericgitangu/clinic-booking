@@ -1,18 +1,20 @@
-"""Release smoke for the live-feed gateway: one stream, one event, then close.
+"""Release smoke for the live-feed gateway: short, bounded stream probes, then nothing left open.
 
 Run by ship-realtime against the TAGGED, no-traffic revision of clinic-realtime, after ship-api
 has made the new API live. It checks, in order, that:
 
 1. /health answers through Cloud Run IAM (the invoker token works);
 2. /stream without an assertion, and with one signed by a wrong key, is refused with 401;
-3. a stream opened with the smoke identity's assertion starts (the ``hello`` frame arrives);
-4. a booking made for a SYNTHETIC patient through the live API shows up on that stream as a
-   ``booked`` event, then is cancelled (the smoke identity sees synthetic events only, in the
-   minimised shape, so no personal data is involved);
-5. the stream closes cleanly when the client leaves.
+3. a stream opened with the smoke identity's assertion starts: the first bytes are the ``hello``
+   frame with its cursor, and the gateway then ends the stream itself (reason ``probe``);
+4. a booking made for a SYNTHETIC patient through the live API is read back as a ``booked`` event
+   by resuming from that cursor, in the minimised shape (the smoke identity sees synthetic events
+   only, so no personal data is involved), and is then cancelled.
 
-It opens exactly one stream and receives one event: no polling loop, no keep-warm. Exit 0 only if
-every step passed.
+Every stream read is a bounded read of STREAM_SECONDS (sse_probe.py), and the gateway closes
+the smoke's streams after their catch-up, so no stream outlives its step. On 2026-10-19 this smoke
+held a stream open for 242 s (Cloud Run never told the instance it had gone), and the live check
+after promotion found no free instance and rolled the release back.
 
     REALTIME_URL=https://sha-abc1234---clinic-realtime-....run.app API_URL=https://clinic-api-....run.app \
     REALTIME_TOKEN=<id token, audience clinic-realtime> API_TOKEN=<id token, audience clinic-api> \
@@ -27,20 +29,26 @@ import hmac
 import json
 import os
 import sys
-import threading
 import time
 from urllib.parse import urlsplit
 
 import httpx
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sse_probe
 import verify_claims
 
 AUDIENCE = "clinic-api/internal"
 SMOKE_SUB = verify_claims.SMOKE_SUB
 IAM_HEADER = "X-Serverless-Authorization"
 COLD_START_SECONDS = 60  # Cloud Run start + Neon wake for the first request
-EVENT_SECONDS = 15
+STREAM_SECONDS = 5  # the most any one stream read may take
+HELLO_ATTEMPTS = 3  # the first stream may wait for Neon to wake
+RESUME_ATTEMPTS = 6  # the booking may not be behind the snapshot horizon yet
+RESUME_PAUSE_SECONDS = 1.0
+MINIMISED = {"event_type", "doctor_id", "local_date", "from_local_date", "from_starts_at",
+             "to_starts_at", "seq"}
 
 
 def _b64(raw: bytes) -> str:
@@ -72,96 +80,76 @@ def check(ok: bool, label: str) -> bool:
     return ok
 
 
-class Frames:
-    """Reads an SSE response on a thread, so the main thread can wait for a frame with a deadline."""
+def _probe(realtime_url: str, token: str, key: str, target: str) -> sse_probe.Probe:
+    prefix = urlsplit(realtime_url).path.rstrip("/")
+    return sse_probe.probe(
+        realtime_url + target,
+        {IAM_HEADER: f"Bearer {token}", "X-Internal-Assertion": stream_assertion(key, prefix + target)},
+        STREAM_SECONDS,
+    )
 
-    def __init__(self, response: httpx.Response) -> None:
-        self.response = response
-        self.items: list[dict[str, str]] = []
-        self.ended = threading.Event()
-        threading.Thread(target=self._read, daemon=True).start()
 
-    def _read(self) -> None:
-        cur: dict[str, str] = {}
-        try:
-            for line in self.response.iter_lines():
-                if line == "":
-                    if cur:
-                        self.items.append(cur)
-                    cur = {}
-                elif line.startswith("event: "):
-                    cur["event"] = line[7:]
-                elif line.startswith("data: "):
-                    cur["data"] = line[6:]
-                elif line.startswith("id: "):
-                    cur["id"] = line[4:]
-        except (httpx.HTTPError, OSError):
-            pass
-        finally:
-            self.ended.set()
-
-    def wait_for(self, event: str, seconds: float, start: int = 0) -> dict[str, str] | None:
-        end = time.monotonic() + seconds
-        while time.monotonic() < end:
-            for item in self.items[start:]:
-                if item.get("event") == event:
-                    return item
-            time.sleep(0.05)
-        return None
+def ended_as_probe(p: sse_probe.Probe) -> bool:
+    end = p.first("reconnect")
+    return end is not None and '"reason":"probe"' in end.get("data", "")
 
 
 def run(realtime_url: str, api_url: str, realtime_token: str, api_token: str, smoke_key: str) -> bool:
     ok = True
     iam = {IAM_HEADER: f"Bearer {realtime_token}"}
-    rt = httpx.Client(base_url=realtime_url, headers=iam, timeout=COLD_START_SECONDS)
-
-    r = rt.get("/health")
-    ok &= check(r.status_code == 200, f"/health through IAM -> {r.status_code}")
-
-    r = rt.get("/stream")
-    ok &= check(r.status_code == 401, f"/stream without an assertion -> {r.status_code} (want 401)")
-    forged = stream_assertion("x" * 40, "/stream")
-    r = rt.get("/stream", headers={"X-Internal-Assertion": forged})
-    ok &= check(r.status_code == 401, f"/stream with a wrong-key assertion -> {r.status_code} (want 401)")
+    with httpx.Client(base_url=realtime_url, headers=iam, timeout=COLD_START_SECONDS) as rt:
+        r = rt.get("/health")
+        ok &= check(r.status_code == 200, f"/health through IAM -> {r.status_code}")
+        r = rt.get("/stream")
+        ok &= check(r.status_code == 401, f"/stream without an assertion -> {r.status_code} (want 401)")
+        forged = stream_assertion("x" * 40, "/stream")
+        r = rt.get("/stream", headers={"X-Internal-Assertion": forged})
+        ok &= check(r.status_code == 401, f"/stream with a wrong-key assertion -> {r.status_code} (want 401)")
     if not ok:
         return False
 
-    target = "/stream"
-    prefix = urlsplit(realtime_url).path.rstrip("/")
-    header = stream_assertion(smoke_key, f"{prefix}{target}")
-    stream = httpx.Client(base_url=realtime_url, headers=iam, timeout=httpx.Timeout(COLD_START_SECONDS, read=None))
-    with stream.stream("GET", target, headers={"X-Internal-Assertion": header}) as resp:
-        if not check(resp.status_code == 200, f"/stream with the smoke identity -> {resp.status_code}"):
-            return False
-        frames = Frames(resp)
-        hello = frames.wait_for("hello", COLD_START_SECONDS)
-        if not check(hello is not None, "first frame (hello) arrived"):
-            return False
+    first = None
+    for _ in range(HELLO_ATTEMPTS):
+        first = _probe(realtime_url, realtime_token, smoke_key, "/stream")
+        if first.status == 200 and first.frames:
+            break
+    assert first is not None
+    if not check(first.status == 200, f"/stream with the smoke identity -> {first.status}"):
+        return False
+    hello = first.frames[0] if first.frames else {}
+    if not check(
+        first.body.startswith("id: ") and hello.get("event") == "hello" and bool(hello.get("id")),
+        "the first bytes are the hello frame, with its cursor",
+    ):
+        return False
+    ok &= check(ended_as_probe(first) and not first.timed_out,
+                f"the gateway closed the smoke stream itself, within {STREAM_SECONDS} s")
 
-        api = httpx.Client(
-            base_url=api_url, headers={IAM_HEADER: f"Bearer {api_token}"}, timeout=30
-        )
+    with httpx.Client(base_url=api_url, headers={IAM_HEADER: f"Bearer {api_token}"}, timeout=30) as api:
         patient = verify_claims._new_patient(api, 1, smoke_key)  # a synthetic patient
         doctor, _day, slot, _other = verify_claims._pick_slots(api)
-        mark = len(frames.items)
         booked = api.post(
             "/appointments", json={"doctor_id": doctor, "patient_id": patient, "starts_at": slot}
         )
         if not check(booked.status_code == 201, f"booking through the live API -> {booked.status_code}"):
             return False
-        event = frames.wait_for("booked", EVENT_SECONDS, start=mark)
-        ok &= check(event is not None, f"the booking reached the stream within {EVENT_SECONDS} s")
-        if event is not None:
-            data = json.loads(event["data"])
-            ok &= check(
-                set(data) == {"event_type", "doctor_id", "local_date", "from_local_date",
-                              "from_starts_at", "to_starts_at", "seq"},
-                "the event has exactly the minimised shape",
-            )
-        appointment = booked.json()["id"]
-        cancelled = api.patch(f"/appointments/{appointment}/cancel", json={"reason": "release smoke"})
-        ok &= check(cancelled.status_code == 200, f"smoke booking cancelled -> {cancelled.status_code}")
-    ok &= check(True, "stream closed by the client")
+        try:
+            event = None
+            target = f"/stream?cursor={hello['id']}"
+            for _ in range(RESUME_ATTEMPTS):
+                again = _probe(realtime_url, realtime_token, smoke_key, target)
+                event = again.first("booked")
+                if event is not None or again.status != 200:
+                    break
+                time.sleep(RESUME_PAUSE_SECONDS)
+            ok &= check(event is not None, "the booking is read back by resuming from the hello cursor")
+            if event is not None:
+                ok &= check(set(json.loads(event["data"])) == MINIMISED,
+                            "the event has exactly the minimised shape")
+        finally:
+            appointment = booked.json()["id"]
+            cancelled = api.patch(f"/appointments/{appointment}/cancel", json={"reason": "release smoke"})
+            ok &= check(cancelled.status_code == 200, f"smoke booking cancelled -> {cancelled.status_code}")
     return ok
 
 
