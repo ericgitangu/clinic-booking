@@ -3,16 +3,12 @@
 // supplies its own display name and passes it in; the address and domain are fixed here so the two
 // cannot drift apart.
 //
-// Email is sent from the verified subdomain, not the root domain: Resend only sends from a domain
-// verified in its dashboard (mail.ericgitangu.com is the verified one), and keeping mail on a
-// subdomain protects the root domain's reputation.
+// The sender address constants live in ./mail-constants (no server-only), re-exported here.
 import "server-only";
 import { logError } from "./proxy/log";
+import { FROM_ADDRESS, MAIL_DOMAIN, REPLY_TO } from "./mail-constants";
 
-export const MAIL_DOMAIN = "mail.ericgitangu.com";
-export const FROM_ADDRESS = `reminders@${MAIL_DOMAIN}`;
-// Replies go to the engineer's own address.
-export const REPLY_TO = "developer.ericgitangu@gmail.com";
+export { FROM_ADDRESS, MAIL_DOMAIN, REPLY_TO };
 
 export interface Composed {
   subject: string;
