@@ -32,12 +32,16 @@ class RecordingPublisher:
         self.batches: list[list[OutboundMessage]] = []
         self.fail = fail
         self.delay = delay
+        # Set when the first publish call starts, so a test can wait for "the relay is publishing"
+        # instead of sleeping and hoping the first request got there first.
+        self.publishing = asyncio.Event()
 
     @property
     def messages(self) -> list[OutboundMessage]:
         return [m for batch in self.batches for m in batch]
 
     async def publish(self, messages: Sequence[OutboundMessage]) -> None:
+        self.publishing.set()
         if self.delay:
             await asyncio.sleep(self.delay)
         if self.fail:
