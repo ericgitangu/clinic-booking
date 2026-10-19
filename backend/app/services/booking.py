@@ -5,7 +5,7 @@ import random
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -14,27 +14,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.db.errors import is_retryable_conflict
+from app.domain.attendance import Attendance, window_is_open
 from app.domain.booking_rules import require_lead_time, validate_slot
 from app.domain.errors import (
     AppointmentAlreadyCancelled,
     AppointmentAlreadyStarted,
+    AppointmentLocked,
     AppointmentNotFound,
+    AttendanceWindowClosed,
     ChangeTooLate,
     ConcurrentUpdate,
+    NothingToVeto,
     PatientDoubleBooked,
+    ReasonRequired,
     SlotTaken,
     UnknownDoctor,
     UnknownPatient,
 )
-from app.domain.events import booked_event, cancelled_event, rescheduled_event
+from app.domain.events import (
+    annotation_event,
+    booked_event,
+    cancelled_event,
+    rescheduled_event,
+)
 from app.domain.idempotency import check_replay, request_fingerprint
 from app.domain.slots import SLOT
+from app.domain.staff import StaffAction
 from app.models.appointment import Appointment
 from app.repositories import appointments as appt_repo
 from app.repositories import doctors as doctor_repo
 from app.repositories import events as event_repo
 from app.repositories import patients as patient_repo
+from app.repositories import staff as staff_repo
 from app.repositories.errors import IdempotencyKeyRaced, map_integrity_error
+from app.schemas.patient import PatientCreate
 
 
 @dataclass(frozen=True)
@@ -92,6 +105,58 @@ async def _clinic_tz(
     return ZoneInfo(clinic.timezone)
 
 
+async def _staff_may_touch(
+    session: AsyncSession, patient_id: uuid.UUID, staff: StaffAction | None
+) -> None:
+    """Staff do not act on the release pipeline's synthetic patients: the admin views never show
+    them, so an id for one is answered as an appointment that does not exist."""
+    if staff is None:
+        return
+    patient = await patient_repo.get_patient(session, patient_id)
+    if patient is None or patient.synthetic:
+        raise AppointmentNotFound()
+
+
+def _actor(staff: StaffAction | None) -> str:
+    return "staff" if staff is not None else "patient"
+
+
+async def _audit(
+    session: AsyncSession,
+    staff: StaffAction,
+    *,
+    appointment_id: uuid.UUID,
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    """The staff audit row, in the transaction of the change it describes. The jsonb carries ids,
+    statuses and instants only: never a patient's name, phone or email."""
+    staff.audit_id = await staff_repo.insert_audit(
+        session,
+        actor_email=staff.actor_email,
+        actor_role=staff.actor_role,
+        action=staff.action,
+        appointment_id=appointment_id,
+        reason=staff.reason,
+        before=before,
+        after=after,
+    )
+
+
+async def _annotate(
+    session: AsyncSession, appt: Appointment, event_type: str, staff: StaffAction
+) -> None:
+    """A staff annotation on the event stream, in the transaction of the change it describes."""
+    tz = await _clinic_tz(session, appt.doctor_id, require_active=False)
+    await event_repo.insert_event(
+        session,
+        appointment_id=appt.id,
+        doctor_id=appt.doctor_id,
+        fields=annotation_event(event_type, appt.starts_at, tz),
+        actor=_actor(staff),
+    )
+
+
 async def _replay(
     session: AsyncSession, patient_id: uuid.UUID, key: str, fingerprint: str
 ) -> Appointment | None:
@@ -119,25 +184,59 @@ async def book(
     settings: Settings,
     *,
     doctor_id: uuid.UUID,
-    patient_id: uuid.UUID,
+    patient_id: uuid.UUID | None = None,
+    new_patient: PatientCreate | None = None,
     starts_at: datetime,
     idempotency_key: str | None = None,
+    staff: StaffAction | None = None,
+    predecessor_id: uuid.UUID | None = None,
 ) -> Booked:
-    lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    """Book a slot. Exactly one of ``patient_id`` and ``new_patient`` (staff only: the patient row
+    is created in the same transaction, so a refused booking leaves no orphan patient).
+
+    ``staff`` lifts the lead-time rule and nothing else: SLOT_IN_PAST, working hours, SLOT_TAKEN and
+    PATIENT_DOUBLE_BOOKED still apply. ``predecessor_id`` links a booking that undoes a cancel.
+    """
+    if (patient_id is None) == (new_patient is None) or (new_patient and staff is None):
+        raise ValueError("book needs a patient_id, or new_patient from staff")
+    if idempotency_key is not None and patient_id is None:
+        raise ValueError("an Idempotency-Key needs a patient_id")
+    key_patient = patient_id
+    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
     fingerprint = request_fingerprint(doctor_id, starts_at) if idempotency_key is not None else None
 
     async def _do() -> Booked:
+        nonlocal patient_id
         # Replays are answered before any validation: a retry after the slot has since passed
         # or been rescheduled still gets the booking it made.
-        if idempotency_key is not None and fingerprint is not None:
-            prior = await _replay(session, patient_id, idempotency_key, fingerprint)
+        if idempotency_key is not None and fingerprint is not None and key_patient is not None:
+            prior = await _replay(session, key_patient, idempotency_key, fingerprint)
             if prior is not None:
                 return Booked(prior, replayed=True)
         doctor = await doctor_repo.get_active_doctor(session, doctor_id)
         if doctor is None:
             raise UnknownDoctor()
-        if await patient_repo.get_patient(session, patient_id) is None:
+        if new_patient is not None:
+            email = str(new_patient.email) if new_patient.email is not None else None
+            same = await patient_repo.find_same_person(
+                session, full_name=new_patient.full_name, phone=new_patient.phone, email=email
+            )
+            if same is not None:
+                patient_id = same.id  # a repeated submit: the same person, not a second row
+            else:
+                created = await patient_repo.insert_patient(
+                    session,
+                    full_name=new_patient.full_name,
+                    phone=new_patient.phone,
+                    email=email,
+                )
+                patient_id = created.id
+        elif patient_id is None:
             raise UnknownPatient()
+        else:
+            existing = await patient_repo.get_patient(session, patient_id)
+            if existing is None or (staff is not None and existing.synthetic):
+                raise UnknownPatient()
         clinic = await doctor_repo.get_clinic(session, doctor.clinic_id)
         if clinic is None:
             raise UnknownDoctor()
@@ -149,6 +248,29 @@ async def book(
             if wh.weekday == weekday
         ]
         validate_slot(starts_at, windows, tz, clock.now(), lead, settings.BOOKING_HORIZON_DAYS)
+        if predecessor_id is not None:
+            # A veto of a cancel decides from reads taken before this transaction; decide again
+            # here, under the cancelled row's lock, so two vetoes (or a veto and a staff
+            # re-booking) cannot both go ahead.
+            predecessor = await appt_repo.get_for_update(session, predecessor_id)
+            latest = await event_repo.latest_event(session, predecessor_id)
+            if (
+                predecessor is None
+                or predecessor.status != "cancelled"
+                or latest is None
+                or latest["event_type"] != "cancelled"
+                or latest["actor"] != "patient"
+                or await appt_repo.has_successor(session, predecessor_id)
+            ):
+                raise NothingToVeto()
+        if (
+            staff is None
+            and patient_id is not None
+            and await appt_repo.locked_booking_exists(session, doctor_id, patient_id, starts_at)
+        ):
+            # Staff vetoed this patient's cancel and re-booked the slot locked: the patient
+            # trying to take it again is a change on that lineage, not a lost race.
+            raise AppointmentLocked()
         appt = await appt_repo.insert_appointment(
             session,
             doctor_id=doctor_id,
@@ -158,20 +280,41 @@ async def book(
             timezone=clinic.timezone,
             idempotency_key=idempotency_key,
             request_fingerprint=fingerprint,
+            predecessor_id=predecessor_id,
+            staff_locked_at=clock.now() if staff and staff.lock else None,
         )
         await event_repo.insert_event(
             session,
             appointment_id=appt.id,
             doctor_id=doctor_id,
             fields=booked_event(starts_at, tz),
+            actor=_actor(staff),
         )
+        if staff is not None:
+            await _audit(
+                session,
+                staff,
+                appointment_id=appt.id,
+                before={"status": "cancelled", "appointment_id": str(predecessor_id)}
+                if predecessor_id
+                else {},
+                after={
+                    "status": "booked",
+                    "starts_at": starts_at.astimezone(UTC).isoformat(),
+                    "doctor_id": str(doctor_id),
+                    "patient_id": str(patient_id),
+                    "locked": appt.staff_locked_at is not None,
+                },
+            )
+            if staff.action == "veto":
+                await _annotate(session, appt, "vetoed", staff)
         await _after_write(session)
         return Booked(appt)
 
     try:
         return await _run_txn(session, _do)
     except (SlotTaken, PatientDoubleBooked, IdempotencyKeyRaced) as conflict:
-        if idempotency_key is None or fingerprint is None:
+        if idempotency_key is None or fingerprint is None or key_patient is None:
             if isinstance(conflict, IdempotencyKeyRaced):  # pragma: no cover - needs a key
                 raise ConcurrentUpdate() from conflict
             raise
@@ -179,7 +322,7 @@ async def book(
         # Postgres may name the doctor-slot index first even when the real cause is a duplicate
         # of this very request, and a lost response must never read as "your slot was taken".
         async with session.begin():
-            winner = await _replay(session, patient_id, idempotency_key, fingerprint)
+            winner = await _replay(session, key_patient, idempotency_key, fingerprint)
         if winner is not None:
             return Booked(winner, replayed=True)
         if isinstance(conflict, IdempotencyKeyRaced):
@@ -195,13 +338,18 @@ async def cancel(
     *,
     appointment_id: uuid.UUID,
     reason: str,
+    staff: StaffAction | None = None,
 ) -> Appointment:
-    lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    # Staff are exempt from the lead-time rule: a zero lead never refuses a start still ahead.
+    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
 
     async def _do() -> Appointment:
         appt = await appt_repo.get_for_update(session, appointment_id)
         if appt is None:
             raise AppointmentNotFound()
+        await _staff_may_touch(session, appt.patient_id, staff)
+        if staff is None and appt.staff_locked_at is not None:
+            raise AppointmentLocked()
         if appt.status == "cancelled":
             raise AppointmentAlreadyCancelled()
         now = clock.now()
@@ -218,7 +366,20 @@ async def cancel(
             appointment_id=appt.id,
             doctor_id=appt.doctor_id,
             fields=cancelled_event(appt.starts_at, tz),
+            actor=_actor(staff),
         )
+        if staff is not None:
+            staff.previous_starts_at = appt.starts_at
+            await _audit(
+                session,
+                staff,
+                appointment_id=appt.id,
+                before={
+                    "status": "booked",
+                    "starts_at": appt.starts_at.astimezone(UTC).isoformat(),
+                },
+                after={"status": "cancelled"},
+            )
         await _after_write(session)
         return appt
 
@@ -232,13 +393,26 @@ async def reschedule(
     *,
     appointment_id: uuid.UUID,
     new_starts_at: datetime,
+    staff: StaffAction | None = None,
+    expect_event_id: int | None = None,
 ) -> Appointment:
-    lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
 
     async def _do() -> Appointment:
         appt = await appt_repo.get_for_update(session, appointment_id)
         if appt is None:
             raise AppointmentNotFound()
+        await _staff_may_touch(session, appt.patient_id, staff)
+        if staff is None and appt.staff_locked_at is not None:
+            raise AppointmentLocked()
+        if expect_event_id is not None:
+            # A veto decided what to undo from the latest event; if another change landed since,
+            # undoing the old one would be wrong.
+            latest = await event_repo.latest_event(session, appointment_id)
+            if latest is None or latest["id"] != expect_event_id:
+                if latest is not None and latest["actor"] == "staff":
+                    raise NothingToVeto()  # another veto (or a staff move) got there first
+                raise ConcurrentUpdate()
         if appt.status == "cancelled":
             raise AppointmentAlreadyCancelled()
         now = clock.now()
@@ -267,8 +441,102 @@ async def reschedule(
             appointment_id=appt.id,
             doctor_id=appt.doctor_id,
             fields=rescheduled_event(old_starts, new_starts_at, tz),
+            actor=_actor(staff),
         )
+        if staff is not None:
+            staff.previous_starts_at = old_starts
+            if staff.lock:
+                appt.staff_locked_at = now
+            await _audit(
+                session,
+                staff,
+                appointment_id=appt.id,
+                before={"starts_at": old_starts.astimezone(UTC).isoformat()},
+                after={
+                    "starts_at": new_starts_at.astimezone(UTC).isoformat(),
+                    "locked": appt.staff_locked_at is not None,
+                },
+            )
+            if staff.action == "veto":
+                await _annotate(session, appt, "vetoed", staff)
         await _after_write(session)
+        return appt
+
+    return await _run_txn(session, _do)
+
+
+async def unlock(
+    session: AsyncSession, clock: Clock, *, appointment_id: uuid.UUID, staff: StaffAction
+) -> Appointment:
+    """Lift the staff lock so the patient can change the appointment again."""
+
+    async def _do() -> Appointment:
+        appt = await appt_repo.get_for_update(session, appointment_id)
+        if appt is None:
+            raise AppointmentNotFound()
+        await _staff_may_touch(session, appt.patient_id, staff)
+        if appt.staff_locked_at is None:
+            raise NothingToVeto("This appointment is not locked.")
+        appt.staff_locked_at = None
+        appt.updated_at = clock.now()
+        await _audit(
+            session,
+            staff,
+            appointment_id=appt.id,
+            before={"locked": True},
+            after={"locked": False},
+        )
+        await _annotate(session, appt, "unlocked", staff)
+        return appt
+
+    return await _run_txn(session, _do)
+
+
+async def mark_attendance(
+    session: AsyncSession,
+    clock: Clock,
+    *,
+    appointment_id: uuid.UUID,
+    kind: Attendance,
+    staff: StaffAction,
+) -> Appointment:
+    """Record that the patient arrived or did not turn up.
+
+    Only inside the attendance window and only on a booked appointment. Marking what is already
+    marked changes nothing (no row, no audit row, ``staff.audit_id`` stays None); changing an
+    earlier mark appends a new row and needs a reason (the caller passes ``staff.reason`` empty
+    when none was given).
+    """
+
+    async def _do() -> Appointment:
+        appt = await appt_repo.get_for_update(session, appointment_id)
+        if appt is None:
+            raise AppointmentNotFound()
+        await _staff_may_touch(session, appt.patient_id, staff)
+        if appt.status == "cancelled":
+            raise AppointmentAlreadyCancelled()
+        now = clock.now()
+        if not window_is_open(appt.starts_at, now, kind):
+            raise AttendanceWindowClosed()
+        previous = await staff_repo.latest_attendance(session, appointment_id)
+        if previous == kind:
+            return appt
+        reason = staff.reason.strip()
+        if (previous is not None and not reason) or (reason and len(reason) < 3):
+            raise ReasonRequired("A reason of at least 3 characters is needed to change a mark.")
+        if not reason:
+            staff.reason = "Marked arrived at the desk" if kind == "arrived" else "Marked no-show"
+        await staff_repo.insert_attendance(
+            session, appointment_id=appointment_id, kind=kind, by=staff.actor_email, at=now
+        )
+        await _audit(
+            session,
+            staff,
+            appointment_id=appt.id,
+            before={"attendance": previous},
+            after={"attendance": kind},
+        )
+        await _annotate(session, appt, kind, staff)
         return appt
 
     return await _run_txn(session, _do)

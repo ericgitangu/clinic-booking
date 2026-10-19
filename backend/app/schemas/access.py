@@ -4,19 +4,26 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, StringConstraints
 
+from app.domain.emailnorm import normalize_email
 from app.schemas.common import ClinicDatetime
 
 Role = Literal["owner", "admin", "viewer"]
 # The owner is configuration, never a grant: only these two can be given.
 GrantableRole = Literal["admin", "viewer"]
 
+
+def _normalise(value: object) -> object:
+    return normalize_email(value) if isinstance(value, str) else value
+
+
+# NFKC + casefold first, so a fullwidth or mixed-case spelling is the same address everywhere.
 Email = Annotated[
     str,
+    BeforeValidator(_normalise),
     StringConstraints(
         strip_whitespace=True,
-        to_lower=True,
         min_length=3,
         max_length=254,
         pattern=r"^[^@\s,]+@[^@\s,]+\.[^@\s,]+$",

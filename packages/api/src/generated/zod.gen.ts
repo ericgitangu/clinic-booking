@@ -3,6 +3,13 @@
 import * as z from 'zod';
 
 /**
+ * AcceptRequest
+ */
+export const zAcceptRequest = z.object({
+    token: z.string().min(20).max(128).regex(/^[A-Za-z0-9_-]+$/)
+});
+
+/**
  * AccessEntry
  */
 export const zAccessEntry = z.object({
@@ -46,14 +53,18 @@ export const zAccountLinked = z.object({
  * AdminAppointment
  */
 export const zAdminAppointment = z.object({
+    attendance: z.enum(['arrived', 'no_show']).nullish(),
     cancellation_reason: z.string().nullable(),
     created_at: z.iso.datetime({ offset: true }),
     doctor_id: z.uuid(),
     doctor_name: z.string(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
+    patient_email: z.string().nullable(),
     patient_id: z.uuid(),
     patient_name: z.string(),
+    patient_phone: z.string().nullable(),
+    staff_locked: z.boolean(),
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
     timezone: z.string()
@@ -64,7 +75,8 @@ export const zAdminAppointment = z.object({
  */
 export const zAdminAppointmentPage = z.object({
     items: z.array(zAdminAppointment),
-    next_cursor: z.string().nullable()
+    next_cursor: z.string().nullable(),
+    view: z.enum(['full', 'minimised'])
 });
 
 /**
@@ -77,7 +89,11 @@ export const zAdminEvent = z.object({
     event_type: z.enum([
         'booked',
         'rescheduled',
-        'cancelled'
+        'cancelled',
+        'vetoed',
+        'unlocked',
+        'arrived',
+        'no_show'
     ]),
     from_local_date: z.iso.date().nullable(),
     from_starts_at: z.iso.datetime({ offset: true }).nullable(),
@@ -112,6 +128,96 @@ export const zAppointmentCreate = z.object({
     doctor_id: z.uuid(),
     patient_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * AttendanceRequest
+ *
+ * The reason is optional for a first mark and required to change an earlier one.
+ */
+export const zAttendanceRequest = z.object({
+    reason: z.string().min(3).max(500).nullish()
+});
+
+/**
+ * AuditEntry
+ */
+export const zAuditEntry = z.object({
+    action: z.enum([
+        'book',
+        'reschedule',
+        'cancel',
+        'veto',
+        'unlock',
+        'arrived',
+        'no_show',
+        'reminder_now',
+        'running_late',
+        'invite_create',
+        'invite_revoke'
+    ]),
+    actor_email: z.string(),
+    actor_role: z.enum([
+        'owner',
+        'admin',
+        'viewer'
+    ]),
+    after: z.record(z.string(), z.unknown()),
+    appointment_id: z.uuid().nullable(),
+    before: z.record(z.string(), z.unknown()),
+    id: z.uuid(),
+    notified: z.boolean(),
+    occurred_at: z.iso.datetime({ offset: true }),
+    reason: z.string()
+});
+
+/**
+ * AuditPage
+ */
+export const zAuditPage = z.object({
+    items: z.array(zAuditEntry),
+    next_cursor: z.string().nullable()
+});
+
+/**
+ * BoardAppointment
+ */
+export const zBoardAppointment = z.object({
+    ends_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    locked: z.boolean(),
+    patient_name: z.string(),
+    patient_phone: z.string().nullable(),
+    starts_at: z.iso.datetime({ offset: true }),
+    status: z.enum([
+        'booked',
+        'arrived',
+        'no_show',
+        'cancelled'
+    ]),
+    timezone: z.string()
+});
+
+/**
+ * BoardGap
+ *
+ * Back-to-back free 30-minute slots, merged.
+ */
+export const zBoardGap = z.object({
+    ends_at: z.iso.datetime({ offset: true }),
+    slots: z.int(),
+    starts_at: z.iso.datetime({ offset: true }),
+    timezone: z.string()
+});
+
+/**
+ * BoardTotals
+ */
+export const zBoardTotals = z.object({
+    arrived: z.int(),
+    booked: z.int(),
+    cancelled: z.int(),
+    no_show: z.int()
 });
 
 /**
@@ -254,10 +360,30 @@ export const zErrorItem = z.object({
 });
 
 /**
+ * FreeSlot
+ */
+export const zFreeSlot = z.object({
+    doctor_id: z.uuid(),
+    doctor_name: z.string(),
+    ends_at: z.iso.datetime({ offset: true }),
+    starts_at: z.iso.datetime({ offset: true }),
+    timezone: z.string()
+});
+
+/**
+ * GapList
+ */
+export const zGapList = z.object({
+    hours: z.int(),
+    items: z.array(zFreeSlot),
+    truncated: z.boolean()
+});
+
+/**
  * GrantRequest
  */
 export const zGrantRequest = z.object({
-    email: z.string().min(3).max(254).regex(/^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/),
+    email: z.string().min(3).max(254),
     role: z.enum(['admin', 'viewer'])
 });
 
@@ -269,9 +395,150 @@ export const zHealth = z.object({
 });
 
 /**
+ * HeatCell
+ */
+export const zHeatCell = z.object({
+    count: z.int(),
+    hour: z.int(),
+    weekday: z.int()
+});
+
+/**
+ * Heatmap
+ */
+export const zHeatmap = z.object({
+    cells: z.array(zHeatCell),
+    doctor_id: z.uuid().nullable(),
+    max: z.int(),
+    range: zDateRange
+});
+
+/**
+ * Invite
+ */
+export const zInvite = z.object({
+    created_at: z.iso.datetime({ offset: true }),
+    email: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    invited_by: z.string(),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'open',
+        'expired',
+        'consumed',
+        'revoked'
+    ])
+});
+
+/**
+ * InviteCreated
+ *
+ * Returned once, on creation. ``token`` is the raw secret for the email link: it is not
+ * stored (only its SHA-256 is), not logged and cannot be read again.
+ *
+ * To email the invitation: when ``deliver`` is true, send the link ``/invite/<token>`` to
+ * ``email`` (Idempotency-Key ``invite/<id>``), then POST ``/internal/admin/audit/<audit_id>/
+ * notified``. A reserved example address is "demo, not sent": ``deliver`` is false, the audit row
+ * says so and nothing may be sent.
+ */
+export const zInviteCreated = z.object({
+    audit_id: z.uuid(),
+    created_at: z.iso.datetime({ offset: true }),
+    deliver: z.boolean(),
+    email: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    invited_by: z.string(),
+    outcome: z.enum([
+        'to send',
+        'demo, not sent',
+        'no email on file'
+    ]),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'open',
+        'expired',
+        'consumed',
+        'revoked'
+    ]),
+    token: z.string()
+});
+
+/**
+ * InviteList
+ */
+export const zInviteList = z.object({
+    items: z.array(zInvite)
+});
+
+/**
+ * InviteRequest
+ */
+export const zInviteRequest = z.object({
+    email: z.string().min(3).max(254),
+    role: z.enum(['admin', 'viewer'])
+});
+
+/**
+ * InviteRevoked
+ */
+export const zInviteRevoked = z.object({
+    audit_id: z.uuid(),
+    created_at: z.iso.datetime({ offset: true }),
+    email: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    invited_by: z.string(),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'open',
+        'expired',
+        'consumed',
+        'revoked'
+    ])
+});
+
+/**
+ * KpiCounts
+ */
+export const zKpiCounts = z.object({
+    arrived: z.int(),
+    booked: z.int(),
+    cancelled: z.int(),
+    no_show: z.int(),
+    offered: z.int()
+});
+
+/**
+ * KpiValue
+ */
+export const zKpiValue = z.object({
+    delta: z.number().nullable(),
+    previous: z.number().nullable(),
+    value: z.number().nullable()
+});
+
+/**
+ * Kpis
+ */
+export const zKpis = z.object({
+    cancellation_rate: zKpiValue,
+    counts: zKpiCounts,
+    fill_rate: zKpiValue,
+    median_lead_minutes: zKpiValue,
+    no_show_rate: zKpiValue,
+    previous_range: zDateRange,
+    range: zDateRange,
+    reschedules: zKpiValue,
+    utilisation: zKpiValue
+});
+
+/**
  * LineageEvent
  */
 export const zLineageEvent = z.object({
+    actor: z.enum(['patient', 'staff']).nullish(),
     event_type: z.enum([
         'booked',
         'rescheduled',
@@ -299,6 +566,43 @@ export const zLineage = z.object({
 export const zMeAppointmentCreate = z.object({
     doctor_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * Notified
+ */
+export const zNotified = z.object({
+    audit_id: z.uuid(),
+    notified: z.literal(true).optional().default(true)
+});
+
+/**
+ * NotifyItem
+ *
+ * One patient to tell. `deliver` is true only when the outcome is "to send": the web app
+ * sends the email (Idempotency-Key = `audit_id`) and then marks the audit row notified. For a
+ * demo or address-less patient nothing is to be sent and `email` is null.
+ */
+export const zNotifyItem = z.object({
+    appointment_id: z.uuid(),
+    audit_id: z.uuid(),
+    deliver: z.boolean(),
+    email: z.string().nullable(),
+    outcome: z.enum([
+        'to send',
+        'demo, not sent',
+        'no email on file'
+    ]),
+    patient_name: z.string(),
+    starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * NotifyResult
+ */
+export const zNotifyResult = z.object({
+    doctor_name: z.string(),
+    items: z.array(zNotifyItem)
 });
 
 /**
@@ -343,6 +647,7 @@ export const zPatientTokenRequest = z.object({
 export const zProblemCode = z.enum([
     'UNAUTHENTICATED',
     'FORBIDDEN',
+    'ROLE_ESCALATION',
     'CLIENT_ADDRESS_UNKNOWN',
     'VALIDATION_ERROR',
     'TIMEZONE_REQUIRED',
@@ -363,8 +668,12 @@ export const zProblemCode = z.enum([
     'CONCURRENT_UPDATE',
     'RATE_LIMITED',
     'IDEMPOTENCY_KEY_CONSUMED',
+    'APPOINTMENT_LOCKED',
+    'ATTENDANCE_WINDOW_CLOSED',
+    'NOTHING_TO_VETO',
     'ACCESS_EXISTS',
     'OWNER_PROTECTED',
+    'INVITE_INVALID',
     'ACCESS_NOT_FOUND',
     'DOCTOR_NOT_FOUND',
     'PATIENT_NOT_FOUND',
@@ -416,6 +725,33 @@ export const zRealtimeToken = z.object({
 });
 
 /**
+ * ReasonShare
+ */
+export const zReasonShare = z.object({
+    category: z.enum([
+        'transport',
+        'illness',
+        'travel',
+        'work',
+        'weather',
+        'felt_better',
+        'insurance',
+        'other'
+    ]),
+    count: z.int(),
+    share: z.number()
+});
+
+/**
+ * ReasonBreakdown
+ */
+export const zReasonBreakdown = z.object({
+    items: z.array(zReasonShare),
+    range: zDateRange,
+    total: z.int()
+});
+
+/**
  * ReminderBatch
  *
  * What one run may send now: the claimed appointments and the day's email budget.
@@ -425,6 +761,15 @@ export const zReminderBatch = z.object({
     date: z.iso.date(),
     items: z.array(zClaimedReminder),
     sent_today: z.int()
+});
+
+/**
+ * ReminderRequest
+ *
+ * Why the reminder goes now. Optional: it defaults to a standard line in the audit row.
+ */
+export const zReminderRequest = z.object({
+    reason: z.string().min(3).max(500).nullish()
 });
 
 /**
@@ -450,6 +795,41 @@ export const zReminderSentRequest = z.object({
  */
 export const zRescheduleRequest = z.object({
     starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * RunningBehind
+ *
+ * True when the earliest booked, unmarked appointment of today began more than 10 minutes
+ * ago (nobody has marked the patient arrived or no-show). `minutes` is how long ago it began.
+ */
+export const zRunningBehind = z.object({
+    appointment_id: z.uuid().nullable(),
+    behind: z.boolean(),
+    minutes: z.int()
+});
+
+/**
+ * DoctorBoard
+ */
+export const zDoctorBoard = z.object({
+    appointments: z.array(zBoardAppointment),
+    date: z.iso.date(),
+    doctor_id: z.uuid(),
+    free_slots: z.int(),
+    name: z.string(),
+    next_gap: zBoardGap.nullable(),
+    running_behind: zRunningBehind,
+    specialty: z.string(),
+    timezone: z.string()
+});
+
+/**
+ * RunningLateRequest
+ */
+export const zRunningLateRequest = z.object({
+    minutes: z.int().gte(5).lte(240),
+    reason: z.string().min(3).max(500).nullish()
 });
 
 /**
@@ -506,6 +886,73 @@ export const zSlotEvent = z.object({
     local_date: z.iso.date(),
     seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})\.[01]$/),
     starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * StaffAppointmentChange
+ *
+ * The changed appointment plus what the web app needs to tell the patient.
+ *
+ * ``audit_id`` is the audit row of this write and the patient email's idempotency key; it is null
+ * only when nothing changed (a reschedule to the time it already has). The patient fields are
+ * full values: these routes are owner and admin only.
+ */
+export const zStaffAppointmentChange = z.object({
+    audit_id: z.uuid().nullable(),
+    cancellation_reason: z.string().nullable(),
+    cancelled_at: z.iso.datetime({ offset: true }).nullable(),
+    created_at: z.iso.datetime({ offset: true }),
+    doctor_id: z.uuid(),
+    doctor_name: z.string(),
+    ends_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    patient_email: z.string().nullable(),
+    patient_id: z.uuid(),
+    patient_name: z.string(),
+    previous_starts_at: z.iso.datetime({ offset: true }).nullable(),
+    starts_at: z.iso.datetime({ offset: true }),
+    status: z.enum(['booked', 'cancelled']),
+    timezone: z.string(),
+    updated_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * StaffCreateAppointment
+ *
+ * Book for a patient: an existing ``patient_id``, or ``patient`` details (exactly one).
+ */
+export const zStaffCreateAppointment = z.object({
+    doctor_id: z.uuid(),
+    patient: zPatientCreate.nullish(),
+    patient_id: z.uuid().nullish(),
+    reason: z.string().min(3).max(500),
+    starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * StaffReasonRequest
+ *
+ * Cancel, veto and unlock carry only the reason.
+ */
+export const zStaffReasonRequest = z.object({
+    reason: z.string().min(3).max(500)
+});
+
+/**
+ * StaffRescheduleRequest
+ */
+export const zStaffRescheduleRequest = z.object({
+    reason: z.string().min(3).max(500),
+    starts_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * TodayBoard
+ */
+export const zTodayBoard = z.object({
+    doctors: z.array(zDoctorBoard),
+    totals: zBoardTotals,
+    view: z.enum(['full', 'minimised'])
 });
 
 /**
@@ -668,7 +1115,7 @@ export const zGrantAccessInternalAdminAccessPostBody = zGrantRequest;
 export const zGrantAccessInternalAdminAccessPostResponse = zAccessEntry;
 
 export const zRevokeAccessInternalAdminAccessEmailDeletePath = z.object({
-    email: z.string().min(3).max(254).regex(/^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/)
+    email: z.string().min(3).max(254)
 });
 
 /**
@@ -679,7 +1126,7 @@ export const zRevokeAccessInternalAdminAccessEmailDeleteResponse = zAccessEntry;
 export const zChangeAccessRoleInternalAdminAccessEmailPatchBody = zChangeRoleRequest;
 
 export const zChangeAccessRoleInternalAdminAccessEmailPatchPath = z.object({
-    email: z.string().min(3).max(254).regex(/^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/)
+    email: z.string().min(3).max(254)
 });
 
 /**
@@ -705,6 +1152,27 @@ export const zListAppointmentsInternalAdminAppointmentsGetQuery = z.object({
  */
 export const zListAppointmentsInternalAdminAppointmentsGetResponse = zAdminAppointmentPage;
 
+export const zCreateAppointmentInternalAdminAppointmentsPostBody = zStaffCreateAppointment;
+
+/**
+ * Successful Response
+ */
+export const zCreateAppointmentInternalAdminAppointmentsPostResponse = zStaffAppointmentChange;
+
+/**
+ * Body
+ */
+export const zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostBody = zAttendanceRequest.nullable();
+
+export const zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse = zStaffAppointmentChange;
+
 export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchBody = zCancelRequest;
 
 export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchPath = z.object({
@@ -714,7 +1182,7 @@ export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchP
 /**
  * Successful Response
  */
-export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = zAppointment;
+export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = zStaffAppointmentChange;
 
 export const zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath = z.object({
     appointment_id: z.uuid()
@@ -725,7 +1193,35 @@ export const zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath = z
  */
 export const zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse = zLineage;
 
-export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody = zRescheduleRequest;
+/**
+ * Body
+ */
+export const zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostBody = zAttendanceRequest.nullable();
+
+export const zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse = zStaffAppointmentChange;
+
+/**
+ * Body
+ */
+export const zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostBody = zReminderRequest.nullable();
+
+export const zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse = zNotifyResult;
+
+export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody = zStaffRescheduleRequest;
 
 export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchPath = z.object({
     appointment_id: z.uuid()
@@ -734,7 +1230,88 @@ export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedu
 /**
  * Successful Response
  */
-export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse = zAppointment;
+export const zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse = zStaffAppointmentChange;
+
+export const zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostBody = zStaffReasonRequest;
+
+export const zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse = zStaffAppointmentChange;
+
+export const zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostBody = zStaffReasonRequest;
+
+export const zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse = zStaffAppointmentChange;
+
+export const zListAuditInternalAdminAuditGetQuery = z.object({
+    appointment_id: z.uuid().nullish(),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListAuditInternalAdminAuditGetResponse = zAuditPage;
+
+export const zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostPath = z.object({
+    audit_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse = zNotified;
+
+export const zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostBody = zRunningLateRequest;
+
+export const zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostPath = z.object({
+    doctor_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse = zNotifyResult;
+
+/**
+ * Successful Response
+ */
+export const zListInvitesInternalAdminInvitesGetResponse = zInviteList;
+
+export const zCreateInviteInternalAdminInvitesPostBody = zInviteRequest;
+
+/**
+ * Successful Response
+ */
+export const zCreateInviteInternalAdminInvitesPostResponse = zInviteCreated;
+
+export const zAcceptInviteInternalAdminInvitesAcceptPostBody = zAcceptRequest;
+
+/**
+ * Successful Response
+ */
+export const zAcceptInviteInternalAdminInvitesAcceptPostResponse = zAccessEntry;
+
+export const zRevokeInviteInternalAdminInvitesInviteIdDeletePath = z.object({
+    invite_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRevokeInviteInternalAdminInvitesInviteIdDeleteResponse = zInviteRevoked;
 
 export const zGetMetricsInternalAdminMetricsGetQuery = z.object({
     from: z.iso.date(),
@@ -746,6 +1323,60 @@ export const zGetMetricsInternalAdminMetricsGetQuery = z.object({
  * Successful Response
  */
 export const zGetMetricsInternalAdminMetricsGetResponse = zMetrics;
+
+export const zCancellationReasonsInternalAdminOpsCancellationReasonsGetQuery = z.object({
+    from: z.iso.date(),
+    to: z.iso.date()
+});
+
+/**
+ * Successful Response
+ */
+export const zCancellationReasonsInternalAdminOpsCancellationReasonsGetResponse = zReasonBreakdown;
+
+export const zDaySheetInternalAdminOpsDaySheetCsvGetQuery = z.object({
+    date: z.iso.date(),
+    doctor_id: z.uuid().nullish()
+});
+
+export const zGapsInternalAdminOpsGapsGetQuery = z.object({
+    hours: z.int().gte(1).lte(96).optional().default(48)
+});
+
+/**
+ * Successful Response
+ */
+export const zGapsInternalAdminOpsGapsGetResponse = zGapList;
+
+export const zHeatmapInternalAdminOpsHeatmapGetQuery = z.object({
+    from: z.iso.date(),
+    to: z.iso.date(),
+    doctor_id: z.uuid().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zHeatmapInternalAdminOpsHeatmapGetResponse = zHeatmap;
+
+export const zKpisInternalAdminOpsKpisGetQuery = z.object({
+    from: z.iso.date(),
+    to: z.iso.date()
+});
+
+/**
+ * Successful Response
+ */
+export const zKpisInternalAdminOpsKpisGetResponse = zKpis;
+
+export const zTodayInternalAdminOpsTodayGetQuery = z.object({
+    date: z.iso.date().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zTodayInternalAdminOpsTodayGetResponse = zTodayBoard;
 
 /**
  * Successful Response

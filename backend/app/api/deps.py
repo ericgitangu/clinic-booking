@@ -14,7 +14,7 @@ from app.core.clock import Clock, SystemClock
 from app.core.config import Settings
 from app.core.logging import APP_LOGGER
 from app.db.session import get_sessionmaker
-from app.domain.errors import Forbidden, Unauthenticated
+from app.domain.errors import Forbidden, NotFoundRoute, Unauthenticated
 from app.domain.idempotency import KEY_PATTERN
 from app.schemas.access import Role
 from app.services import access
@@ -152,7 +152,16 @@ async def require_smoke(request: Request, clock: Clock = Depends(get_clock)) -> 
     return principal
 
 
-def require_role(*allowed: Role) -> Callable[..., Awaitable[assertion.Principal]]:
+def staff_crud_enabled(request: Request) -> None:
+    """Router gate for the staff-CRUD routes: off means they answer as if they did not exist."""
+    settings: Settings = request.app.state.settings
+    if not settings.STAFF_CRUD_ENABLED:
+        raise NotFoundRoute()
+
+
+def require_role(
+    *allowed: Role, when_crud_off: tuple[Role, ...] | None = None
+) -> Callable[..., Awaitable[assertion.Principal]]:
     """Gate for ``/internal/admin/*``: the assertion must be valid and bound to the request, its
     role must be one of ``allowed``, and the database must agree the caller holds that role right
     now. The second check is what makes a revoke take effect on the next request, even if a web
@@ -164,7 +173,14 @@ def require_role(*allowed: Role) -> Callable[..., Awaitable[assertion.Principal]
         session: AsyncSession = Depends(get_session),
     ) -> assertion.Principal:
         principal = _verify(request, clock, await request.body())
-        if principal.role not in allowed:
+        if not principal.email_verified:
+            _refuse("email not verified", "FORBIDDEN")
+            raise Forbidden()
+        settings: Settings = request.app.state.settings
+        permitted = (
+            when_crud_off if (when_crud_off and not settings.STAFF_CRUD_ENABLED) else allowed
+        )
+        if principal.role not in permitted:
             _refuse("role not allowed for this endpoint", "FORBIDDEN")
             raise Forbidden()
         current = await access.resolve_role(session, request.app.state.settings, principal.email)
@@ -182,3 +198,6 @@ def require_role(*allowed: Role) -> Callable[..., Awaitable[assertion.Principal]
 ANY_STAFF = require_role("owner", "admin", "viewer")
 OWNER_ONLY = require_role("owner")
 CAN_MANAGE = require_role("owner", "admin")
+# Changing or revoking a staff row: owner and admin (an admin only on viewers, enforced in the
+# service), or the owner alone when the staff-CRUD switch is off.
+CAN_MANAGE_ACCESS = require_role("owner", "admin", when_crud_off=("owner",))

@@ -76,7 +76,9 @@ async def _remove_test_rows() -> None:
     conn = await asyncpg.connect(owner_dsn())
     try:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
-        await conn.execute("TRUNCATE staff_access, staff_access_audit RESTART IDENTITY")
+        await conn.execute(
+            "TRUNCATE staff_access, staff_access_audit, staff_invites RESTART IDENTITY"
+        )
         await conn.execute("TRUNCATE patient_accounts")
         await conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")
         keep = [uuid.uuid5(NAMESPACE, f"patient:{key}") for key, _ in DEMO_PATIENTS]

@@ -8,7 +8,7 @@
 
 Accepted, decided by the engineer 2026-10-18.
 
-**Build status (2026-10-18, main 2bbfa61): Declared, not built.** None of this code is merged. The backend (migration, routes, audit table, invite flow), the admin screens and the five email templates are three separate pull requests that have not landed. Until they do, `staff_access_audit` is the only audit table and a staff cancel or reschedule still records no actor. Each section below describes the decision, not the running system.
+**Build status (2026-10-19): built in the API, screens and emails pending.** The backend (migrations 0009 and 0010, routes, audit table, invite flow, attendance, the operations read model) is pull request #63. The admin screens and the email templates are separate pull requests that may not have landed; check them before relying on those parts. The text below was written first; where building it changed a decision, the dated amendment further down says so. Before the backend landed (2026-10-18, main 2bbfa61) this ADR was declared, not built. The backend (migration, routes, audit table, invite flow), the admin screens and the five email templates are three separate pull requests that have not landed. Until they do, `staff_access_audit` is the only audit table and a staff cancel or reschedule still records no actor. Each section below describes the decision, not the running system.
 
 ## Context
 
@@ -45,7 +45,8 @@ Option 1.
 | View appointments | Full PII | Full PII | Minimised (initials, masked phone, no email, no reason) |
 | Create, reschedule, cancel | Yes | Yes | No (403) |
 | Veto, lock, unlock | Yes | Yes | No (403) |
-| Invite an admin or a viewer | Yes | Yes | No (403) |
+| Invite a viewer | Yes | Yes | No (403) |
+| Invite an admin | Yes | No (`ROLE_ESCALATION`) | No (403) |
 | Change or revoke a viewer | Yes | Yes | No (403) |
 | Change or revoke an admin | Yes | No (`ROLE_ESCALATION`) | No (403) |
 | Revoke an open invite | Yes | Yes | No (403) |
@@ -78,6 +79,21 @@ Option 1.
 - **Patient email has no retry.** It is sent best-effort after the response, with no outbox. If the process dies after the commit, or the provider fails, the patient is not told and `notified` stays false. Risk: a patient learns of a staff change when they next look. The real fix is the outbox pattern the realtime relay already uses (`0006_realtime_outbox`, [ADR-0031](0031-realtime-push-via-ably-sse.md)): write the email intent in the same transaction and send from a relay. Not built in this ADR to keep the first version small.
 - **An undone cancel gets a new appointment id.** The lineage link is the only join. The real fix is to reopen the cancelled row, which the partial unique index and the lifecycle in [ADR-0008](0008-appointment-lifecycle-and-reschedule.md) do not allow today.
 
+### Amendment, 2026-10-19 (decisions made while building)
+
+These refine the text above; nothing above is removed.
+
+- **Audit grants.** The runtime role has SELECT and INSERT on `staff_action_audit` and one column grant, `UPDATE (notified)`, because the patient email goes out after the response. A trigger lets `notified` move from false to true only, never back, and only on a row whose action emails the patient and whose outcome was not recorded as "demo, not sent" or "no email on file". Every other UPDATE and every DELETE is refused by privilege. The API lets only the person who made the action mark it; anyone else gets the same 404 as an unknown id.
+- **Admin to admin.** An admin cannot make someone an admin by changing their row, and cannot invite an admin either: admin-role invitations are the owner's to send. This also means an admin cannot bring back an admin the owner revoked. The owner can; an admin invites viewers only.
+- **Verified email.** Every staff route requires the signed assertion to carry a verified email, not only the invite accept.
+- **Synthetic patients.** Staff writes and patient notifications treat the release smoke's synthetic patients as not found.
+- **No-show and arrival windows.** Arrival can be recorded from 15 minutes before the start to 2 hours after it; no-show from the start to 2 hours after.
+- **Vetoes.** Only a change recorded as the patient's can be vetoed. An event from before actors were recorded (a NULL actor) cannot be shown to be the patient's, so it is left alone and the answer is `NOTHING_TO_VETO`. A patient trying to take back the slot of a vetoed cancel gets `APPOINTMENT_LOCKED`. When two vetoes race, or a veto races a staff re-booking of the same slot, the loser is told `NOTHING_TO_VETO`, never `SLOT_TAKEN`.
+- **Invite emails** are compared after Unicode NFKC and case folding, at creation and at accept. Accept attempts are limited to 20 per person per day (`RATE_LIMITED`), counted whether or not they succeed; the invalid-invite body is unchanged.
+- **Who granted.** After a role change, `granted_by` and `granted_at` name the person who made the change and when; the full history is in `staff_access_audit`.
+- **Invitations are audited.** Creating and revoking an invitation (including one superseded by a new invitation) each write a `staff_action_audit` row in the same transaction (`invite_create`, `invite_revoke`), with an id, the role and a SHA-256 of the address, never the address. The create response carries `audit_id`, `deliver` and `outcome`. The web app emails the link `/invite/<token>` when `deliver` is true and then marks the row notified; a reserved example address is recorded as "demo, not sent" and nothing is sent.
+- **Downgrade.** Both migrations refuse to downgrade while the audit trail, invitations, attendance marks or annotation events exist, so append-only data is never dropped by a rollback.
+
 ## Assessment line
 
 Section 1 "key decisions, trade-offs": who may change a patient's appointment, how the clinic can hold a booking against the patient, and how that is recorded.
@@ -86,4 +102,4 @@ Section 1 "key decisions, trade-offs": who may change a patient's appointment, h
 
 Per-clinic scoping (roles and invites are global to the single clinic), a second owner, email volume near the caps, or patient consent before staff changes. Then revisit the invite rules, the notification path and the outbox debt first.
 
-**Note (2026-10-19): the one-hour rule.** [ADR-0008](0008-appointment-lifecycle-and-reschedule.md) now refuses a cancel, or a reschedule of a visit under 60 minutes away (`409 CHANGE_TOO_LATE`), for staff too. The staff exemption decided above lands with the staff-write work described here, together with its audit record; until then staff follow the rule.
+**Note (2026-10-19): the one-hour rule.** [ADR-0008](0008-appointment-lifecycle-and-reschedule.md) refuses a cancel, or a reschedule of a visit under 60 minutes away (`409 CHANGE_TOO_LATE`), and a booking or a reschedule's new start under 60 minutes (`422 BOOKING_TOO_SOON`). Staff are exempt from both: the exemption is built (a staff flag on the same service functions), and it is the only rule staff are exempt from. Staff stay bound by `SLOT_IN_PAST`, `APPOINTMENT_ALREADY_STARTED`, `APPOINTMENT_ALREADY_CANCELLED`, `DATE_OUT_OF_RANGE`, `SLOT_MISALIGNED`, `OUTSIDE_WORKING_HOURS`, `SLOT_TAKEN` and `PATIENT_DOUBLE_BOOKED`.

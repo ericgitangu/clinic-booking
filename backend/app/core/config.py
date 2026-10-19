@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.emailnorm import normalize_email
+
 # asyncpg does not accept these DSN query params; libpq-style users expect them, so we
 # reject them loudly rather than letting asyncpg raise an opaque error at connect time.
 _BANNED_DSN_PARAMS = ("sslmode", "channel_binding")
@@ -77,6 +79,10 @@ class Settings(BaseSettings):
     # Comma-separated owner emails. An owner is always `owner`, needs no staff_access row and can
     # never be granted, changed or revoked through the API. Must match the admin app's variable.
     ADMIN_EMAILS: str = ""
+    # Rollback switch for staff CRUD: false turns off staff booking, veto/unlock, invites and the
+    # audit routes (404, as if they did not exist) and returns access management to the owner.
+    # The schema stays; patient-facing behaviour does not depend on it.
+    STAFF_CRUD_ENABLED: bool = True
 
     # Push service (Ably). Unset means "push disabled, polling only": a real configuration state,
     # not a failure. The key is a secret and is never logged.
@@ -169,7 +175,7 @@ class Settings(BaseSettings):
 
     @property
     def owner_emails(self) -> frozenset[str]:
-        return frozenset(e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip())
+        return frozenset(normalize_email(e) for e in self.ADMIN_EMAILS.split(",") if e.strip())
 
     @property
     def cors_origins(self) -> list[str]:

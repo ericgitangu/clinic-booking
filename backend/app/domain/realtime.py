@@ -104,6 +104,10 @@ def _slot_message(
     )
 
 
+# Events staff add to the stream. They carry no slot change, so they only reach the admin channel.
+STAFF_ANNOTATIONS = frozenset({"vetoed", "unlocked", "arrived", "no_show"})
+
+
 class UnknownEventType(DomainError):
     code = "INTERNAL_ERROR"
 
@@ -124,6 +128,8 @@ def messages_for(event: OutboxEvent) -> list[OutboundMessage]:
         freed_on = event.from_local_date or event.local_date
         out.append(_slot_message(event, "slot_freed", event.from_starts_at, freed_on, 0))
         out.append(_slot_message(event, "slot_taken", event.to_starts_at, event.local_date, 1))
+    elif event.event_type in STAFF_ANNOTATIONS:
+        pass  # no slot changed (any move is its own event): patients hear nothing
     else:
         raise UnknownEventType(f"cannot push event {event.cursor} of type {event.event_type!r}")
     if event.synthetic:

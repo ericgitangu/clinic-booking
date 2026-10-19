@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { adminTokenInternalRealtimeTokenAdminPost, bookMineInternalMeAppointmentsPost, cancelAppointmentAppointmentsAppointmentIdCancelPatch, cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch, cancelMineInternalMeAppointmentsAppointmentIdCancelPatch, changeAccessRoleInternalAdminAccessEmailPatch, claimRemindersInternalRemindersClaimPost, createAppointmentAppointmentsPost, doctorAvailabilityDoctorsDoctorIdAvailabilityGet, emailsTodayInternalEmailsTodayGet, getAppointmentAppointmentsAppointmentIdGet, getDoctorDoctorsDoctorIdGet, getLineageInternalAdminAppointmentsAppointmentIdLineageGet, getMetricsInternalAdminMetricsGet, getProblemProblemsSlugGet, getSessionInfoInternalAdminSessionGet, grantAccessInternalAdminAccessPost, healthHealthGet, linkAccountInternalAccountsLinkPost, listAccessInternalAdminAccessGet, listAppointmentsInternalAdminAppointmentsGet, listDoctorsDoctorsGet, listProblemsProblemsGet, markReminderSentInternalRemindersAppointmentIdSentPost, myAppointmentInternalMeAppointmentsAppointmentIdGet, myAppointmentsInternalMeAppointmentsGet, type Options, patientAppointmentsPatientsPatientIdAppointmentsGet, patientTokenRealtimeTokenPatientPost, postPatientPatientsPost, readyReadyGet, releaseEmailInternalEmailsReleasePost, rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch, rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch, rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch, reserveEmailInternalEmailsReservePost, revokeAccessInternalAdminAccessEmailDelete } from '../sdk.gen';
-import type { AdminTokenInternalRealtimeTokenAdminPostData, AdminTokenInternalRealtimeTokenAdminPostResponse, BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostResponse, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchResponse, ClaimRemindersInternalRemindersClaimPostData, ClaimRemindersInternalRemindersClaimPostResponse, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostResponse, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, EmailsTodayInternalEmailsTodayGetData, EmailsTodayInternalEmailsTodayGetResponse, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetResponse, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetResponse, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetResponse, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetResponse, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetResponse, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostResponse, HealthHealthGetData, HealthHealthGetResponse, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostResponse, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetResponse, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetResponse, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponse, ListProblemsProblemsGetData, ListProblemsProblemsGetResponse, MarkReminderSentInternalRemindersAppointmentIdSentPostData, MarkReminderSentInternalRemindersAppointmentIdSentPostResponse, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetResponse, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetResponse, PatientTokenRealtimeTokenPatientPostData, PatientTokenRealtimeTokenPatientPostResponse, PostPatientPatientsPostData, PostPatientPatientsPostResponse, ReadyReadyGetData, ReadyReadyGetResponse, ReleaseEmailInternalEmailsReleasePostData, ReleaseEmailInternalEmailsReleasePostResponse, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, ReserveEmailInternalEmailsReservePostData, ReserveEmailInternalEmailsReservePostResponse, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteResponse } from '../types.gen';
+import { acceptInviteInternalAdminInvitesAcceptPost, adminTokenInternalRealtimeTokenAdminPost, bookMineInternalMeAppointmentsPost, cancelAppointmentAppointmentsAppointmentIdCancelPatch, cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch, cancellationReasonsInternalAdminOpsCancellationReasonsGet, cancelMineInternalMeAppointmentsAppointmentIdCancelPatch, changeAccessRoleInternalAdminAccessEmailPatch, claimRemindersInternalRemindersClaimPost, createAppointmentAppointmentsPost, createAppointmentInternalAdminAppointmentsPost, createInviteInternalAdminInvitesPost, daySheetInternalAdminOpsDaySheetCsvGet, doctorAvailabilityDoctorsDoctorIdAvailabilityGet, doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost, emailsTodayInternalEmailsTodayGet, gapsInternalAdminOpsGapsGet, getAppointmentAppointmentsAppointmentIdGet, getDoctorDoctorsDoctorIdGet, getLineageInternalAdminAppointmentsAppointmentIdLineageGet, getMetricsInternalAdminMetricsGet, getProblemProblemsSlugGet, getSessionInfoInternalAdminSessionGet, grantAccessInternalAdminAccessPost, healthHealthGet, heatmapInternalAdminOpsHeatmapGet, kpisInternalAdminOpsKpisGet, linkAccountInternalAccountsLinkPost, listAccessInternalAdminAccessGet, listAppointmentsInternalAdminAppointmentsGet, listAuditInternalAdminAuditGet, listDoctorsDoctorsGet, listInvitesInternalAdminInvitesGet, listProblemsProblemsGet, markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost, markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost, markNotifiedInternalAdminAuditAuditIdNotifiedPost, markReminderSentInternalRemindersAppointmentIdSentPost, myAppointmentInternalMeAppointmentsAppointmentIdGet, myAppointmentsInternalMeAppointmentsGet, type Options, patientAppointmentsPatientsPatientIdAppointmentsGet, patientTokenRealtimeTokenPatientPost, postPatientPatientsPost, readyReadyGet, releaseEmailInternalEmailsReleasePost, remindNowInternalAdminAppointmentsAppointmentIdRemindPost, rescheduleAppointmentAppointmentsAppointmentIdReschedulePatch, rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch, rescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatch, reserveEmailInternalEmailsReservePost, revokeAccessInternalAdminAccessEmailDelete, revokeInviteInternalAdminInvitesInviteIdDelete, todayInternalAdminOpsTodayGet, unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost, vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost } from '../sdk.gen';
+import type { AcceptInviteInternalAdminInvitesAcceptPostData, AcceptInviteInternalAdminInvitesAcceptPostResponse, AdminTokenInternalRealtimeTokenAdminPostData, AdminTokenInternalRealtimeTokenAdminPostResponse, BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostResponse, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, CancellationReasonsInternalAdminOpsCancellationReasonsGetData, CancellationReasonsInternalAdminOpsCancellationReasonsGetResponse, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchResponse, ClaimRemindersInternalRemindersClaimPostData, ClaimRemindersInternalRemindersClaimPostResponse, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostResponse, CreateAppointmentInternalAdminAppointmentsPostData, CreateAppointmentInternalAdminAppointmentsPostResponse, CreateInviteInternalAdminInvitesPostData, CreateInviteInternalAdminInvitesPostResponse, DaySheetInternalAdminOpsDaySheetCsvGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse, EmailsTodayInternalEmailsTodayGetData, EmailsTodayInternalEmailsTodayGetResponse, GapsInternalAdminOpsGapsGetData, GapsInternalAdminOpsGapsGetResponse, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetResponse, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetResponse, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetResponse, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetResponse, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetResponse, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostResponse, HealthHealthGetData, HealthHealthGetResponse, HeatmapInternalAdminOpsHeatmapGetData, HeatmapInternalAdminOpsHeatmapGetResponse, KpisInternalAdminOpsKpisGetData, KpisInternalAdminOpsKpisGetResponse, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostResponse, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetResponse, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetResponse, ListAuditInternalAdminAuditGetData, ListAuditInternalAdminAuditGetResponse, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponse, ListInvitesInternalAdminInvitesGetData, ListInvitesInternalAdminInvitesGetResponse, ListProblemsProblemsGetData, ListProblemsProblemsGetResponse, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse, MarkReminderSentInternalRemindersAppointmentIdSentPostData, MarkReminderSentInternalRemindersAppointmentIdSentPostResponse, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetResponse, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetResponse, PatientTokenRealtimeTokenPatientPostData, PatientTokenRealtimeTokenPatientPostResponse, PostPatientPatientsPostData, PostPatientPatientsPostResponse, ReadyReadyGetData, ReadyReadyGetResponse, ReleaseEmailInternalEmailsReleasePostData, ReleaseEmailInternalEmailsReleasePostResponse, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, ReserveEmailInternalEmailsReservePostData, ReserveEmailInternalEmailsReservePostResponse, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteResponse, RevokeInviteInternalAdminInvitesInviteIdDeleteData, RevokeInviteInternalAdminInvitesInviteIdDeleteResponse, TodayInternalAdminOpsTodayGetData, TodayInternalAdminOpsTodayGetResponse, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse } from '../types.gen';
 
 /**
  * Create Appointment
@@ -358,9 +358,47 @@ export const listAppointmentsInternalAdminAppointmentsGetInfiniteOptions = (opti
 };
 
 /**
+ * Create Appointment
+ *
+ * Book for a patient: an existing `patient_id`, or `patient` details (exactly one). Staff are exempt from the lead-time rule; the slot, working-hours and double-booking rules still apply. A reason is required and is recorded in the audit trail.
+ */
+export const createAppointmentInternalAdminAppointmentsPostMutation = (options?: Partial<Options<CreateAppointmentInternalAdminAppointmentsPostData>>): UseMutationOptions<CreateAppointmentInternalAdminAppointmentsPostResponse, DefaultError, Options<CreateAppointmentInternalAdminAppointmentsPostData>> => {
+    const mutationOptions: UseMutationOptions<CreateAppointmentInternalAdminAppointmentsPostResponse, DefaultError, Options<CreateAppointmentInternalAdminAppointmentsPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAppointmentInternalAdminAppointmentsPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Mark Arrived
+ *
+ * Record that the patient arrived. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.
+ */
+export const markArrivedInternalAdminAppointmentsAppointmentIdArrivedPostMutation = (options?: Partial<Options<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData>>): UseMutationOptions<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse, DefaultError, Options<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData>> => {
+    const mutationOptions: UseMutationOptions<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse, DefaultError, Options<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * Cancel For Patient
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
+ * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.
  */
 export const cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchMutation = (options?: Partial<Options<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData>>): UseMutationOptions<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, DefaultError, Options<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData>> => {
     const mutationOptions: UseMutationOptions<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, DefaultError, Options<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData>> = {
@@ -395,14 +433,253 @@ export const getLineageInternalAdminAppointmentsAppointmentIdLineageGetOptions =
 });
 
 /**
+ * Mark No Show
+ *
+ * Record that the patient did not turn up. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.
+ */
+export const markNoShowInternalAdminAppointmentsAppointmentIdNoShowPostMutation = (options?: Partial<Options<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData>>): UseMutationOptions<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse, DefaultError, Options<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData>> => {
+    const mutationOptions: UseMutationOptions<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse, DefaultError, Options<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Remind Now
+ *
+ * Remind the patient of this appointment now. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as "demo, not sent" and never has `deliver: true`.
+ */
+export const remindNowInternalAdminAppointmentsAppointmentIdRemindPostMutation = (options?: Partial<Options<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData>>): UseMutationOptions<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse, DefaultError, Options<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData>> => {
+    const mutationOptions: UseMutationOptions<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse, DefaultError, Options<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await remindNowInternalAdminAppointmentsAppointmentIdRemindPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * Reschedule For Patient
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.
+ * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment. Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.
  */
 export const rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchMutation = (options?: Partial<Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>>): UseMutationOptions<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>> => {
     const mutationOptions: UseMutationOptions<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, DefaultError, Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Unlock Appointment
+ *
+ * Lift the lock so the patient can change the appointment again.
+ */
+export const unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostMutation = (options?: Partial<Options<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData>>): UseMutationOptions<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse, DefaultError, Options<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData>> => {
+    const mutationOptions: UseMutationOptions<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse, DefaultError, Options<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Veto Appointment
+ *
+ * Undo the patient's latest change and lock the appointment against further patient changes. A reschedule is moved back (same appointment). A cancel is undone by booking the same slot again as a NEW appointment (the response carries its id) that starts locked. 409 NOTHING_TO_VETO when the latest change is not the patient's or is already undone.
+ */
+export const vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostMutation = (options?: Partial<Options<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData>>): UseMutationOptions<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse, DefaultError, Options<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData>> => {
+    const mutationOptions: UseMutationOptions<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse, DefaultError, Options<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listAuditInternalAdminAuditGetQueryKey = (options?: Options<ListAuditInternalAdminAuditGetData>) => createQueryKey('listAuditInternalAdminAuditGet', options);
+
+/**
+ * List Audit
+ *
+ * Staff actions, newest first. Owner and admin only.
+ */
+export const listAuditInternalAdminAuditGetOptions = (options?: Options<ListAuditInternalAdminAuditGetData>) => queryOptions<ListAuditInternalAdminAuditGetResponse, DefaultError, ListAuditInternalAdminAuditGetResponse, ReturnType<typeof listAuditInternalAdminAuditGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listAuditInternalAdminAuditGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listAuditInternalAdminAuditGetQueryKey(options)
+});
+
+export const listAuditInternalAdminAuditGetInfiniteQueryKey = (options?: Options<ListAuditInternalAdminAuditGetData>): QueryKey<Options<ListAuditInternalAdminAuditGetData>> => createQueryKey('listAuditInternalAdminAuditGet', options, true);
+
+/**
+ * List Audit
+ *
+ * Staff actions, newest first. Owner and admin only.
+ */
+export const listAuditInternalAdminAuditGetInfiniteOptions = (options?: Options<ListAuditInternalAdminAuditGetData>) => {
+    const opts = infiniteQueryOptions<ListAuditInternalAdminAuditGetResponse, DefaultError, InfiniteData<ListAuditInternalAdminAuditGetResponse>, QueryKey<Options<ListAuditInternalAdminAuditGetData>>, string | null | Pick<QueryKey<Options<ListAuditInternalAdminAuditGetData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAuditInternalAdminAuditGetData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    cursor: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAuditInternalAdminAuditGet({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAuditInternalAdminAuditGetInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+/**
+ * Mark Notified
+ *
+ * Record that the patient was emailed about this action. Only the person who made the action can mark it, only for an action that emails the patient, and never for a row recorded as "demo, not sent" or "no email on file". The flag only goes from false to true (marking twice is fine); nothing else in the audit row can change. Anything else is the same 404 as an unknown id.
+ */
+export const markNotifiedInternalAdminAuditAuditIdNotifiedPostMutation = (options?: Partial<Options<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData>>): UseMutationOptions<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse, DefaultError, Options<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData>> => {
+    const mutationOptions: UseMutationOptions<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse, DefaultError, Options<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await markNotifiedInternalAdminAuditAuditIdNotifiedPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Doctor Running Late
+ *
+ * Tell the doctor's remaining patients of today (booked, not yet marked, not synthetic; at most 50) that the doctor is running late. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as "demo, not sent" and never has `deliver: true`. One audit row per patient.
+ */
+export const doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostMutation = (options?: Partial<Options<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData>>): UseMutationOptions<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse, DefaultError, Options<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData>> => {
+    const mutationOptions: UseMutationOptions<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse, DefaultError, Options<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listInvitesInternalAdminInvitesGetQueryKey = (options?: Options<ListInvitesInternalAdminInvitesGetData>) => createQueryKey('listInvitesInternalAdminInvitesGet', options);
+
+/**
+ * List Invites
+ */
+export const listInvitesInternalAdminInvitesGetOptions = (options?: Options<ListInvitesInternalAdminInvitesGetData>) => queryOptions<ListInvitesInternalAdminInvitesGetResponse, DefaultError, ListInvitesInternalAdminInvitesGetResponse, ReturnType<typeof listInvitesInternalAdminInvitesGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listInvitesInternalAdminInvitesGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listInvitesInternalAdminInvitesGetQueryKey(options)
+});
+
+/**
+ * Create Invite
+ *
+ * Invite an email as admin (owner only) or viewer; valid 72 hours. The raw `token` is in this response only (for the email link): the API keeps its hash. Re-inviting an email supersedes its open invite. At most 10 a day per person (429 RATE_LIMITED). An audit row (`audit_id`) is written; when `deliver` is true the web app emails the link and then marks that row notified.
+ */
+export const createInviteInternalAdminInvitesPostMutation = (options?: Partial<Options<CreateInviteInternalAdminInvitesPostData>>): UseMutationOptions<CreateInviteInternalAdminInvitesPostResponse, DefaultError, Options<CreateInviteInternalAdminInvitesPostData>> => {
+    const mutationOptions: UseMutationOptions<CreateInviteInternalAdminInvitesPostResponse, DefaultError, Options<CreateInviteInternalAdminInvitesPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createInviteInternalAdminInvitesPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Accept Invite
+ *
+ * Accept an invite. The caller is whoever the web app signed in with Google; the verified email in the signed assertion must equal the invited email. Every failure (unknown, used, expired, revoked, other email, unverified email) is the same 404 INVITE_INVALID with the same body.
+ */
+export const acceptInviteInternalAdminInvitesAcceptPostMutation = (options?: Partial<Options<AcceptInviteInternalAdminInvitesAcceptPostData>>): UseMutationOptions<AcceptInviteInternalAdminInvitesAcceptPostResponse, DefaultError, Options<AcceptInviteInternalAdminInvitesAcceptPostData>> => {
+    const mutationOptions: UseMutationOptions<AcceptInviteInternalAdminInvitesAcceptPostResponse, DefaultError, Options<AcceptInviteInternalAdminInvitesAcceptPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await acceptInviteInternalAdminInvitesAcceptPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Revoke Invite
+ */
+export const revokeInviteInternalAdminInvitesInviteIdDeleteMutation = (options?: Partial<Options<RevokeInviteInternalAdminInvitesInviteIdDeleteData>>): UseMutationOptions<RevokeInviteInternalAdminInvitesInviteIdDeleteResponse, DefaultError, Options<RevokeInviteInternalAdminInvitesInviteIdDeleteData>> => {
+    const mutationOptions: UseMutationOptions<RevokeInviteInternalAdminInvitesInviteIdDeleteResponse, DefaultError, Options<RevokeInviteInternalAdminInvitesInviteIdDeleteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await revokeInviteInternalAdminInvitesInviteIdDelete({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -431,6 +708,126 @@ export const getMetricsInternalAdminMetricsGetOptions = (options: Options<GetMet
         return data;
     },
     queryKey: getMetricsInternalAdminMetricsGetQueryKey(options)
+});
+
+export const cancellationReasonsInternalAdminOpsCancellationReasonsGetQueryKey = (options: Options<CancellationReasonsInternalAdminOpsCancellationReasonsGetData>) => createQueryKey('cancellationReasonsInternalAdminOpsCancellationReasonsGet', options);
+
+/**
+ * Cancellation Reasons
+ *
+ * Cancellations in [from, to) grouped by the reason text into transport, illness, travel, work, weather, felt_better, insurance and other. Counts only: no reason text.
+ */
+export const cancellationReasonsInternalAdminOpsCancellationReasonsGetOptions = (options: Options<CancellationReasonsInternalAdminOpsCancellationReasonsGetData>) => queryOptions<CancellationReasonsInternalAdminOpsCancellationReasonsGetResponse, DefaultError, CancellationReasonsInternalAdminOpsCancellationReasonsGetResponse, ReturnType<typeof cancellationReasonsInternalAdminOpsCancellationReasonsGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await cancellationReasonsInternalAdminOpsCancellationReasonsGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: cancellationReasonsInternalAdminOpsCancellationReasonsGetQueryKey(options)
+});
+
+export const daySheetInternalAdminOpsDaySheetCsvGetQueryKey = (options: Options<DaySheetInternalAdminOpsDaySheetCsvGetData>) => createQueryKey('daySheetInternalAdminOpsDaySheetCsvGet', options);
+
+/**
+ * Day Sheet
+ *
+ * The day's appointments as CSV (one row each: doctor, time, status, patient, phone, email, cancellation reason), for `date` (clinic-local) and optionally one doctor. Owner and admin get full details; a viewer gets initials and a masked phone and no email or reason. Cells that would run as a spreadsheet formula are neutralised.
+ */
+export const daySheetInternalAdminOpsDaySheetCsvGetOptions = (options: Options<DaySheetInternalAdminOpsDaySheetCsvGetData>) => queryOptions<unknown, DefaultError, unknown, ReturnType<typeof daySheetInternalAdminOpsDaySheetCsvGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await daySheetInternalAdminOpsDaySheetCsvGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: daySheetInternalAdminOpsDaySheetCsvGetQueryKey(options)
+});
+
+export const gapsInternalAdminOpsGapsGetQueryKey = (options?: Options<GapsInternalAdminOpsGapsGetData>) => createQueryKey('gapsInternalAdminOpsGapsGet', options);
+
+/**
+ * Gaps
+ *
+ * Free 30-minute slots starting within the next `hours` (default 48), soonest first. Staff may book any of them, including inside the lead-time window.
+ */
+export const gapsInternalAdminOpsGapsGetOptions = (options?: Options<GapsInternalAdminOpsGapsGetData>) => queryOptions<GapsInternalAdminOpsGapsGetResponse, DefaultError, GapsInternalAdminOpsGapsGetResponse, ReturnType<typeof gapsInternalAdminOpsGapsGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await gapsInternalAdminOpsGapsGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: gapsInternalAdminOpsGapsGetQueryKey(options)
+});
+
+export const heatmapInternalAdminOpsHeatmapGetQueryKey = (options: Options<HeatmapInternalAdminOpsHeatmapGetData>) => createQueryKey('heatmapInternalAdminOpsHeatmapGet', options);
+
+/**
+ * Heatmap
+ *
+ * Booked appointments by weekday (1 = Monday) and local start hour over [from, to), for the clinic or one doctor.
+ */
+export const heatmapInternalAdminOpsHeatmapGetOptions = (options: Options<HeatmapInternalAdminOpsHeatmapGetData>) => queryOptions<HeatmapInternalAdminOpsHeatmapGetResponse, DefaultError, HeatmapInternalAdminOpsHeatmapGetResponse, ReturnType<typeof heatmapInternalAdminOpsHeatmapGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await heatmapInternalAdminOpsHeatmapGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: heatmapInternalAdminOpsHeatmapGetQueryKey(options)
+});
+
+export const kpisInternalAdminOpsKpisGetQueryKey = (options: Options<KpisInternalAdminOpsKpisGetData>) => createQueryKey('kpisInternalAdminOpsKpisGet', options);
+
+/**
+ * Kpis
+ *
+ * Utilisation, fill rate, cancellation rate, no-show rate, median booking lead time and reschedules over the clinic-local days [from, to), each with the previous period of the same length and the difference. A rate is null when its denominator is zero.
+ */
+export const kpisInternalAdminOpsKpisGetOptions = (options: Options<KpisInternalAdminOpsKpisGetData>) => queryOptions<KpisInternalAdminOpsKpisGetResponse, DefaultError, KpisInternalAdminOpsKpisGetResponse, ReturnType<typeof kpisInternalAdminOpsKpisGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await kpisInternalAdminOpsKpisGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: kpisInternalAdminOpsKpisGetQueryKey(options)
+});
+
+export const todayInternalAdminOpsTodayGetQueryKey = (options?: Options<TodayInternalAdminOpsTodayGetData>) => createQueryKey('todayInternalAdminOpsTodayGet', options);
+
+/**
+ * Today
+ *
+ * Each active doctor's day as a timeline with statuses booked, arrived, no_show and cancelled, the next free gap and a running-behind flag. `date` is a clinic-local day; without it, each doctor's clinic's today. Synthetic patients are left out. A viewer gets initials and a masked phone.
+ */
+export const todayInternalAdminOpsTodayGetOptions = (options?: Options<TodayInternalAdminOpsTodayGetData>) => queryOptions<TodayInternalAdminOpsTodayGetResponse, DefaultError, TodayInternalAdminOpsTodayGetResponse, ReturnType<typeof todayInternalAdminOpsTodayGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await todayInternalAdminOpsTodayGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: todayInternalAdminOpsTodayGetQueryKey(options)
 });
 
 export const getSessionInfoInternalAdminSessionGetQueryKey = (options?: Options<GetSessionInfoInternalAdminSessionGetData>) => createQueryKey('getSessionInfoInternalAdminSessionGet', options);

@@ -12,6 +12,7 @@ current state; may succeed later or in another state.
 |---|---|---|---|---|
 | UNAUTHENTICATED | 401 | unauthenticated | Unauthenticated | The internal assertion is missing, malformed, expired or does not match the request. |
 | FORBIDDEN | 403 | forbidden | Forbidden | The internal assertion is valid but its role may not use this endpoint. |
+| ROLE_ESCALATION | 403 | role-escalation | Role escalation | The caller's role may not change this access: an admin cannot change or revoke an admin, and nobody changes their own access. |
 | CLIENT_ADDRESS_UNKNOWN | 400 | client-address-unknown | Client address unknown | The request carries no usable client address, so it cannot be rate limited. Retry. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
 | TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | The datetime is naive (and nothing else is wrong). |
@@ -32,8 +33,12 @@ current state; may succeed later or in another state.
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
 | RATE_LIMITED | 429 | rate-limited | Rate limited | Too many requests from this address. Wait for Retry-After seconds and try again. |
 | IDEMPOTENCY_KEY_CONSUMED | 409 | idempotency-key-consumed | Idempotency key consumed | The Idempotency-Key belongs to an appointment that is no longer booked. |
+| APPOINTMENT_LOCKED | 409 | appointment-locked | Appointment locked | Staff vetoed the last change to this appointment, so it can only be changed by staff until an owner or admin unlocks it. |
+| ATTENDANCE_WINDOW_CLOSED | 409 | attendance-window-closed | Attendance window closed | Arrival can be recorded from 15 minutes before the appointment to 2 hours after it starts, no-show from the start to 2 hours after, and neither outside that. |
+| NOTHING_TO_VETO | 409 | nothing-to-veto | Nothing to veto | The appointment's latest change was not made by the patient (or is already undone), or an unlock was asked for an appointment that is not locked. |
 | ACCESS_EXISTS | 409 | access-exists | Access exists | This email already has active access; change its role instead. |
 | OWNER_PROTECTED | 409 | owner-protected | Owner protected | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
+| INVITE_INVALID | 404 | invite-invalid | Invite invalid | The invitation does not exist, was used, revoked or expired, or was sent to another email. Every reason returns the same body. |
 | ACCESS_NOT_FOUND | 404 | access-not-found | Access not found | No active access for this email. |
 | DOCTOR_NOT_FOUND | 404 | doctor-not-found | Doctor not found | No such doctor (including inactive). |
 | PATIENT_NOT_FOUND | 404 | patient-not-found | Patient not found | No such patient. |
@@ -57,23 +62,6 @@ Realtime tokens (`POST /realtime/token/patient`, `POST /internal/realtime/token/
 `Retry-After`) when an address uses too many tokens in a minute or a day; `REALTIME_UNAVAILABLE` (503) when push is not
 configured or the month's publish budget is spent, so the client polls.
 
-Declared by [ADR-0033](adr/0033-staff-crud-veto-and-invites.md), not yet emitted (staff CRUD, veto and invites are
-pending build). These are bullets, not table rows, because the catalogue test requires the table and `CATALOGUE` to match
-exactly, and a documented code with no code behind it would fail it. The backend change that adds the code to
-`backend/app/domain/errors.py` and the `ProblemCode` enum moves its entry into the table above in the same commit,
-with the slug and title given here. `ACCESS_EXISTS` and `OWNER_PROTECTED` are already in the table and are reused.
-
-- `ROLE_ESCALATION` (403, slug `role-escalation`, title "Role escalation"). Fires when an admin tries to change or revoke
-  an admin, or when anyone changes their own access row. The client should not retry; ask the owner.
-- `APPOINTMENT_LOCKED` (409, slug `appointment-locked`, title "Appointment locked"). Fires when a patient books,
-  cancels or reschedules on a lineage that staff vetoed and locked. The client should show that the clinic has to be
-  contacted; resending cannot succeed until an admin unlocks.
-- `NOTHING_TO_VETO` (409, slug `nothing-to-veto`, title "Nothing to veto"). Fires when staff veto an appointment that
-  has no patient change to reverse. The client should refresh the appointment and its history.
-- `INVITE_INVALID` (404, slug `invite-invalid`, title "Invite invalid"). Fires for every failed accept (unknown,
-  reused, expired, revoked, or a Google email that is not the invited one) with an identical body, so a caller cannot
-  tell which. The client should show one generic message and ask the owner or admin for a new invite.
-
 Every code the API can emit is in this table: `tests/unit/test_error_catalogue.py` checks the
 domain error classes, the codes named in the handlers, the `ProblemCode` enum in the contract
 and this file against `CATALOGUE`.
@@ -84,8 +72,8 @@ Stretch codes are added by their owning feature.
 The one-hour rule for changes. `PATCH /appointments/{id}/cancel` and
 `PATCH /appointments/{id}/reschedule` (and their `/internal/me` and `/internal/admin` forms) are
 refused with this code when the appointment's current start is less than 60 minutes away
-(`BOOKING_MIN_LEAD_MINUTES`); exactly 60 minutes away is allowed. Staff are held to the same
-rule. It fires after the not-found, already-cancelled and already-started checks, and a repeat of
+(`BOOKING_MIN_LEAD_MINUTES`); exactly 60 minutes away is allowed. Staff are exempt: the staff
+routes never return it (they still return every other refusal). It fires after the not-found, already-cancelled and already-started checks, and a repeat of
 a reschedule that already happened (same new start) still returns the appointment.
 
 What a client should do: do not retry, and do not offer cancel or reschedule for an appointment

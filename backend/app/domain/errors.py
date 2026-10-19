@@ -42,6 +42,13 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "The internal assertion is valid but its role may not use this endpoint.",
     ),
     ErrorSpec(
+        "ROLE_ESCALATION",
+        403,
+        "Role escalation",
+        "The caller's role may not change this access: an admin cannot change or revoke an admin, "
+        "and nobody changes their own access.",
+    ),
+    ErrorSpec(
         "CLIENT_ADDRESS_UNKNOWN",
         400,
         "Client address unknown",
@@ -161,6 +168,27 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "The Idempotency-Key belongs to an appointment that is no longer booked.",
     ),
     ErrorSpec(
+        "APPOINTMENT_LOCKED",
+        409,
+        "Appointment locked",
+        "Staff vetoed the last change to this appointment, so it can only be changed by staff "
+        "until an owner or admin unlocks it.",
+    ),
+    ErrorSpec(
+        "ATTENDANCE_WINDOW_CLOSED",
+        409,
+        "Attendance window closed",
+        "Arrival can be recorded from 15 minutes before the appointment to 2 hours after it "
+        "starts, no-show from the start to 2 hours after, and neither outside that.",
+    ),
+    ErrorSpec(
+        "NOTHING_TO_VETO",
+        409,
+        "Nothing to veto",
+        "The appointment's latest change was not made by the patient (or is already undone), "
+        "or an unlock was asked for an appointment that is not locked.",
+    ),
+    ErrorSpec(
         "ACCESS_EXISTS",
         409,
         "Access exists",
@@ -171,6 +199,13 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         409,
         "Owner protected",
         "The owner's access is fixed by configuration and cannot be granted, changed or revoked.",
+    ),
+    ErrorSpec(
+        "INVITE_INVALID",
+        404,
+        "Invite invalid",
+        "The invitation does not exist, was used, revoked or expired, or was sent to another "
+        "email. Every reason returns the same body.",
     ),
     ErrorSpec("ACCESS_NOT_FOUND", 404, "Access not found", "No active access for this email."),
     ErrorSpec("DOCTOR_NOT_FOUND", 404, "Doctor not found", "No such doctor (including inactive)."),
@@ -311,6 +346,42 @@ class AccessExists(DomainError):
 
 class OwnerProtected(DomainError):
     code = "OWNER_PROTECTED"
+
+
+class RoleEscalation(DomainError):
+    code = "ROLE_ESCALATION"
+
+
+class AppointmentLocked(DomainError):
+    code = "APPOINTMENT_LOCKED"
+
+
+class AttendanceWindowClosed(DomainError):
+    code = "ATTENDANCE_WINDOW_CLOSED"
+
+
+class ReasonRequired(DomainError):
+    """Changing an attendance mark that was already made needs a reason."""
+
+    code = "VALIDATION_ERROR"
+
+
+class NothingToVeto(DomainError):
+    code = "NOTHING_TO_VETO"
+
+
+class InviteInvalid(DomainError):
+    code = "INVITE_INVALID"
+
+    # One fixed sentence for every failure: the response must not say which check failed.
+    def __init__(self) -> None:
+        super().__init__("This invitation is not valid.")
+
+
+class NotFoundRoute(DomainError):
+    """The route is switched off (STAFF_CRUD_ENABLED=false): indistinguishable from no route."""
+
+    code = "NOT_FOUND"
 
 
 class AccessNotFound(DomainError):

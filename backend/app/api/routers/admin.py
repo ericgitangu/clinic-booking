@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import (
     ANY_STAFF,
     CAN_MANAGE,
+    CAN_MANAGE_ACCESS,
     OWNER_ONLY,
     get_clock,
     get_relay,
@@ -26,6 +27,7 @@ from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.booking_rules import RULE_CANCEL, RULE_RESCHEDULE
+from app.domain.emailnorm import normalize_email
 from app.schemas.access import (
     AccessEntry,
     AccessList,
@@ -35,11 +37,12 @@ from app.schemas.access import (
     SessionInfo,
 )
 from app.schemas.admin import AdminAppointmentPage, Bucket, Lineage, Metrics
-from app.schemas.appointment import Appointment, CancelRequest, RescheduleRequest
+from app.schemas.appointment import CancelRequest
 from app.schemas.problem import change_too_late_responses, problem_responses
+from app.schemas.staff import StaffAppointmentChange, StaffRescheduleRequest
 from app.services import access as access_service
 from app.services import admin as service
-from app.services import booking
+from app.services import staff_actions
 from app.services.relay import Relay
 
 router = APIRouter(
@@ -60,15 +63,23 @@ manage_router = APIRouter(
     dependencies=[Depends(CAN_MANAGE)],
     responses=problem_responses(401, 403),
 )
-# Managing access: the owner only, enforced here and not only in the UI.
+# Managing access. Granting directly stays with the owner; listing, changing and revoking are for
+# owner and admin, and the service refuses an admin anything above a viewer (amending the owner-only
+# rule). All of it is enforced here and not only in the UI.
 access_router = APIRouter(
     prefix="/internal/admin/access",
     tags=["admin"],
-    dependencies=[Depends(OWNER_ONLY)],
     responses=problem_responses(401, 403),
 )
 
 _NO_STORE = {"Cache-Control": "no-store"}
+STAFF_EXEMPT = (
+    " Staff are exempt from the lead-time rule and only from it: this route never returns "
+    "CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, "
+    "APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, "
+    "SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is "
+    "required."
+)
 
 
 @router.get(
@@ -106,6 +117,7 @@ async def list_appointments(
     to: date | None = None,
     limit: Annotated[int, Query(ge=1, le=service.MAX_LIMIT)] = service.DEFAULT_LIMIT,
     cursor: str | None = None,
+    who: Principal = Depends(ANY_STAFF),
     session: AsyncSession = Depends(get_session),
 ) -> AdminAppointmentPage:
     response.headers.update(_NO_STORE)
@@ -117,6 +129,7 @@ async def list_appointments(
         end=to,
         limit=limit,
         cursor=cursor,
+        role=who.role,
     )
 
 
@@ -143,12 +156,13 @@ async def get_session_info(
 ) -> SessionInfo:
     response.headers.update(_NO_STORE)
     role = await access_service.resolve_role(session, settings, principal.email)
-    return SessionInfo(email=principal.email.strip().lower(), role=role)
+    return SessionInfo(email=normalize_email(principal.email), role=role)
 
 
 @access_router.get("", response_model=AccessList)
 async def list_access(
     response: Response,
+    _: Principal = Depends(CAN_MANAGE_ACCESS),
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AccessList:
@@ -165,10 +179,16 @@ async def grant_access(
     actor: Principal = Depends(OWNER_ONLY),
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
+    clock: Clock = Depends(get_clock),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await access_service.grant(
-        session, settings, actor=actor.email.lower(), email=body.email, role=body.role
+        session,
+        settings,
+        actor=actor.email.lower(),
+        email=body.email,
+        role=body.role,
+        now=clock.now(),
     )
 
 
@@ -179,13 +199,20 @@ async def change_access_role(
     email: Annotated[Email, Path()],
     body: ChangeRoleRequest,
     response: Response,
-    actor: Principal = Depends(OWNER_ONLY),
+    actor: Principal = Depends(CAN_MANAGE_ACCESS),
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
+    clock: Clock = Depends(get_clock),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await access_service.change_role(
-        session, settings, actor=actor.email.lower(), email=email, role=body.role
+        session,
+        settings,
+        actor=normalize_email(actor.email),
+        actor_role=actor.role,
+        email=email,
+        role=body.role,
+        now=clock.now(),
     )
 
 
@@ -195,55 +222,71 @@ async def change_access_role(
 async def revoke_access(
     email: Annotated[Email, Path()],
     response: Response,
-    actor: Principal = Depends(OWNER_ONLY),
+    actor: Principal = Depends(CAN_MANAGE_ACCESS),
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
+    clock: Clock = Depends(get_clock),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
-    return await access_service.revoke(session, settings, actor=actor.email.lower(), email=email)
+    return await access_service.revoke(
+        session,
+        settings,
+        actor=normalize_email(actor.email),
+        actor_role=actor.role,
+        email=email,
+        now=clock.now(),
+    )
 
 
 @manage_router.patch(
     "/{appointment_id}/cancel",
-    response_model=Appointment,
-    description=RULE_CANCEL,
+    response_model=StaffAppointmentChange,
+    description=RULE_CANCEL + STAFF_EXEMPT,
     responses=change_too_late_responses(),
 )
 async def cancel_for_patient(
     appointment_id: uuid.UUID,
     body: CancelRequest,
     response: Response,
+    actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
-) -> Appointment:
+) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
-    appt = await booking.cancel(
-        session, clock, settings, appointment_id=appointment_id, reason=body.reason
+    change = await staff_actions.cancel(
+        session, clock, settings, actor=actor, appointment_id=appointment_id, reason=body.reason
     )
     await relay.run(clock)
-    return Appointment.model_validate(appt)
+    return change
 
 
 @manage_router.patch(
     "/{appointment_id}/reschedule",
-    response_model=Appointment,
-    description=RULE_RESCHEDULE,
+    response_model=StaffAppointmentChange,
+    description=RULE_RESCHEDULE + STAFF_EXEMPT,
     responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_for_patient(
     appointment_id: uuid.UUID,
-    body: RescheduleRequest,
+    body: StaffRescheduleRequest,
     response: Response,
+    actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
-) -> Appointment:
+) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
-    appt = await booking.reschedule(
-        session, clock, settings, appointment_id=appointment_id, new_starts_at=body.starts_at
+    change = await staff_actions.reschedule(
+        session,
+        clock,
+        settings,
+        actor=actor,
+        appointment_id=appointment_id,
+        starts_at=body.starts_at,
+        reason=body.reason,
     )
     await relay.run(clock)
-    return Appointment.model_validate(appt)
+    return change

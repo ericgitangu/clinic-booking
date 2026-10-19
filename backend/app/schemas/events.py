@@ -41,7 +41,9 @@ class AdminEvent(BaseModel):
     """A booking changed, for the staff dashboard. No appointment or patient identifiers."""
 
     model_config = ConfigDict(extra="forbid", title="AdminEvent")
-    event_type: Literal["booked", "rescheduled", "cancelled"]
+    event_type: Literal[
+        "booked", "rescheduled", "cancelled", "vetoed", "unlocked", "arrived", "no_show"
+    ]
     doctor_id: uuid.UUID
     local_date: _dt.date
     from_local_date: _dt.date | None

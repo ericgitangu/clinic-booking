@@ -2,7 +2,7 @@
 
 - Date: 2026-10-16
 - Deciders: engineering
-- Amended by: [ADR-0033](0033-staff-crud-veto-and-invites.md), 2026-10-18: staff are exempt from the lead-time rules, a staff veto sets a lock that follows reschedules and blocks patient changes with `APPOINTMENT_LOCKED`, and an undone cancel is a new appointment linked by lineage. Pending build.
+- Amended by: [ADR-0033](0033-staff-crud-veto-and-invites.md), 2026-10-18: staff are exempt from the lead-time rules, a staff veto sets a lock that follows reschedules and blocks patient changes with `APPOINTMENT_LOCKED`, and an undone cancel is a new appointment linked by lineage. Built in the API on 2026-10-19.
 
 ## Status
 
@@ -57,3 +57,5 @@ Decided by the engineer on 2026-10-18. The brief's bonus is "prevention of booki
 **Note (2026-10-19): the staff exemption.** Staff are held to the one-hour rule today, with no override, because [ADR-0030](0030-staff-roles-and-access.md) gives staff the public booking rules. [ADR-0033](0033-staff-crud-veto-and-invites.md) decides that staff are exempt from the lead-time rules; that exemption is not built yet and lands with the staff-write work, so until then staff follow the rule.
 
 **Correction (2026-10-19): what happens to a visit inside the hour.** The trade-off above says the slot is "lost for that day" and that the clinic can do nothing through the app. To be exact: the visit stays booked and keeps holding its slot, so nobody else is offered it; the app offers no way to cancel or move it inside the hour, for patients or for staff, until the staff exemption in ADR-0033 lands. Changing such a visit is done by the patient and the clinic outside the app (a phone call), which is what the patient copy says.
+
+**Update (2026-10-19): the staff exemption is built.** The two notes above describe the state before the staff-write work. Now the staff booking, cancel and reschedule routes pass a staff flag to the same service functions, and with it the lead-time check is skipped: staff get neither `BOOKING_TOO_SOON` nor `CHANGE_TOO_LATE`. Everything else still applies to staff (`SLOT_IN_PAST`, `APPOINTMENT_ALREADY_STARTED`, `APPOINTMENT_ALREADY_CANCELLED`, `DATE_OUT_OF_RANGE`, `SLOT_MISALIGNED`, `OUTSIDE_WORKING_HOURS`, `SLOT_TAKEN`, `PATIENT_DOUBLE_BOOKED`), and every staff write needs a reason and writes an audit row. Patients are unchanged.
