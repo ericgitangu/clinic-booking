@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import {
   availability,
   cancelForPatient,
@@ -17,6 +18,7 @@ import {
   revokeAccess as revoke,
 } from "@/lib/api";
 import { SITE } from "@/lib/site";
+import { noticeOfInvite, noticeToPatient } from "@/lib/staff-mail";
 import { describeFailure as describe } from "@/lib/failure-copy";
 import { METRICS_TAG } from "@/lib/metrics-cache";
 import { authorise, callerFor, getStaff } from "@/lib/session";
@@ -98,8 +100,10 @@ export async function cancelAppointment(
   const text = reason.trim();
   if (text.length < 3 || text.length > 450)
     return { ok: false, message: "Give a reason of at least 3 characters." };
-  const res = await cancelForPatient(callerFor(staff, staff.role), id, text);
+  const caller = callerFor(staff, staff.role);
+  const res = await cancelForPatient(caller, id, text);
   if (!res.ok) return describe(res, "Give a reason of at least 3 characters.");
+  after(() => noticeToPatient("cancelled", caller, res.data, text));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: "Appointment cancelled." };
@@ -115,13 +119,10 @@ export async function rescheduleAppointment(
   const text = reason.trim();
   if (text.length < 3 || text.length > 450)
     return { ok: false, message: "Give a reason of at least 3 characters." };
-  const res = await rescheduleForPatient(
-    callerFor(staff, staff.role),
-    id,
-    startsAt,
-    text,
-  );
+  const caller = callerFor(staff, staff.role);
+  const res = await rescheduleForPatient(caller, id, startsAt, text);
   if (!res.ok) return describe(res, "Pick a time.");
+  after(() => noticeToPatient("rescheduled", caller, res.data, text));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: "Appointment rescheduled." };
@@ -171,7 +172,8 @@ export async function bookOnBehalf(input: {
     };
   const phone = input.phone.trim();
   const email = input.email.trim();
-  const res = await staffBook(callerFor(staff, staff.role), {
+  const caller = callerFor(staff, staff.role);
+  const res = await staffBook(caller, {
     doctor_id: input.doctorId,
     starts_at: input.startsAt,
     reason,
@@ -183,6 +185,7 @@ export async function bookOnBehalf(input: {
   });
   if (!res.ok)
     return describe(res, "Check the name, phone number and email address.");
+  after(() => noticeToPatient("booked", caller, res.data, reason));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: `Booked for ${res.data.patient_name}.` };
@@ -228,8 +231,10 @@ export async function vetoAppointment(
   const text = validReason(reason);
   if (!text)
     return { ok: false, message: "Give a reason of at least 3 characters." };
-  const res = await veto(callerFor(staff, staff.role), id, text);
+  const caller = callerFor(staff, staff.role);
+  const res = await veto(caller, id, text);
   if (!res.ok) return describe(res, "Give a reason of at least 3 characters.");
+  after(() => noticeToPatient("vetoed", caller, res.data, text));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return { ok: true, message: "Change undone and the appointment locked." };
@@ -263,13 +268,15 @@ export async function createInvite(
   if (!staff) return { ok: false, message: DENIED.message };
   if (!grantable(role)) return { ok: false, message: "Pick admin or viewer." };
   const address = normalise(email);
-  const res = await inviteCreate(callerFor(staff, staff.role), address, role);
+  const caller = callerFor(staff, staff.role);
+  const res = await inviteCreate(caller, address, role);
   if (!res.ok)
     return {
       ok: false,
       message: describe(res, "That is not a valid email address.").message,
     };
   const inv = res.data;
+  after(() => noticeOfInvite(caller, inv));
   revalidatePath("/access");
   return {
     ok: true,
