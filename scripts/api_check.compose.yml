@@ -6,6 +6,10 @@
 # BOOKING_MIN_LEAD_MINUTES set differently. That is the only way to show the rule at any hour,
 # because the normal API never books a visit inside its own lead time, and inside an hour of now
 # there may be no working hours at all.
+#
+# This is the one file allowed to set a lead time other than 60 (backend/tests/contract/
+# test_change_window_constant.py names it and the value). It is test-only: that test also fails if
+# any Dockerfile, Terraform, release job or other script names this file.
 services:
   api-long-lead:
     extends:
