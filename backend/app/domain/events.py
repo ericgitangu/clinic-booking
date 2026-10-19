@@ -44,3 +44,9 @@ def rescheduled_event(
         to_local,
         from_local if from_local != to_local else None,
     )
+
+
+def annotation_event(event_type: str, starts_at: datetime, tz: ZoneInfo) -> EventFields:
+    """A staff annotation on the stream (vetoed, unlocked, arrived, no_show): ids and times only,
+    never a patient's name, phone or email. ``to_starts_at`` is the appointment's start."""
+    return EventFields(event_type, None, starts_at, _local_date(starts_at, tz), None)

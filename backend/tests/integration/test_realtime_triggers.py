@@ -118,7 +118,7 @@ async def test_the_admin_cancel_and_reschedule_routes_push(realtime_clean: None)
         moved = await admin(
             "PATCH",
             f"/internal/admin/appointments/{appt}/reschedule",
-            f'{{"starts_at":"{SLOT_B}"}}',
+            f'{{"starts_at":"{SLOT_B}","reason":"clinic asked to move it"}}',
         )
         assert moved.status_code == 200, moved.text
         assert _names(publisher) == ["slot_taken", "slot_freed", "slot_taken"], "admin reschedule"

@@ -110,6 +110,28 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "The owner's access cannot be changed.",
     severity: "warning",
   },
+  ROLE_ESCALATION: {
+    message: "Your role does not allow changing that access.",
+    severity: "warning",
+  },
+  APPOINTMENT_LOCKED: {
+    message:
+      "The clinic has to be contacted to change this appointment. Please call the clinic.",
+    severity: "warning",
+  },
+  ATTENDANCE_WINDOW_CLOSED: {
+    message:
+      "Arrival can only be recorded from 15 minutes before the visit to 2 hours after it starts.",
+    severity: "warning",
+  },
+  NOTHING_TO_VETO: {
+    message: "There is no recent patient change to undo on this appointment.",
+    severity: "warning",
+  },
+  INVITE_INVALID: {
+    message: "This invitation is not valid. Ask for a new one.",
+    severity: "warning",
+  },
   ACCESS_NOT_FOUND: {
     message: "We could not find that access entry.",
     severity: "error",

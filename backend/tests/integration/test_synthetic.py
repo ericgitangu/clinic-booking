@@ -69,6 +69,7 @@ def _headers(
         "m": method,
         "p": path,
         "bh": body_hash(body),
+        "ev": True,
     }
     return {"X-Internal-Assertion": sign(claims, key.encode("utf-8"))}
 

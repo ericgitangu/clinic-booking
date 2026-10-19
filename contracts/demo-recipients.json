@@ -1,0 +1,31 @@
+{
+  "comment": "Addresses that can never reach a person. Shared by the API (backend/app/domain/notify.py) and the admin app's sender; both test against this list.",
+  "demo": [
+    "someone@example.com",
+    "Someone@EXAMPLE.ORG",
+    "  a.b@example.net ",
+    "a@a.example.com",
+    "a@deep.sub.example.org",
+    "a@example.com.",
+    "a@EXAMPLE.NET.",
+    "a@mail.test",
+    "a@test",
+    "a@x.example",
+    "a@example",
+    "a@host.invalid",
+    "a@invalid",
+    "a@box.localhost",
+    "a@localhost"
+  ],
+  "real": [
+    "a@notexample.com",
+    "a@example.com.evil.co.ke",
+    "a@myexample.org",
+    "a@contest.co.ke",
+    "a@latest.com",
+    "a@mailbox.co.ke",
+    "a@gmail.com",
+    "example.com@gmail.com",
+    "test@gmail.com"
+  ]
+}

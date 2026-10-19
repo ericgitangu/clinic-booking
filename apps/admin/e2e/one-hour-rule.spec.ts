@@ -1,12 +1,28 @@
-// The one-hour rule for staff: inside the last hour before a visit, cancel and reschedule are
-// disabled with a visible reason, and the API refuses them anyway (409 CHANGE_TOO_LATE). The
+// Staff and the one-hour rule: inside the last hour before a visit the screen still disables
+// cancel and reschedule with a visible reason, but the API does not refuse staff (it exempts them
+// from the lead-time rule and nothing else; patients get 409 CHANGE_TOO_LATE). The
 // appointment is booked through the public API for a far-off time, then moved into the window in
 // the database, because nothing public can book it there.
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { formatTime } from "../src/lib/clinic-time";
 import { OWNER, internal, publicApi } from "./support/stack";
 import { expect, test } from "./support/fixtures";
+
+// Reach the stack under test the way whoever started it did. A run that set COMPOSE_PROJECT_NAME
+// (scripts/e2e_admin.sh does) is followed by name; CI starts the stack with a plain
+// `docker compose up` from the repository root, so there the compose file's own default project
+// applies and no name is passed. Playwright runs from apps/admin, hence the path.
+const COMPOSE_FILE = path.resolve(process.cwd(), "../../docker-compose.yml");
+const COMPOSE_ARGS = [
+  "compose",
+  ...(process.env.COMPOSE_PROJECT_NAME
+    ? ["-p", process.env.COMPOSE_PROJECT_NAME]
+    : []),
+  "-f",
+  COMPOSE_FILE,
+];
 
 function moveTo(id: string, minutesAhead: number) {
   // The half hour at or just before now + minutesAhead, i.e. 0 to 30 minutes earlier than that.
@@ -16,7 +32,7 @@ function moveTo(id: string, minutesAhead: number) {
   execFileSync(
     "docker",
     [
-      "compose",
+      ...COMPOSE_ARGS,
       "exec",
       "-T",
       "db",
@@ -42,7 +58,7 @@ function moveTo(id: string, minutesAhead: number) {
 
 const moveIntoTheLastHour = (id: string) => moveTo(id, 50);
 
-test("inside the last hour staff cannot cancel or move a visit, and are told why", async ({
+test("inside the last hour the screen disables the actions and says why, while the API lets staff move the visit", async ({
   as,
 }) => {
   const id = await bookOneStraightThroughTheApi();
@@ -59,16 +75,25 @@ test("inside the last hour staff cannot cancel or move a visit, and are told why
   await expect(move).toHaveAttribute("aria-describedby", "change-note");
   await expect(note).toHaveAttribute("id", "change-note");
 
-  // The API holds the line whatever the screen shows.
-  const body = { reason: "staff cancel attempt" };
-  const res = await internal<{ code: string }>(
-    "PATCH",
-    `/internal/admin/appointments/${id}/cancel`,
-    { email: OWNER, role: "owner" },
-    body,
+  // The API lets staff through: the lead-time rule binds patients, not the clinic. (The screen
+  // still disables the buttons; the admin screens lift that for owner and admin.) A move rather
+  // than a cancel, so the other scenarios' cancellation counts are not disturbed.
+  const monday = new Date();
+  monday.setUTCDate(
+    monday.getUTCDate() + ((8 - monday.getUTCDay()) % 7 || 7) + 14,
   );
-  expect(res.status).toBe(409);
-  expect(res.body.code).toBe("CHANGE_TOO_LATE");
+  const day = monday.toISOString().slice(0, 10);
+  const res = await internal<{ audit_id: string | null }>(
+    "PATCH",
+    `/internal/admin/appointments/${id}/reschedule`,
+    { email: OWNER, role: "owner" },
+    {
+      starts_at: `${day}T11:30:00+03:00`,
+      reason: "staff move inside the hour",
+    },
+  );
+  expect(res.status).toBe(200);
+  expect(res.body.audit_id).toBeTruthy();
 });
 
 test("a dialog open when the visit comes within the hour closes and a toast says why", async ({
