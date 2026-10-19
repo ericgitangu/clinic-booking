@@ -218,3 +218,133 @@ async def test_a_repeated_cancel_keeps_its_own_answer_inside_the_window(
     _clock(app_with_clock, _at(30))
     again = await client.patch(f"/appointments/{appt}/cancel", json={"reason": "plans changed"})
     assert (again.status_code, again.json()["code"]) == (409, "APPOINTMENT_ALREADY_CANCELLED")
+
+
+# --- precedence, staff and the signed-in patient's own routes ----------------------------------
+
+_KEY = secrets.token_hex(24)
+_OWNER = "owner@clinic.example"
+
+
+def _headers(
+    app_now: datetime, method: str, path: str, *, sub: str, email: str, role: str, body: bytes = b""
+) -> dict[str, str]:
+    claims: dict[str, object] = {
+        "aud": AUDIENCE, "sub": sub, "email": email, "role": role,
+        "iat": int(app_now.timestamp()), "exp": int(app_now.timestamp()) + 60,
+        "m": method, "p": path, "bh": body_hash(body), "ev": True,
+    }  # fmt: skip
+    return {"X-Internal-Assertion": sign(claims, _KEY.encode()), "content-type": "application/json"}
+
+
+async def test_both_starts_under_an_hour_answers_409_the_current_start_is_checked_first(
+    client: httpx.AsyncClient, app_with_clock: FastAPI, reset_appointments: None
+) -> None:
+    appt = (await _book(client, app_with_clock, NEAR)).json()["id"]
+    _clock(app_with_clock, _at(30))  # the visit starts in 30 minutes
+    resp = await client.patch(
+        f"/appointments/{appt}/reschedule",
+        json={"starts_at": (NEAR + timedelta(minutes=45)).isoformat()},  # also under an hour away
+    )
+    assert (resp.status_code, resp.json()["code"]) == (409, "CHANGE_TOO_LATE")
+
+
+async def test_staff_reschedule_follows_the_same_two_codes(reset_appointments: None) -> None:
+    owner = "owner@clinic.example"
+    app = create_app(make_settings(INTERNAL_SIGNING_KEY=_KEY, ADMIN_EMAILS=owner))
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+        _clock(app, LONG_AGO)
+        near = (
+            await c.post(
+                "/appointments",
+                json={"doctor_id": OTIENO, "patient_id": AMINA, "starts_at": NEAR.isoformat()},
+            )
+        ).json()["id"]
+        far = (
+            await c.post(
+                "/appointments",
+                json={"doctor_id": OTIENO, "patient_id": AMINA, "starts_at": FAR.isoformat()},
+            )
+        ).json()["id"]
+
+        async def patch(
+            appt: str, op: str, now: datetime, payload: dict[str, str]
+        ) -> httpx.Response:
+            import json
+
+            _clock(app, now)
+            path = f"/internal/admin/appointments/{appt}/{op}"
+            body = json.dumps(payload).encode()
+            return await c.patch(
+                path,
+                content=body,
+                headers=_headers(now, "PATCH", path, sub="s", email=owner, role="owner", body=body),
+            )
+
+        # the visit within the hour: 409 for reschedule from it
+        r = await patch(near, "reschedule", _at(30), {"starts_at": FAR.isoformat()})
+        assert (r.status_code, r.json()["code"]) == (409, "CHANGE_TOO_LATE")
+        # a far visit moved to a too-soon time: 422, as for a fresh booking
+        r = await patch(far, "reschedule", _at(30), {"starts_at": NEAR.isoformat()})
+        assert (r.status_code, r.json()["code"]) == (422, "BOOKING_TOO_SOON")
+
+
+async def test_a_signed_in_patient_cancels_and_reschedules_under_the_same_rules(
+    reset_appointments: None, owner_conn: object
+) -> None:
+    import json
+
+    app = create_app(make_settings(INTERNAL_SIGNING_KEY=_KEY))
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    sub, email = "sub-one-hour", "one.hour@example.test"
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+        _clock(app, LONG_AGO)
+
+        async def call(
+            method: str, path: str, payload: dict[str, str], now: datetime
+        ) -> httpx.Response:
+            _clock(app, now)
+            body = json.dumps(payload).encode()
+            return await c.request(
+                method,
+                path,
+                content=body,
+                headers=_headers(now, method, path, sub=sub, email=email, role="none", body=body),
+            )
+
+        linked = await call("POST", "/internal/accounts/link", {"full_name": "One Hour"}, LONG_AGO)
+        patient = linked.json()["patient_id"]
+        ids = []
+        for start in (NEAR, FAR):
+            _clock(app, LONG_AGO)
+            booked = await c.post(
+                "/appointments",
+                json={"doctor_id": OTIENO, "patient_id": patient, "starts_at": start.isoformat()},
+            )
+            assert booked.status_code == 201, booked.text
+            ids.append(booked.json()["id"])
+        near, far = ids
+
+        r = await call(
+            "PATCH", f"/internal/me/appointments/{near}/cancel", {"reason": "cannot go"}, _at(59)
+        )
+        assert (r.status_code, r.json()["code"]) == (409, "CHANGE_TOO_LATE")
+        r = await call(
+            "PATCH",
+            f"/internal/me/appointments/{near}/reschedule",
+            {"starts_at": FAR.isoformat()},
+            _at(59),
+        )
+        assert (r.status_code, r.json()["code"]) == (409, "CHANGE_TOO_LATE")
+        r = await call(
+            "PATCH",
+            f"/internal/me/appointments/{far}/reschedule",
+            {"starts_at": NEAR.isoformat()},
+            _at(59),
+        )
+        assert (r.status_code, r.json()["code"]) == (422, "BOOKING_TOO_SOON")
+        r = await call(
+            "PATCH", f"/internal/me/appointments/{near}/cancel", {"reason": "cannot go"}, _at(60)
+        )
+        assert r.status_code == 200, r.text

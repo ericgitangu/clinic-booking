@@ -225,7 +225,7 @@ async def book_mine(
     "/me/appointments/{appointment_id}/cancel",
     response_model=Appointment,
     description=RULE_CANCEL,
-    responses=change_too_late_responses("/me/appointments/{appointment_id}/cancel"),
+    responses=change_too_late_responses(),
 )
 async def cancel_mine(
     appointment_id: uuid.UUID,
@@ -251,7 +251,7 @@ async def cancel_mine(
     "/me/appointments/{appointment_id}/reschedule",
     response_model=Appointment,
     description=RULE_RESCHEDULE,
-    responses=change_too_late_responses("/me/appointments/{appointment_id}/reschedule"),
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_mine(
     appointment_id: uuid.UUID,

@@ -4,8 +4,12 @@
 fresh booking). 409 CHANGE_TOO_LATE is for changing or cancelling a visit whose CURRENT start is
 within the hour. An earlier draft said a reschedule's new slot is a 409; this fails if any surface
 (README, docs, the ADRs, the apps' copy, the landing page evidence, the OpenAPI contract, the
-catalogue) says that again. A sentence that mentions a new slot and a 409 / CHANGE_TOO_LATE must
-also name the 422 / BOOKING_TOO_SOON it contrasts with, and a few exact old phrasings are banned.
+catalogue) says that again. A sentence (or a whole wrapped paragraph) that talks about moving or
+rescheduling to a new time and carries a 409 / CHANGE_TOO_LATE / "conflict" must also name the
+422 / BOOKING_TOO_SOON it contrasts with; paraphrases, word order and line wraps do not get past it,
+and a few exact old phrasings are banned. The apps' copy modules, their action components, the
+reschedule page, the landing evidence, the generated client and the served problem text are all
+scanned. ``test_every_surface_catches_a_planted_paraphrase`` plants one in each of them.
 """
 
 from __future__ import annotations
@@ -20,7 +24,14 @@ TEXT_FILES = [
     "README.md",
     "apps/booking/src/lib/evidence.ts",
     "apps/booking/src/lib/problems.ts",
+    "apps/booking/src/lib/change-window.ts",
+    "apps/booking/src/components/booking/appointment-actions.tsx",
+    "apps/booking/src/app/appointments/[id]/reschedule/page.tsx",
     "apps/admin/src/lib/actions.ts",
+    "apps/admin/src/lib/change-window.ts",
+    "apps/admin/src/components/appointment-actions.tsx",
+    "packages/api/src/generated/types.gen.ts",
+    "packages/api/src/generated/sdk.gen.ts",
     "backend/app/domain/errors.py",
     "backend/app/domain/booking_rules.py",
     "backend/app/api/routers/appointments.py",
@@ -28,12 +39,21 @@ TEXT_FILES = [
 ]
 JSON_FILES = ["contracts/openapi.json", "apps/booking/src/generated/openapi.public.json"]
 
-CHANGE = re.compile(r"CHANGE_TOO_LATE|\b409\b")
+RESCHEDULING = re.compile(r"reschedul|\bmov(e|es|ed|ing)\b|\bchang(e|es|ed|ing)\b", re.IGNORECASE)
+# A 409 that names another code (ALREADY_CANCELLED, SLOT_TAKEN, ...) is not the lead-time 409.
+CONFLICT = re.compile(
+    r"CHANGE_TOO_LATE|conflict|\b409\b(?![ `*]*(APPOINTMENT_ALREADY|SLOT_TAKEN|PATIENT_|CONCURRENT"
+    r"|IDEMPOTENCY|ACCESS|OWNER))",
+    re.IGNORECASE,
+)
 NEW_SLOT = re.compile(
-    r"new (start|time|slot)|reschedule'?s? new|from or to|both its current start and the new",
+    r"\bnew\b[^.;]{0,25}(start|time|slot)|target|destination|from or to|"
+    r"both its current start and the new|\bto (a|an|another)\b[^.;]{0,30}(time|slot|start)|"
+    r"\bto\b[^.;]{0,40}(minutes?|hour) away|reschedul\w*\s+to\b|moved? to\b|moving to\b",
     re.IGNORECASE,
 )
 TOO_SOON = re.compile(r"\b422\b|BOOKING_TOO_SOON")
+SAFE = re.compile(r"same new start|returns the appointment|already happened", re.IGNORECASE)
 BANNED = (
     "422 on book, 409 on change",
     "a reschedule is a change, so its new time",
@@ -50,10 +70,24 @@ def _docs() -> list[pathlib.Path]:
     return sorted(out)
 
 
+def _clean(line: str) -> str:
+    """Drop comment and markdown markers so a wrapped comment reads as the sentence it is."""
+    return re.sub(r"^\s*(//+|/?\*+/?|#+|[-*>]|\d+\.)\s?", "", line).strip()
+
+
 def _segments(text: str) -> list[str]:
+    """Sentences and whole paragraphs (a list item is its own paragraph), with line wraps joined."""
     parts: list[str] = []
-    for line in text.splitlines():
-        parts.extend(re.split(r"(?<=[.;])\s+(?=[A-Z`*(])", line))
+    for block in re.split(r"\n\s*\n", text):
+        groups: list[list[str]] = []
+        for line in block.splitlines():
+            if not groups or re.match(r"\s*([-*]|\d+\.)\s", line):
+                groups.append([])
+            groups[-1].append(_clean(line))
+        for group in groups:
+            paragraph = " ".join(filter(None, group))
+            parts.append(paragraph)
+            parts.extend(re.split(r"(?<=[.;])\s+(?=[A-Z`*(\"'])", paragraph))
     return parts
 
 
@@ -79,6 +113,16 @@ def _surfaces() -> list[tuple[str, str]]:
     return found
 
 
+def _paraphrase(segment: str) -> bool:
+    return bool(
+        RESCHEDULING.search(segment)
+        and CONFLICT.search(segment)
+        and NEW_SLOT.search(segment)
+        and not TOO_SOON.search(segment)
+        and not SAFE.search(segment)
+    )
+
+
 def violations(surfaces: list[tuple[str, str]]) -> list[str]:
     bad: list[str] = []
     for name, text in surfaces:
@@ -86,7 +130,7 @@ def violations(surfaces: list[tuple[str, str]]) -> list[str]:
             if phrase in text and not _is_dated_history(name, text, phrase):
                 bad.append(f"{name}: banned phrase {phrase!r}")
         for seg in _segments(text):
-            if CHANGE.search(seg) and NEW_SLOT.search(seg) and not TOO_SOON.search(seg):
+            if _paraphrase(seg):
                 bad.append(f"{name}: new slot paired with 409/CHANGE_TOO_LATE: {seg[:120]!r}")
     return bad
 
@@ -143,3 +187,40 @@ def test_the_checker_catches_the_old_wording() -> None:
         )
     ]
     assert violations(fine) == []
+
+
+PARAPHRASES = [
+    "A reschedule to a new time under an hour away is a 409.",
+    "Moving a visit to a time\n// under an hour away\n// answers CHANGE_TOO_LATE.",
+    "CHANGE_TOO_LATE also covers the target slot of a reschedule.",
+    "When the destination slot of a move is too soon the result is a conflict.",
+    "The new start of a reschedule that is inside the hour comes back as 409.",
+]
+
+
+def test_every_surface_catches_a_planted_paraphrase() -> None:
+    """Mutation proof: a paraphrase planted in ANY scanned surface (the four that once slipped
+    through, both apps' copy and action components, the reschedule page, the landing evidence, the
+    generated client, the catalogue and the OpenAPI strings) is reported."""
+    surfaces = _surfaces()
+    assert violations(surfaces) == []
+    names = {name for name, _ in surfaces}
+    for must in (
+        "README.md",
+        "docs/api-errors.md",
+        "apps/booking/src/lib/change-window.ts",
+        "apps/admin/src/lib/change-window.ts",
+        "apps/booking/src/components/booking/appointment-actions.tsx",
+        "apps/admin/src/components/appointment-actions.tsx",
+        "apps/booking/src/app/appointments/[id]/reschedule/page.tsx",
+        "apps/booking/src/lib/problems.ts",
+        "apps/booking/src/lib/evidence.ts",
+        "apps/admin/src/lib/actions.ts",
+        "packages/api/src/generated/types.gen.ts",
+        "contracts/openapi.json",
+        "backend/app/domain/errors.py",
+    ):
+        assert must in names, f"{must} is not scanned"
+    for name, text in surfaces:
+        for planted in PARAPHRASES:
+            assert violations([(name, f"{text}\n\n{planted}\n")]), (name, planted)

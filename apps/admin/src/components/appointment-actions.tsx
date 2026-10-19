@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CalendarClockIcon, XIcon } from "lucide-react";
 import {
   AlertDialog,
@@ -41,7 +41,12 @@ import {
   rescheduleAppointment,
   type ActionResult,
 } from "@/lib/actions";
-import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
+import {
+  CHANGE_WINDOW_JUST_OPENED,
+  CHANGE_WINDOW_NOTE,
+  clockOffset,
+  insideChangeWindow,
+} from "@/lib/change-window";
 import { formatTime } from "@/lib/clinic-time";
 
 function report(result: ActionResult): boolean {
@@ -57,22 +62,35 @@ export function AppointmentActions({
   doctorId,
   today,
   startsAt,
+  serverNow,
 }: {
   appointmentId: string;
   doctorId: string;
   today: string;
   startsAt: string;
+  /** The server's clock when the page was drawn: the screen reads time from it, not the device. */
+  serverNow: string;
 }) {
+  const [offset] = useState(() => clockOffset(serverNow, Date.now()));
   const [locked, setLocked] = useState(() =>
-    insideChangeWindow(startsAt, Date.now()),
+    insideChangeWindow(startsAt, Date.now() + offset),
   );
-  // The window can open while the page is on screen: look again every 30 seconds.
+  const wasLocked = useRef(locked);
+  // The window can open while the page is on screen: look again every 30 seconds. If it opens while
+  // a dialog is up, the dialog goes with the buttons, so say why.
   useEffect(() => {
-    const tick = () => setLocked(insideChangeWindow(startsAt, Date.now()));
+    const tick = () => {
+      if (!insideChangeWindow(startsAt, Date.now() + offset)) return;
+      if (!wasLocked.current) {
+        wasLocked.current = true;
+        notify.error(CHANGE_WINDOW_JUST_OPENED);
+      }
+      setLocked(true);
+    };
     tick();
     const timer = setInterval(tick, 30_000);
     return () => clearInterval(timer);
-  }, [startsAt]);
+  }, [startsAt, offset]);
 
   if (locked) {
     return (

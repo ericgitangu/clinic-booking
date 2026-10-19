@@ -21,6 +21,7 @@ from app.schemas.appointment import (
 from app.schemas.problem import (
     REPLAY_HEADER,
     REPLAYED_HEADER,
+    change_too_late_responses,
     problem_responses,
     problem_with_example,
 )
@@ -43,13 +44,7 @@ def _to_schema(appt: AppointmentModel) -> Appointment:
     description=RULE_BOOK,
     responses={
         **problem_responses(409, 503),
-        **problem_with_example(
-            422,
-            "BOOKING_TOO_SOON",
-            "Booking too soon",
-            "starts_at is less than the minimum lead time ahead of now.",
-            "/appointments",
-        ),
+        **problem_with_example(422, "BOOKING_TOO_SOON"),
         **REPLAY_HEADER,
     },
 )
@@ -100,17 +95,7 @@ async def get_appointment(
     "/appointments/{appointment_id}/cancel",
     response_model=Appointment,
     description=RULE_CANCEL,
-    responses={
-        **problem_responses(404, 422),
-        **problem_with_example(
-            409,
-            "CHANGE_TOO_LATE",
-            "Change too late",
-            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
-            "lead time (60 minutes).",
-            "/appointments/{appointment_id}/cancel",
-        ),
-    },
+    responses=change_too_late_responses(),
 )
 async def cancel_appointment(
     appointment_id: uuid.UUID,
@@ -133,17 +118,7 @@ async def cancel_appointment(
     "/appointments/{appointment_id}/reschedule",
     response_model=Appointment,
     description=RULE_RESCHEDULE,
-    responses={
-        **problem_responses(404, 422),
-        **problem_with_example(
-            409,
-            "CHANGE_TOO_LATE",
-            "Change too late",
-            "Cancel, or reschedule from, an appointment that starts in less than the minimum "
-            "lead time (60 minutes).",
-            "/appointments/{appointment_id}/reschedule",
-        ),
-    },
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_appointment(
     appointment_id: uuid.UUID,

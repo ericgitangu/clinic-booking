@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from app.core.config import BOOKING_MIN_LEAD_MINUTES_DEFAULT
 from app.domain.errors import (
     BookingTooSoon,
     DateOutOfRange,
@@ -23,21 +24,22 @@ from app.domain.slots import Window, grid_for_date
 # The words the OpenAPI contract uses for the one-hour rule. The contract test
 # (tests/contract/test_one_hour_contract.py) asserts the generated spec carries them, so the
 # documentation cannot drift from the code.
+_N = BOOKING_MIN_LEAD_MINUTES_DEFAULT
 RULE_BOOK = (
-    "Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now "
-    "(BOOKING_MIN_LEAD_MINUTES)."
+    f"Refused with 422 BOOKING_TOO_SOON when the appointment begins less than {_N} minutes from "
+    "now (BOOKING_MIN_LEAD_MINUTES)."
 )
 RULE_CANCEL = (
-    "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now "
-    "(BOOKING_MIN_LEAD_MINUTES)."
+    f"Refused with 409 CHANGE_TOO_LATE when the appointment begins less than {_N} minutes from "
+    "now (BOOKING_MIN_LEAD_MINUTES)."
 )
 RULE_RESCHEDULE = (
-    "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 "
+    f"Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than {_N} "
     "minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new "
     "start does, exactly as for a fresh booking. Repeating a reschedule that already happened "
     "(same new start) returns the appointment."
 )
-RULE_AVAILABILITY = "Slots starting within 60 minutes are never offered."
+RULE_AVAILABILITY = f"Slots starting within {_N} minutes are never offered."
 
 
 def require_lead_time(

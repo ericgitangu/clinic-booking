@@ -32,6 +32,7 @@ export default async function MyAppointments({
     );
   }
 
+  const serverNow = new Date().toISOString();
   const res = await api.myAppointments(callerFor(who));
   // Someone who has never booked has no patient record yet: that is an empty list, not an error.
   const never =
@@ -82,6 +83,7 @@ export default async function MyAppointments({
                     id={a.id}
                     when={formatWhen(a.starts_at)}
                     startsAt={a.starts_at}
+                    serverNow={serverNow}
                   />
                 </li>
               ))}

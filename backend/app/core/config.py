@@ -17,6 +17,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _BANNED_DSN_PARAMS = ("sslmode", "channel_binding")
 _MIN_SIGNING_KEY_CHARS = 32
 
+# The one definition of the lead time's default. The descriptions in the OpenAPI contract, the error
+# catalogue and the booking rules are written from this number, so they cannot disagree with it.
+BOOKING_MIN_LEAD_MINUTES_DEFAULT = 60
+
 # Hard ceiling on publishes to the push service per calendar month, enforced by this API (table
 # realtime_publish_budget), so the free-tier bound does not rest on how the push service behaves
 # when its own cap is reached. Each publish is delivered to every connected subscriber, and the
@@ -43,7 +47,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = Field(..., description="postgresql+asyncpg://…?ssl=require")
     DB_POOL_SIZE: int = 5
-    BOOKING_MIN_LEAD_MINUTES: int = 60
+    BOOKING_MIN_LEAD_MINUTES: int = BOOKING_MIN_LEAD_MINUTES_DEFAULT
     BOOKING_HORIZON_DAYS: int = 90
     # The email provider's free plan allows 100 a day, shared by acknowledgements and reminders. A
     # reminder run claims at most REMINDER_RUN_LIMIT, and never more than what is left of the day.

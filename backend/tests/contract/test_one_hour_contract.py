@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from app.core.config import Settings
 from app.domain.booking_rules import RULE_AVAILABILITY
 from app.main import create_app
@@ -68,3 +70,77 @@ def test_availability_states_the_rule() -> None:
 def test_the_problem_code_enum_in_the_contract_includes_change_too_late() -> None:
     enum = _spec()["components"]["schemas"]["ProblemCode"]["enum"]
     assert "CHANGE_TOO_LATE" in enum
+
+
+CHANGE_OPS = [
+    ("/appointments/{appointment_id}/cancel", False),
+    ("/appointments/{appointment_id}/reschedule", True),
+    ("/internal/me/appointments/{appointment_id}/cancel", False),
+    ("/internal/me/appointments/{appointment_id}/reschedule", True),
+    ("/internal/admin/appointments/{appointment_id}/cancel", False),
+    ("/internal/admin/appointments/{appointment_id}/reschedule", True),
+]
+
+
+def _expected(code: str, instance: str, base: str) -> dict[str, Any]:
+    from app.domain.errors import CATALOGUE_BY_CODE
+
+    entry = CATALOGUE_BY_CODE[code]
+    return {
+        "type": f"{base}/problems/{entry.slug}",
+        "title": entry.title,
+        "status": entry.status,
+        "detail": entry.description,
+        "instance": instance,
+        "code": code,
+        "request_id": "00000000-0000-4000-8000-000000000000",
+        "errors": None,
+    }
+
+
+def test_every_change_operation_has_its_examples_built_from_the_catalogue() -> None:
+    settings = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db")
+    base = str(settings.PUBLIC_BASE_URL).rstrip("/")
+    paths = create_app(settings).openapi()["paths"]
+    for path, new_start in CHANGE_OPS:
+        op = paths[path]["patch"]
+        assert _example(op, "409", "CHANGE_TOO_LATE") == _expected("CHANGE_TOO_LATE", path, base)
+        if new_start:
+            assert _example(op, "422", "BOOKING_TOO_SOON") == _expected(
+                "BOOKING_TOO_SOON", path, base
+            ), path
+    book = paths["/appointments"]["post"]
+    assert _example(book, "422", "BOOKING_TOO_SOON") == _expected(
+        "BOOKING_TOO_SOON", "/appointments", base
+    )
+
+
+def test_changing_the_catalogue_or_the_base_url_changes_the_examples(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from app.domain.errors import CATALOGUE_BY_CODE
+
+    spec = CATALOGUE_BY_CODE["CHANGE_TOO_LATE"]
+    monkeypatch.setitem(
+        CATALOGUE_BY_CODE, "CHANGE_TOO_LATE", replace(spec, description="A different sentence.")
+    )
+    settings = Settings(
+        DATABASE_URL="postgresql+asyncpg://u:p@localhost/db",
+        PUBLIC_BASE_URL="https://other.test/api",
+    )
+    paths = create_app(settings).openapi()["paths"]
+    ex = _example(paths["/appointments/{appointment_id}/cancel"]["patch"], "409", "CHANGE_TOO_LATE")
+    assert ex["detail"] == "A different sentence."
+    assert ex["type"] == "https://other.test/api/problems/change-too-late"
+
+
+def test_the_lead_time_text_comes_from_the_setting_not_a_typed_number() -> None:
+    from app.core.config import BOOKING_MIN_LEAD_MINUTES_DEFAULT
+    from app.domain.booking_rules import RULE_AVAILABILITY, RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE
+
+    default = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db")
+    assert default.BOOKING_MIN_LEAD_MINUTES == BOOKING_MIN_LEAD_MINUTES_DEFAULT
+    for text in (RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE, RULE_AVAILABILITY):
+        assert str(BOOKING_MIN_LEAD_MINUTES_DEFAULT) in text

@@ -29,7 +29,10 @@ def test_both_apps_use_the_apis_lead_time() -> None:
         assert _app_constant(path) == api, path
 
 
-SKIP_DIRS = {"node_modules", ".next", ".venv", ".git", "test-results", "__pycache__"}
+SKIP_DIRS = {".next", ".venv", ".git", "node_modules", "test-results", "__pycache__"} | {
+    ".drift-tmp",
+    "generated",
+}
 # Where a deployed value could be set: workflow, compose, Terraform, scripts, env, Dockerfiles.
 CONFIG_SUFFIXES = {".yml", ".yaml", ".tf", ".tfvars", ".sh", ".env", ".example", ".toml", ".json"}
 
@@ -42,7 +45,7 @@ def _config_files() -> list[pathlib.Path]:
         rel = path.relative_to(ROOT).as_posix()
         if rel.startswith(("docs/", "contracts/", "backend/app/", "backend/tests/")):
             continue  # prose and the contract mention the name; the code defines the default
-        if path.name.startswith("Dockerfile") or path.suffix in CONFIG_SUFFIXES:
+        if path.name.startswith(("Dockerfile", "Makefile")) or path.suffix in CONFIG_SUFFIXES:
             found.append(path)
     return found
 
@@ -57,5 +60,11 @@ def test_no_config_file_sets_a_different_lead_time() -> None:
             text = path.read_text()
         except UnicodeDecodeError:
             continue
-        for match in re.finditer(r"BOOKING_MIN_LEAD_MINUTES\W{0,4}(\d+)", text):
-            assert int(match.group(1)) == api, (path.relative_to(ROOT), match.group(0))
+        for match in re.finditer("BOOKING_MIN_LEAD_MINUTES", text):
+            # The value follows the name: `NAME=45`, `NAME: 45`, or a Terraform / task-definition
+            # block (`name = "NAME"` then `value = "45"`). Whatever form, the next number is it.
+            tail = text[match.end() : match.end() + 120]
+            number = re.search(r"\d+", tail)
+            where = path.relative_to(ROOT)
+            assert number, (where, "the setting is named but its value cannot be read")
+            assert int(number.group(0)) == api, (where, tail[:60])

@@ -72,6 +72,7 @@ export default async function AppointmentPage({
             doctorId={appt.doctor_id}
             today={localDate(new Date())}
             startsAt={appt.starts_at}
+            serverNow={new Date().toISOString()}
           />
         )}
 

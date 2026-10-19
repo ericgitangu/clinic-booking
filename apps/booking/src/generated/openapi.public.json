@@ -713,12 +713,13 @@
                     "summary": "BOOKING_TOO_SOON",
                     "value": {
                       "code": "BOOKING_TOO_SOON",
-                      "detail": "starts_at is less than the minimum lead time ahead of now.",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (60 minutes) ahead of now.",
+                      "errors": null,
                       "instance": "/appointments",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 422,
                       "title": "Booking too soon",
-                      "type": "https://clinic.ericgitangu.com/api/problems/booking-too-soon"
+                      "type": "https://api.example/problems/booking-too-soon"
                     }
                   }
                 }
@@ -831,12 +832,13 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
                       "instance": "/appointments/{appointment_id}/cancel",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
+                      "type": "https://api.example/problems/change-too-late"
                     }
                   }
                 }
@@ -906,12 +908,13 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Cancel, or reschedule from, an appointment that starts in less than the minimum lead time (60 minutes).",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
                       "instance": "/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",
                       "status": 409,
                       "title": "Change too late",
-                      "type": "https://clinic.ericgitangu.com/api/problems/change-too-late"
+                      "type": "https://api.example/problems/change-too-late"
                     }
                   }
                 }
@@ -921,9 +924,25 @@
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (60 minutes) ahead of now.",
+                      "errors": null,
+                      "instance": "/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           }
         },
         "summary": "Reschedule Appointment",

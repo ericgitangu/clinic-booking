@@ -30,7 +30,7 @@ from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.problems import UnhandledErrorMiddleware, register_exception_handlers
 from app.schemas.events import EVENT_MODELS
-from app.schemas.problem import strip_json_from_error_responses
+from app.schemas.problem import fill_problem_examples, strip_json_from_error_responses
 from app.services.publisher import build_publisher
 from app.services.realtime_tokens import MinuteLimiter
 
@@ -84,6 +84,7 @@ def create_app(settings: Settings) -> FastAPI:
     def _openapi() -> dict[str, object]:
         schema = _default_openapi()
         strip_json_from_error_responses(schema)
+        fill_problem_examples(schema, str(settings.PUBLIC_BASE_URL))
         # The pushed messages never appear in a response body, so add them to the components: the
         # generated clients then carry their types and zod schemas.
         components = schema.setdefault("components", {})

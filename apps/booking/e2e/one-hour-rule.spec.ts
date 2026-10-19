@@ -8,8 +8,9 @@ import { newPerson, sessionCookies } from "./support/auth";
 // a request that slips through still gets plain words. The appointment is booked through the UI
 // for a far-off time, then moved into the window in the database, as nothing public can book it.
 
-// Each scenario uses a doctor of its own (2, 3, 4): the appointment is moved to the next half hour,
-// and one doctor cannot hold two bookings at the same time.
+// Each scenario uses its own doctor and week (doctors 0 to 4 across the five scenarios, week 1 for
+// the two that move a visit): the appointment is moved to the next half hour in the database, and
+// one doctor cannot hold two bookings at the same time, so no two scenarios share a doctor.
 async function bookedPerson(
   browser: import("@playwright/test").Browser,
   doctor: number,
@@ -31,22 +32,28 @@ async function bookedPerson(
 }
 
 // The next :00 or :30 boundary that is 20 to 50 minutes away: on the grid, inside the window.
-async function moveIntoWindow(originalStart: string, doctorId: string) {
+async function moveTo(
+  originalStart: string,
+  doctorId: string,
+  minutesAhead: number,
+) {
+  // The half hour at or just before now + minutesAhead: 0 to 30 minutes earlier than that.
   await withDb(async (db) => {
+    const slot = `date_trunc('hour', now() + make_interval(mins => $3))
+        + CASE WHEN extract(minute FROM now() + make_interval(mins => $3)) >= 30
+               THEN interval '30 minutes' ELSE interval '0' END`;
     await db.query(
       `UPDATE appointments
-          SET starts_at = date_trunc('hour', now() + interval '50 minutes')
-                          + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
-                                 THEN interval '30 minutes' ELSE interval '0' END,
-              ends_at = date_trunc('hour', now() + interval '50 minutes')
-                          + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
-                                 THEN interval '30 minutes' ELSE interval '0' END
-                          + interval '30 minutes'
+          SET starts_at = ${slot}, ends_at = ${slot} + interval '30 minutes'
         WHERE starts_at = $1::timestamptz AND doctor_id = $2 AND status = 'booked'`,
-      [originalStart, doctorId],
+      [originalStart, doctorId, minutesAhead],
     );
   });
 }
+
+// 20 to 50 minutes away: inside the last hour.
+const moveIntoWindow = (originalStart: string, doctorId: string) =>
+  moveTo(originalStart, doctorId, 50);
 
 test("inside the last hour, cancel and reschedule are disabled and say why", async ({
   browser,
@@ -155,5 +162,25 @@ test("moving a visit that now starts within the hour says so in plain words (CHA
   await expect(alertOf(page)).toContainText(
     "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.",
   );
+  await context.close();
+});
+
+test("a cancel dialog left open when the visit comes within the hour closes and says why", async ({
+  browser,
+}) => {
+  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 4, 2);
+  // 70 to 100 minutes away: outside the hour when the page is drawn.
+  await moveTo(startsAt, doctorId, 100);
+  await page.clock.install({ time: new Date() });
+  await page.goto("/appointments");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByLabel("Why are you cancelling?")).toBeVisible();
+  // 45 minutes pass with the dialog open; the page looks again every 30 seconds.
+  await page.clock.fastForward(45 * 60_000);
+  await expect(page.getByLabel("Why are you cancelling?")).toHaveCount(0);
+  await expect(alertOf(page)).toContainText(
+    "This visit now starts in less than an hour, so it can no longer be cancelled or moved.",
+  );
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
   await context.close();
 });

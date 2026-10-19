@@ -207,7 +207,7 @@ async def revoke_access(
     "/{appointment_id}/cancel",
     response_model=Appointment,
     description=RULE_CANCEL,
-    responses=change_too_late_responses("/internal/admin/appointments/{appointment_id}/cancel"),
+    responses=change_too_late_responses(),
 )
 async def cancel_for_patient(
     appointment_id: uuid.UUID,
@@ -230,7 +230,7 @@ async def cancel_for_patient(
     "/{appointment_id}/reschedule",
     response_model=Appointment,
     description=RULE_RESCHEDULE,
-    responses=change_too_late_responses("/internal/admin/appointments/{appointment_id}/reschedule"),
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_for_patient(
     appointment_id: uuid.UUID,
