@@ -33,6 +33,27 @@ describe("notify", () => {
     );
   });
 
+  it("remembers a request made before the toaster listens, so a toast raised as a page opens still loads it", async () => {
+    // Fresh modules: the gate is page-wide state and earlier cases have already asked.
+    vi.resetModules();
+    const gate = await import("@clinic/ui/lib/toaster-gate");
+    const fresh = await import("@clinic/ui/lib/notify");
+    const early = vi.fn();
+    fresh.notify.info("Raised in the page's own effect");
+    const off = gate.onToasterRequested(early);
+    expect(early).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it("does not ask for the toaster before anything is raised", async () => {
+    vi.resetModules();
+    const gate = await import("@clinic/ui/lib/toaster-gate");
+    const asked = vi.fn();
+    const off = gate.onToasterRequested(asked);
+    expect(asked).not.toHaveBeenCalled();
+    off();
+  });
+
   it.each([
     ["success", "success", "success"],
     ["info", "info", "info"],
