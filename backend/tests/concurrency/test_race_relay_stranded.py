@@ -154,6 +154,7 @@ async def test_control_a_holder_that_does_not_drain_leaves_events_behind(
     assert booked < 5, "with no drain the losers' events should have been left behind"
 
 
+@pytest.mark.race
 async def test_a_loser_returns_at_once_when_the_cursor_is_held(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
@@ -184,6 +185,7 @@ async def test_a_loser_returns_at_once_when_the_cursor_is_held(
     assert publisher.messages == []
 
 
+@pytest.mark.race
 async def test_a_token_mint_flushes_a_stranded_event_with_no_further_bookings(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
@@ -226,6 +228,7 @@ async def test_a_token_mint_flushes_a_stranded_event_with_no_further_bookings(
     _published_once(publisher, 1)
 
 
+@pytest.mark.race
 async def test_nothing_is_published_while_an_older_transaction_is_open(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
@@ -254,6 +257,7 @@ async def test_nothing_is_published_while_an_older_transaction_is_open(
     _published_once(publisher, 2)
 
 
+@pytest.mark.race
 async def test_an_admin_token_mint_flushes_a_stranded_event_too(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
@@ -316,6 +320,7 @@ class _FlakyPublisher(RecordingPublisher):
         await super().publish(messages)
 
 
+@pytest.mark.race
 async def test_a_failure_in_a_later_pass_keeps_what_the_earlier_pass_sent(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
