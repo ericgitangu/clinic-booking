@@ -344,6 +344,18 @@ for (const scheme of ["light", "dark"] as const) {
       );
       await expect(page.getByTestId("sheet-patient")).toBeVisible();
       await audit("appointment sheet");
+      // And a confirmation dialog opened over the sheet.
+      await tap(
+        sheet(page).getByRole("button", { name: "Cancel appointment" }),
+      );
+      await expect(
+        page.getByRole("dialog", { name: "Cancel this appointment?" }),
+      ).toBeVisible();
+      await audit("confirm dialog over the sheet");
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("dialog", { name: "Cancel this appointment?" }),
+      ).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(page.getByTestId("sheet-patient")).toHaveCount(0);
       await page.keyboard.press("Escape");
