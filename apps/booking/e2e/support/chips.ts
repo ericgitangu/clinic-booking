@@ -57,3 +57,14 @@ export async function expectDesignedFocusRing(link: Locator) {
   expect(offset).toBe("2px");
   expect(color).toBe(token);
 }
+
+// Reaches an element the way a keyboard user does: by pressing Tab from the top of the page until it
+// has focus (no programmatic focus), so :focus-visible applies exactly as it would for a person.
+export async function tabTo(page: Page, target: Locator, max = 120) {
+  await page.locator("body").click({ position: { x: 1, y: 1 } });
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press("Tab");
+    if (await target.evaluate((el) => el === document.activeElement)) return;
+  }
+  throw new Error(`Tab did not reach the element in ${max} presses`);
+}

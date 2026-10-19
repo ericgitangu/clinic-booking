@@ -13,6 +13,7 @@ import {
   expectFree,
   expectInactive,
   freeLink,
+  tabTo,
 } from "./support/chips";
 import { farCell, sharedLateTime } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";
@@ -264,8 +265,7 @@ for (const [n, scheme] of [
     // An inactive chip is not a tab stop; a free one is, and shows the designed focus ring.
     await expect(mine.getByRole("link")).toHaveCount(0);
     const free = freeLink(me.page, slots[2]);
-    await me.page.keyboard.press("Tab"); // keyboard focus, so :focus-visible applies
-    await free.focus();
+    await tabTo(me.page, free); // by keyboard, so :focus-visible applies
     await expect(free).toBeFocused();
     await expectDesignedFocusRing(free);
     // 44 px targets, also for the inactive ones.

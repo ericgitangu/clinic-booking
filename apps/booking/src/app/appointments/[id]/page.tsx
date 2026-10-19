@@ -5,7 +5,8 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
-import { needsSignIn } from "@/lib/auth-failure";
+import { isForbidden, needsSignIn } from "@/lib/auth-failure";
+import { NoAccess } from "@/components/account/no-access";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -36,6 +37,10 @@ export default async function AppointmentPage({
   const res = await api.myAppointment(callerFor(who), id);
   if (!res.ok) {
     // The API refusing the session is a sign-in question, not a missing page.
+    if (isForbidden(res))
+      return (
+        <NoAccess back={{ href: "/appointments", label: "My appointments" }} />
+      );
     if (needsSignIn(res)) {
       return (
         <SignInPrompt
@@ -54,7 +59,22 @@ export default async function AppointmentPage({
     );
   }
   const a = res.data;
-  const doc = await api.getDoctor(a.doctor_id);
+  // The doctor and the day to check both come from the appointment, so these two reads cannot start
+  // before it has answered; once it has, they run together.
+  const cancelled0 = a.status === "cancelled";
+  const [doc, avail] = await Promise.all([
+    api.getDoctor(a.doctor_id),
+    cancelled0 && Date.parse(a.starts_at) > Date.now()
+      ? api.getAvailability(a.doctor_id, clinicDay(a.starts_at))
+      : Promise.resolve(null),
+  ]);
+  // "Free again" is said only when the doctor's list of free times really has it.
+  const isFree =
+    avail !== null &&
+    avail.ok &&
+    avail.data.slots.some(
+      (s) => Date.parse(s.starts_at) === Date.parse(a.starts_at),
+    );
   const doctorName = doc.ok ? doc.data.full_name : "Your doctor";
   const when = formatWhen(a.starts_at);
   const cancelled = a.status === "cancelled";
@@ -97,9 +117,11 @@ export default async function AppointmentPage({
       {cancelled ? (
         <div data-testid="cancelled-note" className="mt-6 space-y-3 text-base">
           <p>
-            {future
+            {isFree
               ? `This appointment was cancelled. ${when} is free again, and anyone can book it.`
-              : "This appointment was cancelled."}
+              : future
+                ? "This appointment was cancelled."
+                : "This appointment was cancelled."}
           </p>
           {a.cancellation_reason ? (
             <p className="text-muted-foreground">

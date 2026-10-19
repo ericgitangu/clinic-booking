@@ -12,6 +12,7 @@ import {
   expectDesignedFocusRing,
   expectFree,
   expectInactive,
+  tabTo,
 } from "./support/chips";
 import { farCell } from "./support/cells";
 import { withDb } from "./support/db";
@@ -74,8 +75,7 @@ test("a free time is a real link to its details page, reachable and activated by
   await expect(link.getByRole("link")).toHaveCount(0);
 
   // Keyboard: Tab reaches it, it shows the designed focus ring, and Enter follows it.
-  await page.keyboard.press("Tab");
-  await link.focus();
+  await tabTo(page, link);
   await expect(link).toBeFocused();
   await expectDesignedFocusRing(link);
   await page.keyboard.press("Enter");
@@ -111,7 +111,7 @@ test("tab order on the grid visits free times only, in time order", async ({
   await expect(
     page.getByRole("link", { name: new RegExp(`^${hhmm(slots[1])}`) }),
   ).toHaveCount(0);
-  await links.first().focus();
+  await tabTo(page, links.first());
   for (let i = 0; i < count; i++) {
     await expect(links.nth(i)).toBeFocused();
     await page.keyboard.press("Tab");
@@ -268,7 +268,7 @@ test("arrow keys move between free times and between days; ? opens the shortcut 
   await page.setViewportSize({ width: 360, height: 800 }); // three columns
   await page.goto(grid(doctorId, day));
   const first = chip(page, slots[0]).getByRole("link");
-  await first.focus();
+  await tabTo(page, first);
   await page.keyboard.press("ArrowRight");
   await expect(chip(page, slots[1]).getByRole("link")).toBeFocused();
   await page.keyboard.press("ArrowLeft");
@@ -287,7 +287,7 @@ test("arrow keys move between free times and between days; ? opens the shortcut 
   const days = page
     .getByRole("navigation", { name: "Pick a day" })
     .locator("a");
-  await days.first().focus();
+  await tabTo(page, days.first());
   await page.keyboard.press("ArrowRight");
   await expect(days.nth(1)).toBeFocused();
 
@@ -408,14 +408,14 @@ test("the photo disclosure is on the doctor list and in each portrait's descript
 }) => {
   await page.goto("/book");
   await expect(
-    page.getByText(
-      "The doctors are fictional. Their portraits are AI-generated.",
-    ),
+    page
+      .getByRole("main")
+      .getByText("AI-generated portraits of fictional doctors."),
   ).toBeVisible();
   const img = page.locator("li img").first();
   await expect(img).toHaveAttribute(
     "title",
-    "AI-generated portrait of a fictional doctor",
+    "AI-generated portraits of fictional doctors",
   );
   await expect(img).toHaveAttribute(
     "srcset",
@@ -424,11 +424,10 @@ test("the photo disclosure is on the doctor list and in each portrait's descript
   await expect(img).toHaveAttribute("alt", /^Dr\. /);
   await page.goto("/");
   await expect(
-    page.getByRole("link", { name: "How they were made" }),
-  ).toHaveAttribute(
-    "href",
-    /README\.md#doctor-portraits-ai-generated$|#doctor-portraits-ai-generated$/,
-  );
+    page.getByRole("contentinfo").getByRole("link", {
+      name: /AI-generated portraits of fictional doctors/,
+    }),
+  ).toHaveAttribute("href", /#doctor-portraits-ai-generated$/);
 });
 
 test("a link to a time someone else has taken lands on that day's times with a notice", async ({

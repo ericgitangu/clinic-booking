@@ -12,6 +12,7 @@ const read = (rel: string) =>
   );
 
 const readme = read("README.md");
+const footer = read("apps/booking/src/lib/footer-links.ts");
 const landing = read("apps/booking/src/app/page.tsx");
 const script = read("scripts/avatars/portraits.py");
 const HEADING = "Doctor portraits (AI-generated)";
@@ -25,28 +26,28 @@ const slug = (h: string) =>
     .replace(/\s/g, "-");
 
 describe("the portrait disclosure", () => {
-  it("is a heading in the README, and the landing link targets its anchor", () => {
+  it("is a heading in the README, and the footer link targets its anchor", () => {
     expect(readme).toMatch(
       new RegExp(`^### ${HEADING.replace(/[()]/g, "\\$&")}$`, "m"),
     );
     const anchor = slug(HEADING);
     expect(anchor).toBe("doctor-portraits-ai-generated");
-    expect(landing).toContain("${README}#" + anchor);
-    expect(landing).toContain(
-      "Doctor portraits are AI-generated fictional people.",
+    expect(footer).toContain("#" + anchor);
+    expect(footer).toContain(
+      'label: "AI-generated portraits of fictional doctors"',
     );
   });
 
-  it("keeps the landing page to one line: no prompt text there", () => {
+  it("keeps the landing page free of the prompt text", () => {
     expect(landing).not.toContain("Professional corporate headshot");
   });
 
   it("states plainly that the people are fictional and that patients get no generated face", () => {
     const section = readme.slice(
       readme.indexOf(`### ${HEADING}`),
-      readme.indexOf("## 11."),
+      readme.indexOf("## 7. Testing"),
     );
-    expect(section).toContain("AI-generated images of fictional people");
+    expect(section).toContain("AI-generated portraits of fictional doctors");
     expect(section).toContain("Patients never get a generated face");
     expect(section).toContain("Apache License 2.0");
     expect(section).toContain(
@@ -57,7 +58,7 @@ describe("the portrait disclosure", () => {
   it("quotes the generator's prompt verbatim and its per-doctor strings exactly", () => {
     const section = readme.slice(
       readme.indexOf(`### ${HEADING}`),
-      readme.indexOf("## 11."),
+      readme.indexOf("## 7. Testing"),
     );
     // The script splits the template over string literals; join them back.
     const base = script

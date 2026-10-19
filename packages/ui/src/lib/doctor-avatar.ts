@@ -34,7 +34,7 @@ export function doctorPhoto(
 
 /** Said on hover and to screen readers (as the image's description; the alt text stays the name). */
 export const PORTRAIT_DISCLOSURE =
-  "AI-generated portrait of a fictional doctor";
+  "AI-generated portraits of fictional doctors";
 export const ILLUSTRATION_DISCLOSURE = "Illustration of a fictional doctor";
 
 /** "Dr. Achieng Otieno" -> "AO". Skips the title; falls back to "?" for an empty name. */

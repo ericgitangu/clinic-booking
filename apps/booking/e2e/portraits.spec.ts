@@ -41,7 +41,11 @@ test("the doctor's portrait is on the list, the slot page, the details page, the
     .filter({ has: page.locator(`a[href="/book/${doctorId}"]`) });
   const name = (await card.getByRole("heading").innerText()).trim();
   await expectPortrait(page, name, 56);
-  await expect(page.getByText(/portraits are AI-generated/)).toBeVisible();
+  await expect(
+    page
+      .getByRole("main")
+      .getByText(/AI-generated portraits of fictional doctors/),
+  ).toBeVisible();
 
   await page.goto(`/book/${doctorId}?date=${day}`);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();

@@ -6,7 +6,8 @@ import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
-import { needsSignIn } from "@/lib/auth-failure";
+import { isForbidden, needsSignIn } from "@/lib/auth-failure";
+import { NoAccess } from "@/components/account/no-access";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -36,6 +37,9 @@ export default async function MyAppointments({
   }
 
   const res = await api.myAppointments(callerFor(who));
+  if (!res.ok && isForbidden(res)) {
+    return <NoAccess back={{ href: "/book", label: "Book a visit" }} />;
+  }
   if (!res.ok && needsSignIn(res)) {
     return (
       <SignInPrompt

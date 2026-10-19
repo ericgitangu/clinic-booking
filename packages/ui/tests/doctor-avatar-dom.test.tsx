@@ -18,7 +18,7 @@ describe("DoctorAvatar (stateful)", () => {
       `/doctors/${ID}-256.webp 256w, /doctors/${ID}-512.webp 512w`,
     );
     expect(photo.getAttribute("title")).toBe(
-      "AI-generated portrait of a fictional doctor",
+      "AI-generated portraits of fictional doctors",
     );
     expect(photo.getAttribute("width")).toBe("48");
 
@@ -79,6 +79,8 @@ describe("DoctorAvatar (stateful)", () => {
     render(<DoctorAvatar doctorId={ID} name={NAME} />);
     const img = screen.getByRole("img", { name: NAME });
     expect(img.getAttribute("alt")).toBe(NAME);
-    expect(img.getAttribute("title")).toMatch(/AI-generated portrait/);
+    expect(img.getAttribute("title")).toMatch(
+      /AI-generated portraits of fictional doctors/,
+    );
   });
 });

@@ -49,7 +49,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 describe("needsSignIn", () => {
   it.each([
     [401, true],
-    [403, true],
+    [403, false],
     [404, false],
     [409, false],
     [500, false],
@@ -70,19 +70,13 @@ describe("pages", () => {
       "Sign in to see your appointment",
     ],
     [
-      403,
-      "appointment page",
-      "@/app/appointments/[id]/page",
-      "Sign in to see your appointment",
-    ],
-    [
       401,
       "reschedule page",
       "@/app/appointments/[id]/reschedule/page",
       "Sign in to reschedule",
     ],
     [
-      403,
+      401,
       "confirmation page",
       "@/app/book/confirmed/[id]/page",
       "Sign in to see your booking",
@@ -122,7 +116,7 @@ describe("pages", () => {
 describe("actions", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it.each([401, 403])(
+  it.each([401])(
     "cancel with a %i from the API says to sign in",
     async (status) => {
       api.cancelMine.mockResolvedValue(refusal(status));
@@ -138,4 +132,51 @@ describe("actions", () => {
       });
     },
   );
+});
+
+describe("403 is not a sign-in question", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["appointment page", "@/app/appointments/[id]/page"],
+    ["reschedule page", "@/app/appointments/[id]/reschedule/page"],
+    ["confirmation page", "@/app/book/confirmed/[id]/page"],
+  ])(
+    "the %s says there is no access, with a link back, and never 'sign in again'",
+    async (_n, path) => {
+      api.myAppointment.mockResolvedValue(refusal(403));
+      const { default: Page } = await import(/* @vite-ignore */ path);
+      const html = renderToStaticMarkup(
+        await Page({ params: params(ID), searchParams: Promise.resolve({}) }),
+      );
+      expect(html).toContain("You don&#x27;t have access to this.");
+      expect(html).toContain('href="/appointments"');
+      expect(html).not.toMatch(/sign in again/i);
+      expect(html).not.toContain("Sign in with Google");
+    },
+  );
+
+  it("My appointments does the same", async () => {
+    api.myAppointments.mockResolvedValue(refusal(403));
+    const { default: Page } = await import("@/app/appointments/(list)/page");
+    const html = renderToStaticMarkup(
+      await Page({ searchParams: Promise.resolve({}) }),
+    );
+    expect(html).toContain("You don&#x27;t have access to this.");
+    expect(html).not.toMatch(/sign in again/i);
+  });
+
+  it("an action answers with the same words", async () => {
+    api.cancelMine.mockResolvedValue(refusal(403));
+    const { cancelAppointment } = await import("@/app/actions");
+    const fd = new FormData();
+    fd.set("appointment_id", ID);
+    fd.set("reason", "Plans changed");
+    const state = await cancelAppointment({ status: "idle" } as never, fd);
+    expect(state).toMatchObject({
+      status: "error",
+      code: "FORBIDDEN",
+      message: "You don't have access to this.",
+    });
+  });
 });

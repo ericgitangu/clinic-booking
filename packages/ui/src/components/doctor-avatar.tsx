@@ -61,7 +61,8 @@ export function DoctorAvatarView({
     );
   }
   return (
-    // Plain img: the source is an inline data URI, so next/image has nothing to optimise.
+    // Plain img: a static file from the app's public directory with its own width and height, so
+    // next/image (optimisation is off) would add nothing.
     <img
       ref={imgRef}
       src={src}

@@ -6,7 +6,8 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { RememberBooking } from "@/components/booking/remember-booking";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
-import { needsSignIn } from "@/lib/auth-failure";
+import { isForbidden, needsSignIn } from "@/lib/auth-failure";
+import { NoAccess } from "@/components/account/no-access";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
@@ -36,6 +37,10 @@ export default async function Confirmed({
   const appt = await api.myAppointment(callerFor(who), id);
   if (!appt.ok) {
     // The API refusing the session is a sign-in question, not a missing page.
+    if (isForbidden(appt))
+      return (
+        <NoAccess back={{ href: "/appointments", label: "My appointments" }} />
+      );
     if (needsSignIn(appt)) {
       return (
         <SignInPrompt

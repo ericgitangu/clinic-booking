@@ -69,7 +69,7 @@ The files here are the source of truth: per doctor id, `<id>-256.webp` and `<id>
 bytes are inlined into any JavaScript chunk) and writes the manifest `packages/ui/src/lib/doctor-avatar-data.ts`
 that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 256 w and 512 w with `sizes` set to the displayed width, explicit width and
 height), then the SVG if the portrait fails, then initials. A unit test fails if the sources, the manifest and
-both app copies drift apart. To change a portrait, replace both WebP sizes and run the sync.
+the app copy drift apart. To change a portrait, replace both WebP sizes and run the sync.
 
 ## Regenerate
 

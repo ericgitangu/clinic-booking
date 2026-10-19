@@ -72,7 +72,7 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     severity: "critical",
   },
   FORBIDDEN: {
-    message: "Your account cannot do that.",
+    message: "You don't have access to this.",
     severity: "error",
   },
   TIMEZONE_REQUIRED: {

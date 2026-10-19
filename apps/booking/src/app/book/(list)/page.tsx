@@ -29,7 +29,7 @@ export default function BookPage() {
         <DoctorList />
       </Suspense>
       <p className="mt-8 text-sm text-muted-foreground">
-        The doctors are fictional. Their portraits are AI-generated.
+        AI-generated portraits of fictional doctors.
       </p>
     </section>
   );

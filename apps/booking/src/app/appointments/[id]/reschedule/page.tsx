@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DateStrip } from "@/components/booking/date-strip";
 import { SlotChooser } from "@/components/booking/slot-chooser";
-import { needsSignIn } from "@/lib/auth-failure";
+import { isForbidden, needsSignIn } from "@/lib/auth-failure";
+import { NoAccess } from "@/components/account/no-access";
 import * as api from "@/lib/api";
 import {
   clinicDay,
@@ -43,6 +44,10 @@ export default async function Reschedule({
   // 404 for an appointment that is not this person's, the same as for one that does not exist.
   const appt = await api.myAppointment(callerFor(who), id);
   if (!appt.ok) {
+    if (isForbidden(appt))
+      return (
+        <NoAccess back={{ href: "/appointments", label: "My appointments" }} />
+      );
     if (needsSignIn(appt)) {
       return (
         <SignInPrompt
