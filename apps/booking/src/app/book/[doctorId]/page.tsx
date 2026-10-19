@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
 import { clinicDay, formatDayLong, isValidDay } from "@/lib/clinic-time";
+import { shouldTrackRenders } from "@/lib/test-run";
 import { ownBooked } from "@/lib/own";
 import { describeProblem } from "@/lib/problems";
 
@@ -30,10 +32,10 @@ export default async function PickTime({
   searchParams,
 }: {
   params: Promise<{ doctorId: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; notice?: string }>;
 }) {
   const { doctorId } = await params;
-  const { date } = await searchParams;
+  const { date, notice } = await searchParams;
   const today = clinicDay(new Date());
   const day = isValidDay(date) ? date : today;
 
@@ -52,7 +54,7 @@ export default async function PickTime({
   }
 
   return (
-    <section className="pb-28 pt-8">
+    <section className="pb-12 pt-8">
       <p className="text-base">
         <Link href="/book" className="underline underline-offset-4">
           All doctors
@@ -60,12 +62,21 @@ export default async function PickTime({
       </p>
       {doctor.ok ? (
         <>
-          <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">
-            {doctor.data.full_name}
-          </h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            {doctor.data.specialty}. Times are Nairobi time.
-          </p>
+          <div className="mt-3 flex items-center gap-4">
+            <DoctorAvatar
+              doctorId={doctor.data.id}
+              name={doctor.data.full_name}
+              size={64}
+            />
+            <div>
+              <h1 className="font-heading text-3xl font-semibold tracking-tight">
+                {doctor.data.full_name}
+              </h1>
+              <p className="mt-1 text-base text-muted-foreground">
+                {doctor.data.specialty}. Times are Nairobi time.
+              </p>
+            </div>
+          </div>
         </>
       ) : (
         <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">
@@ -81,12 +92,27 @@ export default async function PickTime({
         />
       </div>
 
+      {notice === "past" || notice === "taken" ? (
+        <p
+          role="status"
+          className="mt-6 rounded-lg border border-border bg-muted p-4 text-base font-semibold"
+        >
+          {notice === "past"
+            ? "That time has already passed. Pick another time."
+            : "That time is no longer free. Pick another time."}
+        </p>
+      ) : null}
+
       <h2 className="mt-8 font-heading text-xl font-semibold">
         {formatDayLong(day)}
       </h2>
+      <p className="mt-2 hidden text-sm text-muted-foreground pointer-fine:block">
+        Tip: arrow keys move between times and days. Press ? for shortcuts.
+      </p>
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            trackRenders={shouldTrackRenders(process.env)}
             key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="details"
             doctorId={doctorId}

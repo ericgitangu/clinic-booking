@@ -103,7 +103,7 @@ flowchart LR
   M[clinic-migrate: Cloud Run Job] -->|alembic, role clinic_owner| D
 ```
 
-One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Booking, moving and cancelling send the signed-in patient an email through Resend, from `Idyllic Clinic Booking <reminders@mail.ericgitangu.com>` (the verified subdomain, which keeps the root domain's reputation separate) with replies going to my own address. Mail goes only to verified, linked Google accounts. A daily Vercel cron at 15:00 UTC (18:00 in Nairobi) emails a reminder for every appointment tomorrow. Emails are sent after the response with a 5-second abort, and the day (100) and month (3,000) allowances are reserved atomically in the database before a send, so a failed or slow email never fails a booking ([ADR-0025](docs/adr/0025-email-with-resend.md)). `mail.ericgitangu.com` was the only domain showing Verified on my Resend Domains page when it was checked on 2026-10-18 ([`verification.md`](docs/engineering/verification.md)). Booking and cancellation emails were verified live on 2026-10-18 (the gatekeeper's observation, in [`verification.md`](docs/engineering/verification.md)); the daily reminder cron's first send is still unconfirmed. Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
+One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Booking, moving and cancelling send the signed-in patient an email through Resend, from `Idyllic Clinic <reminders@mail.ericgitangu.com>` (the verified subdomain, which keeps the root domain's reputation separate) with replies going to my own address. Mail goes only to verified, linked Google accounts. A daily Vercel cron at 15:00 UTC (18:00 in Nairobi) emails a reminder for every appointment tomorrow. Emails are sent after the response with a 5-second abort, and the day (100) and month (3,000) allowances are reserved atomically in the database before a send, so a failed or slow email never fails a booking ([ADR-0025](docs/adr/0025-email-with-resend.md)). `mail.ericgitangu.com` was the only domain showing Verified on my Resend Domains page when it was checked on 2026-10-18 ([`verification.md`](docs/engineering/verification.md)). Booking and cancellation emails were verified live on 2026-10-18 (the gatekeeper's observation, in [`verification.md`](docs/engineering/verification.md)); the daily reminder cron's first send is still unconfirmed. Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
 
 ### 3.2 Data model
 
@@ -204,6 +204,8 @@ Each row is the decision, what it costs me, and the ADR that weighs the alternat
 - **The daily reminder has not been seen live.** Booking and cancellation emails were verified live on 2026-10-18, but the first send of the 15:00 UTC reminder cron is still to be confirmed in the Resend logs.
 - **The admin app cannot be tried without an invitation**, for the reason in the Start here list.
 
+**Known gap: largest contentful paint on `/book`.** The bar is 2.5 s on mobile Lighthouse. Measured locally (the repo's `lighthouse.sh`, mobile preset, production build, 5-run medians): `/book` 2.80 s, `/` 2.71 s, and the static pages that carry only the shell 2.49 s; CircleCI measured `/book` at 2.91 s. The LCP element is text, and the time is dominated by the first-load JavaScript of the shared shell (React and the Next client are about 117 KB gzip), so the pages with more content sit above the floor. I trimmed first-load JS (about 25 KB on `/`), streamed the `/book` heading before the API answers and sized the portraits by `srcset`, but did not reach 2.5 s; the budget is unchanged. Next step: load the header menus on demand instead of on every page.
+
 ### 4.3 Beyond the brief
 
 - **Race-proof tests with a naive control** that must fail without the index: `make test-race`, `make test-control` ([ADR-0018](docs/adr/0018-testing-strategy.md)).
@@ -255,6 +257,24 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 | `docs/` | ADRs, runbooks, the error catalogue |
 
 `make help` lists every task ([ADR-0001](docs/adr/0001-monorepo-layout-and-task-runner.md)).
+
+### Doctor portraits (AI-generated)
+
+These are **AI-generated portraits of fictional doctors**: the five seeded doctors do not exist, and the images are not photographs of anyone real. Patients never get a generated face: a patient's avatar is their Google picture, or their initials.
+
+- **Model and run.** Z-Image-Turbo (`Tongyi-MAI/Z-Image-Turbo`) through the Hugging Face Space `mcp-tools/Z-Image-Turbo` (gradio `/generate`), on 2026-10-18. 1024x1024, steps 8, shift 3.0, fixed seed 2026. The files served are WebP at 256 and 512 px with EXIF stripped; the 1024 px originals are not kept in the repository.
+- **Licence.** Apache License 2.0. The model card (`Tongyi-MAI/Z-Image-Turbo`, revision `f332072aa78be7aecdf3ee76d5c247082da564a6`) declares `license: apache-2.0` ([model card](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)), confirmed with the Hugging Face CLI on 2026-10-19; the Space listed as running that model is `mcp-tools/Z-Image-Turbo`; the card is not gated and adds no terms about generated images. Apache 2.0 allows commercial use and does not restrict outputs.
+- **Prompt template** (verbatim): "Professional corporate headshot photograph, {who}, wearing a crisp white doctor's coat over {wear}, stethoscope around neck, warm genuine smile, looking at camera, soft even studio lighting, plain light grey background, head and shoulders, centered, sharp focus, photorealistic, 85mm lens"
+
+| Doctor | {who} | {wear} |
+| --- | --- | --- |
+| Dr. Achieng Otieno | a Kenyan Black woman in her late 30s, general practitioner, short natural hair, small gold stud earrings | navy blouse |
+| Dr. Brian Kamau | a Kenyan Black man in his mid 30s, paediatrician, short cropped hair, friendly expression | light blue shirt |
+| Dr. Chebet Rotich | a Kenyan Black woman in her early 30s, dermatologist, neat braids tied back, clear radiant skin | teal scrubs |
+| Dr. David Mwangi | a Kenyan Black man in his late 40s, obstetrician gynaecologist, short greying hair, trimmed beard, reassuring expression | white shirt and dark tie |
+| Dr. Esther Njeri | a Kenyan Black woman in her early 40s, dentist, shoulder-length relaxed hair, bright smile | lilac scrubs |
+
+Fallbacks if a portrait fails to load: the CC0 illustration, then initials. Regenerate with `make avatars` ([`scripts/avatars/portraits.py`](scripts/avatars/portraits.py)); details and sources in [`packages/ui/assets/doctors/README.md`](packages/ui/assets/doctors/README.md) and [`docs/third-party.md`](docs/third-party.md).
 
 ## 7. Testing
 

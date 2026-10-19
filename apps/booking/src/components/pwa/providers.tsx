@@ -1,28 +1,25 @@
 "use client";
 
-import { SerwistProvider } from "@serwist/turbopack/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
-// One QueryClient per browser tab. Nothing is persisted: the cache lives in memory and is gone on
-// reload, so no appointment or availability data is written to the device.
-export function Providers({ children }: { children: ReactNode }) {
-  const [client] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } },
-      }),
-  );
-  return (
-    <SerwistProvider
-      swUrl="/serwist/sw.js"
-      // The provider can ask the worker to cache every page the user navigates to and to reload on
-      // reconnect; the first would store per-user HTML and the second can drop a half-filled form.
-      cacheOnNavigation={false}
-      reloadOnOnline={false}
-      disable={process.env.NODE_ENV !== "production"}
-    >
-      <QueryClientProvider client={client}>{children}</QueryClientProvider>
-    </SerwistProvider>
-  );
+// One QueryClient per browser tab, shared by every provider below it (a module singleton in the
+// browser, a fresh one per render on the server). Nothing is persisted: the cache lives in memory and
+// is gone on reload, so no appointment or availability data is written to the device.
+let browserClient: QueryClient | undefined;
+function makeClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } },
+  });
+}
+function clientForRender(): QueryClient {
+  if (typeof window === "undefined") return makeClient();
+  return (browserClient ??= makeClient());
+}
+
+// Only the pages that read or write availability and bookings sit under this (see the layouts in
+// app/book and app/appointments), so the landing and legal pages do not load the query library.
+export function QueryProvider({ children }: { children: ReactNode }) {
+  const [client] = useState(clientForRender);
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

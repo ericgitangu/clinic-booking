@@ -53,12 +53,18 @@ describe("enforced", () => {
     [undefined, undefined],
     [undefined, "http://localhost.evil.example"],
     ["production", LOCAL],
-  ])("stays on for VERCEL_ENV=%s url=%s even with E2E=1 and the setting", (v, url) => {
-    const o: Record<string, string> = { RECAPTCHA_ENFORCE: "false", E2E: "1" };
-    if (v) o.VERCEL_ENV = v;
-    if (url) o.BETTER_AUTH_URL = url;
-    expect(enforced(env(o))).toBe(true);
-  });
+  ])(
+    "stays on for VERCEL_ENV=%s url=%s even with E2E=1 and the setting",
+    (v, url) => {
+      const o: Record<string, string> = {
+        RECAPTCHA_ENFORCE: "false",
+        E2E: "1",
+      };
+      if (v) o.VERCEL_ENV = v;
+      if (url) o.BETTER_AUTH_URL = url;
+      expect(enforced(env(o))).toBe(true);
+    },
+  );
   it("needs both the test marker and the setting", () => {
     expect(enforced(env({ E2E: "1" }))).toBe(true);
     expect(enforced(env({ NODE_ENV: "test" }))).toBe(true);
@@ -81,7 +87,11 @@ describe("checkHuman", () => {
   it("skips the verifier only when the check is switched off for a test run", async () => {
     const verify = verifier({ ok: true, score: 1 });
     const r = await checkHuman("", "book", {
-      env: env({ RECAPTCHA_ENFORCE: "false", E2E: "1", BETTER_AUTH_URL: LOCAL }),
+      env: env({
+        RECAPTCHA_ENFORCE: "false",
+        E2E: "1",
+        BETTER_AUTH_URL: LOCAL,
+      }),
       verify,
     });
     expect(r).toEqual({ ok: true });

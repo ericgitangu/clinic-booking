@@ -27,13 +27,11 @@ for (const vp of VIEWPORTS) {
       page,
     }) => {
       await page.goto("/");
-      await expect(page).toHaveTitle("Idyllic Clinic Booking");
+      await expect(page).toHaveTitle("Idyllic Clinic");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        "Idyllic Clinic Booking",
+        "Idyllic Clinic",
       );
-      await expect(page.getByRole("banner")).toContainText(
-        "Idyllic Clinic Booking",
-      );
+      await expect(page.getByRole("banner")).toContainText("Idyllic Clinic");
     });
 
     test("every button and link can be hit with a thumb (at least 44px tall)", async ({

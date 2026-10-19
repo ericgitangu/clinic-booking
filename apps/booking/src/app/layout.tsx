@@ -3,7 +3,8 @@ import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { SessionMenu } from "@/components/account/session-menu";
-import { Providers } from "@/components/pwa/providers";
+import { ShortcutHelp } from "@/components/booking/shortcut-help";
+import { ServiceWorker } from "@/components/pwa/service-worker";
 import { NAV_LINKS } from "@/components/layout/nav-links";
 import { FOOTER_COLUMNS } from "@/lib/footer-links";
 import { fontVars } from "@/lib/fonts";
@@ -19,17 +20,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning style={fontVars}>
       <body className="min-h-dvh font-sans antialiased">
         <ThemeProvider>
-          <Providers>
-            <PageShell
-              name={SITE.name}
-              navLinks={NAV_LINKS}
-              footerColumns={FOOTER_COLUMNS}
-              footerNotice={FOOTER_NOTICE}
-              headerTrailing={<SessionMenu />}
-            >
-              {children}
-            </PageShell>
-          </Providers>
+          <PageShell
+            name={SITE.name}
+            navLinks={NAV_LINKS}
+            footerColumns={FOOTER_COLUMNS}
+            footerNotice={FOOTER_NOTICE}
+            headerTrailing={<SessionMenu />}
+          >
+            {children}
+          </PageShell>
+          <ShortcutHelp />
+          <ServiceWorker />
         </ThemeProvider>
       </body>
     </html>
