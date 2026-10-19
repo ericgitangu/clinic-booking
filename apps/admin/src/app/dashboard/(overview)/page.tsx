@@ -154,6 +154,30 @@ export default async function Dashboard({
         comparedWith={`the ${days} days before`}
         items={[
           {
+            label: "Today",
+            value: String(
+              dash.today.totals.booked +
+                dash.today.totals.arrived +
+                dash.today.totals.no_show +
+                dash.today.totals.cancelled,
+            ),
+            note: `visits today, ${dash.today.totals.cancelled} cancelled`,
+            drill: {
+              title: "Today's visits",
+              description: "Every visit today, all doctors, any status.",
+              spec: {
+                from: todayDay,
+                to: addDays(todayDay, 1),
+                status: "all",
+              },
+              expected:
+                dash.today.totals.booked +
+                dash.today.totals.arrived +
+                dash.today.totals.no_show +
+                dash.today.totals.cancelled,
+            },
+          },
+          {
             label: "Upcoming booked",
             value: String(dash.range.totals.upcoming_active),
             note: "from now on, all doctors",
@@ -167,6 +191,7 @@ export default async function Dashboard({
                 status: "booked",
               },
               upcoming: true,
+              expected: dash.range.totals.upcoming_active,
             },
           },
           {
@@ -175,13 +200,16 @@ export default async function Dashboard({
             note: `visits starting in the last ${days} days`,
             drill: inRange("Cancelled visits", "Cancelled visits", {
               spec: { ...range, status: "cancelled" },
+              expected: k.counts.cancelled,
             }),
           },
           {
             label: "Fill rate",
             value: pct(k.fill_rate.value),
             note: `${k.counts.booked} booked of ${k.counts.offered} slots offered`,
-            drill: inRange("Booked visits", "Booked visits, arrived or not,"),
+            drill: inRange("Booked visits", "Booked visits, arrived or not,", {
+              expected: k.counts.booked,
+            }),
             delta: shareDelta(
               k.fill_rate.value,
               k.fill_rate.previous,
@@ -198,6 +226,7 @@ export default async function Dashboard({
               "Booked visits, opened on those marked arrived,",
               {
                 visit: "arrived",
+                expected: k.counts.arrived,
               },
             ),
             delta: shareDelta(
@@ -213,6 +242,7 @@ export default async function Dashboard({
             note: "cancellations per booking made",
             drill: inRange("Cancelled visits", "Cancelled visits", {
               spec: { ...range, status: "cancelled" },
+              expected: k.counts.cancelled,
             }),
             delta: shareDelta(
               k.cancellation_rate.value,
@@ -230,6 +260,7 @@ export default async function Dashboard({
               "Booked visits, opened on those marked no-show at the desk,",
               {
                 visit: "no_show",
+                expected: k.counts.no_show,
               },
             ),
             delta: shareDelta(
@@ -248,6 +279,7 @@ export default async function Dashboard({
             note: "booked visits starting in the range",
             drill: inRange("Booked visits and how far ahead", "Booked visits", {
               showLead: true,
+              expected: k.counts.booked,
             }),
             delta: durationDelta(
               lead(k.median_lead_minutes.value),

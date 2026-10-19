@@ -25,6 +25,8 @@ export interface DrillConfig {
   slot?: { weekday: number; hour: number };
   /** Show how far ahead each visit was booked. */
   showLead?: boolean;
+  /** The number the sheet was opened from. If the list is cut short, the sheet says "of N". */
+  expected?: number;
 }
 
 export interface DrillRow {
@@ -102,4 +104,16 @@ export function leadHours(
   r: Pick<DrillRow, "created_at" | "starts_at">,
 ): number {
   return (Date.parse(r.starts_at) - Date.parse(r.created_at)) / 3_600_000;
+}
+
+/** The line above the list. A list cut at the read bound says so, with the number it was opened from. */
+export function countLine(o: {
+  shown: number;
+  truncated: boolean;
+  expected?: number;
+}): string {
+  const visits = (n: number) => `${n} ${n === 1 ? "visit" : "visits"}`;
+  if (!o.truncated) return visits(o.shown);
+  const of = o.expected !== undefined ? ` of ${o.expected}` : "";
+  return `Showing ${o.shown}${of} visits. The list is cut short; narrow the dates to see the rest.`;
 }

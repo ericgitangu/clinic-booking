@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyDrill,
+  countLine,
   leadHours,
   weekdayHour,
   type DrillConfig,
@@ -115,5 +116,23 @@ describe("drill-down rules", () => {
 
   it("measures how far ahead a visit was booked", () => {
     expect(leadHours(row("x"))).toBe(48);
+  });
+});
+
+describe("the line above the list", () => {
+  it("is a plain count when nothing was cut", () => {
+    expect(countLine({ shown: 1, truncated: false })).toBe("1 visit");
+    expect(countLine({ shown: 12, truncated: false, expected: 12 })).toBe(
+      "12 visits",
+    );
+  });
+
+  it("says showing 500 of N, with the number from the card, when the list was cut", () => {
+    expect(countLine({ shown: 500, truncated: true, expected: 734 })).toMatch(
+      /^Showing 500 of 734 visits\./,
+    );
+    expect(countLine({ shown: 500, truncated: true })).toMatch(
+      /^Showing 500 visits\./,
+    );
   });
 });

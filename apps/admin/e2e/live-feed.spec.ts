@@ -298,6 +298,20 @@ test.describe("live feed", () => {
     await expect(status).not.toHaveAttribute("data-updated-at", "");
   });
 
+  test("a row in the live feed opens its appointment", async ({ as }) => {
+    const page = await as("owner");
+    await live(page);
+    const name = `Live Row ${Date.now()}`;
+    const made = await book(name);
+    const row = page.getByTestId("live-event").filter({ hasText: name });
+    await expect(row).toBeVisible({ timeout: 2000 });
+    await row.getByRole("link").click();
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard/appointments/${made.id}$`),
+    );
+    await expect(page.getByTestId("appointment-patient")).toHaveText(name);
+  });
+
   test("a veto made from the appointment page shows on another person's open page within 2 seconds", async ({
     as,
     browser,

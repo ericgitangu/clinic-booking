@@ -321,6 +321,89 @@ test.describe("sections", () => {
   });
 });
 
+test.describe("the Today figures and the free slots", () => {
+  test("the Today card and each figure in the totals line open exactly that many visits", async ({
+    as,
+  }) => {
+    // A visit of our own in the last hours, so there is something to count today.
+    test.skip(
+      inFirstHourOfClinicDay(),
+      "a past half hour falls on yesterday in the first hour of the clinic day",
+    );
+    const own = await bookOneStraightThroughTheApi();
+    moveToPastHalfHour(own, 6, false, true);
+
+    const today = localDate(new Date());
+    const board = await internal<{
+      totals: {
+        booked: number;
+        arrived: number;
+        no_show: number;
+        cancelled: number;
+      };
+    }>("GET", `/internal/admin/ops/today?date=${today}`, owner);
+    const t = board.body.totals;
+    const all = t.booked + t.arrived + t.no_show + t.cancelled;
+    expect(all).toBeGreaterThan(0);
+
+    const page = await as("owner");
+    await openDashboard(page);
+    // The card's own number is the API's, and the sheet agrees with it.
+    await expect(page.getByTestId("kpi-today")).toHaveText(String(all));
+    const trigger = card(page, "Today");
+    await tap(trigger);
+    await expectSheetCount(page, all);
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+
+    const line = page.getByTestId("today-totals");
+    for (const [word, n] of [
+      ["booked", t.booked],
+      ["arrived", t.arrived],
+      ["no-show", t.no_show],
+      ["cancelled", t.cancelled],
+    ] as const) {
+      const button = line.getByRole("button", { name: `${n} ${word}` });
+      await tap(button);
+      await expectSheetCount(page, n);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    }
+  });
+
+  test("the free-slots sheet lists exactly the API's slots, and a doctor narrows it", async ({
+    as,
+  }) => {
+    const gaps = await internal<{
+      items: { doctor_id: string }[];
+    }>("GET", "/internal/admin/ops/gaps?hours=48", owner);
+    test.skip(
+      gaps.body.items.length === 0,
+      "no free slot in the next 48 hours at this time of day",
+    );
+    const page = await as("owner");
+    await openDashboard(page);
+    await tap(page.getByTestId("slots-open"));
+    await expect(page.getByTestId("slots-count")).toHaveAttribute(
+      "data-count",
+      String(gaps.body.items.length),
+    );
+    await expect(page.getByTestId("slots-list").locator("li")).toHaveCount(
+      gaps.body.items.length,
+    );
+    const first = gaps.body.items[0]!.doctor_id;
+    await page.getByLabel("Doctor").selectOption(first);
+    const expected = gaps.body.items.filter(
+      (g) => g.doctor_id === first,
+    ).length;
+    await expect(page.getByTestId("slots-count")).toHaveAttribute(
+      "data-count",
+      String(expected),
+    );
+    await page.keyboard.press("Escape");
+  });
+});
+
 test.describe("actions are visible where the work is", () => {
   test("a viewer sees no action on the appointment page or the Today board", async ({
     as,

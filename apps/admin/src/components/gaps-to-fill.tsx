@@ -1,5 +1,6 @@
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { BookOnBehalf } from "@/components/book-on-behalf";
+import { SlotsSheet } from "@/components/slots-sheet";
 import { formatSlot, formatTime } from "@/lib/clinic-time";
 import type { FreeSlot, GapList } from "@clinic/api/generated";
 
@@ -106,6 +107,14 @@ export function GapsToFill({
             </li>
           ))}
         </ul>
+      )}
+      {gaps.items.length > 0 && (
+        <SlotsSheet
+          slots={gaps.items}
+          hours={gaps.hours}
+          truncated={gaps.truncated}
+          canBook={canBook}
+        />
       )}
       {(gaps.truncated || all.length > shown.length) && (
         <p className="text-sm text-muted-foreground">

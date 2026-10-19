@@ -69,9 +69,33 @@ export function TodayBoard({
           </div>
         )}
       </div>
+      {/* Each figure opens the visits behind it. Read together the line is still
+          "X booked, Y arrived, Z no-show, W cancelled." */}
       <p className="text-sm text-muted-foreground" data-testid="today-totals">
-        {totals.booked} booked, {totals.arrived} arrived, {totals.no_show}{" "}
-        no-show, {totals.cancelled} cancelled.
+        {(
+          [
+            ["booked", "booked", totals.booked, "Booked, not yet marked"],
+            ["arrived", "arrived", totals.arrived, "Arrived"],
+            ["no_show", "no-show", totals.no_show, "No-show"],
+            ["cancelled", "cancelled", totals.cancelled, "Cancelled"],
+          ] as const
+        ).map(([visit, word, n, title], i, all) => (
+          <span key={visit}>
+            <DrillSheet
+              className="inline-flex min-h-6 items-center rounded-sm px-0.5 underline underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              config={{
+                title: `${title} today`,
+                description: "Visits today, all doctors.",
+                spec: { from: date, to: addDays(date, 1), status: "all" },
+                visit,
+                expected: n,
+              }}
+            >
+              {n} {word}
+            </DrillSheet>
+            {i < all.length - 1 ? ", " : "."}
+          </span>
+        ))}
       </p>
       {board.doctors.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground">

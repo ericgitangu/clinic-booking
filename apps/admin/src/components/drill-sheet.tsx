@@ -25,6 +25,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatSlot } from "@/lib/clinic-time";
 import {
   applyDrill,
+  countLine,
   leadHours,
   type DrillConfig,
   type DrillRow,
@@ -215,11 +216,14 @@ export function DrillSheet({
           data-count={data ? rows.length : ""}
         >
           {data
-            ? `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`
+            ? countLine({
+                shown: rows.length,
+                truncated: data.truncated,
+                expected: config.expected,
+              })
             : pending
               ? "Loading"
               : ""}
-          {data?.truncated ? ". The list is cut at 500; narrow the dates." : ""}
         </p>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
