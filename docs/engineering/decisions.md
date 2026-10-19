@@ -1,6 +1,6 @@
 # Decisions and extras
 
-The README carries a ten-row summary. This page is the longer index: one row per headline decision with the alternative I turned down, and then every item I built beyond the brief with its justification, cost and status. The reasoning itself is in the ADRs, linked on each row. Who decided what is in each ADR's `Deciders` line; where it only says "engineering", the proposal was drafted by an agent and I accepted it.
+The README carries a ten-row summary. This page is the longer index: one row per headline decision with the alternative I turned down, and then every item I built beyond the brief with its justification, cost and status. The reasoning itself is in the ADRs, linked on each row. Who decided what is in each ADR's `Deciders` line; where it only says "engineering", I accepted the proposal.
 
 ## Headline decisions
 
@@ -26,13 +26,13 @@ The README carries a ten-row summary. This page is the longer index: one row per
 
 ## Beyond the brief
 
-Status is as of main `4aef3b8` and live production on 2026-10-18. "Shipped" means on `main` and running in production, "declared" means the code or ADR exists but is not running, "descoped" means I decided not to build it.
+Status of the Go and release-pipeline rows is as of main `7ec2767` and Cloud Run and CircleCI read on 2026-10-20; every other row is as of main `4aef3b8` and live production on 2026-10-18. "Shipped" means on `main` and running in production, "declared" means the code or ADR exists but is not running, "descoped" means I decided not to build it.
 
 | Item | Why it is justified against the brief | Cost | Status | ADR |
 |---|---|---|---|---|
 | Race-proof tests with a naive control | The brief asks for tests of the booking logic; a concurrency test that cannot fail proves nothing | Suite time | Shipped | [0018](../adr/0018-testing-strategy.md) |
 | Idempotency keys | The brief says a booked slot must not be available to others; a retried POST must not look like a lost race | One column, one index, a fingerprint | Shipped (PR 31) | [0013](../adr/0013-idempotency-keys.md) |
-| Immutable releases, tagged no-traffic deploys, automatic rollback | The brief asks for auto-deploy on merge; deploying without a way back is the part I would not ship at work | Pipeline minutes | Built; the rollback path first runs end to end once the admin deploy token is set (pending, see README 4.3) | [0016](../adr/0016-cicd-circleci-keyless-deploy.md) |
+| Immutable releases, tagged no-traffic deploys, automatic rollback | The brief asks for auto-deploy on merge; deploying without a way back is the part I would not ship at work | Pipeline minutes | Built; only partly exercised in CI, see README section 4.3 for what has run | [0016](../adr/0016-cicd-circleci-keyless-deploy.md) |
 | Security gates in CI (gitleaks, semgrep, pip-audit, trivy, ZAP API scan) | The brief asks what the pipeline does; each tool covers one concern | CI credits, within the free plan | Shipped | [0017](../adr/0017-security-testing.md) |
 | Cost guards (`cost_check.sh` static and live, with a self-test) | My own $0 rule; drift would show up as an invoice otherwise | Script maintenance | Shipped | [0014](../adr/0014-hosting-region-and-cost.md) |
 | Generated, validated client | One contract for the server and both apps | A pinned 0.x generator | Shipped | [0011](../adr/0011-openapi-codegen-contract.md) |
@@ -46,5 +46,5 @@ Status is as of main `4aef3b8` and live production on 2026-10-18. "Shipped" mean
 | Self-hosted Swagger UI, ReDoc and fonts | The reviewer's first click must not depend on a CDN | Assets in the repo | Shipped (PR 36) | [0007](../adr/0007-api-style-rest-openapi.md) |
 | Production polish: motion, install surface, SEO heads, a lighter first load | A production feel | About 53 KB of fonts per app (PR 36) | Shipped (PR 38) | [0026](../adr/0026-branding-and-seo.md) |
 | Per-run port and database isolation for local e2e | Parallel local runs would not collide | Time I did not have | Descoped. `make e2e` already starts fresh; a direct Playwright run on a kept stack needs `make down` first | [0018](../adr/0018-testing-strategy.md) |
-| Go SSE gateway for an admin live feed | A cheap way to hold many idle streams | A second runtime and 900 vCPU-seconds per connected hour (PR 37) | Descoped: PR 37 closed, superseded by Ably | [0021](../adr/0021-go-realtime-gateway.md) |
-| Admin live feed | Nice to have on the dashboard | Real-time plumbing for one user | Descoped | [0021](../adr/0021-go-realtime-gateway.md) |
+| Go gateway for the staff live feed | Staff events carry patient names, which should stay inside Google Cloud | A second runtime; about 900 vCPU-seconds per connected hour (deduced, not yet measured); two staff streams at once | Merged (PR 71); the service is deployed in production (read 2026-10-19); the cost measurement is pending | [0021](../adr/0021-go-realtime-gateway.md) |
+| Staff live feed | Staff see bookings and changes without refreshing | Real-time plumbing, covered by the row above | Merged with the Go service (PR 71); a live staff stream in production is not yet observed | [0021](../adr/0021-go-realtime-gateway.md) |

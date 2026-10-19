@@ -53,7 +53,7 @@ Follow `docs/runbooks/base-image-cve.md`, then re-release.
 
 ## Automatic rollback
 
-Status: the path below exists; it first runs end to end once the admin deploy token is set (pending, see README section 4.3).
+What has and has not run in CI is recorded in README section 4.3.
 
 After `ship-booking` and `ship-admin`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
 includes `/ready` through the public URL, for about 90 seconds of retries (cold starts). If it

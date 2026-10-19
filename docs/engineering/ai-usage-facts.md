@@ -21,6 +21,7 @@ Product, cost and security calls that were mine. The first column is where it is
 | Frontend schemas are generated from the contract, not hand-written | 2026-10-17 | Message relayed to the build lane; [ADR-0011](../adr/0011-openapi-codegen-contract.md); PR 23 |
 | Full CI-equivalent suite green locally before every push, one push per fix round | 2026-10-17 | Memory note |
 | Ably's free package instead of SSE for both feeds, after a four-part review of cost, abuse, React and push transport; Go gateway PR closed | 2026-10-18 | PR 37 closing comment |
+| Reversed the move to Ably for staff events: the Go gateway returns for the staff live feed, because staff events carry names and should stay inside Google Cloud | 2026-10-19 | README section 3.7 |
 | The public REST API stays unauthenticated | 2026-10-17 | PR 20 ruling; [ADR-0012](../adr/0012-identity-and-abuse-controls-deferred.md) |
 | Section 11 (AI reflection) is written by me only | 2026-10-16 | [ADR-0020](../adr/0020-git-hygiene-and-ai-disclosure.md) |
 
