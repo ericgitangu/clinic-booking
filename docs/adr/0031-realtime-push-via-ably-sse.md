@@ -66,3 +66,23 @@ Section 1 "components, key decisions, trade-offs": push for slot freshness witho
 ## Review trigger
 
 More than 150 peak concurrent connections, more than 3,000,000 messages in a month, or any change to Ably's free terms (limits, card requirement, enforcement at the limit): move to Cloudflare Durable Objects over WSS.
+
+## Amendment (2026-10-19): the cursor holder drains; a relay that loses a race returns at once
+
+The inline relay could return having sent nothing while a committed event was still unsent: another relay held the cursor row (`SKIP LOCKED` made the loser return at once, and the holder may have read its batch before the loser's event committed), so the event waited for the next trigger. The roles are now fixed.
+
+- **A loser** (it finds the cursor row locked) returns immediately: no sleep, no retry. A booking never pays for another request's slow publish.
+- **The holder** (it won the lock) drains. After each pass it takes a fresh snapshot and reads again, so events other writers committed while it was publishing are picked up. It stops when a pass finds nothing, after eight passes, or when too little of the relay's 2-second budget is left for another pass: a further pass starts only if the time left is at least 1.25 times the slowest pass so far (and at least 50 ms). A pass the budget would cancel mid-publish is never started, because a cancelled publish may already have been accepted over there with the cursor not moved, and the next trigger would send it again.
+- **Failures.** A failed publish ends the drain. The messages that earlier passes of the same trigger sent are returned and are not undone (the cursor moved with them). The failure counts once toward the circuit breaker, even when an earlier pass succeeded. A failed pass keeps its budget debit (the answer may have been counted), and `debited_through` stops the next trigger from debiting it again.
+- **Unchanged.** The `xmin` guard (nothing is published before its transaction is visible), the cursor moving only in the transaction that publishes (an event goes out once however many passes there are), the publish budget debited in that transaction (cap 25,000 a month), and the 60-second poll. The token mints (patient and admin) run the same relay, as holder or loser the same way. A mint whose request ends up holding the cursor waits for that drain, so it can take up to the 2-second relay budget before the token is returned; a loser's mint returns at once.
+
+**What can still wait.** An event can still wait for a later trigger in four exact cases:
+
+1. it commits after the holder's last read (the pass that finds nothing) and reaches the cursor lock before the holder commits that pass, so its own relay is a loser;
+2. the holder stops at the eighth pass;
+3. the holder stops at the deadline: with a push round trip of about 0.8 s or more the second pass does not fit (at 1.0 s the holder sends its own batch and returns at about 1 s);
+4. an older transaction is still open, which keeps the event above the snapshot horizon until the trigger that follows that transaction's commit.
+
+In each case the event is sent by the next booking's relay, or the next token mint (an open page asks for one on user input), or at the latest by the clients' 60-second poll; nothing is lost and nothing goes out twice.
+
+**Cost.** The holder pays about twice the push round trip (0.85 s at 0.4 s and 1.25 s at 0.6 s with five concurrent bookers), bounded by the 2-second budget. Losers are back in a few tens of milliseconds: with five bookers over eight rounds (32 losers each) p50 was 19 ms and p95 37 ms at a 0.4 s round trip, p50 21 ms and p95 47 ms at 0.6 s. Race tests on real Postgres cover 2 and 5 bookers with round trips of 0.1, 0.4, 0.6 and 1.0 seconds (everything published once; at 1.0 s the remainder by the next mint), a loser under 50 ms, a stranded event flushed by a patient and by an admin token mint, a failure in a later pass, and the horizon guard; controls show the events left behind when the holder does not drain.
