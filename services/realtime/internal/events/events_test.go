@@ -29,6 +29,9 @@ type exampleCase struct {
 		ToStartsAt         *string `json:"to_starts_at"`
 		LocalDate          string  `json:"local_date"`
 		FromLocalDate      *string `json:"from_local_date"`
+		ActorEmail         *string `json:"actor_email"`
+		ActorRole          *string `json:"actor_role"`
+		StaffReason        *string `json:"staff_reason"`
 	} `json:"row"`
 	Viewer json.RawMessage `json:"viewer"`
 	Staff  json.RawMessage `json:"staff"`
@@ -98,6 +101,7 @@ func row(c exampleCase) events.Row {
 		FromStartsAt: parse(r.FromStartsAt), ToStartsAt: parse(r.ToStartsAt),
 		LocalDate: ld, FromLocalDate: fld, OccurredAt: time.Now(),
 		AppointmentID: r.AppointmentID, PatientName: r.PatientName, CancellationReason: r.CancellationReason,
+		ActorEmail: r.ActorEmail, ActorRole: r.ActorRole, Reason: r.StaffReason,
 	}
 }
 
@@ -158,12 +162,19 @@ func TestViewerShapeNeverCarriesPersonalFields(t *testing.T) {
 		}
 		var m map[string]any
 		_ = json.Unmarshal(data, &m)
-		for _, banned := range []string{"appointment_id", "patient_name", "cancellation_reason"} {
+		for _, banned := range []string{"appointment_id", "patient_name", "cancellation_reason",
+			"actor_email", "actor_role", "staff_reason"} {
 			if _, ok := m[banned]; ok {
 				t.Fatalf("%s: viewer message has %s", c.Name, banned)
 			}
 		}
-		for _, secret := range []string{r.PatientName, r.AppointmentID} {
+		secrets := []string{r.PatientName, r.AppointmentID}
+		for _, p := range []*string{r.ActorEmail, r.Reason} {
+			if p != nil {
+				secrets = append(secrets, *p)
+			}
+		}
+		for _, secret := range secrets {
 			if bytes.Contains(data, []byte(secret)) {
 				t.Fatalf("%s: viewer message contains %q", c.Name, secret)
 			}
@@ -184,12 +195,21 @@ func TestOnlyCancellationsCarryAReason(t *testing.T) {
 }
 
 func TestEncodeRejectsUnknownType(t *testing.T) {
-	r := events.Row{EventType: "vetoed", LocalDate: time.Now()}
+	r := events.Row{EventType: "teleported", LocalDate: time.Now()}
 	if _, _, err := events.Encode(r, true); err == nil {
 		t.Fatal("unknown event_type was encoded")
 	}
-	if events.Known("vetoed") || !events.Known("booked") {
+	for _, k := range []string{"booked", "rescheduled", "cancelled", "vetoed", "unlocked", "arrived", "no_show"} {
+		if !events.Known(k) {
+			t.Fatalf("Known(%q) = false: every kind the API writes must be streamable", k)
+		}
+	}
+	if events.Known("teleported") {
 		t.Fatal("Known disagrees with Encode")
+	}
+	a := events.Row{Source: events.SourceAction, EventType: "book"}
+	if _, _, err := events.Encode(a, false); err == nil {
+		t.Fatal("an action the stream does not carry on its own was encoded")
 	}
 }
 
@@ -205,5 +225,98 @@ func TestViewerSchemaIsExactlyTheAllowedSet(t *testing.T) {
 	want := []string{"doctor_id", "event_type", "from_local_date", "from_starts_at", "local_date", "seq", "to_starts_at"}
 	if !slices.Equal(got, want) || doc["additionalProperties"] != false {
 		t.Fatalf("viewer schema properties = %v (closed=%v)", got, doc["additionalProperties"])
+	}
+}
+
+type actionCase struct {
+	Name string `json:"name"`
+	Row  struct {
+		Txid          uint64  `json:"txid"`
+		ID            int64   `json:"id"`
+		Action        string  `json:"action"`
+		DoctorID      *string `json:"doctor_id"`
+		StartsAt      *string `json:"starts_at"`
+		DelayMinutes  *int    `json:"delay_minutes"`
+		AppointmentID *string `json:"appointment_id"`
+		PatientName   *string `json:"patient_name"`
+		ActorEmail    *string `json:"actor_email"`
+		ActorRole     *string `json:"actor_role"`
+		Reason        *string `json:"reason"`
+		InviteEmail   *string `json:"invite_email"`
+		InviteRole    *string `json:"invite_role"`
+	} `json:"row"`
+	Viewer json.RawMessage `json:"viewer"`
+	Staff  json.RawMessage `json:"staff"`
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func actionRow(c actionCase) events.Row {
+	r := c.Row
+	return events.Row{
+		Txid: r.Txid, ID: r.ID, Source: events.SourceAction, EventType: r.Action,
+		DoctorID: deref(r.DoctorID), StartsAt: parse(r.StartsAt), DelayMinutes: r.DelayMinutes,
+		AppointmentID: deref(r.AppointmentID), PatientName: deref(r.PatientName),
+		ActorEmail: r.ActorEmail, ActorRole: r.ActorRole, Reason: r.Reason,
+		InviteEmail: r.InviteEmail, InviteRole: r.InviteRole,
+	}
+}
+
+// The staff actions streamed from staff_action_audit: the same shared examples the Python models
+// validate (backend/tests/unit/test_event_examples.py), both shapes against the exported schemas,
+// and the viewer shape free of every personal value in the row.
+func TestActionsMatchTheSharedExamplesAndSchemas(t *testing.T) {
+	raw, err := os.ReadFile(dir + "action-examples.v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Cases []actionCase `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Cases) != len(events.StreamedActions()) {
+		t.Fatalf("%d action examples for %d streamed actions", len(doc.Cases), len(events.StreamedActions()))
+	}
+	viewerSchema, _ := schemaOf(t, "admin-action.v1.schema.json")
+	staffSchema, _ := schemaOf(t, "staff-action.v1.schema.json")
+	for _, c := range doc.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			r := actionRow(c)
+			name, data, err := events.Encode(r, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			equalJSON(t, data, c.Viewer)
+			var v map[string]any
+			_ = json.Unmarshal(data, &v)
+			if name != v["kind"] {
+				t.Fatalf("SSE name %q, kind %v", name, v["kind"])
+			}
+			if err := viewerSchema.Validate(v); err != nil {
+				t.Fatalf("viewer action violates the schema: %v", err)
+			}
+			for _, secret := range []*string{c.Row.PatientName, c.Row.ActorEmail, c.Row.Reason, c.Row.InviteEmail, c.Row.AppointmentID} {
+				if secret != nil && bytes.Contains(data, []byte(*secret)) {
+					t.Fatalf("viewer action contains %q", *secret)
+				}
+			}
+			_, data, err = events.Encode(r, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			equalJSON(t, data, c.Staff)
+			var sv any
+			_ = json.Unmarshal(data, &sv)
+			if err := staffSchema.Validate(sv); err != nil {
+				t.Fatalf("staff action violates the schema: %v", err)
+			}
+		})
 	}
 }

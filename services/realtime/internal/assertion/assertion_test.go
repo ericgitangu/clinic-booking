@@ -1,6 +1,9 @@
 package assertion_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -81,5 +84,38 @@ func TestGoSignedHeaderRoundTripsAndRejectsGarbage(t *testing.T) {
 		if _, err := assertion.Verify(bad, key, "GET", "/stream", nil, now); err == nil {
 			t.Errorf("accepted %q", bad)
 		}
+	}
+}
+
+// A payload whose last base64 character carries non-zero padding bits decodes to the same bytes
+// under a lenient decoder. The verifier refuses it even with a valid MAC over that exact string:
+// one payload, one encoding.
+func TestNonCanonicalBase64IsRefused(t *testing.T) {
+	key := []byte(strings.Repeat("k", 32))
+	now := time.Unix(1_800_000_000, 0)
+	h, err := assertion.Sign(map[string]any{
+		"aud": assertion.Audience, "sub": "s1", "email": "a@b.c", "role": "viewer",
+		"iat": now.Unix(), "exp": now.Unix() + 60, "m": "GET", "p": "/stream", "bh": assertion.BodyHash(nil),
+	}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := strings.Split(h, ".")[1]
+	if len(payload)%4 == 0 {
+		t.Fatalf("payload length %d leaves no padding bits: change the claims", len(payload))
+	}
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+	last := strings.IndexByte(alphabet, payload[len(payload)-1])
+	// The low bit of the last character is a padding bit whenever the length is not a multiple of 4.
+	tampered := payload[:len(payload)-1] + string(alphabet[last^1])
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(tampered))
+	header := "v1." + tampered + "." + base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+	if _, err := base64.RawURLEncoding.DecodeString(tampered); err != nil {
+		t.Fatalf("the lenient decoder must accept the tampered payload for this test to mean anything: %v", err)
+	}
+	_, err = assertion.Verify(header, key, "GET", "/stream", nil, now)
+	if !errors.Is(err, assertion.ErrInvalid) || !strings.Contains(err.Error(), "bad base64") {
+		t.Fatalf("err = %v, want bad base64", err)
 	}
 }

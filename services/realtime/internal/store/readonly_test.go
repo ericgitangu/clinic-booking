@@ -48,7 +48,9 @@ func TestNoSourceFileWritesToTheDatabase(t *testing.T) {
 		}
 		for _, m := range sql.FindAllStringSubmatch(src, -1) {
 			stmt := strings.TrimSpace(m[1])
-			if !strings.HasPrefix(strings.ToUpper(stmt), "SELECT") {
+			up := strings.ToUpper(stmt)
+			// WITH counts too: a data-modifying CTE would be a write hidden behind a read.
+			if !strings.HasPrefix(up, "SELECT") && !strings.HasPrefix(up, "WITH") {
 				continue // a raw string that is not SQL (a message, a pattern)
 			}
 			selects++

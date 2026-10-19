@@ -61,7 +61,7 @@ func TestHorizonAndPollAgainstTheRealTable(t *testing.T) {
 		t.Fatalf("horizon = %v, %v", h, err)
 	}
 	// Everything at or before the horizon is behind it; polling from zero returns ordered rows.
-	rows, err := l.Poll(ctx, cursor.Cursor{}, 50, false)
+	rows, err := l.Poll(ctx, cursor.Cursor{}, 50, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

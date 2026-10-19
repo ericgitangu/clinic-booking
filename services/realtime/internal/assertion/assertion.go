@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -28,6 +29,10 @@ const (
 	Version    = "v1"
 	MaxTTL     = 60 // seconds between iat and exp
 	SkewSecond = 5
+	// TimeBound bounds iat and exp (epoch seconds, about 34,800 years either way) before any
+	// arithmetic, so exp-iat and exp+SkewSecond cannot overflow int64. The Python verifier applies
+	// the same bound with the same verdict ("bad times"); contracts/assertion-vectors.json pins it.
+	TimeBound = int64(1) << 40
 )
 
 // SmokeSub is the subject the release smoke signs with (backend/app/api/deps.py SMOKE_SUB).
@@ -46,7 +51,8 @@ type Principal struct {
 	EmailVerified bool
 }
 
-var enc = base64.RawURLEncoding
+// enc rejects padding and non-zero trailing bits: one payload has exactly one encoding.
+var enc = base64.RawURLEncoding.Strict()
 
 // BodyHash is the lowercase hex SHA-256 the bh claim carries.
 func BodyHash(body []byte) string {
@@ -96,13 +102,18 @@ func Verify(header string, key []byte, method, pathWithQuery string, body []byte
 	if err := dec.Decode(&claims); err != nil || claims == nil {
 		return Principal{}, reject("bad payload")
 	}
+	// The claims object must be the whole payload: anything after it (even another JSON value)
+	// is refused, as the Python verifier's json.loads refuses it.
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return Principal{}, reject("bad payload")
+	}
 
 	if claims["aud"] != Audience {
 		return Principal{}, reject("wrong audience")
 	}
 	iat, ok1 := integer(claims["iat"])
 	exp, ok2 := integer(claims["exp"])
-	if !ok1 || !ok2 {
+	if !ok1 || !ok2 || iat < -TimeBound || iat > TimeBound || exp < -TimeBound || exp > TimeBound {
 		return Principal{}, reject("bad times")
 	}
 	if exp-iat > MaxTTL || exp < iat {

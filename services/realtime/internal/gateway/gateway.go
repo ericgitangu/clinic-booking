@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,9 +33,16 @@ import (
 )
 
 const (
-	pollBatch    = 200
-	writeTimeout = 10 * time.Second
+	pollBatch = 200
+	// maxBatchesPerTick caps one poll's catch-up: a resume from an old cursor replays at most
+	// pollBatch*maxBatchesPerTick rows per PollInterval, and drain, lifetime and the client are
+	// checked between batches, so a long replay can neither hold a shutdown nor outlive the cap.
+	maxBatchesPerTick = 5
+	writeTimeout      = 10 * time.Second
 )
+
+// appointmentID is a canonical lower-case UUID, the only form the appointment filter accepts.
+var appointmentID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Close reasons, also the `reason` field of the final SSE event.
 const (
@@ -165,6 +173,18 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		from = &c
 	}
 
+	// The per-appointment filter (the admin app's appointment page). Same assertion: the signed
+	// path includes the query string, so the filter cannot be changed on the way.
+	appointment := ""
+	if vals, ok := r.URL.Query()["appointment"]; ok {
+		if len(vals) != 1 || !appointmentID.MatchString(vals[0]) {
+			g.writeProblem(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid appointment",
+				"appointment must be one lower-case UUID.", nil)
+			return
+		}
+		appointment = vals[0]
+	}
+
 	// 2. Admission, then the database: the role must be the one the database says.
 	release, status, code := g.admit(strings.ToLower(principal.Email))
 	if release == nil {
@@ -213,9 +233,10 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
-	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
-		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke}
 	begin := time.Now()
+	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
+		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke,
+		appointment: appointment, lifeEnd: begin.Add(g.cfg.MaxConnection)}
 	reason := s.run(r.Context(), lease)
 	g.log.Info("stream closed",
 		slog.String("reason", reason),
@@ -257,6 +278,9 @@ type session struct {
 	email string
 	smoke bool
 	sent  int
+	// appointment, when not "", limits the stream to one appointment.
+	appointment string
+	lifeEnd     time.Time
 }
 
 // frame writes one SSE frame and flushes. A failed write means the client is gone.
@@ -318,10 +342,24 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	roleT := time.NewTicker(g.cfg.RoleRecheck)
 	defer roleT.Stop()
 
-	// poll delivers everything safely behind the horizon, batch after batch.
+	// poll delivers what is safely behind the horizon, batch after batch, at most
+	// maxBatchesPerTick batches per call; the rest follows on the next tick.
 	poll := func() (string, bool) {
-		for {
-			rows, err := lease.Poll(ctx, s.pos, pollBatch, s.staff)
+		for batch := 0; batch < maxBatchesPerTick; batch++ {
+			if batch > 0 {
+				// Between batches of a catch-up: stop for the client, a shutdown or the lifetime.
+				select {
+				case <-ctx.Done():
+					return ReasonClient, true
+				case <-g.drain.Done():
+					return s.finish(ReasonShutdown), true
+				default:
+				}
+				if !time.Now().Before(s.lifeEnd) {
+					return s.finish(ReasonLifetime), true
+				}
+			}
+			rows, err := lease.Poll(ctx, s.pos, pollBatch, s.staff, s.appointment)
 			if err != nil {
 				if ctx.Err() != nil {
 					return ReasonClient, true
@@ -355,6 +393,7 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 				return "", false
 			}
 		}
+		return "", false
 	}
 	if reason, done := poll(); done {
 		return reason

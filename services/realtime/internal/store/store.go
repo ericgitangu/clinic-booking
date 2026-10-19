@@ -1,5 +1,6 @@
-// Package store reads appointment_events with the commit-safe cursor of docs/adr/0009. It is the
-// only code that touches the database, and it only ever issues two SELECTs.
+// Package store reads the event stream (appointment_events and the streamed staff actions of
+// staff_action_audit) with the commit-safe cursor of docs/adr/0009. It is the only code that
+// touches the database, and it only ever issues SELECTs.
 //
 // The connection pool exists only while at least one stream holds a Lease: the first Acquire
 // opens it, the last Release closes it, so an instance with no viewers holds no Neon connection
@@ -26,29 +27,104 @@ import (
 // Rows with txid below the snapshot's xmin belong to transactions that have all finished, so
 // they can no longer appear late. One statement keeps the horizon and the read consistent.
 //
-// Two variants. The viewer's never selects a personal column: it joins patients only to learn
-// whether the patient is the release smoke's synthetic one, whose events staff do not see.
+// The stream is the union of appointment_events and the staff actions that change no appointment
+// (staff_action_audit), ordered by (txid, id) with ONE cursor: the audit row's stream_id is drawn
+// from the event log's sequence (migration 0014), so the two never share an id.
+//
+// $1, $2 = cursor, $3 = limit, $4 = appointment filter (NULL for the whole clinic). The filter also
+// matches the successor a veto books for a cancelled appointment (predecessor_id).
+//
+// Two variants. The viewer's never selects a personal column (no name, no reason, no address, no
+// actor): it joins patients only to learn whether the patient is the release smoke's synthetic
+// one, whose events staff do not see. The role CAN read those columns (migration 0014); this query
+// is where the minimisation is enforced, and TestViewerSQLSelectsNoPersonalColumn keeps it so.
 const viewerSQL = `
-SELECT e.id, e.txid::text, e.doctor_id::text, e.event_type, e.from_starts_at, e.to_starts_at,
-       e.local_date, e.from_local_date, e.occurred_at, COALESCE(p.synthetic, false)
-FROM appointment_events e
-LEFT JOIN appointments a ON a.id = e.appointment_id
-LEFT JOIN patients p ON p.id = a.patient_id
-WHERE e.txid < pg_snapshot_xmin(pg_current_snapshot())
-  AND (e.txid, e.id) > ($1::text::xid8, $2::bigint)
-ORDER BY e.txid, e.id
+WITH h AS (SELECT pg_snapshot_xmin(pg_current_snapshot()) AS xmin)
+SELECT u.src, u.id, u.txid::text, u.kind, u.doctor_id, u.from_starts_at, u.to_starts_at,
+       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic
+FROM (
+  SELECT 'event' AS src, e.id, e.txid, e.event_type AS kind, e.doctor_id::text AS doctor_id,
+         e.from_starts_at, e.to_starts_at, e.local_date, e.from_local_date,
+         NULL::timestamptz AS starts_at, NULL::int AS delay_minutes,
+         COALESCE(p.synthetic, false) AS synthetic
+  FROM appointment_events e
+  CROSS JOIN h
+  LEFT JOIN appointments a ON a.id = e.appointment_id
+  LEFT JOIN patients p ON p.id = a.patient_id
+  WHERE e.txid < h.xmin
+    AND (e.txid, e.id) > ($1::text::xid8, $2::bigint)
+    AND ($4::uuid IS NULL OR e.appointment_id = $4::uuid OR a.predecessor_id = $4::uuid)
+  UNION ALL
+  SELECT 'action', s.stream_id, s.txid, s.action, a.doctor_id::text,
+         NULL, NULL, NULL, NULL, a.starts_at,
+         CASE WHEN s.after ->> 'delay_minutes' ~ '^[0-9]{1,4}$'
+              THEN (s.after ->> 'delay_minutes')::int END,
+         COALESCE(p.synthetic, false)
+  FROM staff_action_audit s
+  CROSS JOIN h
+  LEFT JOIN appointments a ON a.id = s.appointment_id
+  LEFT JOIN patients p ON p.id = a.patient_id
+  WHERE s.action = ANY($5::text[])
+    AND s.txid < h.xmin
+    AND (s.txid, s.stream_id) > ($1::text::xid8, $2::bigint)
+    AND ($4::uuid IS NULL OR s.appointment_id = $4::uuid)
+) u
+ORDER BY u.txid, u.id
 LIMIT $3`
 
+// staffSQL adds the appointment, the patient's name, a cancellation reason, and for a staff change
+// who made it and why: the audit row the API writes in the same transaction as the event.
 const staffSQL = `
-SELECT e.id, e.txid::text, e.doctor_id::text, e.event_type, e.from_starts_at, e.to_starts_at,
-       e.local_date, e.from_local_date, e.occurred_at, COALESCE(p.synthetic, false),
-       e.appointment_id::text, COALESCE(p.full_name, ''), a.cancellation_reason
-FROM appointment_events e
-LEFT JOIN appointments a ON a.id = e.appointment_id
-LEFT JOIN patients p ON p.id = a.patient_id
-WHERE e.txid < pg_snapshot_xmin(pg_current_snapshot())
-  AND (e.txid, e.id) > ($1::text::xid8, $2::bigint)
-ORDER BY e.txid, e.id
+WITH h AS (SELECT pg_snapshot_xmin(pg_current_snapshot()) AS xmin)
+SELECT u.src, u.id, u.txid::text, u.kind, u.doctor_id, u.from_starts_at, u.to_starts_at,
+       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic,
+       u.appointment_id, u.patient_name, u.cancellation_reason, u.actor_email, u.actor_role,
+       u.reason, u.invite_email, u.invite_role
+FROM (
+  SELECT 'event' AS src, e.id, e.txid, e.event_type AS kind, e.doctor_id::text AS doctor_id,
+         e.from_starts_at, e.to_starts_at, e.local_date, e.from_local_date,
+         NULL::timestamptz AS starts_at, NULL::int AS delay_minutes,
+         COALESCE(p.synthetic, false) AS synthetic,
+         COALESCE(e.appointment_id::text, '') AS appointment_id,
+         COALESCE(p.full_name, '') AS patient_name, a.cancellation_reason,
+         sa.actor_email, sa.actor_role, sa.reason,
+         NULL::text AS invite_email, NULL::text AS invite_role
+  FROM appointment_events e
+  CROSS JOIN h
+  LEFT JOIN appointments a ON a.id = e.appointment_id
+  LEFT JOIN patients p ON p.id = a.patient_id
+  LEFT JOIN LATERAL (
+    SELECT x.actor_email, x.actor_role::text AS actor_role, x.reason
+    FROM staff_action_audit x
+    WHERE e.actor = 'staff' AND x.appointment_id = e.appointment_id AND x.txid = e.txid
+      AND x.action IN ('book', 'reschedule', 'cancel', 'veto', 'unlock', 'arrived', 'no_show')
+    ORDER BY x.stream_id
+    LIMIT 1
+  ) sa ON true
+  WHERE e.txid < h.xmin
+    AND (e.txid, e.id) > ($1::text::xid8, $2::bigint)
+    AND ($4::uuid IS NULL OR e.appointment_id = $4::uuid OR a.predecessor_id = $4::uuid)
+  UNION ALL
+  SELECT 'action', s.stream_id, s.txid, s.action, a.doctor_id::text,
+         NULL, NULL, NULL, NULL, a.starts_at,
+         CASE WHEN s.after ->> 'delay_minutes' ~ '^[0-9]{1,4}$'
+              THEN (s.after ->> 'delay_minutes')::int END,
+         COALESCE(p.synthetic, false),
+         COALESCE(s.appointment_id::text, ''), COALESCE(p.full_name, ''), NULL,
+         s.actor_email, s.actor_role::text, s.reason, i.email::text, i.role::text
+  FROM staff_action_audit s
+  CROSS JOIN h
+  LEFT JOIN appointments a ON a.id = s.appointment_id
+  LEFT JOIN patients p ON p.id = a.patient_id
+  LEFT JOIN staff_invites i
+    ON s.after ->> 'invite_id' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+   AND i.id = (s.after ->> 'invite_id')::uuid
+  WHERE s.action = ANY($5::text[])
+    AND s.txid < h.xmin
+    AND (s.txid, s.stream_id) > ($1::text::xid8, $2::bigint)
+    AND ($4::uuid IS NULL OR s.appointment_id = $4::uuid)
+) u
+ORDER BY u.txid, u.id
 LIMIT $3`
 
 const horizonSQL = `SELECT pg_snapshot_xmin(pg_current_snapshot())::text`
@@ -147,13 +223,19 @@ func (l *Lease) Horizon(ctx context.Context) (cursor.Cursor, error) {
 }
 
 // Poll returns up to limit rows after the cursor, in (txid, id) order, that are safe to deliver.
-// staff selects the query that also reads the patient's name and the cancellation reason.
-func (l *Lease) Poll(ctx context.Context, after cursor.Cursor, limit int, staff bool) ([]events.Row, error) {
+// staff selects the query that also reads the personal columns. appointment, when not "", limits
+// the rows to that appointment (and a successor a veto booked for it); the caller validates it.
+func (l *Lease) Poll(ctx context.Context, after cursor.Cursor, limit int, staff bool, appointment string) ([]events.Row, error) {
 	sql := viewerSQL
 	if staff {
 		sql = staffSQL
 	}
-	rows, err := l.pool.Query(ctx, sql, strconv.FormatUint(after.Txid, 10), after.ID, limit)
+	var filter *string
+	if appointment != "" {
+		filter = &appointment
+	}
+	rows, err := l.pool.Query(ctx, sql, strconv.FormatUint(after.Txid, 10), after.ID, limit, filter,
+		events.StreamedActions())
 	if err != nil {
 		return nil, fmt.Errorf("poll: %w", err)
 	}
@@ -161,19 +243,28 @@ func (l *Lease) Poll(ctx context.Context, after cursor.Cursor, limit int, staff 
 	out := make([]events.Row, 0, limit)
 	for rows.Next() {
 		var (
-			r    events.Row
-			txid string
+			r         events.Row
+			txid      string
+			doctor    *string
+			localDate *time.Time
 		)
-		dest := []any{&r.ID, &txid, &r.DoctorID, &r.EventType, &r.FromStartsAt, &r.ToStartsAt,
-			&r.LocalDate, &r.FromLocalDate, &r.OccurredAt, &r.Synthetic}
+		dest := []any{&r.Source, &r.ID, &txid, &r.EventType, &doctor, &r.FromStartsAt, &r.ToStartsAt,
+			&localDate, &r.FromLocalDate, &r.StartsAt, &r.DelayMinutes, &r.Synthetic}
 		if staff {
-			dest = append(dest, &r.AppointmentID, &r.PatientName, &r.CancellationReason)
+			dest = append(dest, &r.AppointmentID, &r.PatientName, &r.CancellationReason, &r.ActorEmail,
+				&r.ActorRole, &r.Reason, &r.InviteEmail, &r.InviteRole)
 		}
 		if err := rows.Scan(dest...); err != nil {
 			return nil, fmt.Errorf("poll scan: %w", err)
 		}
 		if r.Txid, err = strconv.ParseUint(txid, 10, 64); err != nil {
 			return nil, fmt.Errorf("poll txid: %w", err)
+		}
+		if doctor != nil {
+			r.DoctorID = *doctor
+		}
+		if localDate != nil {
+			r.LocalDate = *localDate
 		}
 		out = append(out, r)
 	}

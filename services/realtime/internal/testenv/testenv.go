@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/ericgitangu/clinic-booking/services/realtime/internal/assertion"
 )
 
 // Env is the stack under test.
@@ -94,6 +96,72 @@ type API struct {
 // NewAPI returns a client for e.APIURL.
 func (e Env) NewAPI(t testing.TB) *API {
 	return &API{t: t, base: e.APIURL, http: &http.Client{Timeout: 20 * time.Second}}
+}
+
+// Staffer is a signed-in staff member as the admin app would describe them to the API.
+type Staffer struct{ Email, Role string }
+
+// Staff calls an /internal/admin route of the real API as s, with the assertion the admin app
+// would sign (TEST_API_SIGNING_KEY is the API's INTERNAL_SIGNING_KEY). It fails the test on any
+// other status than want.
+func (a *API) Staff(s Staffer, method, path string, body any, want int, out any) {
+	a.t.Helper()
+	key := os.Getenv("TEST_API_SIGNING_KEY")
+	if key == "" {
+		a.t.Fatal("TEST_API_SIGNING_KEY is not set: it must equal the API's INTERNAL_SIGNING_KEY " +
+			"(the staff-action tests drive the real staff routes)")
+	}
+	var raw []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			a.t.Fatal(err)
+		}
+		raw = b
+	}
+	now := time.Now().Unix()
+	header, err := assertion.Sign(map[string]any{
+		"aud": assertion.Audience, "sub": "sub-" + s.Email, "email": s.Email, "role": s.Role,
+		"iat": now, "exp": now + 60, "m": method, "p": path, "bh": assertion.BodyHash(raw), "ev": true,
+	}, []byte(key))
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	req, err := http.NewRequestWithContext(context.Background(), method, a.base+path, bytes.NewReader(raw))
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set(assertion.Header, header)
+	req.Header.Set("Idempotency-Key", fmt.Sprintf("rt-staff-%d-%d", time.Now().UnixNano(), randN(1<<62)))
+	resp, err := a.http.Do(req)
+	if err != nil {
+		a.t.Fatalf("%s %s: %v", method, path, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	got, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != want {
+		a.t.Fatalf("%s %s as %s = %d, want %d: %s", method, path, s.Role, resp.StatusCode, want, got)
+	}
+	if out != nil {
+		if err := json.Unmarshal(got, out); err != nil {
+			a.t.Fatalf("decode %s: %v (%s)", path, err, got)
+		}
+	}
+}
+
+// Exec runs one statement as the database owner (for rows the API only writes inside a time
+// window a test cannot rely on; see the callers).
+func Exec(t testing.TB, env Env, sql string, args ...any) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	conn := Connect(t, env.OwnerDSN)
+	if _, err := conn.Exec(ctx, sql, args...); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
 }
 
 // Booking is what a test needs to know about an appointment it made.
