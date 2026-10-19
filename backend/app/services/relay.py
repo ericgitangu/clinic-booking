@@ -16,19 +16,21 @@ nothing more. A batch that provably never left this process (nothing was sent) r
 debit included. A repeat inside the push service's duplicate window is dropped by id, and
 consumers also order by ``seq``.
 
-A trigger that finds nothing to send is not always "nothing to send". Two things can strand a
-committed event: another relay holds the cursor row (``SKIP LOCKED`` returns at once, and the holder
-may have read its batch before this event committed), and an older transaction that is still open
-keeps the event above the snapshot's ``xmin`` (it is not yet safe to publish). In both cases no
-later trigger is guaranteed to come soon. So ``Relay.run`` tries again, a bounded number of times
-(``ATTEMPTS`` tries, short backoff ``BACKOFF``), inside the same time budget: when the cursor was
-held by someone else, when committed events are waiting above the horizon, and when a full batch
-leaves more behind. Each try starts from the cursor, which only moves in the transaction that
-publishes, so an event goes out once however many tries there are (the publish budget is debited
-in that same transaction and ``debited_through`` guards a retry). The ``xmin`` guard is untouched:
-nothing is published before its transaction is visible. The token mints run the same relay, so an
-open page that asks for a new token also flushes what is stranded; the clients' poll stays as the
-last safety net.
+A trigger that finds nothing to send is not always "nothing to send". Another relay may hold the
+cursor row (``SKIP LOCKED`` makes the loser return at once), and the holder may have read its batch
+before the loser's event committed; the event would then wait for the next trigger. So the
+roles are fixed: a LOSER returns immediately (no sleep, no retry, so a booking never pays for
+someone else's slow publish), and the HOLDER drains: after each pass it takes a fresh snapshot and
+reads again, until a pass finds nothing new (at most ``MAX_PASSES`` passes, inside the time budget).
+Events committed by other writers while it was publishing are above its earlier snapshot and are
+picked up by the next pass. A failed publish ends the loop (the breaker handles it). Every pass
+starts from the cursor, which only moves in the transaction that publishes, so an event goes out
+once however many passes there are; the publish budget is debited in that same transaction
+(``debited_through`` guards a repeat), and the ``xmin`` guard is untouched: nothing is published
+before its transaction is visible. An event held back by an older open transaction is sent by the
+trigger that follows that transaction's commit. The token mints run the same relay (holder or
+loser the same way), so an open page asking for a new token also flushes what is stranded; the
+clients' poll stays as the last safety net.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
@@ -96,21 +98,10 @@ _MARK_DEBITED = text(
     """
 )
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
-# Committed events after the cursor that the horizon is holding back (an older transaction is open).
-_WAITING = text(
-    """
-    SELECT EXISTS (
-      SELECT 1 FROM appointment_events
-      WHERE (txid, id) > (CAST(:txid AS text)::xid8, CAST(:id AS bigint))
-        AND txid >= pg_snapshot_xmin(pg_current_snapshot())
-    )
-    """
-)
-
-# Tries per trigger and the pause before each retry. The sum of the pauses (0.21 s) is well inside
-# the relay's time budget; a retry never starts after the budget is spent.
-ATTEMPTS = 3
-BACKOFF = (0.06, 0.15)
+# Passes a holder makes in one trigger: each re-reads from a fresh snapshot, and the loop ends as
+# soon as a pass finds nothing. Bounded so a steady stream of writers cannot keep one request busy;
+# the relay's time budget bounds it in seconds as well.
+MAX_PASSES = 8
 
 BREAKER_FAILURES = 3
 BREAKER_PAUSE = timedelta(seconds=60)
@@ -120,15 +111,11 @@ BREAKER_PAUSE = timedelta(seconds=60)
 class RelayResult:
     published: int = 0
     failed: bool = False
-    # Why a try that published nothing may still leave work: the cursor was held by another relay,
-    # committed events wait above the horizon, or a full batch left more behind.
+    # Another relay held the cursor row: this one is a loser and returns at once.
     contended: bool = False
-    waiting: bool = False
-    more: bool = False
-
-    @property
-    def should_retry(self) -> bool:
-        return not self.failed and (self.contended or self.waiting or self.more)
+    # Rows the pass moved the cursor past (sent, or skipped as too old or unpaid for): the holder
+    # reads again after a pass that consumed any.
+    consumed: int = 0
 
 
 class _NothingSent(Exception):
@@ -174,10 +161,7 @@ async def _relay_in(
         await session.execute(_EVENTS, {"txid": cursor.txid, "id": cursor.id, "limit": limit})
     ).all()
     if not rows:
-        waiting = bool(
-            (await session.execute(_WAITING, {"txid": cursor.txid, "id": cursor.id})).scalar_one()
-        )
-        return RelayResult(waiting=waiting)
+        return RelayResult()
     now = clock.now()
     parsed = [_event(r) for r in rows]
     last = parsed[-1][0]
@@ -206,7 +190,7 @@ async def _relay_in(
             return RelayResult(failed=True)
         published = len(messages)
     await session.execute(_ADVANCE, {"txid": str(last.txid), "id": last.id, "now": now})
-    return RelayResult(published=published, more=len(rows) >= limit)
+    return RelayResult(published=published, consumed=len(rows))
 
 
 async def relay_once(
@@ -268,7 +252,7 @@ class Relay:
         if self._paused_until is not None and now < self._paused_until:
             return 0  # breaker open: skip the attempt, the clients' poll covers the gap
         try:
-            result = await asyncio.wait_for(self._tries(clock), timeout=self._timeout)
+            result = await asyncio.wait_for(self._drain(clock), timeout=self._timeout)
         except Exception:  # noqa: BLE001  # a push problem must never fail the booking response
             _log.warning("realtime relay failed; a later trigger retries", exc_info=True)
             result = RelayResult(failed=True)
@@ -288,18 +272,17 @@ class Relay:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
         return 0
 
-    async def _tries(self, clock: Clock) -> RelayResult:
-        """Up to ``ATTEMPTS`` relay passes. A retry follows only a pass that left work it could not
-        do (see the module docstring), never a failed publish, and waits ``BACKOFF`` first. The
-        result counts the messages of every pass."""
+    async def _drain(self, clock: Clock) -> RelayResult:
+        """One trigger. A loser returns at once. A holder passes again from a fresh snapshot after
+        every pass that moved the cursor, until a pass finds nothing (or ``MAX_PASSES``). A failed
+        publish ends it. The result counts the messages of every pass."""
         published = 0
         result = RelayResult()
-        for attempt in range(ATTEMPTS):
+        for _ in range(MAX_PASSES):
             result = await relay_once(
                 self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
             )
             published += result.published
-            if not result.should_retry or attempt == ATTEMPTS - 1:
+            if result.contended or result.failed or result.consumed == 0:
                 break
-            await asyncio.sleep(BACKOFF[min(attempt, len(BACKOFF) - 1)])
         return RelayResult(published=published, failed=result.failed)
