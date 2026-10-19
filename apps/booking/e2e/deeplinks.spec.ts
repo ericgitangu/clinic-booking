@@ -374,7 +374,7 @@ test("a booked visit whose time has passed is read-only", async ({
 
   // The reschedule address says the same instead of offering times.
   await page.goto(`/appointments/${id}/reschedule`);
-  await expect(page.getByText("This visit has passed")).toBeVisible();
+  await expect(page.getByText(/less than an hour/)).toBeVisible();
   await expect(page.getByRole("radio")).toHaveCount(0);
 
   await closeAll(me.context);

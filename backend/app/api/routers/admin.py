@@ -25,6 +25,7 @@ from app.api.deps import (
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.booking_rules import RULE_CANCEL, RULE_RESCHEDULE
 from app.schemas.access import (
     AccessEntry,
     AccessList,
@@ -35,7 +36,7 @@ from app.schemas.access import (
 )
 from app.schemas.admin import AdminAppointmentPage, Bucket, Lineage, Metrics
 from app.schemas.appointment import Appointment, CancelRequest, RescheduleRequest
-from app.schemas.problem import problem_responses
+from app.schemas.problem import change_too_late_responses, problem_responses
 from app.services import access as access_service
 from app.services import admin as service
 from app.services import booking
@@ -205,7 +206,8 @@ async def revoke_access(
 @manage_router.patch(
     "/{appointment_id}/cancel",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_CANCEL,
+    responses=change_too_late_responses(),
 )
 async def cancel_for_patient(
     appointment_id: uuid.UUID,
@@ -213,10 +215,13 @@ async def cancel_for_patient(
     response: Response,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
-    appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    appt = await booking.cancel(
+        session, clock, settings, appointment_id=appointment_id, reason=body.reason
+    )
     await relay.run(clock)
     return Appointment.model_validate(appt)
 
@@ -224,7 +229,8 @@ async def cancel_for_patient(
 @manage_router.patch(
     "/{appointment_id}/reschedule",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_RESCHEDULE,
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_for_patient(
     appointment_id: uuid.UUID,

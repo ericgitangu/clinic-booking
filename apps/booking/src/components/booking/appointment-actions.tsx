@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@clinic/ui/components/ui/button";
 import {
   Dialog,
@@ -18,6 +24,12 @@ import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { cancelAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
+import {
+  CHANGE_WINDOW_JUST_OPENED,
+  CHANGE_WINDOW_NOTE,
+  clockOffset,
+  insideChangeWindow,
+} from "@/lib/change-window";
 import { forgetBooked } from "@/lib/own-bookings";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
@@ -26,12 +38,37 @@ export function AppointmentActions({
   id,
   when,
   startsAt,
+  serverNow,
 }: {
   id: string;
   when: string;
   startsAt: string;
+  /** The server's clock when the page was drawn: the screen reads time from it, not from the device. */
+  serverNow: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [offset] = useState(() => clockOffset(serverNow, Date.now()));
+  const [locked, setLocked] = useState(() =>
+    insideChangeWindow(startsAt, Date.now() + offset),
+  );
+  const [justLocked, setJustLocked] = useState(false);
+  const wasLocked = useRef(locked);
+  // The window opens while the page is on screen: look again every 30 seconds. If a dialog is open
+  // when it does, it closes and the screen says why, instead of the buttons just vanishing.
+  useEffect(() => {
+    const tick = () => {
+      if (!insideChangeWindow(startsAt, Date.now() + offset)) return;
+      if (!wasLocked.current) {
+        wasLocked.current = true;
+        setJustLocked(true);
+      }
+      setLocked(true);
+      setOpen(false);
+    };
+    tick();
+    const timer = setInterval(tick, 30_000);
+    return () => clearInterval(timer);
+  }, [startsAt, offset]);
   const [state, formAction, pending] = useActionState(
     cancelAppointment,
     initialState,
@@ -58,6 +95,40 @@ export function AppointmentActions({
   }, [state, router]);
   const reasonError =
     state.status === "error" ? state.fieldErrors?.reason : undefined;
+
+  if (locked) {
+    const note = `change-note-${id}`;
+    return (
+      <div className="mt-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="h-11 px-4 text-base"
+            disabled
+            aria-describedby={note}
+          >
+            Reschedule
+          </Button>
+          <Button
+            variant="outline"
+            className="h-11 px-4 text-base"
+            disabled
+            aria-describedby={note}
+          >
+            Cancel
+          </Button>
+        </div>
+        <p
+          id={note}
+          role={justLocked ? "alert" : undefined}
+          className="mt-2 text-base text-muted-foreground"
+        >
+          {justLocked ? `${CHANGE_WINDOW_JUST_OPENED} ` : ""}
+          {CHANGE_WINDOW_NOTE}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">

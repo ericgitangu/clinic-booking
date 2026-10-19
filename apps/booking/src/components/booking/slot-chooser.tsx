@@ -26,7 +26,12 @@ import { buildChips, type Chip, type OwnBooking } from "@/lib/slot-chips";
 
 // `availability` is the server-rendered answer for one doctor and day; the chooser keeps it
 // current. `own` is what the signed-in patient already holds (empty when signed out).
-type Props = { own: OwnBooking[]; availability: Availability } & (
+type Props = {
+  own: OwnBooking[];
+  availability: Availability;
+  /** Set by the page from lib/test-run.ts; production leaves it off. */
+  trackRenders?: boolean;
+} & (
   | { mode: "details"; doctorId: string }
   | { mode: "reschedule"; appointmentId: string }
 );
@@ -207,7 +212,11 @@ export function SlotChooser(props: Props) {
         {notice}
         {anyFree ? null : none}
         {chips.length > 0 ? (
-          <SlotLinks chips={chips} doctorId={props.doctorId} />
+          <SlotLinks
+            chips={chips}
+            doctorId={props.doctorId}
+            trackRenders={props.trackRenders}
+          />
         ) : null}
       </>
     );
@@ -229,7 +238,12 @@ export function SlotChooser(props: Props) {
       {notice}
       {anyFree ? null : none}
       {chips.length > 0 ? (
-        <SlotRadios chips={chips} value={selected} onChange={choose} />
+        <SlotRadios
+          chips={chips}
+          value={selected}
+          onChange={choose}
+          trackRenders={props.trackRenders}
+        />
       ) : null}
       {state.status === "error" && state.code === "SLOT_TAKEN" ? (
         <div

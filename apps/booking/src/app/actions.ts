@@ -136,15 +136,42 @@ export async function bookAppointment(
   const linked = await api.linkAccount(caller, patientName(who));
   if (!linked.ok) return failed(linked);
 
-  // Refuse a time the patient already holds before the API is asked: the API would also refuse it,
-  // but only with a code; this says what happened and where to look. The API stays the final gate.
-  const mine = await api.myAppointments(caller);
-  if (mine.ok) {
-    const live = mine.data.items.filter(
-      (a) => a.status === "booked" && Date.parse(a.ends_at) > Date.now(),
-    );
-    const held = live.find((a) => Date.parse(a.starts_at) === Date.parse(when));
-    if (held) {
+  // The form makes one key per booking attempt and sends the same one with every submit of that
+  // attempt, so two submits of one attempt (a double click, a retry after a lost response) reach
+  // the API with the same key and the second is answered with the booking the first made.
+  const booked = await api.bookMine(
+    caller,
+    { doctor_id: doctor, starts_at: when },
+    keyFor(blank(fd.get("idempotency_key"))),
+  );
+  if (!booked.ok) {
+    // The patient's own time gets plain words. The list is read only now that the API has refused
+    // (never before every booking): with the same doctor the database may name either index first
+    // (the doctor's slot or the patient's own time), so a SLOT_TAKEN for a time this patient
+    // holds with that doctor means they hold it themselves. The two lookups are independent.
+    const refused =
+      booked.kind === "problem" &&
+      (booked.code === "PATIENT_DOUBLE_BOOKED" || booked.code === "SLOT_TAKEN");
+    const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
+    const [mine, next] = refused
+      ? await Promise.all([
+          api.myAppointments(caller),
+          taken ? nextFreeSlots(doctor, when) : Promise.resolve(undefined),
+        ])
+      : [undefined, undefined];
+    const held = mine?.ok
+      ? mine.data.items.find(
+          (a) =>
+            a.status === "booked" &&
+            Date.parse(a.ends_at) > Date.now() &&
+            Date.parse(a.starts_at) === Date.parse(when),
+        )
+      : undefined;
+    if (
+      held &&
+      booked.kind === "problem" &&
+      (booked.code === "PATIENT_DOUBLE_BOOKED" || held.doctor_id === doctor)
+    ) {
       return {
         status: "error",
         code: "PATIENT_DOUBLE_BOOKED",
@@ -156,22 +183,7 @@ export async function bookAppointment(
         }),
       };
     }
-  }
-
-  // The form makes one key per booking attempt and sends the same one with every submit of that
-  // attempt, so two submits of one attempt (a double click, a retry after a lost response) reach
-  // the API with the same key and the second is answered with the booking the first made.
-  const booked = await api.bookMine(
-    caller,
-    { doctor_id: doctor, starts_at: when },
-    keyFor(blank(fd.get("idempotency_key"))),
-  );
-  if (!booked.ok) {
-    const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
-    return failed(booked, {
-      nextSlots: taken ? await nextFreeSlots(doctor, when) : undefined,
-      doctorId: doctor,
-    });
+    return failed(booked, { nextSlots: next, doctorId: doctor });
   }
   // After the response has gone, so the email can never hold up the confirmation page.
   const made = booked.data;

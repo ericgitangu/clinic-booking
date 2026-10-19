@@ -12,6 +12,9 @@ import {
   formatWhen,
   isValidDay,
 } from "@/lib/clinic-time";
+import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
+import { ChangeWindowWatch } from "@/components/booking/change-window-watch";
+import { shouldTrackRenders } from "@/lib/test-run";
 import { ownBooked } from "@/lib/own";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -77,18 +80,17 @@ export default async function Reschedule({
     );
   }
 
-  if (Date.parse(appt.data.starts_at) <= Date.now()) {
+  if (insideChangeWindow(appt.data.starts_at, Date.now())) {
     return (
       <section className="py-10">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Reschedule
         </h1>
-        <p className="mt-4 text-base">
-          This visit has passed, so it cannot be moved.{" "}
+        <p role="status" className="mt-4 text-base">
+          {CHANGE_WINDOW_NOTE}{" "}
           <Link href="/appointments" className="underline underline-offset-4">
             My appointments
           </Link>
-          .
         </p>
       </section>
     );
@@ -107,6 +109,10 @@ export default async function Reschedule({
 
   return (
     <section className="pb-28 pt-8">
+      <ChangeWindowWatch
+        startsAt={appt.data.starts_at}
+        serverNow={new Date().toISOString()}
+      />
       <p className="text-base">
         <Link href="/appointments" className="underline underline-offset-4">
           My appointments
@@ -131,6 +137,7 @@ export default async function Reschedule({
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            trackRenders={shouldTrackRenders(process.env)}
             key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="reschedule"
             appointmentId={id}

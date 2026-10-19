@@ -36,6 +36,7 @@ export default async function MyAppointments({
     );
   }
 
+  const serverNow = new Date().toISOString();
   const res = await api.myAppointments(callerFor(who));
   if (!res.ok && isForbidden(res)) {
     return <NoAccess back={{ href: "/book", label: "Book a visit" }} />;
@@ -115,6 +116,7 @@ export default async function MyAppointments({
                     id={a.id}
                     when={formatWhen(a.starts_at)}
                     startsAt={a.starts_at}
+                    serverNow={serverNow}
                   />
                 </li>
               ))}

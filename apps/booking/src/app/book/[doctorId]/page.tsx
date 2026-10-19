@@ -6,6 +6,7 @@ import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
 import { clinicDay, formatDayLong, isValidDay } from "@/lib/clinic-time";
+import { shouldTrackRenders } from "@/lib/test-run";
 import { ownBooked } from "@/lib/own";
 import { describeProblem } from "@/lib/problems";
 
@@ -111,6 +112,7 @@ export default async function PickTime({
       <div className="mt-4">
         {avail.ok ? (
           <SlotChooser
+            trackRenders={shouldTrackRenders(process.env)}
             key={`${avail.data.doctor_id}-${avail.data.date}`}
             mode="details"
             doctorId={doctorId}

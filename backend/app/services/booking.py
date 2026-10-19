@@ -14,11 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.db.errors import is_retryable_conflict
-from app.domain.booking_rules import validate_slot
+from app.domain.booking_rules import require_lead_time, validate_slot
 from app.domain.errors import (
     AppointmentAlreadyCancelled,
     AppointmentAlreadyStarted,
     AppointmentNotFound,
+    ChangeTooLate,
     ConcurrentUpdate,
     PatientDoubleBooked,
     SlotTaken,
@@ -190,10 +191,13 @@ async def book(
 async def cancel(
     session: AsyncSession,
     clock: Clock,
+    settings: Settings,
     *,
     appointment_id: uuid.UUID,
     reason: str,
 ) -> Appointment:
+    lead = timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+
     async def _do() -> Appointment:
         appt = await appt_repo.get_for_update(session, appointment_id)
         if appt is None:
@@ -203,6 +207,7 @@ async def cancel(
         now = clock.now()
         if appt.starts_at <= now:
             raise AppointmentAlreadyStarted()
+        require_lead_time(appt.starts_at, now, lead, ChangeTooLate)
         tz = await _clinic_tz(session, appt.doctor_id, require_active=False)
         appt.status = "cancelled"
         appt.cancelled_at = now
@@ -240,7 +245,8 @@ async def reschedule(
         if appt.starts_at <= now:
             raise AppointmentAlreadyStarted()
         if appt.starts_at == new_starts_at:
-            return appt  # same-start no-op
+            return appt  # same-start no-op: a retry of a move that already happened
+        require_lead_time(appt.starts_at, now, lead, ChangeTooLate)  # the current time
         tz = await _clinic_tz(session, appt.doctor_id)
         weekday = new_starts_at.astimezone(tz).isoweekday()
         windows = [

@@ -14,9 +14,12 @@ export const detailsHref = (doctorId: string, startsAt: string) =>
 export const SlotLinks = memo(function SlotLinks({
   chips,
   doctorId,
+  trackRenders = false,
 }: {
   chips: readonly Chip[];
   doctorId: string;
+  /** Test runs only (lib/test-run.ts): write the render count into data-renders. */
+  trackRenders?: boolean;
 }) {
   // Written to the DOM after each commit (no state, so no render). The render-count tests read it:
   // a poll that changes nothing must not move it.
@@ -25,7 +28,8 @@ export const SlotLinks = memo(function SlotLinks({
   useArrowKeys(field, { vertical: true });
   useEffect(() => {
     renders.current += 1;
-    field.current?.setAttribute("data-renders", String(renders.current));
+    if (trackRenders)
+      field.current?.setAttribute("data-renders", String(renders.current));
   });
   return (
     <fieldset ref={field}>

@@ -1365,6 +1365,7 @@
           "SLOT_TAKEN",
           "PATIENT_DOUBLE_BOOKED",
           "APPOINTMENT_ALREADY_CANCELLED",
+          "CHANGE_TOO_LATE",
           "APPOINTMENT_ALREADY_STARTED",
           "PATIENT_PHONE_EXISTS",
           "CONCURRENT_UPDATE",
@@ -1769,6 +1770,7 @@
   "paths": {
     "/appointments": {
       "post": {
+        "description": "Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
         "operationId": "create_appointment_appointments_post",
         "parameters": [
           {
@@ -1833,9 +1835,25 @@
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
+                      "errors": null,
+                      "instance": "/appointments",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           },
           "503": {
             "content": {
@@ -1897,6 +1915,7 @@
     },
     "/appointments/{appointment_id}/cancel": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
         "operationId": "cancel_appointment_appointments__appointment_id__cancel_patch",
         "parameters": [
           {
@@ -1939,9 +1958,25 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/appointments/{appointment_id}/cancel",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
@@ -1958,6 +1993,7 @@
     },
     "/appointments/{appointment_id}/reschedule": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_appointment_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -2000,15 +2036,47 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
+                      "errors": null,
+                      "instance": "/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           }
         },
         "summary": "Reschedule Appointment",
@@ -2085,6 +2153,7 @@
     },
     "/doctors/{doctor_id}/availability": {
       "get": {
+        "description": "Slots starting within 60 minutes are never offered.",
         "operationId": "doctor_availability_doctors__doctor_id__availability_get",
         "parameters": [
           {
@@ -2584,6 +2653,7 @@
     },
     "/internal/admin/appointments/{appointment_id}/cancel": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
         "operationId": "cancel_for_patient_internal_admin_appointments__appointment_id__cancel_patch",
         "parameters": [
           {
@@ -2638,9 +2708,25 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/internal/admin/appointments/{appointment_id}/cancel",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
@@ -2714,6 +2800,7 @@
     },
     "/internal/admin/appointments/{appointment_id}/reschedule": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_for_patient_internal_admin_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -2768,15 +2855,47 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/internal/admin/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
+                      "errors": null,
+                      "instance": "/internal/admin/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           }
         },
         "summary": "Reschedule For Patient",
@@ -3058,6 +3177,7 @@
         ]
       },
       "post": {
+        "description": "Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
         "operationId": "book_mine_internal_me_appointments_post",
         "parameters": [
           {
@@ -3140,9 +3260,25 @@
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
+                      "errors": null,
+                      "instance": "/internal/me/appointments",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           },
           "503": {
             "content": {
@@ -3216,6 +3352,7 @@
     },
     "/internal/me/appointments/{appointment_id}/cancel": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
         "operationId": "cancel_mine_internal_me_appointments__appointment_id__cancel_patch",
         "parameters": [
           {
@@ -3270,9 +3407,25 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/internal/me/appointments/{appointment_id}/cancel",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
@@ -3289,6 +3442,7 @@
     },
     "/internal/me/appointments/{appointment_id}/reschedule": {
       "patch": {
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
         "operationId": "reschedule_mine_internal_me_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -3343,15 +3497,47 @@
           },
           "409": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "CHANGE_TOO_LATE": {
+                    "summary": "CHANGE_TOO_LATE",
+                    "value": {
+                      "code": "CHANGE_TOO_LATE",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "errors": null,
+                      "instance": "/internal/me/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 409,
+                      "title": "Change too late",
+                      "type": "https://api.example/problems/change-too-late"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including CHANGE_TOO_LATE"
           },
           "422": {
             "content": {
-              "application/problem+json": {}
+              "application/problem+json": {
+                "examples": {
+                  "BOOKING_TOO_SOON": {
+                    "summary": "BOOKING_TOO_SOON",
+                    "value": {
+                      "code": "BOOKING_TOO_SOON",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
+                      "errors": null,
+                      "instance": "/internal/me/appointments/{appointment_id}/reschedule",
+                      "request_id": "00000000-0000-4000-8000-000000000000",
+                      "status": 422,
+                      "title": "Booking too soon",
+                      "type": "https://api.example/problems/booking-too-soon"
+                    }
+                  }
+                }
+              }
             },
-            "description": "Problem (RFC 9457)"
+            "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
           }
         },
         "summary": "Reschedule Mine",

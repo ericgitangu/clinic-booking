@@ -10,7 +10,13 @@ export function CopyBlock({ code, label }: { code: string; label: string }) {
   const [done, setDone] = useState(false);
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-lg border border-border bg-muted p-4 pr-14 text-sm leading-6">
+      <pre
+        // A scrolling region must be reachable by keyboard (axe: scrollable-region-focusable).
+        tabIndex={0}
+        role="region"
+        aria-label={`Command to copy: ${label}`}
+        className="overflow-x-auto rounded-lg border border-border bg-muted p-4 pr-14 text-sm leading-6"
+      >
         <code>{code}</code>
       </pre>
       <Button

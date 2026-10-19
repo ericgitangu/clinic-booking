@@ -158,7 +158,12 @@ export default async function AppointmentPage({
           </div>
         </div>
       ) : (
-        <AppointmentActions id={a.id} when={when} startsAt={a.starts_at} />
+        <AppointmentActions
+          id={a.id}
+          when={when}
+          startsAt={a.starts_at}
+          serverNow={new Date().toISOString()}
+        />
       )}
     </section>
   );

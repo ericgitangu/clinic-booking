@@ -349,6 +349,46 @@ test("the form's idempotency key is the one the API got: a retry of the booking 
   await closeAll(context);
 });
 
+test("a retry with the same key, sent after the first request finished, still answers with that booking", async ({
+  browser,
+}) => {
+  // The order the concurrent test above leaves to chance: here the second request always arrives
+  // after the first one booked. It used to be refused by the "you already hold that time" check
+  // that runs before the API is asked, and so did the concurrent one whenever it lost the race.
+  const { doctorId, slots } = await pick(5, { doctor: 1 });
+  const { context, page } = await signedIn(browser, newPerson(), {
+    serviceWorkers: "block",
+  });
+  await page.goto(details(doctorId, slots[0]));
+  await expect(
+    page.getByRole("button", { name: "Confirm booking" }),
+  ).toBeEnabled();
+
+  const redirects: (string | null)[] = [];
+  let sent = 0;
+  await page.route("**/book/**", async (route) => {
+    const req = route.request();
+    if (req.method() !== "POST" || !req.headers()["next-action"] || sent > 0) {
+      return route.continue();
+    }
+    sent++;
+    const first = await route.fetch();
+    const second = await route.fetch(); // same bytes, same key, after the first booked
+    for (const r of [first, second])
+      redirects.push(r.headers()["x-action-redirect"] ?? null);
+    await route.fulfill({ response: first });
+  });
+
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You are booked" }),
+  ).toBeVisible();
+  const target = (r: string | null) => r?.split(";")[0] ?? null;
+  expect(target(redirects[0])).toMatch(/^\/book\/confirmed\/[0-9a-f-]{36}$/);
+  expect(target(redirects[1])).toBe(target(redirects[0]));
+  await closeAll(context);
+});
+
 test("two server-action requests of one attempt, with the same key, book once and both answer with that booking", async ({
   browser,
 }) => {

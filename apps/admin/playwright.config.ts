@@ -25,7 +25,11 @@ export default defineConfig({
   projects: [
     {
       name: "independent",
-      testIgnore: ["**/dashboard.spec.ts", "**/metrics-cache.spec.ts"],
+      testIgnore: [
+        "**/dashboard.spec.ts",
+        "**/metrics-cache.spec.ts",
+        "**/one-hour-rule.spec.ts",
+      ],
     },
     {
       name: "dashboard",
@@ -34,7 +38,8 @@ export default defineConfig({
     },
     {
       name: "metrics-cache",
-      testMatch: "**/metrics-cache.spec.ts",
+      // one-hour-rule books a visit and leaves it, which changes the clinic-wide numbers.
+      testMatch: ["**/metrics-cache.spec.ts", "**/one-hour-rule.spec.ts"],
       dependencies: ["dashboard"],
     },
   ],
