@@ -67,6 +67,8 @@ export default async function PickTime({
               doctorId={doctor.data.id}
               name={doctor.data.full_name}
               size={64}
+              lazy={false}
+              priority
             />
             <div>
               <h1 className="font-heading text-3xl font-semibold tracking-tight">
