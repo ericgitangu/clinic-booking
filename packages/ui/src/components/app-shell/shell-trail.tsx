@@ -25,7 +25,7 @@ export function ShellTrail({ config }: { config: ShellRoutes }) {
         className={`${LINK} -ml-2 inline-flex min-h-11 items-center gap-1 px-2 text-base sm:hidden`}
       >
         <ChevronLeftIcon aria-hidden className="size-4" />
-        Back to {parent.label}
+        Back to {parent.backLabel}
       </a>
       <ol className="-ml-1 hidden min-h-11 flex-wrap items-center gap-x-1 sm:flex">
         {crumbs.map((c, i) => {

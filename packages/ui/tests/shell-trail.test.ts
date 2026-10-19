@@ -42,7 +42,7 @@ describe("patterns", () => {
 describe("resolveTrail", () => {
   it("gives a root page no parent", () => {
     expect(resolveTrail("/", cfg)).toEqual({
-      crumbs: [{ href: "/", label: "Home" }],
+      crumbs: [{ href: "/", label: "Home", backLabel: "home" }],
       parent: null,
     });
   });
@@ -50,12 +50,14 @@ describe("resolveTrail", () => {
     expect(resolveTrail("/a/9/edit", cfg).parent).toEqual({
       href: "/a/9",
       label: "One",
+      backLabel: "one",
     });
   });
   it("falls back to the fallback parent for an unknown path", () => {
     expect(resolveTrail("/zzz", cfg).parent).toEqual({
       href: "/",
       label: "Home",
+      backLabel: "home",
     });
   });
 });

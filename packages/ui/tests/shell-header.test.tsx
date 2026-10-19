@@ -93,7 +93,7 @@ describe("ShellTrail", () => {
     fallbackParent: "/",
     unknownLabel: "Page not found",
     routes: [
-      { pattern: "/", label: "Home" },
+      { pattern: "/", label: "Home", backLabel: "home" },
       { pattern: "/book", label: "Book a visit", parent: "/" },
     ],
   };
@@ -106,7 +106,7 @@ describe("ShellTrail", () => {
     path = "/book";
     render(<ShellTrail config={routes} />);
     const back = screen.getByRole("link", {
-      name: "Back to Home",
+      name: "Back to home",
       hidden: true,
     });
     expect(back.getAttribute("href")).toBe("/");

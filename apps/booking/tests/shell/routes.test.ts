@@ -20,6 +20,7 @@ describe("booking route list", () => {
     [`/book/${DOCTOR}/details`, `/book/${DOCTOR}`, "Choose a time"],
     [`/book/confirmed/${APPT}`, "/appointments", "My appointments"],
     ["/appointments", "/", "Home"],
+    [`/appointments/${APPT}`, "/appointments", "My appointments"],
     [`/appointments/${APPT}/reschedule`, "/appointments", "My appointments"],
     ["/about", "/", "Home"],
     ["/privacy", "/", "Home"],
@@ -27,7 +28,6 @@ describe("booking route list", () => {
     ["/data", "/", "Home"],
     ["/docs", "/", "Home"],
     ["/redoc", "/", "Home"],
-    ["/decisions", "/", "Home"],
     ["/no/such/page", "/", "Home"],
   ];
   it.each(cases)("%s goes back to %s", (path, href, label) => {
@@ -59,8 +59,11 @@ describe("booking route list", () => {
 
   it("labels an unknown path as not found, with a way home", () => {
     const { crumbs, parent } = resolveTrail("/nope", SHELL_ROUTES);
-    expect(crumbs.at(-1)).toEqual({ href: "/nope", label: "Page not found" });
-    expect(parent).toEqual({ href: "/", label: "Home" });
+    expect(crumbs.at(-1)).toMatchObject({
+      href: "/nope",
+      label: "Page not found",
+    });
+    expect(parent).toMatchObject({ href: "/", label: "Home" });
   });
 
   it("treats a missing pathname as the root", () => {
@@ -85,12 +88,24 @@ describe("active nav item", () => {
   });
 });
 
-describe("the Decisions page", () => {
-  // The page and its header and footer links come from their own branch; the shell only has to
-  // know where it sits so it has a way back the day it lands.
-  it("has a route, so the page has a trail the day it lands", () => {
-    expect(SHELL_ROUTES.routes.some((r) => r.pattern === "/decisions")).toBe(
-      true,
-    );
+describe("what a back link says", () => {
+  it.each([
+    ["/book", "Back to home"],
+    [`/book/${DOCTOR}`, "Back to doctors"],
+    [`/book/${DOCTOR}/details`, "Back to times"],
+    [`/book/confirmed/${APPT}`, "Back to my appointments"],
+    [`/appointments/${APPT}`, "Back to my appointments"],
+    ["/nope", "Back to home"],
+  ])("%s says %s", (path, text) => {
+    expect(
+      `Back to ${resolveTrail(path, SHELL_ROUTES).parent?.backLabel}`,
+    ).toBe(text);
+  });
+  it("never starts a label with a capital after 'Back to'", () => {
+    for (const r of SHELL_ROUTES.routes) {
+      const label =
+        r.backLabel ?? r.label.charAt(0).toLowerCase() + r.label.slice(1);
+      expect(label, r.pattern).toMatch(/^[a-z]/);
+    }
   });
 });

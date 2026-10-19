@@ -7,8 +7,8 @@ export const SHELL_ROUTES: ShellRoutes = {
   fallbackParent: "/dashboard",
   unknownLabel: "Page not found",
   routes: [
-    { pattern: "/", label: "Sign in" },
-    { pattern: "/dashboard", label: "Dashboard" },
+    { pattern: "/", label: "Sign in", backLabel: "sign in" },
+    { pattern: "/dashboard", label: "Dashboard", backLabel: "dashboard" },
     { pattern: "/access", label: "Access", parent: "/dashboard" },
     {
       pattern: "/dashboard/appointments/:id",

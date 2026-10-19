@@ -6,9 +6,19 @@ export const SHELL_ROUTES: ShellRoutes = {
   fallbackParent: "/",
   unknownLabel: "Page not found",
   routes: [
-    { pattern: "/", label: "Home" },
-    { pattern: "/book", label: "Book a visit", parent: "/" },
-    { pattern: "/book/:doctorId", label: "Choose a time", parent: "/book" },
+    { pattern: "/", label: "Home", backLabel: "home" },
+    {
+      pattern: "/book",
+      label: "Book a visit",
+      backLabel: "doctors",
+      parent: "/",
+    },
+    {
+      pattern: "/book/:doctorId",
+      label: "Choose a time",
+      backLabel: "times",
+      parent: "/book",
+    },
     {
       pattern: "/book/:doctorId/details",
       label: "Your details",
@@ -19,7 +29,17 @@ export const SHELL_ROUTES: ShellRoutes = {
       label: "Booking confirmed",
       parent: "/appointments",
     },
-    { pattern: "/appointments", label: "My appointments", parent: "/" },
+    {
+      pattern: "/appointments",
+      label: "My appointments",
+      backLabel: "my appointments",
+      parent: "/",
+    },
+    {
+      pattern: "/appointments/:id",
+      label: "Appointment",
+      parent: "/appointments",
+    },
     {
       pattern: "/appointments/:id/reschedule",
       label: "Reschedule",
@@ -31,6 +51,5 @@ export const SHELL_ROUTES: ShellRoutes = {
     { pattern: "/data", label: "Data handling", parent: "/" },
     { pattern: "/docs", label: "API docs", parent: "/" },
     { pattern: "/redoc", label: "ReDoc", parent: "/" },
-    { pattern: "/decisions", label: "Decisions", parent: "/" },
   ],
 };

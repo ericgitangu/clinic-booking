@@ -8,6 +8,9 @@
 export type ShellRoute = {
   pattern: string;
   label: string;
+  // What "Back to ..." says when this route is the parent, in sentence case ("my appointments").
+  // Without it, the label with its first letter lowercased.
+  backLabel?: string;
   parent?: string;
 };
 
@@ -18,7 +21,10 @@ export type ShellRoutes = {
   unknownLabel: string;
 };
 
-export type Crumb = { href: string; label: string };
+export type Crumb = { href: string; label: string; backLabel: string };
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const backOf = (r: ShellRoute) => r.backLabel ?? lowerFirst(r.label);
 
 export type Trail = {
   // Root first, the current page last. A root page has a single crumb.
@@ -107,9 +113,16 @@ export function resolveTrail(
     const up = findRoute(config, config.fallbackParent);
     const above = up
       ? chain(config, up.route, up.params, config.fallbackParent)
-      : [{ href: config.fallbackParent, label: "Home" }];
+      : [{ href: config.fallbackParent, label: "Home", backLabel: "home" }];
     return {
-      crumbs: [...above, { href: path, label: config.unknownLabel }],
+      crumbs: [
+        ...above,
+        {
+          href: path,
+          label: config.unknownLabel,
+          backLabel: lowerFirst(config.unknownLabel),
+        },
+      ],
       parent: above.at(-1) ?? null,
     };
   }
@@ -125,7 +138,7 @@ function chain(
   params: Record<string, string>,
   href: string,
 ): Crumb[] {
-  const out: Crumb[] = [{ href, label: route.label }];
+  const out: Crumb[] = [{ href, label: route.label, backLabel: backOf(route) }];
   const seen = new Set<string>([route.pattern]);
   let current = route;
   for (let depth = 0; depth < MAX_DEPTH && current.parent; depth++) {
@@ -134,7 +147,7 @@ function chain(
     const to = next && fillPattern(next.pattern, params);
     if (!next || !to) break;
     seen.add(next.pattern);
-    out.unshift({ href: to, label: next.label });
+    out.unshift({ href: to, label: next.label, backLabel: backOf(next) });
     current = next;
   }
   return out;

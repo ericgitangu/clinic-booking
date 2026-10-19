@@ -20,3 +20,14 @@ describe("admin route list", () => {
     expect(resolveTrail(path, SHELL_ROUTES).parent?.href ?? null).toBe(href);
   });
 });
+
+describe("what a back link says", () => {
+  it("is sentence case", () => {
+    expect(resolveTrail("/access", SHELL_ROUTES).parent?.backLabel).toBe(
+      "dashboard",
+    );
+    expect(resolveTrail("/nope", SHELL_ROUTES).parent?.backLabel).toBe(
+      "dashboard",
+    );
+  });
+});
