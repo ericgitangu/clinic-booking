@@ -69,7 +69,7 @@ test("adds, changes and revokes someone, with confirmation, and the database fol
   expect(await entry(email)).toMatchObject({ role: "admin" });
 
   await page.getByRole("button", { name: `Revoke access of ${email}` }).click();
-  await expect(page.getByRole("alertdialog")).toContainText(email);
+  await expect(page.getByRole("dialog")).toContainText(email);
   await page
     .getByRole("button", { name: "Revoke access", exact: true })
     .click();
@@ -131,36 +131,25 @@ test("a revoke takes effect on the person's very next request", async ({
   await ctx.close();
 });
 
-test("an owner sees the Access link, other roles do not", async ({
-  as,
+test("owner and admin see the Access and Audit links, a viewer does not", async ({
   browser,
 }) => {
-  const ownerPage = await as("owner");
-  await ownerPage.setViewportSize({ width: 1280, height: 900 });
-  await ownerPage.goto("/dashboard");
-  await expect(
-    ownerPage
-      .getByRole("navigation", { name: "Primary" })
-      .getByRole("link", { name: "Access" }),
-  ).toBeVisible();
-
-  for (const who of ["admin@clinic.example", "viewer@clinic.example"]) {
+  for (const [who, sees] of [
+    ["owner", true],
+    ["admin@clinic.example", true],
+    ["viewer@clinic.example", false],
+  ] as const) {
     const ctx = await browser.newContext({
       viewport: { width: 1280, height: 900 },
     });
-    await signIn(ctx, `e2e-${who}`);
+    await signIn(ctx, who === "owner" ? OWNER : `e2e-${who}`);
     const page = await ctx.newPage();
     await page.goto("/dashboard");
-    await expect(
-      page
-        .getByRole("navigation", { name: "Primary" })
-        .getByRole("link", { name: "Dashboard" }),
-    ).toBeVisible();
-    await expect(
-      page
-        .getByRole("navigation", { name: "Primary" })
-        .getByRole("link", { name: "Access" }),
-    ).toHaveCount(0);
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    await expect(nav.getByRole("link", { name: "Dashboard" })).toBeVisible();
+    for (const name of ["Access", "Audit"]) {
+      await expect(nav.getByRole("link", { name })).toHaveCount(sees ? 1 : 0);
+    }
     await ctx.close();
   }
 });

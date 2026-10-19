@@ -1,28 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { PencilIcon, UserMinusIcon, UserPlusIcon } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@clinic/ui/components/ui/alert-dialog";
 import { Badge } from "@clinic/ui/components/ui/badge";
 import { Button } from "@clinic/ui/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@clinic/ui/components/ui/dialog";
 import { Input } from "@clinic/ui/components/ui/input";
 import { Label } from "@clinic/ui/components/ui/label";
 import {
@@ -40,46 +21,27 @@ import {
   TableHeader,
   TableRow,
 } from "@clinic/ui/components/ui/table";
-import { notify } from "@clinic/ui/lib/notify";
-import {
-  changeAccessRole,
-  grantAccess,
-  revokeAccess,
-  type ActionResult,
-} from "@/lib/actions";
+import { changeAccessRole, grantAccess, revokeAccess } from "@/lib/actions";
+import { ConfirmAction } from "@/components/confirm-action";
+import { InvitesPanel } from "@/components/invites-panel";
 import { formatSlot } from "@/lib/clinic-time";
 import { ROLE_HELP, ROLE_LABEL, type GrantableRole } from "@/lib/roles";
-import type { AccessEntry } from "@clinic/api/generated";
+import type { AccessEntry, Invite } from "@clinic/api/generated";
 
 const GRANTABLE: readonly GrantableRole[] = ["admin", "viewer"];
 
-type Dialogue =
-  | { kind: "none" }
-  | { kind: "add" }
-  | { kind: "role"; entry: AccessEntry }
-  | { kind: "revoke"; entry: AccessEntry };
-
 // Only the owner reaches this page, and every action is checked again on the server and in the
 // API, so what is hidden here is a convenience and never the protection.
-export function AccessManager({ entries }: { entries: AccessEntry[] }) {
-  const router = useRouter();
-  const [dialogue, setDialogue] = useState<Dialogue>({ kind: "none" });
-  const [pending, start] = useTransition();
-  const close = () => setDialogue({ kind: "none" });
-
-  function run(task: () => Promise<ActionResult>) {
-    start(async () => {
-      const res = await task();
-      if (res.ok) {
-        notify.success(res.message);
-        close();
-        router.refresh();
-      } else {
-        notify.error(res.message);
-      }
-    });
-  }
-
+export function AccessManager({
+  entries,
+  invites,
+  actor,
+}: {
+  entries: AccessEntry[];
+  invites: Invite[];
+  /** Who is looking. An admin can invite, and change or revoke viewers; the owner can do it all. */
+  actor: "owner" | "admin";
+}) {
   const active = entries.filter((e) => e.revoked_at === null);
   const revoked = entries.filter((e) => e.revoked_at !== null);
 
@@ -89,12 +51,7 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Access
         </h1>
-        <Button
-          className="min-h-11"
-          onClick={() => setDialogue({ kind: "add" })}
-        >
-          <UserPlusIcon aria-hidden /> Add someone
-        </Button>
+        {actor === "owner" && <AddSomeone />}
       </div>
       <p className="max-w-[60ch] text-muted-foreground">
         Only people listed here can open the dashboard. A change applies on
@@ -128,7 +85,7 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
                     : `${e.granted_by}${e.granted_at ? `, ${formatSlot(e.granted_at)}` : ""}`}
                 </TableCell>
                 <TableCell className="text-right">
-                  <RowActions entry={e} onPick={setDialogue} />
+                  <RowActions entry={e} actor={actor} />
                 </TableCell>
               </TableRow>
             ))}
@@ -153,10 +110,12 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
                 ? "Fixed by configuration"
                 : `Added by ${e.granted_by}`}
             </p>
-            <RowActions entry={e} onPick={setDialogue} wide />
+            <RowActions entry={e} actor={actor} wide />
           </li>
         ))}
       </ul>
+
+      <InvitesPanel invites={invites} />
 
       {revoked.length > 0 && (
         <section aria-labelledby="revoked" className="space-y-2">
@@ -173,85 +132,42 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
           </ul>
         </section>
       )}
-
-      <AddDialog
-        open={dialogue.kind === "add"}
-        pending={pending}
-        onClose={close}
-        onSubmit={(email, role) => run(() => grantAccess(email, role))}
-      />
-      <RoleDialog
-        entry={dialogue.kind === "role" ? dialogue.entry : null}
-        pending={pending}
-        onClose={close}
-        onSubmit={(email, role) => run(() => changeAccessRole(email, role))}
-      />
-      <AlertDialog
-        open={dialogue.kind === "revoke"}
-        onOpenChange={(o) => !o && close()}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke access?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {dialogue.kind === "revoke"
-                ? `${dialogue.entry.email} will see an access-denied page on their next click. You can add them again later.`
-                : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-11">
-              Keep access
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="min-h-11"
-              disabled={pending}
-              onClick={(ev) => {
-                ev.preventDefault();
-                if (dialogue.kind === "revoke") {
-                  const email = dialogue.entry.email;
-                  run(() => revokeAccess(email));
-                }
-              }}
-            >
-              Revoke access
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
 
 function RowActions({
   entry,
-  onPick,
+  actor,
   wide = false,
 }: {
   entry: AccessEntry;
-  onPick: (d: Dialogue) => void;
+  actor: "owner" | "admin";
   wide?: boolean;
 }) {
-  // The owner is fixed by configuration: nothing to change or revoke.
+  // The owner is fixed by configuration: nothing to change or revoke. An admin may act on viewers
+  // only; the API answers ROLE_ESCALATION for anything else, so hiding it is a convenience.
   if (entry.source === "env") return null;
+  if (actor === "admin" && entry.role !== "viewer") return null;
   return (
     <div className={wide ? "grid grid-cols-2 gap-2" : "flex justify-end gap-2"}>
-      <Button
-        variant="outline"
-        className="min-h-11"
-        onClick={() => onPick({ kind: "role", entry })}
-        aria-label={`Change role of ${entry.email}`}
-      >
-        <PencilIcon aria-hidden /> Change role
-      </Button>
-      <Button
-        variant="outline"
-        className="min-h-11 text-destructive"
-        onClick={() => onPick({ kind: "revoke", entry })}
-        aria-label={`Revoke access of ${entry.email}`}
-      >
-        <UserMinusIcon aria-hidden /> Revoke
-      </Button>
+      {actor === "owner" && <ChangeRole entry={entry} />}
+      <ConfirmAction
+        trigger={
+          <Button
+            variant="outline"
+            className="min-h-11 text-destructive"
+            aria-label={`Revoke access of ${entry.email}`}
+          >
+            <UserMinusIcon aria-hidden /> Revoke
+          </Button>
+        }
+        title="Revoke access?"
+        description={`${entry.email} will see an access-denied page on their next click. You can add them again later.`}
+        confirmLabel="Revoke access"
+        withReason={false}
+        run={() => revokeAccess(entry.email)}
+      />
     </div>
   );
 }
@@ -281,35 +197,27 @@ function RoleSelect({
   );
 }
 
-function AddDialog({
-  open,
-  pending,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  pending: boolean;
-  onClose: () => void;
-  onSubmit: (email: string, role: string) => void;
-}) {
+// Giving someone access straight away. Like every action it opens the one confirmation dialog; the
+// API takes no reason for this one, so that field is left out.
+function AddSomeone() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("viewer");
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add someone</DialogTitle>
-          <DialogDescription>
-            They sign in with that Google address and get the role you pick.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit(email, role);
-          }}
-        >
+    <ConfirmAction
+      trigger={
+        <Button className="min-h-11">
+          <UserPlusIcon aria-hidden /> Add someone
+        </Button>
+      }
+      title="Add someone"
+      description="They sign in with that Google address and get the role you pick."
+      confirmLabel="Add access"
+      withReason={false}
+      extraReady={/.+@.+\..+/.test(email.trim())}
+      run={() => grantAccess(email, role)}
+      onDone={() => setEmail("")}
+      extra={
+        <>
           <div className="space-y-2">
             <Label htmlFor="add-email">Google email</Label>
             <Input
@@ -326,59 +234,39 @@ function AddDialog({
             <Label htmlFor="add-role">Role</Label>
             <RoleSelect id="add-role" value={role} onChange={setRole} />
           </div>
-          <DialogFooter>
-            <Button type="submit" className="min-h-11" disabled={pending}>
-              {pending ? "Adding" : "Add access"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    />
   );
 }
 
-function RoleDialog({
-  entry,
-  pending,
-  onClose,
-  onSubmit,
-}: {
-  entry: AccessEntry | null;
-  pending: boolean;
-  onClose: () => void;
-  onSubmit: (email: string, role: string) => void;
-}) {
+function ChangeRole({ entry }: { entry: AccessEntry }) {
   const [role, setRole] = useState<string | null>(null);
-  const value = role ?? entry?.role ?? "viewer";
+  const value = role ?? entry.role;
   return (
-    <Dialog
-      open={entry !== null}
-      onOpenChange={(o) => {
-        if (!o) {
-          setRole(null);
-          onClose();
-        }
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Change role</DialogTitle>
-          <DialogDescription>{entry?.email}</DialogDescription>
-        </DialogHeader>
+    <ConfirmAction
+      trigger={
+        <Button
+          variant="outline"
+          className="min-h-11"
+          aria-label={`Change role of ${entry.email}`}
+        >
+          <PencilIcon aria-hidden /> Change role
+        </Button>
+      }
+      title="Change role"
+      description={entry.email}
+      confirmLabel="Save role"
+      withReason={false}
+      extraReady={value !== entry.role}
+      run={() => changeAccessRole(entry.email, value)}
+      onDone={() => setRole(null)}
+      extra={
         <div className="space-y-2">
           <Label htmlFor="change-role">Role</Label>
           <RoleSelect id="change-role" value={value} onChange={setRole} />
         </div>
-        <DialogFooter>
-          <Button
-            className="min-h-11"
-            disabled={pending || !entry || value === entry.role}
-            onClick={() => entry && onSubmit(entry.email, value)}
-          >
-            {pending ? "Saving" : "Save role"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      }
+    />
   );
 }

@@ -12,6 +12,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { APPOINTMENT_MINUTES } from "@clinic/api/appointment";
 
 // One template for the four emails (booked, rescheduled, cancelled, reminder), in the Idyllic
 // colours: ink navy for text, lotus blue for the button, mist behind a white card. Written for
@@ -161,7 +162,7 @@ export function IdyllicEmail(d: EmailData) {
                 {d.doctor}, {d.specialty}
               </Text>
               <Text style={{ margin: "4px 0 0", fontSize: 13, color: MUTED }}>
-                {d.zone}, 30 minutes.
+                {d.zone}, {APPOINTMENT_MINUTES} minutes.
               </Text>
             </Section>
             {d.reason ? (
