@@ -30,6 +30,11 @@ export type EventResult =
  * (txid, id) is after the cursor of the response on screen (anything at or before that cursor is
  * already in the slots). A taken slot is removed here, at once; a freed slot is not added here:
  * whether a time is offerable is the server's call, so the caller refetches once.
+ *
+ * The cursor on screen stays the response's own. The server's cursor is "<xmin>.0", which can sit
+ * behind the (txid, id) of an event already pushed; moving it to the event made the refetch after
+ * a freed event look older and be dropped. Event order is tracked by `lastSeq` instead, and a taken
+ * time is held back from older responses by `reapplyTaken`.
  */
 export function applyEvent(
   data: Availability,
@@ -54,13 +59,31 @@ export function applyEvent(
     lastSeq: ev.seq,
     data: {
       ...data,
-      cursor: `${seq[0]}.${seq[1]}`,
       slots: data.slots.filter((s) => !sameInstant(s.starts_at, ev.starts_at)),
       taken: data.taken.some((t) => sameInstant(t, ev.starts_at))
         ? data.taken
         : [...data.taken, ev.starts_at],
     },
   };
+}
+
+/**
+ * A taken time is kept off a polled response that is older than the event that took it (its cursor
+ * has not reached the event's (txid, id)), so a slow poll cannot bring a taken time back. The caller
+ * forgets a time when a freed event for it arrives.
+ */
+export function reapplyTaken(
+  data: Availability,
+  taken: readonly { startsAt: string; seq: string }[],
+): Availability {
+  const cursor = parseSeq(data.cursor);
+  let out = data;
+  for (const t of taken) {
+    const seq = parseSeq(t.seq);
+    if (cursor && seq && compareSeq(seq, cursor, 2) <= 0) continue;
+    out = withTaken(out, t.startsAt);
+  }
+  return out;
 }
 
 /** RULE 3: the API said 409 for this time, or the patient's own booking took it: patch at once. */

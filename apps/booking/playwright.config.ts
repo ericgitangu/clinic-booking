@@ -21,6 +21,8 @@ export default defineConfig({
   ],
   use: {
     baseURL: "http://localhost:3100",
+    // Kept for a failed scenario only, so CI can store them (.circleci/config.yml, e2e-real).
+    trace: "retain-on-failure",
     ...(process.env.PW_CHROME_PATH
       ? { launchOptions: { executablePath: process.env.PW_CHROME_PATH } }
       : process.env.PW_BUNDLED
