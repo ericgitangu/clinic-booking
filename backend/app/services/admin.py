@@ -100,6 +100,30 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
         raise bad from exc
 
 
+def encode_changes_cursor(occurred_at: datetime, event_id: int) -> str:
+    body = {"o": occurred_at.astimezone(UTC).isoformat(), "i": event_id}
+    raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def decode_changes_cursor(cursor: str) -> tuple[datetime, int]:
+    bad = InvalidAdminQuery("cursor is not a cursor issued by this endpoint")
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+        body = json.loads(raw)
+        if not isinstance(body, dict) or set(body) != {"o", "i"}:
+            raise bad
+        o, i = body["o"], body["i"]
+        if not isinstance(o, str) or not isinstance(i, int) or isinstance(i, bool):
+            raise bad
+        occurred_at = datetime.fromisoformat(o)
+        if occurred_at.tzinfo is None:
+            raise bad
+        return occurred_at.astimezone(UTC), i
+    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+        raise bad from exc
+
+
 async def metrics(
     session: AsyncSession, clock: Clock, *, start: date, end: date, bucket: Bucket
 ) -> Metrics:
@@ -185,6 +209,18 @@ async def appointments(
     return AdminAppointmentPage(
         view="minimised" if minimised else "full", items=items, next_cursor=next_cursor
     )
+
+
+async def appointment(
+    session: AsyncSession, appointment_id: uuid.UUID, *, role: str
+) -> AdminAppointment:
+    """One admin appointment row, projected for the role like an item of the list. An unknown id
+    and a synthetic patient's appointment are both 404."""
+    row = await repo.appointment_row(session, appointment_id)
+    if row is None:
+        raise AppointmentNotFound()
+    item = AdminAppointment.model_validate(row)
+    return item if role in FULL_VIEW_ROLES else project_for_viewer(item)
 
 
 async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:

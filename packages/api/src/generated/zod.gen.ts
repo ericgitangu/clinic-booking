@@ -209,6 +209,7 @@ export const zBoardAppointment = z.object({
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
     locked: z.boolean(),
+    patient_changed: z.boolean(),
     patient_name: z.string(),
     patient_phone: z.string().nullable(),
     starts_at: z.iso.datetime({ offset: true }),
@@ -248,6 +249,42 @@ export const zBoardTotals = z.object({
  */
 export const zCancelRequest = z.object({
     reason: z.string().min(3).max(500)
+});
+
+/**
+ * ChangeItem
+ *
+ * One booking, reschedule or cancellation, placed by the day the change happened.
+ */
+export const zChangeItem = z.object({
+    actor: z.enum(['patient', 'staff']).nullable(),
+    appointment_id: z.uuid(),
+    attendance: z.enum(['arrived', 'no_show']).nullable(),
+    doctor_id: z.uuid(),
+    doctor_name: z.string(),
+    from_starts_at: z.iso.datetime({ offset: true }).nullable(),
+    kind: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled'
+    ]),
+    occurred_at: z.iso.datetime({ offset: true }),
+    patient_name: z.string(),
+    reason: z.string().nullable(),
+    reason_category: z.enum([
+        'transport',
+        'illness',
+        'travel',
+        'work',
+        'weather',
+        'felt_better',
+        'insurance',
+        'other'
+    ]).nullable(),
+    starts_at: z.iso.datetime({ offset: true }),
+    status: z.enum(['booked', 'cancelled']),
+    timezone: z.string(),
+    to_starts_at: z.iso.datetime({ offset: true }).nullable()
 });
 
 /**
@@ -291,6 +328,22 @@ export const zClinic = z.object({
 export const zDateRange = z.object({
     from: z.iso.date(),
     to: z.iso.date()
+});
+
+/**
+ * ChangeList
+ */
+export const zChangeList = z.object({
+    items: z.array(zChangeItem),
+    kind: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled'
+    ]),
+    next_cursor: z.string().nullable(),
+    range: zDateRange,
+    total: z.int(),
+    view: z.enum(['full', 'minimised'])
 });
 
 /**
@@ -1249,6 +1302,15 @@ export const zCreateAppointmentInternalAdminAppointmentsPostBody = zStaffCreateA
  */
 export const zCreateAppointmentInternalAdminAppointmentsPostResponse = zStaffAppointmentChange;
 
+export const zGetAppointmentInternalAdminAppointmentsAppointmentIdGetPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetAppointmentInternalAdminAppointmentsAppointmentIdGetResponse = zAdminAppointment;
+
 /**
  * Body
  */
@@ -1423,6 +1485,34 @@ export const zCancellationReasonsInternalAdminOpsCancellationReasonsGetQuery = z
  * Successful Response
  */
 export const zCancellationReasonsInternalAdminOpsCancellationReasonsGetResponse = zReasonBreakdown;
+
+export const zChangesInternalAdminOpsChangesGetQuery = z.object({
+    kind: z.enum([
+        'booked',
+        'rescheduled',
+        'cancelled'
+    ]),
+    from: z.iso.date(),
+    to: z.iso.date(),
+    reason: z.enum([
+        'transport',
+        'illness',
+        'travel',
+        'work',
+        'weather',
+        'felt_better',
+        'insurance',
+        'other'
+    ]).nullish(),
+    doctor_id: z.uuid().nullish(),
+    limit: z.int().gte(1).lte(100).optional().default(50),
+    cursor: z.string().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zChangesInternalAdminOpsChangesGetResponse = zChangeList;
 
 export const zDaySheetInternalAdminOpsDaySheetCsvGetQuery = z.object({
     date: z.iso.date(),
