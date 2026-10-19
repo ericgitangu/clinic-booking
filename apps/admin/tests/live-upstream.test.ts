@@ -188,6 +188,43 @@ describe("passing the gateway's answer on", () => {
     }
   });
 
+  it("Cloud Run's 'no available instance' 500 is busy (503 REALTIME_BUSY with Retry-After), never a 500", async () => {
+    const text =
+      "<html><body>Error: Server Error\nThe request was aborted because there was no available instance.</body></html>";
+    expect(mapUpstreamStatus(500, null, text)).toEqual({
+      status: 503,
+      code: "REALTIME_BUSY",
+      retryAfter: "30",
+    });
+    expect(mapUpstreamStatus(503, "12", text)).toEqual({
+      status: 503,
+      code: "REALTIME_BUSY",
+      retryAfter: "12",
+    });
+    // A Retry-After that is not a small number of seconds is not passed on.
+    expect(
+      mapUpstreamStatus(500, "Wed, 21 Oct 2026 07:28:00 GMT", text),
+    ).toMatchObject({ retryAfter: "30" });
+    // Any other 500 is unavailable, also with Retry-After, also the page's fallback.
+    expect(mapUpstreamStatus(500, null, "boom")).toEqual({
+      status: 503,
+      code: "REALTIME_UNAVAILABLE",
+      retryAfter: "30",
+    });
+
+    const fetchImpl = vi.fn(async () => new Response(text, { status: 500 }));
+    const r = await openUpstream({
+      req,
+      signal: new AbortController().signal,
+      lifetimeMs: 295_000,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(r).toEqual({
+      kind: "problem",
+      problem: { status: 503, code: "REALTIME_BUSY", retryAfter: "30" },
+    });
+  });
+
   it("a stream that answers in time is passed through, and a client that left is not an error", async () => {
     const body = new ReadableStream<Uint8Array>();
     const ok = await openUpstream({

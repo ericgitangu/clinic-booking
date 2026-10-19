@@ -89,19 +89,34 @@ export type UpstreamProblem = {
 };
 
 /**
- * What the page gets for a refused stream. 429 (no free slot, the gateway's or Cloud Run's) and
- * "no headers in time" are RATE_LIMITED, the page's busy fallback; 503 is unavailable (also the
- * fallback); 401/403 are a refusal; 422 (a cursor or filter the gateway will not take) becomes 400
- * so the page drops its cursor and starts fresh instead of retrying the same one; anything else
- * is unavailable.
+ * Cloud Run's own answer when every instance is busy and none can start: a 500 (sometimes a 503)
+ * whose body says "The request was aborted because there was no available instance". It comes
+ * from Cloud Run, not the gateway, so it carries no problem+json and no Retry-After.
+ */
+const NO_INSTANCE = /no available instance/i;
+
+/** How much of a refused upstream body is read to recognise Cloud Run's "no instance" answer. */
+const BODY_PEEK_BYTES = 2048;
+
+/**
+ * What the page gets for a refused stream. 429 (no free slot, the gateway's or Cloud Run's),
+ * Cloud Run's "no available instance" 500 and "no headers in time" are the busy fallback: 429
+ * RATE_LIMITED, or 503 REALTIME_BUSY with Retry-After, never a 500 the page would show as an
+ * error. 503 is unavailable (also the fallback); 401/403 are a refusal; 422 (a cursor or filter the
+ * gateway will not take) becomes 400 so the page drops its cursor and starts fresh instead of
+ * retrying the same one; anything else is unavailable.
  */
 export function mapUpstreamStatus(
   status: number,
   retryAfter: string | null,
+  body = "",
 ): UpstreamProblem {
-  const retry = retryAfter ?? "30";
+  const retry =
+    retryAfter && /^[0-9]{1,4}$/.test(retryAfter) ? retryAfter : "30";
   if (status === 429)
     return { status: 429, code: "RATE_LIMITED", retryAfter: retry };
+  if ((status === 500 || status === 503) && NO_INSTANCE.test(body))
+    return { status: 503, code: "REALTIME_BUSY", retryAfter: retry };
   if (status === 401 || status === 403)
     return { status, code: "FORBIDDEN", retryAfter: retry };
   if (status === 422 || status === 400)
@@ -164,11 +179,35 @@ export async function openUpstream(opts: {
   if (!res.ok || !res.body) {
     clearTimeout(lifetime);
     opts.signal.removeEventListener("abort", onAbort);
-    await res.body?.cancel();
+    const body = await peek(res.body);
     return {
       kind: "problem",
-      problem: mapUpstreamStatus(res.status, res.headers.get("retry-after")),
+      problem: mapUpstreamStatus(
+        res.status,
+        res.headers.get("retry-after"),
+        body,
+      ),
     };
   }
   return { kind: "stream", body: res.body };
+}
+
+/** The first BODY_PEEK_BYTES of a refused response as text; the rest is dropped. */
+async function peek(body: ReadableStream<Uint8Array> | null): Promise<string> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let text = "";
+  try {
+    while (text.length < BODY_PEEK_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += dec.decode(value, { stream: true });
+    }
+  } catch {
+    // A body that fails mid-read is still a refusal; the status decides.
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return text.slice(0, BODY_PEEK_BYTES);
 }

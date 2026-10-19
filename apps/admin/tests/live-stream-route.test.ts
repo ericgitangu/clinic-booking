@@ -58,6 +58,41 @@ describe("GET /live/stream refusals", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("Cloud Run's 'no available instance' 500 reaches the page as 503 with Retry-After", async () => {
+    getStaff.mockResolvedValue({
+      sub: "g-4",
+      email: "owner@clinic.example",
+      role: "owner",
+    });
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        "The request was aborted because there was no available instance.",
+        { status: 500, headers: { "content-type": "text/html" } },
+      ),
+    );
+    const res = await call();
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("30");
+    expect(await res.json()).toEqual({ status: 503, code: "REALTIME_BUSY" });
+  });
+
+  it("the gateway's own 429 stays 429 with its Retry-After", async () => {
+    getStaff.mockResolvedValue({
+      sub: "g-5",
+      email: "owner@clinic.example",
+      role: "owner",
+    });
+    fetchSpy.mockResolvedValueOnce(
+      new Response('{"code":"RATE_LIMITED"}', {
+        status: 429,
+        headers: { "retry-after": "30" },
+      }),
+    );
+    const res = await call();
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("30");
+  });
+
   it("a staff member is passed through to the gateway (the control for the cases above)", async () => {
     getStaff.mockResolvedValue({
       sub: "g-3",

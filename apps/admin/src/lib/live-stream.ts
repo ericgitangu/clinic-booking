@@ -8,7 +8,11 @@
 //   a lifetime or shutdown close and does NOT after an idle close (that waits for the person);
 // - a tab hidden for HIDDEN_CLOSE_MS closes its stream and resumes when it is visible again;
 // - a refused stream (the gateway has no free slot, or is unavailable) falls back to refreshing the
-//   page's numbers every BUSY_REFRESH_MS and tries the stream again later.
+//   page's numbers every BUSY_REFRESH_MS and tries the stream again with a growing, jittered delay
+//   (BUSY_RETRY_BASE_MS doubling up to BUSY_RETRY_MAX_MS, never sooner than Retry-After).
+//
+// One browser holds one of these at a time: live-share.ts elects a leader tab that owns it and
+// passes its events to the other tabs.
 import { createSseParser } from "@clinic/api/realtime";
 
 export type LiveStatus =
@@ -23,7 +27,8 @@ type Handle = ReturnType<typeof setTimeout>;
 
 export const HIDDEN_CLOSE_MS = 5 * 60_000;
 export const BUSY_REFRESH_MS = 30_000;
-export const BUSY_RETRY_MS = 60_000;
+export const BUSY_RETRY_BASE_MS = 30_000;
+export const BUSY_RETRY_MAX_MS = 4 * 60_000;
 
 export interface LiveStreamOptions {
   /** Called with each event frame's SSE id, event name and data. */
@@ -31,10 +36,14 @@ export interface LiveStreamOptions {
   onStatus(status: LiveStatus): void;
   /** Refresh the page's numbers by other means (the fallback while the stream is unavailable). */
   onRefresh(): void;
+  /** The stream's hello frame: its cursor and the role the gateway serves (from the database). */
+  onHello?(id: string, data: string): void;
   /** Where to read from; defaults to the admin app's own route. */
   url?: string;
-  /** Only this appointment's events (the appointment page); a canonical UUID. */
-  appointment?: string;
+  /** Resume from here on the first connection (a new leader tab continues where the last left). */
+  cursor?: string | null;
+  /** 0..1, for the busy retry's jitter; Math.random by default. */
+  random?: () => number;
   fetchImpl?: typeof fetch;
   isHidden?: () => boolean;
   timers?: {
@@ -55,11 +64,19 @@ export class LiveStream {
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private pausedByHidden = false;
   private failures = 0;
+  private busyStreak = 0;
   private droppedCursor = false;
   /** Counts connection attempts, so a test (or a trace) can see that a hidden tab opened none. */
   attempts = 0;
 
-  constructor(private readonly o: LiveStreamOptions) {}
+  constructor(private readonly o: LiveStreamOptions) {
+    this.lastId = o.cursor ?? null;
+  }
+
+  /** The last event id seen: where a reconnect, or the next leader, resumes from. */
+  get cursor(): string | null {
+    return this.lastId;
+  }
 
   private t() {
     return (
@@ -170,7 +187,6 @@ export class LiveStream {
     const doFetch = this.o.fetchImpl ?? fetch;
     const base = this.o.url ?? "/live/stream";
     const query = new URLSearchParams();
-    if (this.o.appointment) query.set("appointment", this.o.appointment);
     if (this.lastId) query.set("cursor", this.lastId);
     const qs = query.toString();
     const url = qs ? `${base}?${qs}` : base;
@@ -205,10 +221,10 @@ export class LiveStream {
       return;
     }
     if (res.status === 429 || res.status === 503) {
-      const wait = Number(res.headers.get("retry-after")) * 1000;
+      await res.body?.cancel();
       this.set("busy");
       this.startRefreshing();
-      this.later(Math.max(BUSY_RETRY_MS, Number.isFinite(wait) ? wait : 0));
+      this.later(this.busyDelay(res.headers.get("retry-after")));
       return;
     }
     if (!res.ok || !res.body) {
@@ -216,6 +232,7 @@ export class LiveStream {
       return;
     }
     this.failures = 0;
+    this.busyStreak = 0;
     this.droppedCursor = false;
     this.stopRefreshing();
     this.set("live");
@@ -224,7 +241,10 @@ export class LiveStream {
     const parser = createSseParser((f) => {
       if (f.kind !== "event") return;
       if (f.id) this.lastId = f.id;
-      if (f.event === "hello") return;
+      if (f.event === "hello") {
+        this.o.onHello?.(f.id ?? "", f.data);
+        return;
+      }
       if (f.event === "reconnect" || f.event === "idle") {
         closeReason = f.event === "idle" ? "idle" : this.reason(f.data);
         return;
@@ -257,6 +277,18 @@ export class LiveStream {
     } catch {
       return "";
     }
+  }
+
+  /** 30 s, 60 s, 120 s, 240 s, then 240 s: +-20 % so two refused browsers do not retry in step. */
+  private busyDelay(retryAfter: string | null): number {
+    const told = Number(retryAfter) * 1000;
+    const floor = Number.isFinite(told) && told > 0 ? told : 0;
+    const step = Math.min(
+      BUSY_RETRY_BASE_MS * 2 ** this.busyStreak++,
+      BUSY_RETRY_MAX_MS,
+    );
+    const jitter = 0.8 + 0.4 * (this.o.random ?? Math.random)();
+    return Math.max(floor, Math.round(step * jitter));
   }
 
   private network() {
