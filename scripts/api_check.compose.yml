@@ -1,0 +1,24 @@
+# Added to docker-compose.yml by scripts/api_check.sh (never by `make up`).
+#
+# A second API on the same database, identical except that its lead time is 100 days. A visit
+# booked through the normal API for tomorrow is inside that lead, so changing it here gives
+# 409 CHANGE_TOO_LATE through the real request path: the same code and the same rule, with only
+# BOOKING_MIN_LEAD_MINUTES set differently. That is the only way to show the rule at any hour,
+# because the normal API never books a visit inside its own lead time, and inside an hour of now
+# there may be no working hours at all.
+#
+# This is the one file allowed to set a lead time other than 60 (backend/tests/contract/
+# test_change_window_constant.py names it and the value). It is test-only: that test also fails if
+# any Dockerfile, Terraform, release job or other script names this file.
+services:
+  api-long-lead:
+    extends:
+      file: docker-compose.yml  # paths resolve from the project directory, the repository root
+      service: api
+    environment:
+      BOOKING_MIN_LEAD_MINUTES: "144000"
+    ports: !override
+      - "${API_CHECK_LONG_LEAD_PORT:-18181}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
