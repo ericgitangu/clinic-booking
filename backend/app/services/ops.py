@@ -19,8 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.domain.errors import DomainError
 from app.domain.ops import board_status, coalesce_gaps, running_behind
-from app.domain.reasons import CATEGORIES, classify_reason
+from app.domain.reasons import CATEGORIES, Category, classify_reason
 from app.domain.slots import SLOT, generate_slots
+from app.domain.staff import is_vetoable
 from app.repositories import admin as admin_repo
 from app.repositories import doctors as doctor_repo
 from app.repositories import ops as repo
@@ -29,6 +30,9 @@ from app.schemas.ops import (
     BoardAppointment,
     BoardGap,
     BoardTotals,
+    ChangeItem,
+    ChangeKind,
+    ChangeList,
     DoctorBoard,
     FreeSlot,
     GapList,
@@ -42,7 +46,13 @@ from app.schemas.ops import (
     RunningBehind,
     TodayBoard,
 )
-from app.services.admin import FULL_VIEW_ROLES, initials, mask_phone
+from app.services.admin import (
+    FULL_VIEW_ROLES,
+    decode_changes_cursor,
+    encode_changes_cursor,
+    initials,
+    mask_phone,
+)
 
 MAX_RANGE_DAYS = 92
 MAX_GAP_HOURS = 96
@@ -135,6 +145,9 @@ async def today_board(
                     patient_name=a["full_name"] if full else initials(a["full_name"]),
                     patient_phone=a["phone"] if full else mask_phone(a["phone"]),
                     locked=a["locked"],
+                    patient_changed=is_vetoable(
+                        a["latest_event_type"], a["latest_actor"], a["has_successor"]
+                    ),
                 )
             )
         free = generate_slots(
@@ -242,6 +255,81 @@ async def reasons(session: AsyncSession, *, start: date, end: date) -> ReasonBre
             )
             for c in order
         ],
+    )
+
+
+async def changes(
+    session: AsyncSession,
+    *,
+    kind: ChangeKind,
+    start: date,
+    end: date,
+    reason: Category | None,
+    doctor_id: uuid.UUID | None,
+    limit: int,
+    cursor: str | None,
+    role: str,
+) -> ChangeList:
+    """The events behind a number of the dashboard: every booking, reschedule or cancellation made
+    in the clinic-local days [start, end), newest first. Same filters and joins as the metrics
+    series, so ``total`` is that series' count and, for cancellations, the reasons chart's."""
+    _check_range(start, end)
+    if reason is not None and kind != "cancelled":
+        raise InvalidOpsQuery("'reason' applies only to kind=cancelled")
+    after = decode_changes_cursor(cursor) if cursor else None
+    ids: list[int] | None = None
+    if reason is not None:
+        texts = await repo.change_reason_texts(
+            session, from_day=start, to_day=end, doctor_id=doctor_id
+        )
+        ids = [i for i, t in texts if classify_reason(t) == reason]
+    total = await repo.changes_count(
+        session, kind=kind, from_day=start, to_day=end, doctor_id=doctor_id, ids=ids
+    )
+    rows = await repo.changes_page(
+        session,
+        kind=kind,
+        from_day=start,
+        to_day=end,
+        doctor_id=doctor_id,
+        ids=ids,
+        after=after,
+        limit=limit + 1,
+    )
+    await session.rollback()
+    page, has_more = rows[:limit], len(rows) > limit
+    full = role in FULL_VIEW_ROLES
+    items = [
+        ChangeItem(
+            timezone=r["timezone"],
+            appointment_id=r["appointment_id"],
+            doctor_id=r["doctor_id"],
+            doctor_name=r["doctor_name"],
+            patient_name=r["patient_name"] if full else initials(r["patient_name"]),
+            kind=r["kind"],
+            occurred_at=r["occurred_at"],
+            actor=r["actor"],
+            from_starts_at=r["from_starts_at"] if kind == "rescheduled" else None,
+            to_starts_at=r["to_starts_at"] if kind == "rescheduled" else None,
+            starts_at=r["starts_at"],
+            status=r["status"],
+            attendance=r["attendance"],
+            reason=r["cancellation_reason"] if full and kind == "cancelled" else None,
+            reason_category=classify_reason(r["cancellation_reason"])
+            if kind == "cancelled"
+            else None,
+        )
+        for r in page
+    ]
+    return ChangeList(
+        view="full" if full else "minimised",
+        kind=kind,
+        range=DateRange(from_=start, to=end),
+        total=total,
+        items=items,
+        next_cursor=encode_changes_cursor(page[-1]["occurred_at"], page[-1]["id"])
+        if has_more
+        else None,
     )
 
 

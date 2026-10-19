@@ -25,7 +25,7 @@ from app.domain.errors import (
     SlotTaken,
     UnknownPatient,
 )
-from app.domain.staff import StaffAction, StaffActionName
+from app.domain.staff import StaffAction, StaffActionName, is_vetoable
 from app.models.appointment import Appointment
 from app.repositories import appointments as appt_repo
 from app.repositories import doctors as doctor_repo
@@ -161,14 +161,7 @@ async def veto(
     successor = await appt_repo.has_successor(session, appointment_id)
     doctor_id, patient_id = appt.doctor_id, appt.patient_id  # read before the rollback expires it
     await session.rollback()  # end the read transaction before the write opens its own
-    # Only a change recorded as the patient's can be vetoed. A NULL actor is an event from before
-    # actors were recorded: it cannot be shown to be the patient's, so it is left alone.
-    if (
-        latest is None
-        or latest["actor"] != "patient"
-        or latest["event_type"] == "booked"
-        or successor
-    ):
+    if latest is None or not is_vetoable(latest["event_type"], latest["actor"], successor):
         raise NothingToVeto()
     ctx = _ctx(actor, "veto", reason, lock=True)
     if latest["event_type"] == "rescheduled":
