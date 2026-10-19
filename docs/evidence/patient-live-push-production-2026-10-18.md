@@ -1,6 +1,6 @@
 # Evidence: patient live push is on in production (2026-10-18)
 
-Supports [ADR-0031](../adr/0031-realtime-push-via-ably-sse.md) and [ADR-0009](../adr/0009-realtime-polling-now-sse-later.md). A real production observation by the gatekeeper at about 13:55 UTC, after the release of main 748d7d8. I did not make these observations; I recorded them as given.
+Supports [ADR-0031](../adr/0031-realtime-push-via-ably-sse.md) and [ADR-0009](../adr/0009-realtime-polling-now-sse-later.md). A real production observation by the reviewer at about 13:55 UTC, after the release of main 748d7d8. I did not make these observations; I recorded them as given.
 
 ## The release
 
