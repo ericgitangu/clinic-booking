@@ -35,17 +35,18 @@ export default defineConfig({
       // the app, the API and the database, is real.
       command: "node e2e/support/resend-standin.mjs",
       url: "http://127.0.0.1:3198/_health",
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 15_000,
     },
     {
       command: "pnpm exec next start -p 3100",
       url: "http://localhost:3100",
-      reuseExistingServer: !process.env.CI,
+      // Never attach to a server that is already there (another worktree's, say): fail instead.
+      reuseExistingServer: false,
       timeout: 60_000,
       env: {
         API_URL: process.env.E2E_API_URL ?? "http://127.0.0.1:8080",
-        // Turns on /e2e-shell/error, the page that throws on purpose (app/e2e-shell/error/page.tsx).
+        // The e2e error fixture (page.e2e.tsx) only gets a nonce at runtime when this is set.
         SHELL_E2E: "1",
         // The human check is off for test runs only (see lib/human-check.ts); there is no Google here.
         E2E: "1",
@@ -73,7 +74,7 @@ export default defineConfig({
           {
             command: "pnpm exec next dev -p 3101",
             url: "http://localhost:3101/robots.txt",
-            reuseExistingServer: !process.env.CI,
+            reuseExistingServer: false,
             timeout: 120_000,
             env: {
               API_URL: process.env.E2E_API_URL ?? "http://127.0.0.1:8080",
@@ -93,7 +94,7 @@ export default defineConfig({
           {
             command: "node e2e/support/fake-push.mjs",
             url: "http://localhost:3199/__stats",
-            reuseExistingServer: !process.env.CI,
+            reuseExistingServer: false,
             timeout: 20_000,
           },
         ]

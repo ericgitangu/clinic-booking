@@ -779,7 +779,8 @@ jobs:
             REAL_API_URL=http://127.0.0.1:8080 pnpm -C packages/api exec vitest run tests/real-api.test.ts
             # the same Google person on two app instances gets the same patient (real OAuth callback, real API)
             REAL_API_URL=http://127.0.0.1:8080 pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts
-            pnpm -C apps/booking build
+            # SHELL_E2E=1 adds the test-only error page that the shell specs open; real builds do not have it
+            SHELL_E2E=1 pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e
       - run:
@@ -873,7 +874,8 @@ jobs:
             node --version
             sudo npm install -g pnpm@12.5.1
             pnpm install --frozen-lockfile --ignore-scripts
-            pnpm -C apps/admin build
+            # SHELL_E2E=1 adds the test-only error page that the shell specs open; real builds do not have it
+            SHELL_E2E=1 pnpm -C apps/admin build
             pnpm -C apps/admin exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 E2E_REALTIME_URL=http://127.0.0.1:8090 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
       - run:
