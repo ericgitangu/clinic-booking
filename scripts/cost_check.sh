@@ -493,7 +493,8 @@ live_checks() {
   rm -f "$c5_body"
   c5_go=no
   c5_pkgs="$(gc artifacts packages list --repository clinic --location "$REGION" --project "$PROJECT" --format='value(name)' 2>/dev/null)" || echo "note  C5 AR could not list the packages; the Go images are counted as not pushed yet"
-  grep -qx "projects/$PROJECT/locations/$REGION/repositories/clinic/packages/$AR_GO_PACKAGE" <<<"$c5_pkgs" && c5_go=yes
+  # `value(name)` prints the bare package name; older output printed the full resource path. Accept both.
+  sed 's#.*/##' <<<"$c5_pkgs" | grep -qx "$AR_GO_PACKAGE" && c5_go=yes
   if [ -n "$c5_tok" ] && [ -z "$SECRET_COUNT_ERROR" ]; then
     if [ "$c5_http" != 200 ]; then
       fail "C5 AR repository read refused or failed (HTTP ${c5_http:-none}); the size is unknown"
