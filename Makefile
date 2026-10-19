@@ -9,7 +9,8 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint lint-go fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin avatars
+        contract lint lint-go fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin avatars \
+        api-collection api-check api-check-prod
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -130,6 +131,15 @@ e2e: ## Playwright checks against the real API and database (their own docker co
 	pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
 	pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts && \
 	cd apps/booking && pnpm build && pnpm test:e2e
+
+api-collection: ## Rebuild the reviewer collection in docs/api/ from contracts/openapi.json
+	node scripts/api_collection.mjs
+
+api-check: ## Run the reviewer collection with newman against its own compose stack (Docker only)
+	bash scripts/api_check.sh local
+
+api-check-prod: ## The collection's read-only requests against production; API_WRITES=1 adds the booking writes
+	bash scripts/api_check.sh production
 
 e2e-admin: ## Playwright for apps/admin against the real build, API and Postgres (compose); only Google sign-in is replaced
 	bash scripts/e2e_admin.sh
