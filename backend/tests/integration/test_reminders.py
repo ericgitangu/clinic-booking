@@ -80,6 +80,7 @@ def _headers(
         "m": method,
         "p": path,
         "bh": body_hash(body),
+        "jti": uuid.uuid4().hex,
         "ev": True,
     }
     return {"X-Internal-Assertion": sign(claims, KEY.encode()), "content-type": "application/json"}

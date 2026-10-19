@@ -2695,6 +2695,7 @@
         "enum": [
           "UNAUTHENTICATED",
           "FORBIDDEN",
+          "ASSERTION_REPLAYED",
           "ROLE_ESCALATION",
           "CLIENT_ADDRESS_UNKNOWN",
           "VALIDATION_ERROR",
@@ -4405,6 +4406,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Grant Access",
@@ -4469,6 +4485,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Revoke Access",
@@ -4541,6 +4572,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Change Access Role",
@@ -4736,6 +4782,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Create Appointment",
@@ -4875,6 +4936,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Mark Arrived",
@@ -4965,6 +5041,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Cancel For Patient",
@@ -5103,6 +5194,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Mark No Show",
@@ -5184,6 +5290,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Remind Now",
@@ -5290,6 +5411,21 @@
               }
             },
             "description": "Problem (RFC 9457), including BOOKING_TOO_SOON"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Reschedule For Patient",
@@ -5364,6 +5500,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Unlock Appointment",
@@ -5438,6 +5589,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Veto Appointment",
@@ -5586,6 +5752,21 @@
           },
           "422": {
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Mark Notified",
@@ -5654,6 +5835,21 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Doctor Running Late",
@@ -5746,7 +5942,16 @@
             "content": {
               "application/problem+json": {}
             },
-            "description": "Problem (RFC 9457)"
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Create Invite",
@@ -5851,6 +6056,21 @@
           },
           "422": {
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Revoke Invite",

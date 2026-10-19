@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     # audit routes (404, as if they did not exist) and returns access management to the owner.
     # The schema stays; patient-facing behaviour does not depend on it.
     STAFF_CRUD_ENABLED: bool = True
+    # At most this many staff writes per person in each window, whether or not they succeed; the
+    # one-minute assertion replay check runs beside it (app/services/write_guard.py).
+    STAFF_WRITE_LIMIT: int = 60
+    STAFF_WRITE_WINDOW_SECONDS: int = 600
 
     # Push service (Ably). Unset means "push disabled, polling only": a real configuration state,
     # not a failure. The key is a secret and is never logged.

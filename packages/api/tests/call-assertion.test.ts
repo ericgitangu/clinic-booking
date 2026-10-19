@@ -139,3 +139,72 @@ describe("callApi signs the request it sends", () => {
     expect(res).toMatchObject({ ok: false, kind: "contract_violation" });
   });
 });
+
+describe("callApi keeps what a 429 says about waiting", () => {
+  it("returns the Retry-After seconds with the problem", async () => {
+    vi.restoreAllMocks();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      Response.json(
+        {
+          type: "https://api.example.run.app/problems/rate-limited",
+          title: "Rate limited",
+          status: 429,
+          detail: "At most 60 changes every 10 minutes. Wait and try again.",
+          instance: "/internal/admin/access/x@y.io",
+          code: "RATE_LIMITED",
+          request_id: "00000000-0000-4000-8000-000000000000",
+        },
+        { status: 429, headers: { "Retry-After": "42" } },
+      ),
+    );
+    const res = await callApi(
+      "changeRole",
+      (client) =>
+        changeAccessRoleInternalAdminAccessEmailPatch({
+          client,
+          path: { email: "x@y.io" },
+          body: { role: "viewer" },
+        }),
+      { caller },
+    );
+    expect(res).toMatchObject({
+      ok: false,
+      kind: "problem",
+      status: 429,
+      code: "RATE_LIMITED",
+      retryAfter: 42,
+    });
+  });
+
+  it("leaves it out when the header is missing or not a whole number", async () => {
+    for (const header of [undefined, "soon", "-3"]) {
+      vi.restoreAllMocks();
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        Response.json(
+          {
+            type: "t",
+            title: "Rate limited",
+            status: 429,
+            detail: "d",
+            instance: "/i",
+            code: "RATE_LIMITED",
+            request_id: "00000000-0000-4000-8000-000000000000",
+          },
+          { status: 429, headers: header ? { "Retry-After": header } : {} },
+        ),
+      );
+      const res = await callApi(
+        "changeRole",
+        (client) =>
+          changeAccessRoleInternalAdminAccessEmailPatch({
+            client,
+            path: { email: "x@y.io" },
+            body: { role: "viewer" },
+          }),
+        { caller },
+      );
+      expect(res.ok).toBe(false);
+      expect("retryAfter" in res).toBe(false);
+    }
+  });
+});

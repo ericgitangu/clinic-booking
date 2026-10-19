@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 // The signed assertion the API requires on every /internal/* call. The wire format is fixed by
 // the API (backend/app/core/assertion.py): `v1.<payload>.<mac>`, payload = base64url of the
@@ -19,6 +19,8 @@ export interface AssertionClaims {
   path: string;
   body: string;
   now: Date;
+  /** A unique id for this assertion (16 to 64 characters). Made at random when not given. */
+  jti?: string;
 }
 
 function sortKeys(value: unknown): unknown {
@@ -50,6 +52,8 @@ export function signAssertion(claims: AssertionClaims, key: string): string {
       m: claims.method.toUpperCase(),
       p: claims.path,
       bh: createHash("sha256").update(claims.body, "utf8").digest("hex"),
+      // Unique per assertion and bound by the MAC: the API accepts a signed write once.
+      jti: claims.jti ?? randomBytes(16).toString("base64url"),
       ...(claims.emailVerified === undefined
         ? {}
         : { ev: claims.emailVerified }),

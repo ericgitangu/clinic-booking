@@ -47,6 +47,43 @@ class Env:
         self.client = client
         self.clock = clock
 
+    def sign_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        role: str = "owner",
+        email: str | None = None,
+        body: dict[str, Any] | None = None,
+        verified: bool | None = True,
+        jti: str | None = None,
+        iat_offset: int = 0,
+    ) -> tuple[dict[str, str], bytes]:
+        """Headers and body for one request. Every call makes a new random ``jti`` unless one is
+        given, so two calls are two assertions; the same ``jti`` and fake time give byte-identical
+        ones (a replay). ``iat_offset`` shifts the issue time (up to 5 s ahead is allowed)."""
+        raw = json.dumps(body).encode() if body is not None else b""
+        now = self.clock.now()
+        claims: dict[str, object] = {
+            "aud": AUDIENCE,
+            "sub": f"sub-{email or role}",
+            "email": email or EMAIL_OF.get(role, STRANGER),
+            "role": role,
+            "iat": int(now.timestamp()) + iat_offset,
+            "exp": int(now.timestamp()) + iat_offset + 60,
+            "m": method,
+            "p": path,
+            "bh": body_hash(raw),
+            "jti": jti or uuid.uuid4().hex,
+        }
+        if verified is not None:  # None leaves the claim out, as an old web app would
+            claims["ev"] = verified
+        headers = {
+            "X-Internal-Assertion": sign(claims, KEY.encode()),
+            "content-type": "application/json",
+        }
+        return headers, raw
+
     async def req(
         self,
         method: str,
@@ -57,25 +94,9 @@ class Env:
         body: dict[str, Any] | None = None,
         verified: bool | None = True,
     ) -> httpx.Response:
-        raw = json.dumps(body).encode() if body is not None else b""
-        now = self.clock.now()
-        claims: dict[str, object] = {
-            "aud": AUDIENCE,
-            "sub": f"sub-{email or role}",
-            "email": email or EMAIL_OF.get(role, STRANGER),
-            "role": role,
-            "iat": int(now.timestamp()),
-            "exp": int(now.timestamp()) + 60,
-            "m": method,
-            "p": path,
-            "bh": body_hash(raw),
-        }
-        if verified is not None:  # None leaves the claim out, as an old web app would
-            claims["ev"] = verified
-        headers = {
-            "X-Internal-Assertion": sign(claims, KEY.encode()),
-            "content-type": "application/json",
-        }
+        headers, raw = self.sign_request(
+            method, path, role=role, email=email, body=body, verified=verified
+        )
         return await self.client.request(method, path, headers=headers, content=raw or None)
 
     async def patient_book(self, starts_at: str = TUE_10) -> str:

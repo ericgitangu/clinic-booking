@@ -63,6 +63,7 @@ def _headers(
         "aud": AUDIENCE, "sub": sub, "email": email, "role": role,
         "iat": int(at.timestamp()), "exp": int(at.timestamp()) + 60,
         "m": method, "p": path, "bh": body_hash(body), "ev": ev,
+        "jti": uuid.uuid4().hex,
     }  # fmt: skip
     return {"X-Internal-Assertion": sign(claims, KEY.encode()), "content-type": "application/json"}
 

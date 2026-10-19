@@ -12,6 +12,7 @@ current state; may succeed later or in another state.
 |---|---|---|---|---|
 | UNAUTHENTICATED | 401 | unauthenticated | Unauthenticated | The internal assertion is missing, malformed, expired or does not match the request. |
 | FORBIDDEN | 403 | forbidden | Forbidden | The internal assertion is valid but its role may not use this endpoint. |
+| ASSERTION_REPLAYED | 401 | assertion-replayed | Assertion replayed | This signed request was already used once. Sign a new one for each write. |
 | ROLE_ESCALATION | 403 | role-escalation | Role escalation | The caller's role may not change this access: an admin cannot change or revoke an admin, and nobody changes their own access. |
 | CLIENT_ADDRESS_UNKNOWN | 400 | client-address-unknown | Client address unknown | The request carries no usable client address, so it cannot be rate limited. Retry. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
@@ -31,7 +32,7 @@ current state; may succeed later or in another state.
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
-| RATE_LIMITED | 429 | rate-limited | Rate limited | Too many requests from this address. Wait for Retry-After seconds and try again. |
+| RATE_LIMITED | 429 | rate-limited | Rate limited | Too many requests from this address, or too many staff changes by this person in the current window. Wait for Retry-After seconds and try again. |
 | IDEMPOTENCY_KEY_CONSUMED | 409 | idempotency-key-consumed | Idempotency key consumed | The Idempotency-Key belongs to an appointment that is no longer booked. |
 | APPOINTMENT_LOCKED | 409 | appointment-locked | Appointment locked | Staff vetoed the last change to this appointment, so it can only be changed by staff until an owner or admin unlocks it. |
 | ATTENDANCE_WINDOW_CLOSED | 409 | attendance-window-closed | Attendance window closed | Arrival can be recorded from 15 minutes before the appointment to 2 hours after it starts, no-show from the start to 2 hours after, and neither outside that. |

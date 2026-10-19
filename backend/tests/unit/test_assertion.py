@@ -25,6 +25,7 @@ def _claims(**over: object) -> dict[str, object]:
         "m": "GET",
         "p": PATH,
         "bh": body_hash(b""),
+        "jti": "test-jti-0123456789abcdef",
     }
     base.update(over)
     return base
@@ -133,3 +134,29 @@ def test_times_must_be_integers(bad: object) -> None:
 def test_identity_claims_are_required() -> None:
     with pytest.raises(InvalidAssertion, match="identity"):
         _verify(sign(_claims(role=None), KEY))
+
+
+def test_the_principal_carries_the_jti_and_the_last_valid_second() -> None:
+    principal = _verify(sign(_claims(), KEY))
+    assert principal.jti == "test-jti-0123456789abcdef"
+    assert principal.valid_until == int(NOW.timestamp()) + 60 + assertion.SKEW_SECONDS
+
+
+@pytest.mark.parametrize("jti", [None, "", "short", 12345, "x" * 65, ["a" * 20]])
+def test_an_assertion_without_a_usable_jti_is_refused(jti: object) -> None:
+    claims = _claims()
+    if jti is None:
+        del claims["jti"]
+    else:
+        claims["jti"] = jti
+    with pytest.raises(assertion.InvalidAssertion, match="jti"):
+        _verify(sign(claims, KEY))
+
+
+def test_the_jti_is_bound_by_the_mac() -> None:
+    header = sign(_claims(), KEY)
+    other = sign(_claims(jti="a-different-jti-0123456789"), KEY)
+    assert header.split(".")[1] != other.split(".")[1]
+    forged = ".".join([*header.split(".")[:2], other.split(".")[2]])
+    with pytest.raises(assertion.InvalidAssertion, match="signature"):
+        _verify(forged)

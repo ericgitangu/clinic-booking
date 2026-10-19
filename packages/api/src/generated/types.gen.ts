@@ -1577,7 +1577,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'ROLE_ESCALATION' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'APPOINTMENT_LOCKED' | 'ATTENDANCE_WINDOW_CLOSED' | 'NOTHING_TO_VETO' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'INVITE_INVALID' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'ASSERTION_REPLAYED' | 'ROLE_ESCALATION' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'APPOINTMENT_LOCKED' | 'ATTENDANCE_WINDOW_CLOSED' | 'NOTHING_TO_VETO' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'INVITE_INVALID' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -2532,6 +2532,10 @@ export type GrantAccessInternalAdminAccessPostErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type GrantAccessInternalAdminAccessPostResponses = {
@@ -2576,6 +2580,10 @@ export type RevokeAccessInternalAdminAccessEmailDeleteErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type RevokeAccessInternalAdminAccessEmailDeleteResponses = {
@@ -2620,6 +2628,10 @@ export type ChangeAccessRoleInternalAdminAccessEmailPatchErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type ChangeAccessRoleInternalAdminAccessEmailPatchResponses = {
@@ -2715,6 +2727,10 @@ export type CreateAppointmentInternalAdminAppointmentsPostErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type CreateAppointmentInternalAdminAppointmentsPostResponses = {
@@ -2802,6 +2818,10 @@ export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostErrors =
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses = {
@@ -2846,6 +2866,10 @@ export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErr
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses = {
@@ -2933,6 +2957,10 @@ export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses = {
@@ -2980,6 +3008,10 @@ export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostErrors = {
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses = {
@@ -3024,6 +3056,10 @@ export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedule
      * Problem (RFC 9457), including BOOKING_TOO_SOON
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses = {
@@ -3068,6 +3104,10 @@ export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostErr
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses = {
@@ -3112,6 +3152,10 @@ export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostErrors 
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses = {
@@ -3200,6 +3244,10 @@ export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostErrors = {
      * Validation Error
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses = {
@@ -3240,6 +3288,10 @@ export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostErrors =
      * Problem (RFC 9457)
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses = {
@@ -3303,7 +3355,7 @@ export type CreateInviteInternalAdminInvitesPostErrors = {
      */
     422: unknown;
     /**
-     * Problem (RFC 9457)
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
      */
     429: unknown;
 };
@@ -3377,6 +3429,10 @@ export type RevokeInviteInternalAdminInvitesInviteIdDeleteErrors = {
      * Validation Error
      */
     422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
 };
 
 export type RevokeInviteInternalAdminInvitesInviteIdDeleteResponses = {
