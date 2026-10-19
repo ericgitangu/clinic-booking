@@ -82,6 +82,7 @@ export default async function Dashboard({
   const rows: ActivityRow[] = eachDay(from, to).map((d) => {
     const p = byDay.get(d);
     return {
+      day: d,
       label: formatBucket(`${d}T00:00:00`),
       booked: p?.booked ?? 0,
       rescheduled: p?.rescheduled ?? 0,
@@ -292,11 +293,19 @@ export default async function Dashboard({
             label: "Reschedules",
             value: String(k.reschedules.value ?? 0),
             note: `in the last ${days} days`,
-            figure: {
+            changes: {
               title: "Reschedules",
               description: `Visits moved in the last ${days} days, against the ${days} days before.`,
+              range,
+              options: [
+                {
+                  kind: "rescheduled",
+                  label: "Moved visits",
+                  expected: k.reschedules.value ?? 0,
+                },
+              ],
               gap: RESCHEDULE_GAP,
-              body: (
+              figure: (
                 <p className="tabular-nums" data-testid="figure-reschedules">
                   {k.reschedules.value ?? 0} now, {k.reschedules.previous ?? 0}{" "}
                   before.
@@ -313,7 +322,7 @@ export default async function Dashboard({
       />
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <ActivityChart rows={rows} />
+        <ActivityChart rows={rows} canAct={mayAct} />
         <DoctorUtilisation
           doctors={dash.range.per_doctor}
           days={days}
@@ -323,7 +332,12 @@ export default async function Dashboard({
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
-        <ReasonsChart data={dash.reasons} days={days} />
+        <ReasonsChart
+          data={dash.reasons}
+          days={days}
+          range={range}
+          canAct={mayAct}
+        />
         <PeakHours
           data={dash.heatmap}
           doctors={dash.today.doctors.map((d) => ({

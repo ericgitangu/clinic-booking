@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { FigureSheet } from "@/components/figure-sheet";
+import { ChangesSheet, type ChangeOption } from "@/components/changes-sheet";
 import { DrillSheet } from "@/components/drill-sheet";
 import type { DrillConfig } from "@/lib/drill";
 import { CountUp } from "@/components/count-up";
@@ -17,8 +17,15 @@ export interface Kpi {
   href?: string;
   /** The appointments behind the number, opened in a sheet. Its count is the number's count. */
   drill?: DrillConfig;
-  /** For a figure the API gives only as a number: its sheet of numbers, and the gap named. */
-  figure?: { title: string; description: string; gap: string; body: ReactNode };
+  /** For a figure the API gives only as a count: the changes behind it (contract in lib/changes.ts). */
+  changes?: {
+    title: string;
+    description: string;
+    options: readonly ChangeOption[];
+    range: { from: string; to: string };
+    figure: ReactNode;
+    gap: string;
+  };
   /** Change against the period before; omitted for numbers that are a snapshot of now. */
   delta?: Delta | null;
 }
@@ -97,19 +104,21 @@ export function KpiStrip({
                 >
                   {body}
                 </DrillSheet>
-              ) : k.figure ? (
-                <FigureSheet
-                  title={k.figure.title}
-                  description={k.figure.description}
-                  gap={k.figure.gap}
+              ) : k.changes ? (
+                <ChangesSheet
+                  title={k.changes.title}
+                  description={k.changes.description}
+                  options={k.changes.options}
+                  range={k.changes.range}
+                  canAct={canAct}
+                  figure={k.changes.figure}
+                  gap={k.changes.gap}
                   className={cn(
                     base,
                     "w-full text-left motion-safe:transition-[transform,box-shadow,background-color] hover:bg-card hover:shadow-md motion-safe:active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   )}
                   trigger={body}
-                >
-                  {k.figure.body}
-                </FigureSheet>
+                />
               ) : k.href ? (
                 <Link
                   href={k.href}

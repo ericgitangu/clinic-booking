@@ -301,6 +301,62 @@ test.describe("a click opens the detail", () => {
   });
 });
 
+test.describe("the changes behind a figure, once the API has the read", () => {
+  // The contract is in src/lib/changes.ts. Until the API answers it, the sheets show the figures and
+  // name the gap (asserted above); once it does, every count must equal the figure it was opened
+  // from, and these assert it. They skip, saying why, only while the endpoint does not exist.
+  async function probe(): Promise<boolean> {
+    const r = lastDays(new Date(), 14);
+    const res = await internal(
+      "GET",
+      `/internal/admin/ops/changes?kind=rescheduled&from=${r.from}&to=${r.to}&limit=1`,
+      owner,
+    );
+    return res.status !== 404;
+  }
+
+  test("Reschedules, a reason and an activity day list as many changes as the figure says", async ({
+    as,
+  }) => {
+    test.skip(
+      !(await probe()),
+      "the API does not have /internal/admin/ops/changes yet (contract in src/lib/changes.ts)",
+    );
+    const r = lastDays(new Date(), 14);
+    const kpis = await internal<{ reschedules: { value: number | null } }>(
+      "GET",
+      `/internal/admin/ops/kpis?from=${r.from}&to=${r.to}`,
+      owner,
+    );
+    const page = await as("owner");
+    await openDashboard(page);
+    await tap(page.getByRole("button", { name: /^Reschedules\b/ }));
+    await expect(page.getByTestId("changes-count")).toHaveAttribute(
+      "data-count",
+      String(kpis.body.reschedules.value ?? 0),
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("changes-count")).toHaveCount(0);
+
+    const reasons = await internal<{
+      items: { category: string; count: number }[];
+    }>(
+      "GET",
+      `/internal/admin/ops/cancellation-reasons?from=${r.from}&to=${r.to}`,
+      owner,
+    );
+    const top = reasons.body.items
+      .filter((i) => i.count > 0)
+      .sort((a, b) => b.count - a.count)[0];
+    test.skip(!top, "no cancellations to group");
+    await tap(page.getByTestId("reason-row").first());
+    await expect(page.getByTestId("changes-count")).toHaveAttribute(
+      "data-count",
+      String(top!.count),
+    );
+  });
+});
+
 for (const scheme of ["light", "dark"] as const) {
   test.describe(`${scheme} theme, open modals`, () => {
     test.use({ colorScheme: scheme });

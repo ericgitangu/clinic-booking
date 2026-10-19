@@ -1,7 +1,8 @@
 "use client";
 
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-import { FigureSheet } from "@/components/figure-sheet";
+import { ChangesSheet } from "@/components/changes-sheet";
+import { addDays } from "@/lib/clinic-time";
 import { ACTIVITY_GAP } from "@/lib/figure-gaps";
 import {
   ChartContainer,
@@ -20,6 +21,8 @@ import {
 } from "@clinic/ui/components/ui/card";
 
 export interface ActivityRow {
+  /** The clinic-local day, YYYY-MM-DD. */
+  day: string;
   /** Short label for the axis, such as "20 Oct". */
   label: string;
   booked: number;
@@ -35,7 +38,13 @@ const config = {
 
 // Activity is when people booked, rescheduled or cancelled, not when the visit happens. Each line
 // differs in dash as well as colour so the three stay apart without relying on hue.
-export function ActivityChart({ rows }: { rows: ActivityRow[] }) {
+export function ActivityChart({
+  rows,
+  canAct = false,
+}: {
+  rows: ActivityRow[];
+  canAct?: boolean;
+}) {
   const sum = (k: "booked" | "rescheduled" | "cancelled") =>
     rows.reduce((n, r) => n + r[k], 0);
   const total = sum("booked") + sum("rescheduled") + sum("cancelled");
@@ -154,23 +163,43 @@ export function ActivityChart({ rows }: { rows: ActivityRow[] }) {
                           scope="row"
                           className="py-1.5 pr-2 text-left font-normal"
                         >
-                          <FigureSheet
+                          <ChangesSheet
                             className="min-h-6 rounded-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
                             title={`Activity on ${r.label}`}
                             description="Bookings, moves and cancellations made that day."
                             gap={ACTIVITY_GAP}
+                            range={{ from: r.day, to: addDays(r.day, 1) }}
+                            canAct={canAct}
+                            options={[
+                              {
+                                kind: "booked",
+                                label: "Booked",
+                                expected: r.booked,
+                              },
+                              {
+                                kind: "rescheduled",
+                                label: "Rescheduled",
+                                expected: r.rescheduled,
+                              },
+                              {
+                                kind: "cancelled",
+                                label: "Cancelled",
+                                expected: r.cancelled,
+                              },
+                            ]}
                             trigger={
                               <span data-testid="activity-day">{r.label}</span>
                             }
-                          >
-                            <p
-                              className="tabular-nums"
-                              data-testid="figure-activity"
-                            >
-                              {r.booked} booked, {r.rescheduled} rescheduled,{" "}
-                              {r.cancelled} cancelled.
-                            </p>
-                          </FigureSheet>
+                            figure={
+                              <p
+                                className="tabular-nums"
+                                data-testid="figure-activity"
+                              >
+                                {r.booked} booked, {r.rescheduled} rescheduled,{" "}
+                                {r.cancelled} cancelled.
+                              </p>
+                            }
+                          />
                         </th>
                         <td className="pr-2">{r.booked}</td>
                         <td className="pr-2">{r.rescheduled}</td>

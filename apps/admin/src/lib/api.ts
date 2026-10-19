@@ -416,3 +416,20 @@ export const auditList = (
       { caller },
     ),
   );
+
+// The read of changes by the day they were made (see lib/changes.ts for the contract). It is not in
+// the generated client because the API does not have it yet, so it goes through the generic client
+// and is typed by hand. DEBT: replace with the generated function when the contract lands.
+export const opsChanges = (
+  caller: Caller,
+  query: Record<string, string | number | undefined>,
+) =>
+  callApi(
+    "opsChanges",
+    (client) =>
+      client.get<unknown, unknown, false>({
+        url: "/internal/admin/ops/changes",
+        query,
+      }),
+    { caller },
+  );
