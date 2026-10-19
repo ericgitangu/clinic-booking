@@ -100,9 +100,26 @@ def test_assignment_matrix() -> None:
         assert lead_assignments(text) == [], text
 
 
+# The one file allowed to set a different lead time, and the only value it may set. It starts a
+# second API for the reviewer collection's CHANGE_TOO_LATE folder (a visit booked for tomorrow is
+# inside a 100-day lead), so the rule can be shown at any hour without writing to the database
+# outside the API. It is test-only: see test_the_test_only_lead_time_is_never_deployed.
+TEST_ONLY_LEAD = {"scripts/api_check.compose.yml": 144000}
+# Files that may name that file: the runner, the generator (its folder text), and the CI job that
+# runs the runner. Nothing that builds or deploys an image or infrastructure may.
+TEST_ONLY_LEAD_USERS = {
+    "scripts/api_check.sh",
+    "scripts/api_collection.mjs",
+    "scripts/ci/test_ci_scripts.sh",
+    ".circleci/config.yml",
+    "backend/tests/contract/test_change_window_constant.py",
+}
+
+
 def test_no_config_file_sets_a_different_lead_time() -> None:
     """A file may assign the default (``BOOKING_MIN_LEAD_MINUTES=60``); none may set another value,
-    and an assignment whose value cannot be read as a number is refused."""
+    and an assignment whose value cannot be read as a number is refused. The one test-only file in
+    ``TEST_ONLY_LEAD`` may set its own value, and nothing else."""
     files = _config_files()
     assert any(f.name == "config.yml" for f in files), "the scan found the CircleCI config"
     api = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db").BOOKING_MIN_LEAD_MINUTES
@@ -114,4 +131,31 @@ def test_no_config_file_sets_a_different_lead_time() -> None:
         for value in lead_assignments(text):
             where = path.relative_to(ROOT)
             assert value.isdigit(), (where, "the value cannot be read", value)
-            assert int(value) == api, (where, value)
+            allowed = TEST_ONLY_LEAD.get(where.as_posix(), api)
+            assert int(value) == allowed, (where, value)
+    for rel, minutes in TEST_ONLY_LEAD.items():
+        # An allowlisted file must really set its value: a stale entry would hide a later change.
+        assert lead_assignments((ROOT / rel).read_text()) == [str(minutes)], rel
+
+
+def test_the_test_only_lead_time_is_never_deployed() -> None:
+    """The file that sets another lead time is named only by the reviewer-collection runner, its
+    generator and the CI job that runs it: no Dockerfile, Terraform, release job or other script
+    builds, ships or starts it."""
+    for rel in TEST_ONLY_LEAD:
+        name = pathlib.PurePosixPath(rel).name
+        users: set[str] = set()
+        for path in [*_config_files(), *ROOT.glob("**/Dockerfile*")]:
+            if any(part in SKIP_DIRS for part in path.relative_to(ROOT).parts):
+                continue
+            try:
+                if name in path.read_text():
+                    users.add(path.relative_to(ROOT).as_posix())
+            except UnicodeDecodeError:
+                continue
+        assert users <= TEST_ONLY_LEAD_USERS, (rel, sorted(users - TEST_ONLY_LEAD_USERS))
+        # In the CI config it appears only inside the api-check job.
+        config = (ROOT / ".circleci" / "config.yml").read_text()
+        job = config[config.index("\n  api-check:\n") :]
+        job = job[: job.index("\n  admin-e2e:\n")] if "\n  admin-e2e:\n" in job else job
+        assert config.count(name) == job.count(name), (rel, "named outside the api-check job")

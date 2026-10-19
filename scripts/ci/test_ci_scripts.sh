@@ -1011,6 +1011,199 @@ expect "measure: --update-readme rewrites only the text between the markers" "$(
 printf 'no markers here\n' > "$WORK/rm/none.md"
 expect "measure: --update-readme refuses a README without the markers" "$(README="$WORK/rm/none.md" EVIDENCE="$WORK/ev.json" bash "$MEASURE" --update-readme >/dev/null 2>&1; echo $?)" 1
 
+# =========================================================================================
+# api_check.sh: the newman image is pinned by digest, and no other file names a newman image,
+# so the pin is the one place to change it. The collection mount is read-only.
+# =========================================================================================
+newman_pin="$(sed -n 's/^NEWMAN_IMAGE="\(.*\)"$/\1/p' "$HERE/../api_check.sh")"
+expect "api check: newman is pinned to a tag and a sha256 digest" \
+  "$(printf '%s' "$newman_pin" | grep -cE '^postman/newman:[0-9.]+-alpine@sha256:[0-9a-f]{64}$')" 1
+expect "api check: no other tracked file names a newman image" \
+  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' | tr '\n' ' ')" "scripts/api_check.sh "
+expect "api check: docs/api is mounted read-only into the newman container" \
+  "$(grep -c 'docs/api:/etc/newman:ro' "$HERE/../api_check.sh")" 1
+
+# =========================================================================================
+# realtime_live_check.sh: a gateway full of real streams is not a failed release; a broken one is.
+# A fake curl answers /health from a script of responses, a fake sleep records the backoff, and the
+# fake gcloud above answers the stream-free probe (services describe) from a fixture.
+# =========================================================================================
+LC="$WORK/lc"; mkdir -p "$LC/bin"
+cat > "$LC/bin/curl" <<'FAKE'
+#!/usr/bin/env bash
+# Answers from $LC/responses, one "code|body" line per call; the last line repeats.
+echo "$*" >> "$LC/argv"
+n=$(( $(cat "$LC/n" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$LC/n"
+line="$(sed -n "${n}p" "$LC/responses")"; [ -n "$line" ] || line="$(tail -n 1 "$LC/responses")"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '%s' "${line#*|}" > "$out"
+printf '%s' "${line%%|*}"
+FAKE
+cat > "$LC/bin/sleep" <<'FAKE'
+#!/usr/bin/env bash
+echo "$1" >> "$LC/sleeps"
+FAKE
+chmod +x "$LC/bin/curl" "$LC/bin/sleep"
+export LC
+lc_run() { # <name> <responses...>; leaves rc and output in $FX/lc.out
+  new_fx "lc.$1"; shift
+  rm -f "$LC/n" "$LC/argv" "$LC/sleeps"; printf '%s\n' "$@" > "$LC/responses"
+  mkdir -p "$FX/promoted-rt"; echo promoted > "$FX/promoted-rt/state"
+  echo '{"revisions":["rev-n","rev-p"],"current":"rev-n","previous":"rev-p"}' > "$FX/promoted-rt/keep.json"
+  [ -f "$FX/service_after.json" ] || echo '{"status":{"latestReadyRevisionName":"rev-n","conditions":[{"type":"Ready","status":"True"}],"traffic":[{"revisionName":"rev-n","percent":100,"tag":"sha-n"},{"revisionName":"rev-p","percent":0}]}}' > "$FX/service_after.json"
+  touch "$FX/promoted"
+  ( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=tok-secret-123 PROMOTE_DIR="$FX/promoted-rt" \
+      bash "$HERE/realtime_live_check.sh" ) >"$FX/lc.out" 2>&1; rc=$?
+}
+lc_calls() { cat "$LC/n" 2>/dev/null || echo 0; }
+lc_describes() { grep -c 'run services describe clinic-realtime' "$FX/calls.all" 2>/dev/null || echo 0; }
+FULL429='429|Rate exceeded.'
+NOINST='500|<html>The request was aborted because there was no available instance.</html>'
+
+lc_run ok '200|{"status":"ok"}'
+expect "live check: a healthy /health passes on the first try" "$rc:$(lc_calls)" "0:1"
+expect "live check: ...and asks the Cloud Run API nothing" "$(lc_describes)" 0
+expect "live check: /health goes through IAM with the token, never printed" \
+  "$(grep -c 'X-Serverless-Authorization: Bearer tok-secret-123 https://rt.example/health' "$LC/argv"):$(grep -c 'tok-secret-123' "$FX/lc.out")" "1:0"
+
+lc_run busy-then-ok "$FULL429" "$NOINST" '200|{"status":"ok"}'
+expect "live check: busy, busy, then healthy passes on the third try" "$rc:$(lc_calls)" "0:3"
+expect "live check: ...backing off 2 s then 4 s" "$(tr '\n' ' ' < "$LC/sleeps")" "2 4 "
+
+lc_run full-ready "$FULL429"
+expect "live check: full for the whole minute, revision Ready and serving -> passes" "$rc" 0
+expect "live check: ...after about 60 s of backoff (2+4+8+16+16+16)" "$(awk '{s+=$1} END {print s}' "$LC/sleeps"):$(lc_calls)" "62:7"
+expect "live check: ...because the stream-free probe said so" "$(lc_describes):$(grep -c 'Ready and serves all traffic' "$FX/lc.out")" "1:1"
+
+new_fx lc.full-noinstance-notready
+echo '{"status":{"latestReadyRevisionName":"rev-p","conditions":[{"type":"Ready","status":"False"}],"traffic":[{"revisionName":"rev-n","percent":100}]}}' > "$FX/service_after.json"
+SAVED_FX="$FX"
+lc_run_keep() { # like lc_run, reusing the fixture already in $FX
+  rm -f "$LC/n" "$LC/argv" "$LC/sleeps"; printf '%s\n' "$@" > "$LC/responses"
+  mkdir -p "$FX/promoted-rt"; echo '{"revisions":["rev-n","rev-p"],"current":"rev-n","previous":"rev-p"}' > "$FX/promoted-rt/keep.json"
+  touch "$FX/promoted"
+  ( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=tok-secret-123 PROMOTE_DIR="$FX/promoted-rt" \
+      bash "$HERE/realtime_live_check.sh" ) >"$FX/lc.out" 2>&1; rc=$?
+}
+lc_run_keep "$NOINST"
+expect "live check: sustained 'no available instance' and the revision is NOT ready -> fails (rollback)" "$rc" 1
+expect "live check: ...after asking the Cloud Run API" "$(lc_describes)" 1
+
+new_fx lc.full-other-serving
+echo '{"status":{"latestReadyRevisionName":"rev-n","conditions":[{"type":"Ready","status":"True"}],"traffic":[{"revisionName":"rev-p","percent":100},{"revisionName":"rev-n","percent":0}]}}' > "$FX/service_after.json"
+lc_run_keep "$FULL429"
+expect "live check: sustained 429 while traffic is on another revision -> fails" "$rc" 1
+
+new_fx lc.describe-fails
+echo 'not json' > "$FX/service_after.json"
+lc_run_keep "$FULL429"
+expect "live check: sustained 429 and an unreadable Cloud Run answer -> fails closed" "$rc" 1
+FX="$SAVED_FX"
+
+lc_run broken '500|upstream connect error'
+expect "live check: a 500 that is not 'no available instance' fails, even after retrying" "$rc" 1
+expect "live check: ...and is never excused by the stream-free probe" "$(lc_describes)" 0
+
+lc_run crash-then-full '503|Service Unavailable' "$FULL429" '503|Service Unavailable'
+expect "live check: the last answer decides: a broken revision that was briefly 'full' still fails" "$rc:$(lc_describes)" "1:0"
+
+lc_run denied '403|Forbidden'
+expect "live check: 403 fails at once (waiting cannot fix the identity)" "$rc:$(lc_calls)" "1:1"
+
+lc_run nokeep '200|{"status":"ok"}'
+rm -f "$FX/promoted-rt/keep.json"
+( PATH="$LC/bin:$PATH" CURL="$LC/bin/curl" URL=https://rt.example TOKEN=t PROMOTE_DIR="$FX/promoted-rt" bash "$HERE/realtime_live_check.sh" ) >/dev/null 2>&1; rc=$?
+expect "live check: no keep.json (no promoted revision named) fails closed" "$rc" 1
+
+# The release job wires it, and still rolls back when it fails.
+LCSTEP="$(awk '/Live check after promotion/,/persist_to_workspace/' "$HERE/../../.circleci/config.yml")"
+expect "live check: ship-realtime runs realtime_live_check.sh after promotion" "$(grep -c 'bash scripts/ci/realtime_live_check.sh' <<<"$LCSTEP")" 1
+expect "live check: ...and rolls back when it fails" "$(grep -c 'rollback.sh' <<<"$LCSTEP")" 1
+expect "live check: ...with no bare one-shot /health curl left behind" "$(grep -c 'curl -fsS --max-time 30' <<<"$LCSTEP")" 0
+
+# =========================================================================================
+# sse_probe.py (the release smoke's stream reads): http.client over TLS to a *.run.app host, a
+# deadline and socket timeout, the first bytes parsed, a stream the server did not close reported as
+# timed out, and a URL that does not qualify never requested. A stand-in server on a free port
+# (plain HTTP through the connect seam) plays the gateway.
+# =========================================================================================
+python3 - "$HERE" > "$WORK/sp.out" 2>&1 <<'PY'
+import http.client, sys, threading, time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+sys.path.insert(0, sys.argv[1])
+import sse_probe
+
+seen = []          # (path, headers) of every request the stand-in received
+class H(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    def log_message(self, *a): pass
+    def do_GET(self):
+        seen.append((self.path, dict(self.headers)))
+        self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.send_header("Transfer-Encoding", "chunked"); self.end_headers()
+        def send(s):
+            b = s.encode(); self.wfile.write(b"%x\r\n%s\r\n" % (len(b), b)); self.wfile.flush()
+        try:
+            if "cursor=" in self.path:
+                send('id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nid: 5.9\nevent: booked\ndata: {"seq":"5.9"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n')
+            elif "hang" in self.path:
+                send('id: 5.0\nevent: hello\ndata: {}\n\n: hb\n\n')
+                time.sleep(30)                     # never closes within the probe's deadline
+            else:
+                send('id: 5.0\nevent: hello\ndata: {"role":"smoke"}\n\nevent: reconnect\ndata: {"reason":"probe"}\n\n')
+            self.wfile.write(b"0\r\n\r\n"); self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+srv = ThreadingHTTPServer(("127.0.0.1", 0), H); srv.daemon_threads = True
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+port = srv.server_port
+plain = lambda h, p, timeout: http.client.HTTPConnection(h, p, timeout=timeout)
+loop = lambda h: h == "127.0.0.1"
+U = "https://127.0.0.1:%d" % port
+HDR = {"X-Internal-Assertion": "v1.assert-fixture", "X-Serverless-Authorization": "Bearer fixture-token"}
+out = []
+def check(name, ok): out.append("%s|%s" % (name, "PASS" if ok else "FAIL"))
+
+p = sse_probe.probe(U + "/stream", HDR, 5, connect=plain, host_ok=loop)
+hello = p.frames[0] if p.frames else {}; end = p.first("reconnect") or {}
+check("the first bytes are the hello frame and the server's probe close is seen", (p.status, p.body.startswith("id: "), hello.get("event"), hello.get("id"), "probe" in end.get("data", ""), p.timed_out) == (200, True, "hello", "5.0", True, False))
+check("the assertion and token reached the server as headers", seen[0][1].get("X-Internal-Assertion") == "v1.assert-fixture" and seen[0][1].get("X-Serverless-Authorization") == "Bearer fixture-token" and seen[0][1].get("Accept") == "text/event-stream")
+p = sse_probe.probe(U + "/stream?cursor=5.0", HDR, 5, connect=plain, host_ok=loop)
+check("a resume reads the booked event behind the cursor", (p.first("booked") or {}).get("id") == "5.9")
+t0 = time.monotonic(); p = sse_probe.probe(U + "/hang", HDR, 1.0, connect=plain, host_ok=loop); el = time.monotonic() - t0
+check("a stream the server never closes is reported as timed out", p.timed_out and p.status == 200 and (p.first("hello") or {}).get("id") == "5.0")
+check("...and the read is bounded by the deadline (1 second asked, under 3 taken, the server held it for 30)", el < 3.0)
+n = len(seen)
+bad = {
+    "a plain http URL": "http://127.0.0.1:%d/stream" % port,
+    "a host that is not a run.app address": "https://example.com/stream",
+    "a URL with whitespace": "https://127.0.0.1:%d/stre am" % port,
+    "a URL with a newline": "https://127.0.0.1:%d/stream\nX-Evil: 1" % port,
+    "a URL with a control character": "https://127.0.0.1:%d/stream\x01" % port,
+    "a URL with credentials": "https://user:pw@127.0.0.1:%d/stream" % port,
+    "an empty URL": "",
+    "a URL with no host": "https:///stream",
+}
+for name, url in bad.items():
+    q = sse_probe.probe(url, HDR, 2, connect=plain, host_ok=loop if "example" not in url else None)
+    check("%s is rejected without a request" % name, q.status == 0 and q.body == "" and not q.timed_out)
+check("...and the server saw none of those requests", len(seen) == n)
+q = sse_probe.probe("https://rt-fixture---clinic-realtime-abc123-uk.a.run.app/stream", HDR, 1, connect=lambda h, p, timeout: (_ for _ in ()).throw(OSError("unreachable")))
+check("a run.app host passes the check by default (and an unreachable one gives status 0)", q.status == 0)
+check("the default host rule is the run.app pattern", sse_probe._RUN_APP.fullmatch("sha-abc1234---clinic-realtime-2shno7sa7q-uk.a.run.app") is not None and sse_probe._RUN_APP.fullmatch("run.app.evil.com") is None and sse_probe._RUN_APP.fullmatch("evilrun.app") is None)
+check("a refused connection is status 0, not an exception", sse_probe.probe("https://127.0.0.1:1/stream", HDR, 1, connect=plain, host_ok=loop).status == 0)
+print("\n".join(out))
+print("OUTPUT-HAS-SECRET" if ("fixture-token" in "\n".join(out) or "assert-fixture" in "\n".join(out)) else "OUTPUT-CLEAN")
+PY
+while IFS='|' read -r name verdict; do
+  [ -n "$verdict" ] || continue
+  expect "sse probe: $name" "$verdict" PASS
+done < <(grep '|' "$WORK/sp.out")
+expect "sse probe: nothing it prints holds the assertion or the token" "$(grep -c '^OUTPUT-CLEAN$' "$WORK/sp.out")" 1
+expect "sse probe: it is plain http.client, no subprocess and no curl" "$(grep -cE '^import subprocess|^from subprocess|curl' "$HERE/sse_probe.py")" 0
+expect "realtime smoke: every stream read is the bounded probe (no long-held httpx stream)" \
+  "$(grep -c '\.stream(' "$HERE/realtime_smoke.py"):$(grep -c '^STREAM_SECONDS = 5 ' "$HERE/realtime_smoke.py")" "0:1"
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

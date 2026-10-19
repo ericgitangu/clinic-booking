@@ -34,7 +34,8 @@ import {
   type LiveEvent,
   type LiveKind,
 } from "@/lib/live-events";
-import { LiveStream, type LiveStatus } from "@/lib/live-stream";
+import { sharedStream } from "@/lib/live-share";
+import type { LiveStatus } from "@/lib/live-stream";
 import type { Role } from "@/lib/roles";
 
 const ICON: Record<LiveKind, typeof RadioIcon> = {
@@ -66,21 +67,25 @@ const STATUS_TEXT: Record<LiveStatus, string> = {
  * invitations) as they happen. The numbers above and the list below
  * follow: each event asks for a fresh page, at most once every two seconds.
  *
- * The stream is held open only while it is useful: a tab hidden for five minutes lets go of it, the
- * server lets go of one that has been quiet for four, and both wait for the person to come back.
- * If the gateway has no free slot the panel says so and the page refreshes by itself instead.
+ * Every tab of the browser shares one stream (live-share.ts), so this panel next to an open
+ * appointment page costs no second slot. The stream is held open only while it is useful: a tab
+ * hidden for five minutes lets go of it, the server lets go of one that has been quiet for four,
+ * and both wait for the person to come back. If the gateway has no free slot the panel says so,
+ * the page refreshes by itself every 30 s, and the stream is tried again with a growing delay.
  */
 export function LiveFeed({
   role,
+  person,
   doctors,
 }: {
   role: Role;
+  /** The per-person key the tabs share their stream under (liveKey). */
+  person: string;
   doctors: { id: string; name: string }[];
 }) {
   const [status, setStatus] = useState<LiveStatus>("connecting");
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [, start] = useTransition();
-  const stream = useRef<LiveStream | null>(null);
   const canAct = role === "owner" || role === "admin";
   const refreshAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const names = new Map(doctors.map((d) => [d.id, d.name]));
@@ -92,8 +97,8 @@ export function LiveFeed({
   }, []);
 
   useEffect(() => {
-    const s = new LiveStream({
-      isHidden: () => document.hidden,
+    const off = sharedStream(person).subscribe({
+      role,
       onStatus: setStatus,
       onRefresh: refresh,
       onEvent: (_id, _event, data) => {
@@ -108,18 +113,12 @@ export function LiveFeed({
         }
       },
     });
-    stream.current = s;
-    s.start();
-    const onVisibility = () => s.visibilityChanged();
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
+      off();
       if (refreshAt.current !== null) clearTimeout(refreshAt.current);
       refreshAt.current = null;
-      s.stop();
-      stream.current = null;
     };
-  }, [role, refresh]);
+  }, [person, role, refresh]);
 
   return (
     <Card data-testid="live-feed">
@@ -151,7 +150,7 @@ export function LiveFeed({
                 size="sm"
                 className="min-h-11"
                 data-testid="live-resume"
-                onClick={() => stream.current?.resume()}
+                onClick={() => sharedStream(person).resume()}
               >
                 Resume live
               </Button>

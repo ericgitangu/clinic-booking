@@ -862,6 +862,10 @@
             "title": "Locked",
             "type": "boolean"
           },
+          "patient_changed": {
+            "title": "Patient Changed",
+            "type": "boolean"
+          },
           "patient_name": {
             "title": "Patient Name",
             "type": "string"
@@ -905,7 +909,8 @@
           "status",
           "patient_name",
           "patient_phone",
-          "locked"
+          "locked",
+          "patient_changed"
         ],
         "title": "BoardAppointment",
         "type": "object"
@@ -983,6 +988,221 @@
           "reason"
         ],
         "title": "CancelRequest",
+        "type": "object"
+      },
+      "ChangeItem": {
+        "description": "One booking, reschedule or cancellation, placed by the day the change happened.",
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "enum": [
+                  "patient",
+                  "staff"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "attendance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "arrived",
+                  "no_show"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "from_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Starts At"
+          },
+          "kind": {
+            "enum": [
+              "booked",
+              "rescheduled",
+              "cancelled"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "transport",
+                  "illness",
+                  "travel",
+                  "work",
+                  "weather",
+                  "felt_better",
+                  "insurance",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "to_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Starts At"
+          }
+        },
+        "required": [
+          "timezone",
+          "appointment_id",
+          "doctor_id",
+          "doctor_name",
+          "patient_name",
+          "kind",
+          "occurred_at",
+          "actor",
+          "from_starts_at",
+          "to_starts_at",
+          "starts_at",
+          "status",
+          "attendance",
+          "reason",
+          "reason_category"
+        ],
+        "title": "ChangeItem",
+        "type": "object"
+      },
+      "ChangeList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "booked",
+              "rescheduled",
+              "cancelled"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "range": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "view": {
+            "enum": [
+              "full",
+              "minimised"
+            ],
+            "title": "View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "view",
+          "kind",
+          "range",
+          "total",
+          "items",
+          "next_cursor"
+        ],
+        "title": "ChangeList",
         "type": "object"
       },
       "ChangeRoleRequest": {
@@ -4465,6 +4685,64 @@
         ]
       }
     },
+    "/internal/admin/appointments/{appointment_id}": {
+      "get": {
+        "description": "One appointment as an item of the admin list: same fields and the same projection by role (a viewer gets initials, a masked phone, no email and no reason). Appointments of synthetic patients are not shown in admin views and answer 404, like an unknown id.",
+        "operationId": "get_appointment_internal_admin_appointments__appointment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppointment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Get Appointment",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/internal/admin/appointments/{appointment_id}/arrived": {
       "post": {
         "description": "Record that the patient arrived. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.",
@@ -5655,6 +5933,153 @@
           }
         },
         "summary": "Cancellation Reasons",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/changes": {
+      "get": {
+        "description": "The bookings, reschedules or cancellations (`kind`) made in the clinic-local days [from, to), by the day the change happened and not the day of the visit, newest first. `reason` (cancelled only) narrows to one cancellation-reason category, grouped as in `/cancellation-reasons`. `total` counts the whole range and filters, whatever `limit` (1 to 100, default 50) and `cursor` say. A viewer gets initials and no reason text.",
+        "operationId": "changes_internal_admin_ops_changes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "booked",
+                "rescheduled",
+                "cancelled"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "transport",
+                    "illness",
+                    "travel",
+                    "work",
+                    "weather",
+                    "felt_better",
+                    "insurance",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doctor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Changes",
         "tags": [
           "admin"
         ]

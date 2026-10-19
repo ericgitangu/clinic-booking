@@ -1,0 +1,2818 @@
+{
+  "info": {
+    "name": "Clinic Booking API reviewer journey",
+    "description": "Built from contracts/openapi.json (API version 1.0.0) by scripts/api_collection.mjs; edit that script, not this file.\n\nPick the `local` or `production` environment and run the folders in order. IDs and times flow from one request to the next through collection variables, and every time is computed from now, so the run never goes stale.\n\nRequests other than GET go to `writeBaseUrl`. The local environment sets it; the production environment does not, so those requests are skipped there, and a client that ignores the scripts has no host to send them to.\n\nPublic operations not in the journey:\n- `POST /realtime/token/patient`: the booking site's live-updates token: it answers only the site's own Origin and needs an Ably key, which the compose stack does not have.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "doctorId",
+      "value": ""
+    },
+    {
+      "key": "slotDay",
+      "value": ""
+    },
+    {
+      "key": "slotSearch",
+      "value": ""
+    },
+    {
+      "key": "slotMinutes",
+      "value": ""
+    },
+    {
+      "key": "slotStart",
+      "value": ""
+    },
+    {
+      "key": "slotStartNew",
+      "value": ""
+    },
+    {
+      "key": "patientId",
+      "value": ""
+    },
+    {
+      "key": "otherPatientId",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": ""
+    },
+    {
+      "key": "appointmentId",
+      "value": ""
+    },
+    {
+      "key": "changeAppointmentId",
+      "value": ""
+    },
+    {
+      "key": "soonStart",
+      "value": ""
+    },
+    {
+      "key": "farDay",
+      "value": ""
+    },
+    {
+      "key": "naiveStart",
+      "value": ""
+    },
+    {
+      "key": "pastStart",
+      "value": ""
+    },
+    {
+      "key": "offGridStart",
+      "value": ""
+    },
+    {
+      "key": "nightStart",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Health",
+      "description": "Liveness, readiness (the API runs `SELECT 1` against Postgres) and the error catalogue.",
+      "item": [
+        {
+          "name": "Liveness",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"status\":{\"const\":\"ok\",\"type\":\"string\"}},\"required\":[\"status\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"status is ok\", () => pm.expect(pm.response.json().status).to.eql(\"ok\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "`GET /health` (health_health_get). Expects 200.\n\nFrom the contract: Health. Liveness. Never touches the DB, so it never wakes Neon."
+          }
+        },
+        {
+          "name": "Readiness",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"status\":{\"const\":\"ok\",\"type\":\"string\"}},\"required\":[\"status\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            },
+            "description": "`GET /ready` (ready_ready_get). Expects 200.\n\nFrom the contract: Ready. Readiness. A failed SELECT 1 propagates to the DB_UNAVAILABLE handler (503)."
+          }
+        },
+        {
+          "name": "Error catalogue",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"items\":{\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"slug\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"}},\"required\":[\"code\",\"slug\",\"title\",\"status\",\"description\"],\"type\":\"object\"},\"type\":\"array\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const codes = pm.response.json().map((p) => p.code);",
+                  "pm.test(\"catalogue lists both lead-time codes\", () => pm.expect(codes).to.include.members([\"BOOKING_TOO_SOON\", \"CHANGE_TOO_LATE\"]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/problems",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "problems"
+              ]
+            },
+            "description": "`GET /problems` (list_problems_problems_get). Expects 200.\n\nFrom the contract: List Problems"
+          }
+        },
+        {
+          "name": "Error type document",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"slug\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"}},\"required\":[\"code\",\"slug\",\"title\",\"status\",\"description\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"it documents BOOKING_TOO_SOON as a 422\", () => {",
+                  "  const p = pm.response.json();",
+                  "  pm.expect([p.code, p.status]).to.eql([\"BOOKING_TOO_SOON\", 422]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/problems/booking-too-soon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "problems",
+                "booking-too-soon"
+              ]
+            },
+            "description": "`GET /problems/{slug}` (get_problem_problems__slug__get). Expects 200.\n\nFrom the contract: Get Problem"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Doctors",
+      "description": "The seeded doctors. The first one is used for the rest of the run.",
+      "item": [
+        {
+          "name": "List doctors",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"items\":{\"items\":{\"properties\":{\"clinic\":{\"properties\":{\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"timezone\":{\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"timezone\"],\"type\":\"object\"},\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"specialty\":{\"type\":\"string\"},\"working_hours\":{\"items\":{\"properties\":{\"end_time\":{\"type\":\"string\"},\"start_time\":{\"type\":\"string\"},\"weekday\":{\"type\":\"integer\"}},\"required\":[\"weekday\",\"start_time\",\"end_time\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"id\",\"full_name\",\"specialty\",\"clinic\",\"working_hours\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"items\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const items = pm.response.json().items;",
+                  "pm.test(\"at least one doctor\", () => pm.expect(items).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.test(\"every doctor has working hours\", () => items.forEach((d) => pm.expect(d.working_hours, d.full_name).to.not.be.empty));",
+                  "pm.collectionVariables.set(\"doctorId\", items[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors"
+              ]
+            },
+            "description": "`GET /doctors` (list_doctors_doctors_get). Expects 200.\n\nFrom the contract: List Doctors"
+          }
+        },
+        {
+          "name": "One doctor",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"doctorId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"clinic\":{\"properties\":{\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"timezone\":{\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"timezone\"],\"type\":\"object\"},\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"specialty\":{\"type\":\"string\"},\"working_hours\":{\"items\":{\"properties\":{\"end_time\":{\"type\":\"string\"},\"start_time\":{\"type\":\"string\"},\"weekday\":{\"type\":\"integer\"}},\"required\":[\"weekday\",\"start_time\",\"end_time\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"id\",\"full_name\",\"specialty\",\"clinic\",\"working_hours\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"it is the doctor asked for\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"doctorId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "{{doctorId}}"
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}` (get_doctor_doctors__doctor_id__get). Expects 200.\n\nFrom the contract: Get Doctor"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Slots",
+      "description": "Free slots for the doctor on a clinic-local day. The pre-request script looks from tomorrow, a day at a time (up to 14), for a day with at least two free slots, so the run never depends on a fixed date. It works when the request is sent on its own too.",
+      "item": [
+        {
+          "name": "Free slots for a day",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"doctorId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  // Asks for one day after another, from tomorrow, until a day has two free slots, then sends this",
+                  "  // request for that day. Dates are UTC dates: the sandbox has no time-zone data, and from tomorrow",
+                  "  // on the UTC date is never earlier than the clinic's local today. pm.sendRequest works for a request",
+                  "  // sent by hand as well as in a collection run.",
+                  "  const base = pm.variables.replaceIn(\"{{baseUrl}}/doctors/{{doctorId}}/availability?date=\");",
+                  "  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);",
+                  "  pm.collectionVariables.set(\"slotDay\", day(1));",
+                  "  pm.collectionVariables.set(\"slotSearch\", \"none\");",
+                  "  const probe = (n) => {",
+                  "    if (n > 14) return; // none found: slotSearch stays \"none\" and the tests below fail and say so",
+                  "    pm.sendRequest(base + day(n), (err, res) => {",
+                  "      if (!err && res.code === 200 && res.json().slots.length >= 2) {",
+                  "        pm.collectionVariables.set(\"slotDay\", day(n));",
+                  "        pm.collectionVariables.set(\"slotSearch\", \"found\");",
+                  "      } else probe(n + 1);",
+                  "    });",
+                  "  };",
+                  "  probe(1);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cursor\":{\"pattern\":\"^(0|[1-9][0-9]{0,19})\\\\.(0|[1-9][0-9]{0,19})$\",\"type\":\"string\"},\"date\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"slot_minutes\":{\"const\":30,\"type\":\"integer\"},\"slots\":{\"items\":{\"properties\":{\"ends_at\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"}},\"required\":[\"starts_at\",\"ends_at\"],\"type\":\"object\"},\"type\":\"array\"},\"taken\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"timezone\":{\"type\":\"string\"}},\"required\":[\"doctor_id\",\"date\",\"timezone\",\"cursor\",\"slots\",\"taken\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"it is the day asked for\", () => pm.expect(body.date).to.eql(pm.collectionVariables.get(\"slotDay\")));",
+                  "pm.test(\"no slot starts within 60 minutes\", () => {",
+                  "  // Against the server's clock (the Date header, whole seconds), not this machine's.",
+                  "  const now = Date.parse(pm.response.headers.get(\"Date\") || \"\") || Date.now() - 120000;",
+                  "  const earliest = now + 60 * 60000 - 2000;",
+                  "  body.slots.forEach((s) => pm.expect(new Date(s.starts_at).getTime(), s.starts_at).to.be.at.least(earliest));",
+                  "});",
+                  "const found = pm.collectionVariables.get(\"slotSearch\") === \"found\" && body.slots.length >= 2;",
+                  "pm.test(\"a day in the next 14 has two free slots (if not, the steps that book are skipped; send this again later)\", () => {",
+                  "  pm.expect(found, \"no day from tomorrow to 14 days out has two free slots\").to.be.true;",
+                  "});",
+                  "pm.collectionVariables.set(\"slotMinutes\", String(body.slot_minutes));",
+                  "pm.collectionVariables.set(\"slotStart\", found ? body.slots[0].starts_at : \"\");",
+                  "pm.collectionVariables.set(\"slotStartNew\", found ? body.slots[1].starts_at : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability?date={{slotDay}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "{{doctorId}}",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{slotDay}}"
+                }
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}/availability` (doctor_availability_doctors__doctor_id__availability_get). Expects 200.\n\nFrom the contract: Doctor Availability. Slots starting within 60 minutes are never offered."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Book with an Idempotency-Key",
+      "description": "Creates a patient and books the first free slot with an Idempotency-Key. Sending the same request again returns the same appointment with `Idempotent-Replayed: true`; the same key with a different time is refused.",
+      "item": [
+        {
+          "name": "Create a patient",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"created_at\":{\"type\":\"string\"},\"email\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"phone\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]}},\"required\":[\"id\",\"full_name\",\"phone\",\"email\",\"created_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.collectionVariables.set(\"patientId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/patients",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            },
+            "description": "`POST /patients` (post_patient_patients_post). Expects 201.\n\nFrom the contract: Post Patient",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Reviewer {{$randomFirstName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Book the slot",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"patientId\",\"slotStart\",\"slotMinutes\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  // One key per booking attempt; the replay below reuses it.",
+                  "  pm.collectionVariables.set(\"idempotencyKey\", \"review-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const appt = pm.response.json();",
+                  "pm.test(\"booked at the slot asked for\", () => {",
+                  "  pm.expect(appt.status).to.eql(\"booked\");",
+                  "  pm.expect(new Date(appt.starts_at).getTime()).to.eql(new Date(pm.collectionVariables.get(\"slotStart\")).getTime());",
+                  "  pm.expect(new Date(appt.ends_at) - new Date(appt.starts_at)).to.eql(Number(pm.collectionVariables.get(\"slotMinutes\")) * 60000);",
+                  "});",
+                  "pm.test(\"Location points at the appointment\", () => pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/appointments/\" + appt.id));",
+                  "pm.test(\"not marked as a replay\", () => pm.expect(pm.response.headers.has(\"Idempotent-Replayed\")).to.be.false);",
+                  "pm.collectionVariables.set(\"appointmentId\", appt.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 201.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay the same booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"idempotencyKey\",\"doctorId\",\"patientId\",\"slotStart\",\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"same appointment returned\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"appointmentId\")));",
+                  "pm.test(\"Idempotent-Replayed: true\", () => pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"true\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 201.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Same key, different time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"idempotencyKey\",\"doctorId\",\"patientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is IDEMPOTENCY_KEY_REUSED\", () => pm.expect(problem.code).to.eql(\"IDEMPOTENCY_KEY_REUSED\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 IDEMPOTENCY_KEY_REUSED.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read the appointment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"it is the booked appointment\", () => {",
+                  "  const a = pm.response.json();",
+                  "  pm.expect([a.id, a.status]).to.eql([pm.collectionVariables.get(\"appointmentId\"), \"booked\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}"
+              ]
+            },
+            "description": "`GET /appointments/{appointment_id}` (get_appointment_appointments__appointment_id__get). Expects 200.\n\nFrom the contract: Get Appointment"
+          }
+        },
+        {
+          "name": "The patient's appointments",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"patientId\",\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"items\":{\"items\":{\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor\":{\"properties\":{\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"specialty\":{\"type\":\"string\"}},\"required\":[\"id\",\"full_name\",\"specialty\"],\"type\":\"object\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\",\"doctor\"],\"type\":\"object\"},\"type\":\"array\"},\"next_cursor\":{\"type\":\"null\"}},\"required\":[\"items\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const ids = pm.response.json().items.map((a) => a.id);",
+                  "pm.test(\"the replay made no second booking\", () => pm.expect(ids).to.eql([pm.collectionVariables.get(\"appointmentId\")]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/patients/{{patientId}}/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patients",
+                "{{patientId}}",
+                "appointments"
+              ]
+            },
+            "description": "`GET /patients/{patient_id}/appointments` (patient_appointments_patients__patient_id__appointments_get). Expects 200.\n\nFrom the contract: Patient Appointments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Double booking",
+      "description": "A second patient asks for the slot the first one holds. The partial unique index refuses it with 409.",
+      "item": [
+        {
+          "name": "Create a second patient",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"created_at\":{\"type\":\"string\"},\"email\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"phone\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]}},\"required\":[\"id\",\"full_name\",\"phone\",\"email\",\"created_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.collectionVariables.set(\"otherPatientId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/patients",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            },
+            "description": "`POST /patients` (post_patient_patients_post). Expects 201.\n\nFrom the contract: Post Patient",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Reviewer {{$randomFirstName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Book the taken slot",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStart\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is SLOT_TAKEN\", () => pm.expect(problem.code).to.eql(\"SLOT_TAKEN\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(409));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 409 SLOT_TAKEN.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Too soon",
+      "description": "The lead-time rule on a new time: a start under 60 minutes away is 422 BOOKING_TOO_SOON, for a booking and for a reschedule's new time. The time is computed from now, 30 minutes ahead. 60 comes from the contract.",
+      "item": [
+        {
+          "name": "Book 30 minutes from now",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  const t = new Date(Date.now() + 30 * 60000);",
+                  "  t.setUTCSeconds(0, 0);",
+                  "  pm.collectionVariables.set(\"soonStart\", t.toISOString());",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is BOOKING_TOO_SOON\", () => pm.expect(problem.code).to.eql(\"BOOKING_TOO_SOON\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 BOOKING_TOO_SOON.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{soonStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reschedule to 30 minutes from now",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\",\"soonStart\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is BOOKING_TOO_SOON\", () => pm.expect(problem.code).to.eql(\"BOOKING_TOO_SOON\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/reschedule",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "reschedule"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/reschedule` (reschedule_appointment_appointments__appointment_id__reschedule_patch). Expects 422 BOOKING_TOO_SOON.\n\nFrom the contract: Reschedule Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"starts_at\": \"{{soonStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Reschedule and cancel",
+      "description": "Moves the booking to the second free slot (the same appointment id; repeating the move returns it unchanged), then cancels it. Cancelling twice is a 409, and the original Idempotency-Key cannot book again once its booking is cancelled.",
+      "item": [
+        {
+          "name": "Reschedule to the second slot",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const a = pm.response.json();",
+                  "pm.test(\"same appointment, new time\", () => {",
+                  "  pm.expect(a.id).to.eql(pm.collectionVariables.get(\"appointmentId\"));",
+                  "  pm.expect(new Date(a.starts_at).getTime()).to.eql(new Date(pm.collectionVariables.get(\"slotStartNew\")).getTime());",
+                  "  pm.expect(a.status).to.eql(\"booked\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/reschedule",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "reschedule"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/reschedule` (reschedule_appointment_appointments__appointment_id__reschedule_patch). Expects 200.\n\nFrom the contract: Reschedule Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Repeat the reschedule",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"returns the appointment unchanged\", () => {",
+                  "  const a = pm.response.json();",
+                  "  pm.expect(a.id).to.eql(pm.collectionVariables.get(\"appointmentId\"));",
+                  "  pm.expect(new Date(a.starts_at).getTime()).to.eql(new Date(pm.collectionVariables.get(\"slotStartNew\")).getTime());",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/reschedule",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "reschedule"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/reschedule` (reschedule_appointment_appointments__appointment_id__reschedule_patch). Expects 200.\n\nFrom the contract: Reschedule Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "const a = pm.response.json();",
+                  "pm.test(\"cancelled with the reason given\", () => {",
+                  "  pm.expect(a.status).to.eql(\"cancelled\");",
+                  "  pm.expect(a.cancellation_reason).to.eql(\"Reviewer run of the API collection\");",
+                  "  pm.expect(a.cancelled_at).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/cancel",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 200.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Reviewer run of the API collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel again",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is APPOINTMENT_ALREADY_CANCELLED\", () => pm.expect(problem.code).to.eql(\"APPOINTMENT_ALREADY_CANCELLED\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(409));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/cancel",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 409 APPOINTMENT_ALREADY_CANCELLED.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Reviewer run of the API collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reuse the key after cancelling",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"idempotencyKey\",\"doctorId\",\"patientId\",\"slotStart\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is IDEMPOTENCY_KEY_CONSUMED\", () => pm.expect(problem.code).to.eql(\"IDEMPOTENCY_KEY_CONSUMED\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(409));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 409 IDEMPOTENCY_KEY_CONSUMED.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{patientId}}\",\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Change inside the lead time",
+      "description": "Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (60 minutes), and inside that lead from now there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (`BOOKING_MIN_LEAD_MINUTES`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. `make api-check` starts that API and passes `longLeadBaseUrl`; without it, the two refusals are skipped.",
+      "item": [
+        {
+          "name": "Book a visit to change",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.collectionVariables.set(\"changeAppointmentId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 201.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel inside the lead time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"longLeadBaseUrl\",\"changeAppointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is CHANGE_TOO_LATE\", () => pm.expect(problem.code).to.eql(\"CHANGE_TOO_LATE\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(409));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{longLeadBaseUrl}}/appointments/{{changeAppointmentId}}/cancel",
+              "host": [
+                "{{longLeadBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{changeAppointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 409 CHANGE_TOO_LATE.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Reviewer run of the API collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reschedule inside the lead time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"longLeadBaseUrl\",\"changeAppointmentId\",\"slotStart\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is CHANGE_TOO_LATE\", () => pm.expect(problem.code).to.eql(\"CHANGE_TOO_LATE\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(409));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{longLeadBaseUrl}}/appointments/{{changeAppointmentId}}/reschedule",
+              "host": [
+                "{{longLeadBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{changeAppointmentId}}",
+                "reschedule"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/reschedule` (reschedule_appointment_appointments__appointment_id__reschedule_patch). Expects 409 CHANGE_TOO_LATE.\n\nFrom the contract: Reschedule Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel through the normal API",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"changeAppointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"the same visit cancels under the normal lead time\", () => {",
+                  "  const a = pm.response.json();",
+                  "  pm.expect([a.id, a.status]).to.eql([pm.collectionVariables.get(\"changeAppointmentId\"), \"cancelled\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{changeAppointmentId}}/cancel",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{changeAppointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 200.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Reviewer run of the API collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Validation errors",
+      "description": "Requests the API refuses before touching anything. Each is a 422 (or a 404 for a resource that does not exist) in application/problem+json with a stable code; schema errors list the offending field in `errors[]`.",
+      "item": [
+        {
+          "name": "Doctor id is not a UUID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names path.doctor_id\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"path.doctor_id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "not-a-uuid"
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}` (get_doctor_doctors__doctor_id__get). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Get Doctor"
+          }
+        },
+        {
+          "name": "Doctor that does not exist",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is DOCTOR_NOT_FOUND\", () => pm.expect(problem.code).to.eql(\"DOCTOR_NOT_FOUND\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(404));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}` (get_doctor_doctors__doctor_id__get). Expects 404 DOCTOR_NOT_FOUND.\n\nFrom the contract: Get Doctor"
+          }
+        },
+        {
+          "name": "Availability without a date",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"doctorId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names query.date\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"query.date\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "{{doctorId}}",
+                "availability"
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}/availability` (doctor_availability_doctors__doctor_id__availability_get). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Doctor Availability. Slots starting within 60 minutes are never offered."
+          }
+        },
+        {
+          "name": "Availability past the booking horizon",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"doctorId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.collectionVariables.set(\"farDay\", new Date(Date.now() + 400 * 86400000).toISOString().slice(0, 10));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is DATE_OUT_OF_RANGE\", () => pm.expect(problem.code).to.eql(\"DATE_OUT_OF_RANGE\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability?date={{farDay}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "doctors",
+                "{{doctorId}}",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{farDay}}"
+                }
+              ]
+            },
+            "description": "`GET /doctors/{doctor_id}/availability` (doctor_availability_doctors__doctor_id__availability_get). Expects 422 DATE_OUT_OF_RANGE.\n\nFrom the contract: Doctor Availability. Slots starting within 60 minutes are never offered."
+          }
+        },
+        {
+          "name": "Appointment that does not exist",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is APPOINTMENT_NOT_FOUND\", () => pm.expect(problem.code).to.eql(\"APPOINTMENT_NOT_FOUND\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(404));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "description": "`GET /appointments/{appointment_id}` (get_appointment_appointments__appointment_id__get). Expects 404 APPOINTMENT_NOT_FOUND.\n\nFrom the contract: Get Appointment"
+          }
+        },
+        {
+          "name": "Patient without a name",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names body.full_name\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"body.full_name\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/patients",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            },
+            "description": "`POST /patients` (post_patient_patients_post). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Post Patient",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Patient phone not in E.164",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names body.phone\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"body.phone\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/patients",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            },
+            "description": "`POST /patients` (post_patient_patients_post). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Post Patient",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Reviewer Phone\",\n  \"phone\": \"0712\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking with no fields",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names body.starts_at\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"body.starts_at\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Idempotency-Key with a space",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names header.Idempotency-Key\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"header.Idempotency-Key\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "has space"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Time without a UTC offset",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.collectionVariables.set(\"naiveStart\", pm.collectionVariables.get(\"slotStartNew\").slice(0, 19));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is TIMEZONE_REQUIRED\", () => pm.expect(problem.code).to.eql(\"TIMEZONE_REQUIRED\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 TIMEZONE_REQUIRED.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{naiveStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Time in the past",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  const t = new Date(Date.now() - 86400000);",
+                  "  t.setUTCMinutes(0, 0, 0);",
+                  "  pm.collectionVariables.set(\"pastStart\", t.toISOString());",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is SLOT_IN_PAST\", () => pm.expect(problem.code).to.eql(\"SLOT_IN_PAST\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 SLOT_IN_PAST.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{pastStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Time off the 30-minute grid",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  // Seven minutes after a free slot: inside working hours, off the grid.",
+                  "  pm.collectionVariables.set(\"offGridStart\", new Date(new Date(pm.collectionVariables.get(\"slotStartNew\")).getTime() + 7 * 60000).toISOString());",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is SLOT_MISALIGNED\", () => pm.expect(problem.code).to.eql(\"SLOT_MISALIGNED\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 SLOT_MISALIGNED.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{offGridStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Time outside working hours",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\",\"slotDay\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  // 03:00 clinic time on the day the slots came from, with the offset the API used for them.",
+                  "  const start = pm.collectionVariables.get(\"slotStartNew\");",
+                  "  pm.collectionVariables.set(\"nightStart\", pm.collectionVariables.get(\"slotDay\") + \"T03:00:00\" + start.slice(19));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is OUTSIDE_WORKING_HOURS\", () => pm.expect(problem.code).to.eql(\"OUTSIDE_WORKING_HOURS\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 OUTSIDE_WORKING_HOURS.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{nightStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Doctor that does not exist, on a booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is UNKNOWN_DOCTOR\", () => pm.expect(problem.code).to.eql(\"UNKNOWN_DOCTOR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 422 UNKNOWN_DOCTOR.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"00000000-0000-4000-8000-000000000000\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel reason too short",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"appointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"content-type is application/problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/problem\\+json/));",
+                  "const problem = pm.response.json();",
+                  "pm.test(\"problem code is VALIDATION_ERROR\", () => pm.expect(problem.code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"problem status matches the response\", () => pm.expect(problem.status).to.eql(422));",
+                  "pm.test(\"problem carries type, title, instance and request_id\", () => {",
+                  "  for (const k of [\"type\", \"title\", \"instance\", \"request_id\"]) pm.expect(problem[k], k).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const schema = {\"properties\":{\"code\":{\"enum\":[\"UNAUTHENTICATED\",\"FORBIDDEN\",\"ROLE_ESCALATION\",\"CLIENT_ADDRESS_UNKNOWN\",\"VALIDATION_ERROR\",\"TIMEZONE_REQUIRED\",\"UNKNOWN_DOCTOR\",\"UNKNOWN_PATIENT\",\"SLOT_IN_PAST\",\"BOOKING_TOO_SOON\",\"DATE_OUT_OF_RANGE\",\"SLOT_MISALIGNED\",\"OUTSIDE_WORKING_HOURS\",\"IDEMPOTENCY_KEY_REUSED\",\"SLOT_TAKEN\",\"PATIENT_DOUBLE_BOOKED\",\"APPOINTMENT_ALREADY_CANCELLED\",\"CHANGE_TOO_LATE\",\"APPOINTMENT_ALREADY_STARTED\",\"PATIENT_PHONE_EXISTS\",\"CONCURRENT_UPDATE\",\"RATE_LIMITED\",\"IDEMPOTENCY_KEY_CONSUMED\",\"APPOINTMENT_LOCKED\",\"ATTENDANCE_WINDOW_CLOSED\",\"NOTHING_TO_VETO\",\"ACCESS_EXISTS\",\"OWNER_PROTECTED\",\"INVITE_INVALID\",\"ACCESS_NOT_FOUND\",\"DOCTOR_NOT_FOUND\",\"PATIENT_NOT_FOUND\",\"APPOINTMENT_NOT_FOUND\",\"PROBLEM_NOT_FOUND\",\"NOT_FOUND\",\"METHOD_NOT_ALLOWED\",\"REALTIME_UNAVAILABLE\",\"DB_UNAVAILABLE\",\"INTERNAL_ERROR\"],\"type\":\"string\"},\"detail\":{\"type\":\"string\"},\"errors\":{\"anyOf\":[{\"items\":{\"properties\":{\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"type\":\"array\"},\"msg\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}]},\"instance\":{\"type\":\"string\"},\"request_id\":{\"type\":\"string\"},\"status\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"type\":{\"type\":\"string\"}},\"required\":[\"type\",\"title\",\"status\",\"detail\",\"instance\",\"code\",\"request_id\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"errors[] names body.reason\", () => {",
+                  "  const locs = (problem.errors || []).map((e) => (e.loc || []).join(\".\"));",
+                  "  pm.expect(locs).to.include(\"body.reason\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{appointmentId}}/cancel",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 422 VALIDATION_ERROR.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { ActivityChart, type ActivityRow } from "@/components/activity-chart";
 import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
 import { LiveFeed } from "@/components/live-feed";
+import { liveKey } from "@/lib/live-key";
 import { PeakHours } from "@/components/peak-hours";
 import { ReasonsChart } from "@/components/reasons-chart";
 import { GapsToFill } from "@/components/gaps-to-fill";
@@ -144,6 +145,7 @@ export default async function Dashboard({
 
       <LiveFeed
         role={staff.role}
+        person={liveKey(staff.sub)}
         doctors={dash.range.per_doctor.map((d) => ({
           id: d.doctor_id,
           name: d.name,

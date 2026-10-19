@@ -562,7 +562,9 @@ jobs:
             SMOKE_SA="clinic-smoke@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com"
             URL="$(gcloud run services describe clinic-realtime --region us-east4 --format='value(status.url)')"
             TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SMOKE_SA" --audiences=clinic-realtime)"
-            if ! curl -fsS --max-time 30 -H "X-Serverless-Authorization: Bearer ${TOKEN}" "$URL/health"; then
+            # Retries /health for about 60 s; a service full of real streams passes only if the
+            # Cloud Run API reports the promoted revision Ready and serving (see the script).
+            if ! URL="$URL" TOKEN="$TOKEN" SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/realtime_live_check.sh; then
               echo "FAIL: the promoted revision does not answer /health; rolling back"
               SERVICE=clinic-realtime PROMOTE_DIR=/tmp/promoted-realtime bash scripts/ci/rollback.sh || true
               exit 1
@@ -812,6 +814,31 @@ jobs:
           name: API logs
           command: docker compose logs api | tail -80
           when: on_fail
+
+  api-check:
+    # The reviewer collection (docs/api/) with newman against the compose stack: the whole booking
+    # journey, every problem code it covers, and every body against the contract's schema. Also
+    # fails when the committed collection no longer matches a build from contracts/openapi.json.
+    # That drift check covers openapi -> collection only; backend -> openapi is backend-contract's.
+    # Not required by build-scan-push, like e2e-real, admin-e2e and dast: it calls the API over HTTP
+    # through the same rules backend-test and backend-contract already gate the deploy on, so it
+    # reports on the reviewer artefact rather than adding a second gate on the API.
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Skip when nothing this job covers changed (fails closed)
+          # Makefile and README.md are left out: the job runs scripts/api_check.sh directly and reads
+          # no prose, so a change to either cannot change its result.
+          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ docs/api/ scripts/api_check.sh scripts/api_check.compose.yml scripts/api_collection.mjs scripts/ci/skip_unless_changed.sh docker-compose.yml .circleci/
+      - run:
+          name: Collection against the compose stack (newman, pinned image)
+          command: REPORT_DIR=/tmp/newman bash scripts/api_check.sh local
+      - store_test_results:
+          path: /tmp/newman
 
   admin-e2e:
     # The admin app's Playwright scenarios against its production build, the real API and the real
@@ -1176,6 +1203,7 @@ workflows:
       - e2e-real:
           context: ably-ci
       - admin-e2e
+      - api-check
       - cost-static
 
   wif-deny:
@@ -1206,6 +1234,7 @@ workflows:
       - e2e-real:
           context: ably-ci
       - admin-e2e
+      - api-check
       - cost-static
       - build-scan-push:
           context: gcp-deploy

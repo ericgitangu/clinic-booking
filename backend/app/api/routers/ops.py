@@ -14,7 +14,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import ANY_STAFF, get_clock, get_session
 from app.core.assertion import Principal
 from app.core.clock import Clock
-from app.schemas.ops import GapList, Heatmap, Kpis, ReasonBreakdown, TodayBoard
+from app.domain.reasons import Category
+from app.schemas.ops import (
+    ChangeKind,
+    ChangeList,
+    GapList,
+    Heatmap,
+    Kpis,
+    ReasonBreakdown,
+    TodayBoard,
+)
 from app.schemas.problem import problem_responses
 from app.services import ops
 
@@ -88,6 +97,44 @@ async def cancellation_reasons(
 ) -> ReasonBreakdown:
     response.headers.update(_NO_STORE)
     return await ops.reasons(session, start=from_, end=to)
+
+
+@router.get(
+    "/changes",
+    response_model=ChangeList,
+    responses=problem_responses(422),
+    description=(
+        "The bookings, reschedules or cancellations (`kind`) made in the clinic-local days "
+        "[from, to), by the day the change happened and not the day of the visit, newest first. "
+        "`reason` (cancelled only) narrows to one cancellation-reason category, grouped as in "
+        "`/cancellation-reasons`. `total` counts the whole range and filters, whatever `limit` "
+        "(1 to 100, default 50) and `cursor` say. A viewer gets initials and no reason text."
+    ),
+)
+async def changes(
+    response: Response,
+    kind: ChangeKind,
+    from_: FromDay,
+    to: date,
+    reason: Category | None = None,
+    doctor_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    cursor: str | None = None,
+    who: Principal = Depends(ANY_STAFF),
+    session: AsyncSession = Depends(get_session),
+) -> ChangeList:
+    response.headers.update(_NO_STORE)
+    return await ops.changes(
+        session,
+        kind=kind,
+        start=from_,
+        end=to,
+        reason=reason,
+        doctor_id=doctor_id,
+        limit=limit,
+        cursor=cursor,
+        role=who.role,
+    )
 
 
 @router.get(

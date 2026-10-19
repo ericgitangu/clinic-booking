@@ -204,18 +204,10 @@ async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> list[dict
     return [dict(r) for r in rows.mappings()]
 
 
-async def appointments_page(
-    session: AsyncSession,
-    *,
-    status: str,
-    doctor_id: uuid.UUID | None,
-    from_day: date | None,
-    to_day: date | None,
-    after: tuple[datetime, uuid.UUID] | None,
-    limit: int,
-) -> list[dict[str, Any]]:
-    """One page plus one extra row (the caller trims it and derives ``next_cursor``)."""
-    stmt = (
+def _appointment_select() -> Any:  # a Core Select whose column tuple is too long to spell
+    """An admin appointment row: doctor, patient, clinic zone, lock and latest attendance.
+    Synthetic patients are left out here, so the list and the single read share the filter."""
+    return (
         select(
             Appointment.id,
             Appointment.doctor_id,
@@ -237,6 +229,33 @@ async def appointments_page(
         .join(Clinic, Clinic.id == Doctor.clinic_id)
         .join(Patient, Patient.id == Appointment.patient_id)
         .where(Patient.synthetic.is_(False))
+    )
+
+
+async def appointment_row(
+    session: AsyncSession, appointment_id: uuid.UUID
+) -> dict[str, Any] | None:
+    row = (
+        (await session.execute(_appointment_select().where(Appointment.id == appointment_id)))
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
+async def appointments_page(
+    session: AsyncSession,
+    *,
+    status: str,
+    doctor_id: uuid.UUID | None,
+    from_day: date | None,
+    to_day: date | None,
+    after: tuple[datetime, uuid.UUID] | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """One page plus one extra row (the caller trims it and derives ``next_cursor``)."""
+    stmt = (
+        _appointment_select()
         .order_by(Appointment.starts_at.desc(), Appointment.id.desc())
         .limit(limit + 1)
     )

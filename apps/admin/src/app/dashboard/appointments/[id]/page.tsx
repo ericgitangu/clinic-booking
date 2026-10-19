@@ -11,6 +11,7 @@ import { LineageTimeline } from "@/components/lineage-timeline";
 import { StatusBadge } from "@/components/status-badge";
 import { formatSlot, localDate } from "@/lib/clinic-time";
 import { loadAppointmentRow, loadLineage } from "@/lib/dashboard-data";
+import { liveKey } from "@/lib/live-key";
 import { getAppointment } from "@/lib/api";
 import { shownName } from "@/lib/shown-name";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
@@ -94,7 +95,12 @@ export default async function AppointmentPage({
           </p>
         )}
         {staff.role && (
-          <AppointmentLive appointmentId={appt.id} role={staff.role} />
+          <AppointmentLive
+            appointmentId={appt.id}
+            doctorId={appt.doctor_id}
+            role={staff.role}
+            person={liveKey(staff.sub)}
+          />
         )}
       </header>
 
