@@ -46,6 +46,10 @@
       "value": ""
     },
     {
+      "key": "changeAppointmentId",
+      "value": ""
+    },
+    {
       "key": "soonStart",
       "value": ""
     },
@@ -1516,18 +1520,81 @@
       ]
     },
     {
-      "name": "08 Change within 60 minutes",
-      "description": "Cancelling or rescheduling a visit that starts in under 60 minutes is 409 CHANGE_TOO_LATE. The API never books a slot that close, so this needs an appointment made another way: `make api-check` writes one straight into the database of its own stack and passes its id as `soonAppointmentId`. To send these by hand, run `KEEP_STACK=1 make api-check` and paste the `baseUrl`, `writeBaseUrl` and `soonAppointmentId` it prints into the local environment. The seeded visit starts 5 to 35 minutes after the run, so use it straight away. Without it these requests are skipped.",
+      "name": "08 Change inside the lead time",
+      "description": "Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (60 minutes), and in the next hour there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (`BOOKING_MIN_LEAD_MINUTES`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. `make api-check` starts that API and passes `longLeadBaseUrl`; without it, the two refusals are skipped.",
       "item": [
         {
-          "name": "Cancel within 60 minutes",
+          "name": "Book a visit to change",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const needs = [\"writeBaseUrl\",\"soonAppointmentId\"];",
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.collectionVariables.set(\"changeAppointmentId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            },
+            "description": "`POST /appointments` (create_appointment_appointments_post). Expects 201.\n\nFrom the contract: Create Appointment. Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_id\": \"{{doctorId}}\",\n  \"patient_id\": \"{{otherPatientId}}\",\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel inside the lead time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"longLeadBaseUrl\",\"changeAppointmentId\"];",
                   "const missing = needs.filter((name) => !pm.variables.get(name));",
                   "if (missing.includes(\"writeBaseUrl\")) {",
                   "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
@@ -1567,13 +1634,13 @@
               }
             ],
             "url": {
-              "raw": "{{writeBaseUrl}}/appointments/{{soonAppointmentId}}/cancel",
+              "raw": "{{longLeadBaseUrl}}/appointments/{{changeAppointmentId}}/cancel",
               "host": [
-                "{{writeBaseUrl}}"
+                "{{longLeadBaseUrl}}"
               ],
               "path": [
                 "appointments",
-                "{{soonAppointmentId}}",
+                "{{changeAppointmentId}}",
                 "cancel"
               ]
             },
@@ -1590,14 +1657,14 @@
           }
         },
         {
-          "name": "Reschedule within 60 minutes",
+          "name": "Reschedule inside the lead time",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const needs = [\"writeBaseUrl\",\"soonAppointmentId\",\"slotStartNew\"];",
+                  "const needs = [\"longLeadBaseUrl\",\"changeAppointmentId\",\"slotStart\"];",
                   "const missing = needs.filter((name) => !pm.variables.get(name));",
                   "if (missing.includes(\"writeBaseUrl\")) {",
                   "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
@@ -1637,20 +1704,88 @@
               }
             ],
             "url": {
-              "raw": "{{writeBaseUrl}}/appointments/{{soonAppointmentId}}/reschedule",
+              "raw": "{{longLeadBaseUrl}}/appointments/{{changeAppointmentId}}/reschedule",
               "host": [
-                "{{writeBaseUrl}}"
+                "{{longLeadBaseUrl}}"
               ],
               "path": [
                 "appointments",
-                "{{soonAppointmentId}}",
+                "{{changeAppointmentId}}",
                 "reschedule"
               ]
             },
             "description": "`PATCH /appointments/{appointment_id}/reschedule` (reschedule_appointment_appointments__appointment_id__reschedule_patch). Expects 409 CHANGE_TOO_LATE.\n\nFrom the contract: Reschedule Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"starts_at\": \"{{slotStartNew}}\"\n}",
+              "raw": "{\n  \"starts_at\": \"{{slotStart}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel through the normal API",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const needs = [\"writeBaseUrl\",\"changeAppointmentId\"];",
+                  "const missing = needs.filter((name) => !pm.variables.get(name));",
+                  "if (missing.includes(\"writeBaseUrl\")) {",
+                  "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "} else if (missing.length) {",
+                  "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
+                  "pm.test(\"the same visit cancels under the normal lead time\", () => {",
+                  "  const a = pm.response.json();",
+                  "  pm.expect([a.id, a.status]).to.eql([pm.collectionVariables.get(\"changeAppointmentId\"), \"cancelled\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{writeBaseUrl}}/appointments/{{changeAppointmentId}}/cancel",
+              "host": [
+                "{{writeBaseUrl}}"
+              ],
+              "path": [
+                "appointments",
+                "{{changeAppointmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "`PATCH /appointments/{appointment_id}/cancel` (cancel_appointment_appointments__appointment_id__cancel_patch). Expects 200.\n\nFrom the contract: Cancel Appointment. Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Reviewer run of the API collection\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

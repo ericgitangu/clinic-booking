@@ -75,9 +75,10 @@ function responseSchema(op, status) {
 const js = (strings, ...vals) => String.raw(strings, ...vals);
 
 // Every request's pre-request script starts with this guard. It skips the request when a variable
-// it needs is still empty: an earlier step was skipped or failed, soonAppointmentId was not seeded,
-// or, for every request other than GET, writeBaseUrl is not set. `needs` is worked out when the
-// collection is built: the variables the request and its scripts read, less those its pre-request sets.
+// it needs is still empty: an earlier step was skipped or failed, writeBaseUrl is not set (every
+// request other than GET), or longLeadBaseUrl is not set (folder 08's refusals). `needs` is worked
+// out when the collection is built: the variables the request and its scripts read, less those its
+// pre-request sets.
 //
 // The guard is a convenience, not the safety. Requests other than GET are addressed to
 // {{writeBaseUrl}}, which the production environment does not define, so a client that ignores
@@ -381,23 +382,43 @@ pm.test("cancelled with the reason given", () => {
     ],
   },
   {
-    name: `08 Change within ${LEAD} minutes`,
+    name: "08 Change inside the lead time",
     description:
-      `Cancelling or rescheduling a visit that starts in under ${LEAD} minutes is 409 CHANGE_TOO_LATE. The API never books a slot that close, so this needs an appointment made another way: \`make api-check\` writes one straight into the database of its own stack and passes its id as \`soonAppointmentId\`. To send these by hand, run \`KEEP_STACK=1 make api-check\` and paste the \`baseUrl\`, \`writeBaseUrl\` and \`soonAppointmentId\` it prints into the local environment. The seeded visit starts 5 to 35 minutes after the run, so use it straight away. Without it these requests are skipped.`,
+      `Cancelling or rescheduling a visit that starts inside the lead time is 409 CHANGE_TOO_LATE. The normal API never books a visit inside its own lead (${LEAD} minutes), and in the next hour there may be no working hours at all, so this folder uses a second API on the same database whose only difference is a 100-day lead (\`BOOKING_MIN_LEAD_MINUTES\`, scripts/api_check.compose.yml). A visit booked for the free slot through the normal API is inside that lead, so the second API refuses to change it, through the same code and rule. The normal API then cancels it. \`make api-check\` starts that API and passes \`longLeadBaseUrl\`; without it, the two refusals are skipped.`,
     requests: [
       {
-        name: `Cancel within ${LEAD} minutes`,
+        name: "Book a visit to change",
+        op: ["POST", "/appointments"],
+        body: { doctor_id: "{{doctorId}}", patient_id: "{{otherPatientId}}", starts_at: "{{slotStartNew}}" },
+        expect: [201],
+        tests: js`pm.collectionVariables.set("changeAppointmentId", pm.response.json().id);`,
+      },
+      {
+        name: "Cancel inside the lead time",
         op: ["PATCH", "/appointments/{appointment_id}/cancel"],
-        path: "/appointments/{{soonAppointmentId}}/cancel",
+        host: "longLeadBaseUrl",
+        path: "/appointments/{{changeAppointmentId}}/cancel",
         body: { reason: "Reviewer run of the API collection" },
         expect: [409, "CHANGE_TOO_LATE"],
       },
       {
-        name: `Reschedule within ${LEAD} minutes`,
+        name: "Reschedule inside the lead time",
         op: ["PATCH", "/appointments/{appointment_id}/reschedule"],
-        path: "/appointments/{{soonAppointmentId}}/reschedule",
-        body: { starts_at: "{{slotStartNew}}" },
+        host: "longLeadBaseUrl",
+        path: "/appointments/{{changeAppointmentId}}/reschedule",
+        body: { starts_at: "{{slotStart}}" },
         expect: [409, "CHANGE_TOO_LATE"],
+      },
+      {
+        name: "Cancel through the normal API",
+        op: ["PATCH", "/appointments/{appointment_id}/cancel"],
+        path: "/appointments/{{changeAppointmentId}}/cancel",
+        body: { reason: "Reviewer run of the API collection" },
+        expect: [200],
+        tests: js`pm.test("the same visit cancels under the normal lead time", () => {
+  const a = pm.response.json();
+  pm.expect([a.id, a.status]).to.eql([pm.collectionVariables.get("changeAppointmentId"), "cancelled"]);
+});`,
       },
     ],
   },
@@ -537,14 +558,15 @@ function buildRequest(r) {
   if (r.tests) test.push(r.tests);
 
   const event = [];
-  // Reads go to baseUrl; anything else goes to writeBaseUrl, which production does not define.
-  const host = method === "GET" ? "baseUrl" : "writeBaseUrl";
+  // Reads go to baseUrl; anything else goes to writeBaseUrl, which production does not define,
+  // unless the request names its own host (folder 08's long-lead API, local only).
+  const host = r.host ?? (method === "GET" ? "baseUrl" : "writeBaseUrl");
   const used = [...JSON.stringify([host, path, query, headers, r.body ?? null]).matchAll(/{{\s*([A-Za-z0-9_]+)\s*}}/g)].map((m) => m[1]);
   const pre = r.prerequest ?? "";
   // Variables the request's scripts read: the pre-request's inputs, and what its tests compare with.
   const reads = [...(pre + (r.tests ?? "")).matchAll(/collectionVariables\.get\("([A-Za-z0-9_]+)"\)/g)].map((m) => m[1]);
   const sets = [...pre.matchAll(/collectionVariables\.set\("([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
-  const needs = [...new Set([...(host === "writeBaseUrl" ? [host] : []), ...used, ...reads])].filter((v) => v !== "baseUrl" && !sets.includes(v));
+  const needs = [...new Set([...(host === "baseUrl" ? [] : [host]), ...used, ...reads])].filter((v) => v !== "baseUrl" && !sets.includes(v));
   event.push({ listen: "prerequest", script: { type: "text/javascript", exec: guard(needs, r.prerequest).split("\n") } });
   event.push({ listen: "test", script: { type: "text/javascript", exec: test.join("\n").split("\n") } });
 
@@ -592,17 +614,18 @@ function build() {
     },
     variable: [
       "doctorId", "slotDay", "slotSearch", "slotMinutes", "slotStart", "slotStartNew", "patientId", "otherPatientId",
-      "idempotencyKey", "appointmentId", "soonStart", "farDay", "naiveStart", "pastStart", "offGridStart", "nightStart",
+      "idempotencyKey", "appointmentId", "changeAppointmentId", "soonStart", "farDay", "naiveStart", "pastStart", "offGridStart", "nightStart",
     ].map((key) => ({ key, value: "" })),
     item: FOLDERS.map((f) => ({ name: f.name, description: f.description, item: f.requests.map(buildRequest) })),
   };
 
-  const env = (name, baseUrl, writeBaseUrl) => ({
+  const env = (name, baseUrl, writeBaseUrl, local) => ({
     name: `Clinic booking API, ${name}`,
     values: [
       { key: "baseUrl", value: baseUrl, type: "default", enabled: true },
       ...(writeBaseUrl ? [{ key: "writeBaseUrl", value: writeBaseUrl, type: "default", enabled: true }] : []),
-      { key: "soonAppointmentId", value: "", type: "default", enabled: true },
+      // Folder 08's long-lead API: only the api-check stack has one (KEEP_STACK=1 prints its URL).
+      ...(local ? [{ key: "longLeadBaseUrl", value: "", type: "default", enabled: true }] : []),
     ],
     _postman_variable_scope: "environment",
   });
@@ -610,10 +633,10 @@ function build() {
   return {
     "clinic-booking.postman_collection.json": collection,
     // The `make up` stack (compose publishes the API on API_HOST_PORT, 8080 by default).
-    "local.postman_environment.json": env("local (docker compose)", "http://localhost:8080", "http://localhost:8080"),
+    "local.postman_environment.json": env("local (docker compose)", "http://localhost:8080", "http://localhost:8080", true),
     // The public path is the booking site's /api proxy: Cloud Run itself is IAM-only. No
     // writeBaseUrl on purpose: writes need it passed in (API_WRITES=1 make api-check-prod).
-    "production.postman_environment.json": env("production (read-only)", "https://clinic.ericgitangu.com/api", null),
+    "production.postman_environment.json": env("production (read-only)", "https://clinic.ericgitangu.com/api", null, false),
   };
 }
 

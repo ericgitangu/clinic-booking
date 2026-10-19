@@ -10,7 +10,7 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Click.** <https://clinic.ericgitangu.com/book> for the patient flow (Google sign-in), <https://clinic.ericgitangu.com/docs> for Swagger UI against the real API (no sign-in, as the brief asks).
 - **Read first.** [3.4 The concurrency guarantee](#34-the-concurrency-guarantee) and the two ADRs behind it, [ADR-0003](docs/adr/0003-double-booking-partial-unique-index.md) and [ADR-0018](docs/adr/0018-testing-strategy.md). If that logic is wrong, nothing else matters.
 - **Run.** [Section 2](#2-verify-the-claims-in-10-minutes) is a copy-paste path against production: 20 simultaneous bookings of one slot, then cancelling twice.
-- **Try the API.** `make api-check` runs a Postman collection of the whole booking journey against a local stack; the same files import into Postman or Insomnia ([Try the API](#try-the-api)).
+- **Try the API.** `make api-check` runs a Postman collection of the whole booking journey against a local stack; the same files import into Postman ([Try the API](#try-the-api)).
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and an [ADR](docs/adr/README.md) that names what it costs. [`docs/architecture/overview.md`](docs/architecture/overview.md) has the diagrams (context, containers, booking, push, release, data handling), [`docs/engineering/decisions.md`](docs/engineering/decisions.md) the long decisions index, and [`docs/engineering/verification.md`](docs/engineering/verification.md) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](docs/runbooks/admin-access.md)), so a reviewer cannot sign in. I can grant access if you want to see it.
 - **Reviewer access.** The API side of [ADR-0033](docs/adr/0033-staff-crud-veto-and-invites.md) (invitations, roles, audit trail) is built and is in pull request #63; the invitation email and the admin screens that use it are separate pull requests (#68 and the admin revamp) and are not live until they merge. Once they are, the owner invites the reviewer as admin through `/access`; the invitation expires in 72 hours and must be accepted with the same Google email it was sent to. Until then, ask me and I grant access by hand.
@@ -92,7 +92,7 @@ Observed: the first returns `200`. The second returns `409` as `application/prob
 
 ### Try the API
 
-A Postman collection in [`docs/api/`](docs/api/README.md) walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot under an hour away (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change within the hour (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
+A Postman collection in [`docs/api/`](docs/api/README.md), run with newman, walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot under an hour away (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change inside the lead time (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
 
 One command, Docker only (its own compose stack, removed afterwards):
 
@@ -100,14 +100,9 @@ One command, Docker only (its own compose stack, removed afterwards):
 make api-check
 ```
 
-Observed on 2026-10-19: 40 requests (the 39 in the collection and one slot lookup), 212 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production: 13 requests, 62 assertions, 0 failed on 2026-10-19. `API_WRITES=1 make api-check-prod` also runs the writes, and those leave two "Reviewer …" patients and a cancelled appointment in the production database.
+Observed on 2026-10-19: 42 requests (the 41 in the collection and one slot lookup), 219 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production: 13 requests, 62 assertions, 0 failed on 2026-10-19. `API_WRITES=1 make api-check-prod` also runs the writes, and those leave two "Reviewer …" patients and two cancelled appointments in the production database.
 
-To click through it instead, start the API with `make up` (or use production), then:
-
-- **Postman**: Import the three files in `docs/api/` and pick the `local` or `production` environment.
-- **Insomnia**: Import the collection file (it reads the Postman format) and create an environment with `baseUrl` and, for local, `writeBaseUrl` (`http://localhost:8080` for both). Without `writeBaseUrl`, every request other than GET has no host. I have not verified the Insomnia import; `inso` 13.3.1 refuses the file, and Insomnia runs only part of Postman's test scripts.
-
-Folder 08 (`CHANGE_TOO_LATE`) needs a visit inside the lead time, which only `make api-check` can seed; [`docs/api/README.md`](docs/api/README.md#the-journey) explains how to send it by hand. No request needs a key.
+To click through it instead, start the API with `make up` (or use production), then in Postman Import the three files in `docs/api/` and pick the `local` or `production` environment. newman and Postman are the supported tools; [`docs/api/README.md`](docs/api/README.md#postman-and-newman) says why Insomnia is not. Folder 08 needs the second API that only `make api-check` starts ([how to send it by hand](docs/api/README.md#the-journey)). No request needs a key.
 
 ## 3. System design
 

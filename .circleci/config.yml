@@ -831,7 +831,7 @@ jobs:
           name: Skip when nothing this job covers changed (fails closed)
           # Makefile and README.md are left out: the job runs scripts/api_check.sh directly and reads
           # no prose, so a change to either cannot change its result.
-          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ docs/api/ scripts/api_check.sh scripts/api_collection.mjs docker-compose.yml .circleci/
+          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ docs/api/ scripts/api_check.sh scripts/api_check.compose.yml scripts/api_collection.mjs docker-compose.yml .circleci/
       - run:
           name: Collection against the compose stack (newman, pinned image)
           command: REPORT_DIR=/tmp/newman bash scripts/api_check.sh local
