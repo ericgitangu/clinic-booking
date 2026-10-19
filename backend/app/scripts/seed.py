@@ -21,6 +21,9 @@ from app.db.session import dispose_engine, get_engine
 
 NAMESPACE = uuid.UUID("6f1c2a52-6a0e-4c7a-9a3e-2b6f2d1c0a11")
 CLINIC_NAME = "Idyllic Clinic"
+# The clinic's id is kept as it was first seeded, so renaming the clinic updates the existing row
+# instead of adding a second one (a seeded id is derived from a key, and the key is not the name).
+CLINIC_ID = uuid.UUID("03f26da7-672f-5d72-95fc-28f44c71b62c")
 CLINIC_TZ = "Africa/Nairobi"
 
 
@@ -111,12 +114,7 @@ def _validate_no_overlap(doc: DoctorSeed) -> None:
 
 
 async def _seed(conn: AsyncConnection) -> None:
-    # The key "mvule" is an old name and it stays. The id is a uuid5 of this exact string, so
-    # renaming the key makes a different id (03f26da7-... today, 8bf928a1-... for "idyllic").
-    # Production was seeded with the current one, so re-running this seed there would insert a
-    # second clinic and move the doctors to it. The visible name comes from CLINIC_NAME, which was
-    # renamed and is updated in place by the ON CONFLICT below. The id is never shown to anyone.
-    clinic_id = _id("clinic", "mvule")
+    clinic_id = CLINIC_ID
     await conn.execute(
         text(
             "INSERT INTO clinics (id, name, timezone) VALUES (:id, :name, :tz) "
