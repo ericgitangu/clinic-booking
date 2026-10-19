@@ -43,3 +43,16 @@ class StaffAction:
     # changed nothing, so wrote nothing) and the start the appointment had before a move or cancel.
     audit_id: uuid.UUID | None = None
     previous_starts_at: datetime | None = None
+
+
+def is_vetoable(event_type: str | None, actor: str | None, has_successor: bool) -> bool:
+    """Whether the latest change of an appointment can be vetoed: it was recorded as the
+    patient's, it is not the first booking, and staff have not already booked a replacement. A NULL
+    actor is an event from before actors were recorded: it cannot be shown to be the patient's, so
+    it is left alone. The veto action and the Today board's ``patient_changed`` both call this."""
+    return (
+        event_type is not None
+        and actor == "patient"
+        and event_type != "booked"
+        and not has_successor
+    )

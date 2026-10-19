@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.domain.ops import BoardStatus
 from app.domain.reasons import Category
-from app.schemas.admin import DateRange
+from app.schemas.admin import AppointmentStatus, DateRange
 from app.schemas.common import ClinicZoned
 
 View = Literal["full", "minimised"]
@@ -25,6 +25,9 @@ class BoardAppointment(ClinicZoned):
     patient_name: str
     patient_phone: str | None
     locked: bool
+    # True when the appointment's latest change was recorded as the patient's and a veto would
+    # act on it (the veto action would not answer NOTHING_TO_VETO).
+    patient_changed: bool
 
 
 class BoardGap(ClinicZoned):
@@ -138,3 +141,39 @@ class GapList(BaseModel):
     hours: int
     items: list[FreeSlot]
     truncated: bool
+
+
+ChangeKind = Literal["booked", "rescheduled", "cancelled"]
+
+
+class ChangeItem(ClinicZoned):
+    """One booking, reschedule or cancellation, placed by the day the change happened."""
+
+    appointment_id: uuid.UUID
+    doctor_id: uuid.UUID
+    doctor_name: str
+    # Owner and admin: the full name. Viewer: initials.
+    patient_name: str
+    kind: ChangeKind
+    occurred_at: _dt.datetime
+    actor: Literal["patient", "staff"] | None
+    # Reschedules only: where the visit was and where it went.
+    from_starts_at: _dt.datetime | None
+    to_starts_at: _dt.datetime | None
+    # Where the appointment stands now, not at the time of the change.
+    starts_at: _dt.datetime
+    status: AppointmentStatus
+    attendance: Literal["arrived", "no_show"] | None
+    # Cancellations only. Never present for a viewer.
+    reason: str | None
+    reason_category: Category | None
+
+
+class ChangeList(BaseModel):
+    view: View
+    kind: ChangeKind
+    range: DateRange
+    # Over the whole range and filters, whatever the page size or cursor.
+    total: int
+    items: list[ChangeItem]
+    next_cursor: str | None

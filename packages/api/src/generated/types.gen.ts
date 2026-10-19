@@ -487,6 +487,10 @@ export type BoardAppointment = {
      */
     locked: boolean;
     /**
+     * Patient Changed
+     */
+    patient_changed: boolean;
+    /**
      * Patient Name
      */
     patient_name: string;
@@ -562,6 +566,101 @@ export type CancelRequest = {
      * Reason
      */
     reason: string;
+};
+
+/**
+ * ChangeItem
+ *
+ * One booking, reschedule or cancellation, placed by the day the change happened.
+ */
+export type ChangeItem = {
+    /**
+     * Actor
+     */
+    actor: 'patient' | 'staff' | null;
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Attendance
+     */
+    attendance: 'arrived' | 'no_show' | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * From Starts At
+     */
+    from_starts_at: string | null;
+    /**
+     * Kind
+     */
+    kind: 'booked' | 'rescheduled' | 'cancelled';
+    /**
+     * Occurred At
+     */
+    occurred_at: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Reason Category
+     */
+    reason_category: 'transport' | 'illness' | 'travel' | 'work' | 'weather' | 'felt_better' | 'insurance' | 'other' | null;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Status
+     */
+    status: 'booked' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
+    /**
+     * To Starts At
+     */
+    to_starts_at: string | null;
+};
+
+/**
+ * ChangeList
+ */
+export type ChangeList = {
+    /**
+     * Items
+     */
+    items: Array<ChangeItem>;
+    /**
+     * Kind
+     */
+    kind: 'booked' | 'rescheduled' | 'cancelled';
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+    range: DateRange;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * View
+     */
+    view: 'full' | 'minimised';
 };
 
 /**
@@ -2597,6 +2696,46 @@ export type CreateAppointmentInternalAdminAppointmentsPostResponses = {
 
 export type CreateAppointmentInternalAdminAppointmentsPostResponse = CreateAppointmentInternalAdminAppointmentsPostResponses[keyof CreateAppointmentInternalAdminAppointmentsPostResponses];
 
+export type GetAppointmentInternalAdminAppointmentsAppointmentIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}';
+};
+
+export type GetAppointmentInternalAdminAppointmentsAppointmentIdGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type GetAppointmentInternalAdminAppointmentsAppointmentIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminAppointment;
+};
+
+export type GetAppointmentInternalAdminAppointmentsAppointmentIdGetResponse = GetAppointmentInternalAdminAppointmentsAppointmentIdGetResponses[keyof GetAppointmentInternalAdminAppointmentsAppointmentIdGetResponses];
+
 export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData = {
     /**
      * Body
@@ -3302,6 +3441,66 @@ export type CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses =
 };
 
 export type CancellationReasonsInternalAdminOpsCancellationReasonsGetResponse = CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses[keyof CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses];
+
+export type ChangesInternalAdminOpsChangesGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Kind
+         */
+        kind: 'booked' | 'rescheduled' | 'cancelled';
+        /**
+         * From
+         */
+        from: string;
+        /**
+         * To
+         */
+        to: string;
+        /**
+         * Reason
+         */
+        reason?: 'transport' | 'illness' | 'travel' | 'work' | 'weather' | 'felt_better' | 'insurance' | 'other' | null;
+        /**
+         * Doctor Id
+         */
+        doctor_id?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/internal/admin/ops/changes';
+};
+
+export type ChangesInternalAdminOpsChangesGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ChangesInternalAdminOpsChangesGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: ChangeList;
+};
+
+export type ChangesInternalAdminOpsChangesGetResponse = ChangesInternalAdminOpsChangesGetResponses[keyof ChangesInternalAdminOpsChangesGetResponses];
 
 export type DaySheetInternalAdminOpsDaySheetCsvGetData = {
     body?: never;
