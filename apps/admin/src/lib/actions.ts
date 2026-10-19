@@ -118,7 +118,7 @@ export async function changeAccessRole(
 export async function revokeAccess(email: string): Promise<ActionResult> {
   // An admin may revoke a viewer; the API answers ROLE_ESCALATION for anyone else, so owner and
   // admin both pass this check and the API decides.
-  const staff = await authorise("manage-appointments");
+  const staff = await authorise("manage-access");
   if (!staff) return DENIED;
   const address = normalise(email);
   const res = await revoke(callerFor(staff, staff.role), address);
@@ -302,7 +302,7 @@ export async function createInvite(
   email: string,
   role: string,
 ): Promise<InviteResult> {
-  const staff = await authorise("manage-appointments");
+  const staff = await authorise("manage-access");
   if (!staff) return { ok: false, message: DENIED.message };
   if (!grantable(role)) return { ok: false, message: "Pick admin or viewer." };
   const address = normalise(email);
@@ -322,7 +322,7 @@ export async function createInvite(
 }
 
 export async function revokeInvite(id: string): Promise<ActionResult> {
-  const staff = await authorise("manage-appointments");
+  const staff = await authorise("manage-access");
   if (!staff) return DENIED;
   const res = await inviteRevoke(callerFor(staff, staff.role), id);
   if (!res.ok) return describe(res, "That invitation could not be found.");

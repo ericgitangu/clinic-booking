@@ -3,6 +3,7 @@ import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { Shortcuts } from "@/components/shortcuts";
+import { can } from "@/lib/roles";
 import { StaffMenu } from "@/components/staff-menu";
 import { FOOTER_COLUMNS } from "@/lib/footer";
 import { fontVars } from "@/lib/fonts";
@@ -29,10 +30,9 @@ export default async function RootLayout({
 }) {
   // A failed lookup must not break every page; the page itself reports it.
   const staff = await getStaff().catch(() => null);
-  const navLinks =
-    staff?.role === "owner" || staff?.role === "admin"
-      ? [...NAV_LINKS, ACCESS_LINK, AUDIT_LINK]
-      : [...NAV_LINKS];
+  const navLinks = can(staff?.role ?? null, "manage-access")
+    ? [...NAV_LINKS, ACCESS_LINK, AUDIT_LINK]
+    : [...NAV_LINKS];
   return (
     <html lang="en" suppressHydrationWarning style={fontVars}>
       <body className="min-h-dvh font-sans antialiased">

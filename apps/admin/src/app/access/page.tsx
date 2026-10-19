@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // Owner and admin. A viewer, or anyone without a role, gets the 403 page whatever the link was. An
 // admin sees the whole list but can act only on viewers; the API enforces it again.
 export default async function AccessPage() {
-  const staff = await requireStaff("manage-appointments");
+  const staff = await requireStaff("manage-access");
   const caller = callerFor(staff, staff.role);
   const [res, inv] = await Promise.all([
     accessList(caller),
