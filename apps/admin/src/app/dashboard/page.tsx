@@ -4,6 +4,7 @@ import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
 import { KpiStrip } from "@/components/kpi-strip";
 import { LiveFeed } from "@/components/live-feed";
+import { liveKey } from "@/lib/live-key";
 import { RangeNav } from "@/components/range-nav";
 import { RefreshButton } from "@/components/refresh-button";
 import { StaffBar } from "@/components/staff-bar";
@@ -118,6 +119,7 @@ export default async function Dashboard({
 
         <LiveFeed
           role={staff.role}
+          person={liveKey(staff.sub)}
           doctors={dash.range.per_doctor.map((d) => ({
             id: d.doctor_id,
             name: d.name,
