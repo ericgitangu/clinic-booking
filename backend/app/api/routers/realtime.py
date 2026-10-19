@@ -104,6 +104,7 @@ async def patient_token(
         raise DateOutOfRange()
     if await relay.budget.exhausted(now):
         raise RealtimeUnavailable("This month's live-update budget is spent. Poll instead.")
+    await relay.run(clock)  # flush what a busy moment stranded; bounded, never raises
     return tokens.patient_token(key, settings.ABLY_STREAM_URL, body.doctor_id, body.date, now)
 
 
@@ -124,4 +125,5 @@ async def admin_token(
     now = clock.now()
     if await relay.budget.exhausted(now):
         raise RealtimeUnavailable("This month's live-update budget is spent. Poll instead.")
+    await relay.run(clock)
     return tokens.admin_token(key, settings.ABLY_STREAM_URL, now)
