@@ -17,7 +17,7 @@ export const SHORTCUTS: readonly ShortcutDoc[] = [
   { keys: ["?"], join: "", does: "Show this list" },
   { keys: ["/", "Ctrl K"], join: "or", does: "Search and run commands" },
   { keys: ["g", "d"], join: "then", does: "Go to the dashboard" },
-  { keys: ["g", "a"], join: "then", does: "Go to access (owners)" },
+  { keys: ["g", "a"], join: "then", does: "Go to access (owners and admins)" },
   {
     keys: ["j", "k"],
     join: "or",

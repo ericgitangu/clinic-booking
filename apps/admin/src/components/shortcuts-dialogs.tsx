@@ -11,6 +11,7 @@ import {
 } from "@clinic/ui/components/ui/dialog";
 import { cn } from "@clinic/ui/lib/utils";
 import { SHORTCUTS } from "@/lib/hotkeys";
+import { nextActive } from "@/lib/palette";
 import { RANGES, STATUSES, STATUS_LABEL } from "@/lib/filters";
 import type { Panel } from "@/components/shortcuts";
 
@@ -85,13 +86,13 @@ function Help({
 // A small command palette: go places, change the view, jump to an appointment on this page. It
 // searches the commands and the rows already on screen, not the whole database.
 function Palette({
-  isOwner,
+  canManage,
   close,
   showHelp,
   singleKeys,
   setSingleKeys,
 }: {
-  isOwner: boolean;
+  canManage: boolean;
   close: () => void;
   showHelp: () => void;
   singleKeys: boolean;
@@ -113,13 +114,21 @@ function Palette({
         run: () => router.push("/dashboard"),
       },
     ];
-    if (isOwner) {
-      list.push({
-        id: "access",
-        label: "Access",
-        group: "Go to",
-        run: () => router.push("/access"),
-      });
+    if (canManage) {
+      list.push(
+        {
+          id: "access",
+          label: "Access",
+          group: "Go to",
+          run: () => router.push("/access"),
+        },
+        {
+          id: "audit",
+          label: "Audit trail",
+          group: "Go to",
+          run: () => router.push("/audit"),
+        },
+      );
     }
     const view = (name: string, value: string) => () => {
       const sp = new URLSearchParams(
@@ -171,12 +180,20 @@ function Palette({
         });
       });
     return list;
-  }, [isOwner, params, path, router, showHelp, singleKeys, setSingleKeys]);
+  }, [canManage, params, path, router, showHelp, singleKeys, setSingleKeys]);
 
   const shown = commands.filter((c) =>
     c.label.toLowerCase().includes(query.trim().toLowerCase()),
   );
   useEffect(() => setActive(0), [query]);
+  // Keep the active option on screen as the arrow keys move it (WCAG 2.4.7 and 2.4.11): the list
+  // scrolls, and the option is never left hidden under the edge of it.
+  const activeId = shown[active] ? `${uid}-${shown[active].id}` : null;
+  useEffect(() => {
+    if (activeId) {
+      document.getElementById(activeId)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeId]);
 
   function pick(c: Command | undefined) {
     if (!c) return;
@@ -209,12 +226,11 @@ function Palette({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
-              setActive((a) => Math.min(shown.length - 1, a + 1));
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setActive((a) => Math.max(0, a - 1));
+              setActive((a) =>
+                nextActive(a, e.key as "ArrowDown" | "ArrowUp", shown.length),
+              );
             } else if (e.key === "Enter") {
               e.preventDefault();
               pick(shown[active]);
@@ -266,13 +282,13 @@ function Palette({
 export function ShortcutsDialogs({
   panel,
   setPanel,
-  isOwner,
+  canManage,
   singleKeys,
   setSingleKeys,
 }: {
   panel: Exclude<Panel, null>;
   setPanel: (p: Panel) => void;
-  isOwner: boolean;
+  canManage: boolean;
   singleKeys: boolean;
   setSingleKeys: (on: boolean) => void;
 }) {
@@ -283,7 +299,7 @@ export function ShortcutsDialogs({
           <Help singleKeys={singleKeys} setSingleKeys={setSingleKeys} />
         ) : (
           <Palette
-            isOwner={isOwner}
+            canManage={canManage}
             close={() => setPanel(null)}
             showHelp={() => setPanel("help")}
             singleKeys={singleKeys}

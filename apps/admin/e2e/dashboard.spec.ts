@@ -418,6 +418,55 @@ test.describe("owner dashboard", () => {
     }
   });
 
+  test("keyboard: the palette scrolls the active option into view, with more than 20 options", async ({
+    as,
+  }) => {
+    const page = await as("owner");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("appointments-table")).toBeVisible();
+    await page.keyboard.press("/");
+    const box = page.getByRole("combobox", {
+      name: "Search commands and appointments",
+    });
+    await expect(box).toBeFocused();
+    const options = page.getByRole("option");
+    // The commands and the visits listed on the page: well over a screenful.
+    await expect.poll(() => options.count()).toBeGreaterThan(20);
+    const total = await options.count();
+    const list = page.getByRole("listbox", { name: "Results" });
+    for (let i = 0; i < total + 3; i++) await page.keyboard.press("ArrowDown");
+    const last = options.nth(total - 1);
+    await expect(last).toHaveAttribute("aria-selected", "true");
+    // Past the last one the choice stays on it (it does not go off the list).
+    await expect(box).toHaveAttribute(
+      "aria-activedescendant",
+      (await last.getAttribute("id"))!,
+    );
+    const inView = async () => {
+      const l = (await list.boundingBox())!;
+      const o = (await last.boundingBox())!;
+      return o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+    await expect.poll(inView).toBe(true);
+    // And back up to the first, which must also be on screen.
+    for (let i = 0; i < total + 3; i++) await page.keyboard.press("ArrowUp");
+    const first = options.first();
+    await expect(first).toHaveAttribute("aria-selected", "true");
+    await expect
+      .poll(async () => {
+        const l = (await list.boundingBox())!;
+        const o = (await first.boundingBox())!;
+        return o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+      })
+      .toBe(true);
+    // No match: the arrows do nothing harmful and nothing is active.
+    await box.fill("zzzzzz");
+    await page.keyboard.press("ArrowDown");
+    await expect(options).toHaveCount(0);
+    await expect(box).not.toHaveAttribute("aria-activedescendant", /.+/);
+  });
+
   test("the 404 page keeps the signed-in header", async ({ as }) => {
     const page = await as("owner");
     const res = await page.goto("/no-such-page-here");

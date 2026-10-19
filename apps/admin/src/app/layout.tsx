@@ -45,7 +45,7 @@ export default async function RootLayout({
             headerTrailing={
               staff ? (
                 <div className="flex items-center">
-                  <Shortcuts isOwner={staff.role === "owner"} />
+                  <Shortcuts canManage={can(staff.role, "manage-access")} />
                   <StaffMenu
                     name={staff.name}
                     email={staff.email}

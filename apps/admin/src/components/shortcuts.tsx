@@ -36,7 +36,7 @@ function rowLinks(): HTMLAnchorElement[] {
 // One keydown listener for the whole app, plus the header button that opens search for anyone
 // without a keyboard. The rules are in lib/hotkeys.ts. Shortcuts are documented in the help dialog
 // ("?"), which reads the same list.
-export function Shortcuts({ isOwner }: { isOwner: boolean }) {
+export function Shortcuts({ canManage }: { canManage: boolean }) {
   const router = useRouter();
   const [panel, setPanel] = useState<Panel>(null);
   const chord = useRef<ChordState>(IDLE);
@@ -80,11 +80,11 @@ export function Shortcuts({ isOwner }: { isOwner: boolean }) {
       if (a.type === "help") setPanel("help");
       else if (a.type === "palette") setPanel("palette");
       else if (a.type === "row") moveRow(a.step);
-      else if (a.to === "/dashboard" || isOwner) router.push(a.to);
+      else if (a.to === "/dashboard" || canManage) router.push(a.to);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [isOwner, moveRow, router, singleKeys]);
+  }, [canManage, moveRow, router, singleKeys]);
 
   return (
     <>
@@ -104,7 +104,7 @@ export function Shortcuts({ isOwner }: { isOwner: boolean }) {
         <Dialogs
           panel={panel}
           setPanel={setPanel}
-          isOwner={isOwner}
+          canManage={canManage}
           singleKeys={singleKeys}
           setSingleKeys={writeSingleKeys}
         />
