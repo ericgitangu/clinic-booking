@@ -318,6 +318,9 @@ test.describe("live feed", () => {
     as,
     browser,
   }) => {
+    // Setting up (booking through the API, two browsers, the page loads) is slow on a cold app; the
+    // 2 second assertions below are the ones that measure the feed.
+    test.setTimeout(60_000);
     const made = await book(`Live Veto UI ${Date.now()}`);
     await patientReschedules(made);
     const ownerPage = await as("owner");
@@ -329,6 +332,9 @@ test.describe("live feed", () => {
     await expect(ownerPage.getByTestId("lineage-rescheduled")).toHaveCount(1);
 
     const ctx = await browser.newContext();
+    // The local gateway serves one stream at a time and the owner's page holds it, so the admin's
+    // page (which only does the action) must not open one of its own and compete for the slot.
+    await ctx.route("**/live/stream**", (route) => route.abort());
     await signIn(ctx, EMAIL.admin);
     const adminPage = await ctx.newPage();
     await adminPage.goto(`/dashboard/appointments/${made.id}`);
@@ -354,6 +360,9 @@ test.describe("live feed", () => {
     as,
     browser,
   }) => {
+    // Setting up (booking through the API, two browsers, the page loads) is slow on a cold app; the
+    // 2 second assertions below are the ones that measure the feed.
+    test.setTimeout(60_000);
     test.skip(
       inFirstHourOfClinicDay(),
       "a past half hour falls on yesterday in the first hour of the clinic day",
@@ -370,6 +379,9 @@ test.describe("live feed", () => {
     await expect(badge).toHaveText(/Booked/);
 
     const ctx = await browser.newContext();
+    // The local gateway serves one stream at a time and the owner's page holds it, so the admin's
+    // page (which only does the action) must not open one of its own and compete for the slot.
+    await ctx.route("**/live/stream**", (route) => route.abort());
     await signIn(ctx, EMAIL.admin);
     const adminPage = await ctx.newPage();
     await adminPage.goto(`/dashboard/appointments/${made.id}`);
