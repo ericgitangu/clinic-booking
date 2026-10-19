@@ -22,6 +22,9 @@ class Patient(Base):
     # True only for the release smoke's own patients (set by the signed internal smoke path, never
     # by a public request). Admin aggregates and the admin feed leave these out.
     synthetic: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # True only for the curated fictional demo patients (app.scripts.seed_demo). They appear in
+    # every view; the flag only records that the person is invented.
+    demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

@@ -66,6 +66,15 @@ export default function DataPage() {
         I set for a demonstration, not a promise for a live clinic.
       </p>
 
+      <h2>Demo patients are not real</h2>
+      <p>
+        The patients and bookings you see when this clinic is reviewed (names,
+        phone numbers, emails ending in <code>example.com</code>, appointments
+        and cancellation reasons) are AI-generated, fictional and Nairobi-local.
+        They were created to make the clinic reviewable and describe no real
+        person.
+      </p>
+
       <h2>What is collected</h2>
       <div
         className="overflow-x-auto"
