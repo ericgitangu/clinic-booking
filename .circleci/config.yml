@@ -43,6 +43,19 @@ commands:
           paths:
             - ~/.cache/trivy
 
+  owner_emails:
+    description: >-
+      The one place the owner addresses are set (ADMIN_EMAILS for clinic-api and clinic-realtime,
+      which must agree: both resolve the owner role from it). Exported as OWNER_EMAILS.
+    steps:
+      - run:
+          name: Owner addresses (ADMIN_EMAILS, shared by the API and the gateway)
+          command: |
+            owners="developer.ericgitangu@gmail.com"
+            # gcloud --set-env-vars splits on commas; a second owner needs a custom delimiter there.
+            case "$owners" in *,*) echo "OWNER_EMAILS holds a comma: change the deploy delimiter first" >&2; exit 1 ;; esac
+            echo "export OWNER_EMAILS=$owners" >> "$BASH_ENV"
+
   create_app_role:
     description: Create the clinic_app role in the CI Postgres (local/CI only).
     steps:
@@ -170,6 +183,9 @@ jobs:
             cd backend && uv sync --frozen
       - create_app_role
       - run:
+          name: A fresh signing key for this run (the API and the staff-action tests share it)
+          command: echo "export INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)" >> "$BASH_ENV"
+      - run:
           name: migrate + seed, then start the API the tests book through
           command: |
             cd backend
@@ -196,6 +212,7 @@ jobs:
             export TEST_OWNER_DSN=postgres://clinic:clinic@127.0.0.1:5432/clinic
             export TEST_REALTIME_DSN=postgres://clinic_realtime:clinic_realtime_local@127.0.0.1:5432/clinic
             export TEST_API_URL=http://127.0.0.1:8080
+            export TEST_API_SIGNING_KEY="$INTERNAL_SIGNING_KEY"
             go test -race -count=1 ./...
       - store_artifacts:
           path: /tmp/api.log
@@ -400,14 +417,16 @@ jobs:
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
             gcloud run jobs deploy clinic-migrate --image "$IMAGE_REF" --region us-east4 --service-account "clinic-migrate@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-migrate:latest --task-timeout 600s --max-retries 0 --command sh --args="-c,alembic upgrade head && python -m app.scripts.seed" --quiet
             gcloud run jobs execute clinic-migrate --region us-east4 --wait
+      - owner_emails
       - run:
           name: Deploy a tagged revision with no traffic
           command: |
+            : "${OWNER_EMAILS:?the owner_emails step did not run}"
             : "${PUBLIC_BASE_URL:?gcp-deploy context is missing PUBLIC_BASE_URL}"
             : "${WEB_ORIGIN:?gcp-deploy context is missing WEB_ORIGIN}"
             : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref)"
-            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest,ABLY_API_KEY=clinic-ably-api-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=developer.ericgitangu@gmail.com" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
+            gcloud run deploy clinic-api --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-api-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-app:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest,ABLY_API_KEY=clinic-ably-api-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PUBLIC_BASE_URL=${PUBLIC_BASE_URL},WEB_ORIGIN=${WEB_ORIGIN},ADMIN_EMAILS=${OWNER_EMAILS}" --min-instances 0 --max-instances 3 --concurrency 80 --cpu 1 --memory 512Mi --cpu-boost --timeout 60 --add-custom-audiences=clinic-api --quiet
       - run:
           name: Tag-URL smoke behind the C19 egress gate
           command: |
@@ -505,13 +524,15 @@ jobs:
       - run:
           name: Prerequisites a human sets once (a clear failure here, not a mysterious one later)
           command: bash scripts/ci/realtime_prereqs.sh
+      - owner_emails
       - run:
           name: Deploy a tagged revision with no traffic (min 0, max 2, concurrency 1, request-based billing)
           command: |
+            : "${OWNER_EMAILS:?the owner_emails step did not run}"
             : "${PUBLIC_BASE_URL:?gcp-deploy context is missing PUBLIC_BASE_URL}"
             : "${GOOGLE_PROJECT_ID:?gcp-deploy context is missing GOOGLE_PROJECT_ID}"
             IMAGE_REF="$(cat /tmp/ws/image_ref_realtime)"
-            gcloud run deploy clinic-realtime --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-realtime-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-realtime:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PROBLEMS_BASE_URL=${PUBLIC_BASE_URL},ADMIN_EMAILS=developer.ericgitangu@gmail.com,MAX_STREAMS_PER_INSTANCE=1,MAX_STREAMS_PER_PERSON=1,MAX_CONNECTION=290s,IDLE_TIMEOUT=240s" --min-instances 0 --max-instances 2 --concurrency 1 --cpu 0.25 --memory 256Mi --execution-environment gen1 --cpu-boost --timeout 900 --add-custom-audiences=clinic-realtime --no-allow-unauthenticated --quiet
+            gcloud run deploy clinic-realtime --image "$IMAGE_REF" --region us-east4 --no-traffic --tag "sha-${CIRCLE_SHA1:0:7}" --service-account "clinic-realtime-runtime@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com" --set-secrets DATABASE_URL=clinic-database-url-realtime:latest,INTERNAL_SIGNING_KEY=clinic-internal-signing-key:latest,SMOKE_SIGNING_KEY=clinic-smoke-signing-key:latest --set-env-vars "GIT_SHA=${CIRCLE_SHA1},PROBLEMS_BASE_URL=${PUBLIC_BASE_URL},ADMIN_EMAILS=${OWNER_EMAILS},MAX_STREAMS_PER_INSTANCE=1,MAX_STREAMS_PER_PERSON=1,MAX_CONNECTION=290s,IDLE_TIMEOUT=240s" --min-instances 0 --max-instances 2 --concurrency 1 --cpu 0.25 --memory 256Mi --execution-environment gen1 --cpu-boost --timeout 900 --add-custom-audiences=clinic-realtime --no-allow-unauthenticated --quiet
       - run:
           name: The invoker bindings exist (only the admin app and the smoke identity)
           command: bash scripts/ci/realtime_prereqs.sh --after-deploy

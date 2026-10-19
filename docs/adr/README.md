@@ -61,7 +61,7 @@ Checked against `main` (748d7d8) on 2026-10-18 (read, not run). Words used: ship
 | 0013 | Shipped (#31) |
 | 0014 | Mostly shipped |
 | 0015 | Shipped; the gateway role is pinned by migration 0014 (PR 71) |
-| 0016 | Shipped, text amended; the Go lane is built (PR 71) |
+| 0016 | Shipped, text amended; the Go realtime jobs are built (PR 71) |
 | 0017 | Shipped |
 | 0018 | Shipped, text amended |
 | 0019 | Shipped |
