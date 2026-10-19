@@ -3,7 +3,8 @@
 // the public API, exactly as a patient's would be, and the dashboard in a real browser must show it.
 // Only Google's own sign-in is replaced (support/test-auth.ts).
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { expect, seeded, test } from "./support/fixtures";
+import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import { expect, seeded, signIn, tap, test } from "./support/fixtures";
 
 interface Slot {
   starts_at: string;
@@ -295,5 +296,71 @@ test.describe("live feed", () => {
     // The veto moves the visit back: the history gains that move without a reload.
     await expect(moves).toHaveCount(2, { timeout: 2000 });
     await expect(status).not.toHaveAttribute("data-updated-at", "");
+  });
+
+  test("a veto made from the appointment page shows on another person's open page within 2 seconds", async ({
+    as,
+    browser,
+  }) => {
+    const made = await book(`Live Veto UI ${Date.now()}`);
+    await patientReschedules(made);
+    const ownerPage = await as("owner");
+    await ownerPage.goto(`/dashboard/appointments/${made.id}`);
+    await expect(ownerPage.getByTestId("appointment-live")).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+    await expect(ownerPage.getByTestId("lineage-rescheduled")).toHaveCount(1);
+
+    const ctx = await browser.newContext();
+    await signIn(ctx, EMAIL.admin);
+    const adminPage = await ctx.newPage();
+    await adminPage.goto(`/dashboard/appointments/${made.id}`);
+    await tap(adminPage.getByRole("button", { name: "Veto and lock" }));
+    const dialog = adminPage.getByRole("dialog", {
+      name: "Undo the patient's last change?",
+    });
+    await dialog.getByLabel("Reason").fill("Doctor needs the original time");
+    await dialog.getByRole("button", { name: "Veto and lock" }).click();
+    await expect(adminPage.getByTestId("locked-note")).toBeVisible();
+
+    // The owner's page, which never reloaded, gains the move back and the lock.
+    await expect(ownerPage.getByTestId("lineage-rescheduled")).toHaveCount(2, {
+      timeout: 2000,
+    });
+    await expect(ownerPage.getByTestId("locked-note")).toBeVisible({
+      timeout: 2000,
+    });
+    await ctx.close();
+  });
+
+  test("an arrival marked on the appointment page shows on another person's open page within 2 seconds", async ({
+    as,
+    browser,
+  }) => {
+    test.skip(
+      inFirstHourOfClinicDay(),
+      "a past half hour falls on yesterday in the first hour of the clinic day",
+    );
+    const made = await book(`Live Arrival ${Date.now()}`);
+    moveToPastHalfHour(made.id, 1, false, true);
+    const ownerPage = await as("owner");
+    await ownerPage.goto(`/dashboard/appointments/${made.id}`);
+    await expect(ownerPage.getByTestId("appointment-live")).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+    const badge = ownerPage.locator('main [data-slot="badge"]');
+    await expect(badge).toHaveText(/Booked/);
+
+    const ctx = await browser.newContext();
+    await signIn(ctx, EMAIL.admin);
+    const adminPage = await ctx.newPage();
+    await adminPage.goto(`/dashboard/appointments/${made.id}`);
+    await tap(adminPage.getByRole("button", { name: "Mark arrived" }));
+    await expect(adminPage.getByText("Marked as arrived.")).toBeVisible();
+
+    await expect(badge).toHaveText(/Arrived/, { timeout: 2000 });
+    await ctx.close();
   });
 });

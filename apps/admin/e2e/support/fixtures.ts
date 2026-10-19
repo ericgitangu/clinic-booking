@@ -1,4 +1,10 @@
-import { test as base, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { EMAIL, type Persona } from "./stack";
 import { sessionCookies } from "./test-auth";
 
@@ -28,6 +34,29 @@ export const test = base.extend<{
   as: (who: Persona | string) => Promise<Page>;
 }>({
   page: async ({ page, context }, use) => {
+    // The pages stream in and hydrate after the load event, and a click before that does nothing.
+    // (Not "networkidle": the live feed keeps a stream open for as long as a page is.) After a
+    // navigation, wait until React has attached to the first buttons and links, best effort.
+    const goto = page.goto.bind(page);
+    page.goto = async (url, options) => {
+      const res = await goto(url, options);
+      await page
+        .waitForFunction(
+          () => {
+            const els = [...document.querySelectorAll("button, a")].slice(0, 6);
+            return (
+              els.length === 0 ||
+              els.some((el) =>
+                Object.keys(el).some((k) => k.startsWith("__reactProps")),
+              )
+            );
+          },
+          undefined,
+          { timeout: 10_000 },
+        )
+        .catch(() => undefined);
+      return res;
+    };
     if (THROTTLE > 1) {
       const cdp = await context.newCDPSession(page);
       await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
@@ -44,3 +73,19 @@ export const test = base.extend<{
 });
 
 export { expect } from "@playwright/test";
+
+/**
+ * Clicks a control once React has attached to it. The pages are server-rendered and stream in, so a
+ * click that lands before hydration does nothing and the test would wait for an outcome that never
+ * comes. React marks every hydrated element with an internal props key; wait for it.
+ */
+export async function tap(locator: Locator): Promise<void> {
+  await expect
+    .poll(() =>
+      locator.evaluate((el) =>
+        Object.keys(el).some((k) => k.startsWith("__reactProps")),
+      ),
+    )
+    .toBe(true);
+  await locator.click();
+}

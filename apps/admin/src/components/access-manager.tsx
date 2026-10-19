@@ -47,9 +47,10 @@ import {
   revokeAccess,
   type ActionResult,
 } from "@/lib/actions";
+import { InvitesPanel } from "@/components/invites-panel";
 import { formatSlot } from "@/lib/clinic-time";
 import { ROLE_HELP, ROLE_LABEL, type GrantableRole } from "@/lib/roles";
-import type { AccessEntry } from "@clinic/api/generated";
+import type { AccessEntry, Invite } from "@clinic/api/generated";
 
 const GRANTABLE: readonly GrantableRole[] = ["admin", "viewer"];
 
@@ -61,7 +62,16 @@ type Dialogue =
 
 // Only the owner reaches this page, and every action is checked again on the server and in the
 // API, so what is hidden here is a convenience and never the protection.
-export function AccessManager({ entries }: { entries: AccessEntry[] }) {
+export function AccessManager({
+  entries,
+  invites,
+  actor,
+}: {
+  entries: AccessEntry[];
+  invites: Invite[];
+  /** Who is looking. An admin can invite, and change or revoke viewers; the owner can do it all. */
+  actor: "owner" | "admin";
+}) {
   const router = useRouter();
   const [dialogue, setDialogue] = useState<Dialogue>({ kind: "none" });
   const [pending, start] = useTransition();
@@ -89,12 +99,14 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Access
         </h1>
-        <Button
-          className="min-h-11"
-          onClick={() => setDialogue({ kind: "add" })}
-        >
-          <UserPlusIcon aria-hidden /> Add someone
-        </Button>
+        {actor === "owner" && (
+          <Button
+            className="min-h-11"
+            onClick={() => setDialogue({ kind: "add" })}
+          >
+            <UserPlusIcon aria-hidden /> Add someone
+          </Button>
+        )}
       </div>
       <p className="max-w-[60ch] text-muted-foreground">
         Only people listed here can open the dashboard. A change applies on
@@ -128,7 +140,7 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
                     : `${e.granted_by}${e.granted_at ? `, ${formatSlot(e.granted_at)}` : ""}`}
                 </TableCell>
                 <TableCell className="text-right">
-                  <RowActions entry={e} onPick={setDialogue} />
+                  <RowActions entry={e} actor={actor} onPick={setDialogue} />
                 </TableCell>
               </TableRow>
             ))}
@@ -153,10 +165,12 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
                 ? "Fixed by configuration"
                 : `Added by ${e.granted_by}`}
             </p>
-            <RowActions entry={e} onPick={setDialogue} wide />
+            <RowActions entry={e} actor={actor} onPick={setDialogue} wide />
           </li>
         ))}
       </ul>
+
+      <InvitesPanel invites={invites} />
 
       {revoked.length > 0 && (
         <section aria-labelledby="revoked" className="space-y-2">
@@ -225,25 +239,31 @@ export function AccessManager({ entries }: { entries: AccessEntry[] }) {
 
 function RowActions({
   entry,
+  actor,
   onPick,
   wide = false,
 }: {
   entry: AccessEntry;
+  actor: "owner" | "admin";
   onPick: (d: Dialogue) => void;
   wide?: boolean;
 }) {
-  // The owner is fixed by configuration: nothing to change or revoke.
+  // The owner is fixed by configuration: nothing to change or revoke. An admin may act on viewers
+  // only; the API answers ROLE_ESCALATION for anything else, so hiding it is a convenience.
   if (entry.source === "env") return null;
+  if (actor === "admin" && entry.role !== "viewer") return null;
   return (
     <div className={wide ? "grid grid-cols-2 gap-2" : "flex justify-end gap-2"}>
-      <Button
-        variant="outline"
-        className="min-h-11"
-        onClick={() => onPick({ kind: "role", entry })}
-        aria-label={`Change role of ${entry.email}`}
-      >
-        <PencilIcon aria-hidden /> Change role
-      </Button>
+      {actor === "owner" && (
+        <Button
+          variant="outline"
+          className="min-h-11"
+          onClick={() => onPick({ kind: "role", entry })}
+          aria-label={`Change role of ${entry.email}`}
+        >
+          <PencilIcon aria-hidden /> Change role
+        </Button>
+      )}
       <Button
         variant="outline"
         className="min-h-11 text-destructive"

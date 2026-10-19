@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { CalendarClockIcon, XIcon } from "lucide-react";
 import {
   AlertDialog,
@@ -41,12 +41,6 @@ import {
   rescheduleAppointment,
   type ActionResult,
 } from "@/lib/actions";
-import {
-  CHANGE_WINDOW_JUST_OPENED,
-  CHANGE_WINDOW_NOTE,
-  clockOffset,
-  insideChangeWindow,
-} from "@/lib/change-window";
 import { formatTime } from "@/lib/clinic-time";
 
 function report(result: ActionResult): boolean {
@@ -61,67 +55,20 @@ export function AppointmentActions({
   appointmentId,
   doctorId,
   today,
-  startsAt,
-  serverNow,
+  compact = false,
 }: {
   appointmentId: string;
   doctorId: string;
   today: string;
-  startsAt: string;
-  /** The server's clock when the page was drawn: the screen reads time from it, not the device. */
-  serverNow: string;
+  /** Side by side and smaller, for a row on the Today board. */
+  compact?: boolean;
 }) {
-  const [offset] = useState(() => clockOffset(serverNow, Date.now()));
-  const [locked, setLocked] = useState(() =>
-    insideChangeWindow(startsAt, Date.now() + offset),
-  );
-  const wasLocked = useRef(locked);
-  // The window can open while the page is on screen: look again every 30 seconds. If it opens while
-  // a dialog is up, the dialog goes with the buttons, so say why.
-  useEffect(() => {
-    const tick = () => {
-      if (!insideChangeWindow(startsAt, Date.now() + offset)) return;
-      if (!wasLocked.current) {
-        wasLocked.current = true;
-        notify.error(CHANGE_WINDOW_JUST_OPENED);
-      }
-      setLocked(true);
-    };
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, [startsAt, offset]);
-
-  if (locked) {
-    return (
-      <div className="space-y-2">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            variant="outline"
-            className="min-h-11"
-            disabled
-            aria-describedby="change-note"
-          >
-            <CalendarClockIcon aria-hidden /> Reschedule
-          </Button>
-          <Button
-            variant="destructive"
-            className="min-h-11"
-            disabled
-            aria-describedby="change-note"
-          >
-            <XIcon aria-hidden /> Cancel appointment
-          </Button>
-        </div>
-        <p id="change-note" className="text-muted-foreground">
-          {CHANGE_WINDOW_NOTE}
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-3 sm:flex-row">
+    <div
+      className={
+        compact ? "flex flex-wrap gap-2" : "flex flex-col gap-3 sm:flex-row"
+      }
+    >
       <RescheduleDialog
         appointmentId={appointmentId}
         doctorId={doctorId}
@@ -206,6 +153,7 @@ function RescheduleDialog({
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
   const [slot, setSlot] = useState("");
+  const [reason, setReason] = useState("");
   const [pending, start] = useTransition();
 
   function pickDate(value: string) {
@@ -226,8 +174,9 @@ function RescheduleDialog({
 
   function confirm() {
     start(async () => {
-      if (report(await rescheduleAppointment(appointmentId, slot))) {
+      if (report(await rescheduleAppointment(appointmentId, slot, reason))) {
         setOpen(false);
+        setReason("");
         router.refresh();
       }
     });
@@ -286,11 +235,24 @@ function RescheduleDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="move-reason">Reason</Label>
+            <Textarea
+              id="move-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={450}
+              rows={2}
+            />
+            <p className="text-sm text-muted-foreground">
+              Kept with the appointment.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button
             className="min-h-11"
-            disabled={pending || !slot}
+            disabled={pending || !slot || reason.trim().length < 3}
             onClick={confirm}
           >
             {pending ? "Working" : "Move appointment"}

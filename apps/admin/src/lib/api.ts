@@ -7,7 +7,26 @@ import { callApi, type Caller } from "@clinic/api/call";
 import {
   cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch,
   changeAccessRoleInternalAdminAccessEmailPatch,
+  acceptInviteInternalAdminInvitesAcceptPost,
+  cancellationReasonsInternalAdminOpsCancellationReasonsGet,
+  createInviteInternalAdminInvitesPost,
+  doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost,
+  listAuditInternalAdminAuditGet,
+  listInvitesInternalAdminInvitesGet,
+  remindNowInternalAdminAppointmentsAppointmentIdRemindPost,
+  revokeInviteInternalAdminInvitesInviteIdDelete,
+  createAppointmentInternalAdminAppointmentsPost,
+  daySheetInternalAdminOpsDaySheetCsvGet,
   doctorAvailabilityDoctorsDoctorIdAvailabilityGet,
+  gapsInternalAdminOpsGapsGet,
+  heatmapInternalAdminOpsHeatmapGet,
+  kpisInternalAdminOpsKpisGet,
+  markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost,
+  markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost,
+  todayInternalAdminOpsTodayGet,
+  unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost,
+  vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost,
+  listDoctorsDoctorsGet,
   getAppointmentAppointmentsAppointmentIdGet,
   getLineageInternalAdminAppointmentsAppointmentIdLineageGet,
   getMetricsInternalAdminMetricsGet,
@@ -41,6 +60,7 @@ export const metrics = (caller: Caller, from: string, to: string) =>
 
 export interface AppointmentQuery {
   status?: "booked" | "cancelled" | "all";
+  doctor_id?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -128,9 +148,7 @@ export const rescheduleForPatient = (
   caller: Caller,
   id: string,
   startsAt: string,
-  // The API requires a reason on every staff write. The reschedule form has no reason field yet
-  // (the admin screens add it), so until then this is the recorded reason.
-  reason = "Rescheduled by clinic staff",
+  reason: string,
 ) =>
   callApi(
     "rescheduleForPatient",
@@ -160,4 +178,210 @@ export const availability = (doctorId: string, date: string) =>
       path: { doctor_id: doctorId },
       query: { date },
     }),
+  );
+
+export const doctors = () =>
+  callApi("listDoctors", (client) => listDoctorsDoctorsGet({ client }));
+
+// Operations reads. Any staff role may read them; the API decides what a viewer sees (initials,
+// masked phone), never this app.
+export const opsToday = (caller: Caller, date?: string) =>
+  callApi(
+    "opsToday",
+    (client) =>
+      todayInternalAdminOpsTodayGet({ client, query: date ? { date } : {} }),
+    { caller },
+  );
+
+export const opsKpis = (caller: Caller, from: string, to: string) =>
+  callApi(
+    "opsKpis",
+    (client) => kpisInternalAdminOpsKpisGet({ client, query: { from, to } }),
+    { caller },
+  );
+
+export const opsReasons = (caller: Caller, from: string, to: string) =>
+  callApi(
+    "opsReasons",
+    (client) =>
+      cancellationReasonsInternalAdminOpsCancellationReasonsGet({
+        client,
+        query: { from, to },
+      }),
+    { caller },
+  );
+
+export const opsHeatmap = (
+  caller: Caller,
+  from: string,
+  to: string,
+  doctorId?: string,
+) =>
+  callApi(
+    "opsHeatmap",
+    (client) =>
+      heatmapInternalAdminOpsHeatmapGet({
+        client,
+        query: { from, to, ...(doctorId ? { doctor_id: doctorId } : {}) },
+      }),
+    { caller },
+  );
+
+export const opsGaps = (caller: Caller, hours = 48) =>
+  callApi(
+    "opsGaps",
+    (client) => gapsInternalAdminOpsGapsGet({ client, query: { hours } }),
+    { caller },
+  );
+
+export const opsDaySheet = (caller: Caller, date: string) =>
+  callApi(
+    "opsDaySheet",
+    (client) =>
+      daySheetInternalAdminOpsDaySheetCsvGet({ client, query: { date } }),
+    { caller },
+  );
+
+export const markAttendance = (
+  caller: Caller,
+  id: string,
+  kind: "arrived" | "no_show",
+  reason?: string,
+) =>
+  callApi(
+    "markAttendance",
+    (client) =>
+      kind === "arrived"
+        ? markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost({
+            client,
+            path: { appointment_id: id },
+            body: reason ? { reason } : null,
+          })
+        : markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost({
+            client,
+            path: { appointment_id: id },
+            body: reason ? { reason } : null,
+          }),
+    { caller },
+  );
+
+export const staffBook = (
+  caller: Caller,
+  body: {
+    doctor_id: string;
+    starts_at: string;
+    reason: string;
+    patient: { full_name: string; phone?: string; email?: string };
+  },
+) =>
+  callApi(
+    "staffBook",
+    (client) =>
+      createAppointmentInternalAdminAppointmentsPost({ client, body }),
+    { caller },
+  );
+
+export const vetoAppointment = (caller: Caller, id: string, reason: string) =>
+  callApi(
+    "veto",
+    (client) =>
+      vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost({
+        client,
+        path: { appointment_id: id },
+        body: { reason },
+      }),
+    { caller },
+  );
+
+export const unlockAppointment = (caller: Caller, id: string, reason: string) =>
+  callApi(
+    "unlock",
+    (client) =>
+      unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost({
+        client,
+        path: { appointment_id: id },
+        body: { reason },
+      }),
+    { caller },
+  );
+
+export const remindNow = (caller: Caller, id: string, reason?: string) =>
+  callApi(
+    "remindNow",
+    (client) =>
+      remindNowInternalAdminAppointmentsAppointmentIdRemindPost({
+        client,
+        path: { appointment_id: id },
+        body: reason ? { reason } : null,
+      }),
+    { caller },
+  );
+
+export const runningLate = (
+  caller: Caller,
+  doctorId: string,
+  minutes: number,
+  reason?: string,
+) =>
+  callApi(
+    "runningLate",
+    (client) =>
+      doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost({
+        client,
+        path: { doctor_id: doctorId },
+        body: { minutes, ...(reason ? { reason } : {}) },
+      }),
+    { caller },
+  );
+
+export const invitesList = (caller: Caller) =>
+  callApi(
+    "invitesList",
+    (client) => listInvitesInternalAdminInvitesGet({ client }),
+    { caller },
+  );
+
+export const inviteCreate = (
+  caller: Caller,
+  email: string,
+  role: "admin" | "viewer",
+) =>
+  callApi(
+    "inviteCreate",
+    (client) =>
+      createInviteInternalAdminInvitesPost({ client, body: { email, role } }),
+    { caller },
+  );
+
+export const inviteRevoke = (caller: Caller, id: string) =>
+  callApi(
+    "inviteRevoke",
+    (client) =>
+      revokeInviteInternalAdminInvitesInviteIdDelete({
+        client,
+        path: { invite_id: id },
+      }),
+    { caller },
+  );
+
+export const inviteAccept = (caller: Caller, token: string) =>
+  callApi(
+    "inviteAccept",
+    (client) =>
+      acceptInviteInternalAdminInvitesAcceptPost({ client, body: { token } }),
+    { caller },
+  );
+
+export const auditList = (
+  caller: Caller,
+  query: { limit?: number; cursor?: string | null; appointment_id?: string },
+) =>
+  callApi(
+    "auditList",
+    (client) =>
+      listAuditInternalAdminAuditGet({
+        client,
+        query: { ...query, cursor: query.cursor ?? undefined },
+      }),
+    { caller },
   );

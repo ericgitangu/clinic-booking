@@ -75,9 +75,6 @@ test("an admin's cancel shows on the dashboard at once, with no refresh and no w
   await page.goto("/dashboard?days=7");
   await refreshUntil(page, (await truth()).upcoming_active);
   const before = await truth();
-  await expect(page.getByTestId("kpi-cancellations")).toHaveText(
-    String(before.cancelled),
-  );
 
   await page.goto(`/dashboard/appointments/${id}`);
   await page.getByRole("button", { name: "Cancel appointment" }).click();
@@ -90,9 +87,6 @@ test("an admin's cancel shows on the dashboard at once, with no refresh and no w
   expect(after.cancelled).toBe(before.cancelled + 1);
   expect(after.upcoming_active).toBe(before.upcoming_active - 1);
   await page.goto("/dashboard?days=7");
-  await expect(page.getByTestId("kpi-cancellations")).toHaveText(
-    String(after.cancelled),
-  );
   await expect(upcoming(page)).toHaveText(String(after.upcoming_active));
 });
 

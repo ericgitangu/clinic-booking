@@ -27,6 +27,8 @@ export default defineConfig({
       name: "independent",
       testIgnore: [
         "**/dashboard.spec.ts",
+        "**/staff-ops.spec.ts",
+        "**/drill-down.spec.ts",
         "**/metrics-cache.spec.ts",
         "**/one-hour-rule.spec.ts",
         "**/live-feed.spec.ts",
@@ -34,7 +36,12 @@ export default defineConfig({
     },
     {
       name: "dashboard",
-      testMatch: "**/dashboard.spec.ts",
+      // staff-ops books, cancels and moves visits, so it counts as clinic-wide too.
+      testMatch: [
+        "**/dashboard.spec.ts",
+        "**/staff-ops.spec.ts",
+        "**/drill-down.spec.ts",
+      ],
       dependencies: ["independent"],
     },
     {
