@@ -3,6 +3,7 @@ import type { RecaptchaResult } from "@clinic/api/recaptcha";
 import { checkHuman, enforced } from "@/lib/human-check";
 
 const env = (o: Record<string, string>) => o as unknown as NodeJS.ProcessEnv;
+const LOCAL = "http://localhost:3100";
 const configured = {
   NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "site",
   RECAPTCHA_SERVICE_ACCOUNT_EMAIL: "clinic-recaptcha@p.iam.gserviceaccount.com",
@@ -24,15 +25,39 @@ describe("enforced", () => {
       enforced(env({ RECAPTCHA_ENFORCE: "false", VERCEL_ENV: "preview" })),
     ).toBe(true);
   });
-  it("can be switched off for NODE_ENV=test or E2E=1", () => {
+  it("can be switched off for NODE_ENV=test or E2E=1 on this machine", () => {
     expect(
-      enforced(env({ RECAPTCHA_ENFORCE: "false", NODE_ENV: "test" })),
+      enforced(
+        env({
+          RECAPTCHA_ENFORCE: "false",
+          NODE_ENV: "test",
+          BETTER_AUTH_URL: LOCAL,
+        }),
+      ),
     ).toBe(false);
     expect(
       enforced(
-        env({ RECAPTCHA_ENFORCE: "false", E2E: "1", NODE_ENV: "production" }),
+        env({
+          RECAPTCHA_ENFORCE: "false",
+          E2E: "1",
+          NODE_ENV: "production",
+          BETTER_AUTH_URL: LOCAL,
+        }),
       ),
     ).toBe(false);
+  });
+  // The same matrix as the sign-in rate limit: a person setting E2E=1 on a real host gets nothing.
+  it.each([
+    ["preview", "https://clinic-git-x.vercel.app"],
+    [undefined, "https://clinic.ericgitangu.com"],
+    [undefined, undefined],
+    [undefined, "http://localhost.evil.example"],
+    ["production", LOCAL],
+  ])("stays on for VERCEL_ENV=%s url=%s even with E2E=1 and the setting", (v, url) => {
+    const o: Record<string, string> = { RECAPTCHA_ENFORCE: "false", E2E: "1" };
+    if (v) o.VERCEL_ENV = v;
+    if (url) o.BETTER_AUTH_URL = url;
+    expect(enforced(env(o))).toBe(true);
   });
   it("needs both the test marker and the setting", () => {
     expect(enforced(env({ E2E: "1" }))).toBe(true);
@@ -56,7 +81,7 @@ describe("checkHuman", () => {
   it("skips the verifier only when the check is switched off for a test run", async () => {
     const verify = verifier({ ok: true, score: 1 });
     const r = await checkHuman("", "book", {
-      env: env({ RECAPTCHA_ENFORCE: "false", E2E: "1" }),
+      env: env({ RECAPTCHA_ENFORCE: "false", E2E: "1", BETTER_AUTH_URL: LOCAL }),
       verify,
     });
     expect(r).toEqual({ ok: true });

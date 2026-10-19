@@ -1,15 +1,15 @@
 import { DEFAULT_MIN_SCORE, verifyRecaptcha } from "@clinic/api/recaptcha";
 import { logError } from "@clinic/api/proxy/log";
+import { isTestRun } from "@/lib/test-run";
 
 export type Action = "book" | "cancel" | "reschedule";
 
-// The check can be switched off only for automated tests: RECAPTCHA_ENFORCE=false together with
-// NODE_ENV=test or E2E=1, and never when VERCEL_ENV is production. In every other case it runs, and
-// if it cannot run (no keys, no way to reach Google) the request is refused.
+// The check can be switched off only for automated tests: RECAPTCHA_ENFORCE=false together with a
+// test run (lib/test-run.ts: not Vercel production, NODE_ENV=test or E2E=1, and a local base URL).
+// In every other case it runs, and if it cannot run (no keys, no way to reach Google) the request
+// is refused.
 export function enforced(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.VERCEL_ENV === "production") return true;
-  const testRun = env.NODE_ENV === "test" || env.E2E === "1";
-  return !(env.RECAPTCHA_ENFORCE === "false" && testRun);
+  return !(env.RECAPTCHA_ENFORCE === "false" && isTestRun(env));
 }
 
 export type HumanCheck = { ok: true } | { ok: false; unavailable: boolean };

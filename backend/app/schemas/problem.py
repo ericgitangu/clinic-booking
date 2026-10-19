@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -29,6 +30,7 @@ class ProblemCode(enum.StrEnum):
     SLOT_TAKEN = "SLOT_TAKEN"
     PATIENT_DOUBLE_BOOKED = "PATIENT_DOUBLE_BOOKED"
     APPOINTMENT_ALREADY_CANCELLED = "APPOINTMENT_ALREADY_CANCELLED"
+    CHANGE_TOO_LATE = "CHANGE_TOO_LATE"
     APPOINTMENT_ALREADY_STARTED = "APPOINTMENT_ALREADY_STARTED"
     PATIENT_PHONE_EXISTS = "PATIENT_PHONE_EXISTS"
     CONCURRENT_UPDATE = "CONCURRENT_UPDATE"
@@ -85,6 +87,92 @@ def problem_responses(*statuses: int) -> dict[int | str, dict[str, object]]:
         }
         for status in statuses
     }
+
+
+CATALOGUE_EXAMPLE_MARK = "x-from-catalogue"
+
+
+def problem_with_example(status: int, *codes: str) -> dict[int | str, dict[str, object]]:
+    """One error response that carries worked ``application/problem+json`` examples.
+
+    Only the codes are named here. The example bodies are written when the OpenAPI document is
+    built (``fill_problem_examples``), from the error catalogue and the configured public base URL,
+    so an example is built the way the handler builds its body and cannot drift from it.
+    """
+    return {
+        status: {
+            "model": Problem,
+            "description": "Problem (RFC 9457), including " + ", ".join(codes),
+            "content": {
+                "application/problem+json": {
+                    "examples": {
+                        code: {"summary": code, "value": {CATALOGUE_EXAMPLE_MARK: code}}
+                        for code in codes
+                    }
+                }
+            },
+        }
+    }
+
+
+def change_too_late_responses(*, new_start: bool = False) -> dict[int | str, dict[str, object]]:
+    """404, a 409 documenting CHANGE_TOO_LATE, and a 422 that documents BOOKING_TOO_SOON when the
+    operation also takes a new start (reschedule). Cancel and reschedule, public and internal."""
+    return {
+        **problem_responses(404),
+        **(problem_with_example(422, "BOOKING_TOO_SOON") if new_start else problem_responses(422)),
+        **problem_with_example(409, "CHANGE_TOO_LATE"),
+    }
+
+
+def fill_lead_time(node: Any, minutes: int) -> None:
+    """In place: replace the lead-time token in every string of the document with the configured
+    value, so the contract states what this deployment enforces."""
+    from app.domain.booking_rules import LEAD_TOKEN
+
+    items = (
+        node.items()
+        if isinstance(node, dict)
+        else enumerate(node)
+        if isinstance(node, list)
+        else ()
+    )
+    for key, value in list(items):
+        if isinstance(value, str):
+            node[key] = value.replace(LEAD_TOKEN, str(minutes))
+        else:
+            fill_lead_time(value, minutes)
+
+
+def fill_problem_examples(spec: dict[str, Any], public_base_url: str) -> None:
+    """Write each marked example from ``CATALOGUE_BY_CODE`` and ``public_base_url``: the same
+    fields, built the same way, as ``app.core.problems.build_problem``. Two differences, both
+    because an example is not a request: ``instance`` is the operation's path template (the handler
+    sends the concrete request path) and ``request_id`` is a fixed placeholder."""
+    from app.domain.errors import CATALOGUE_BY_CODE
+
+    base = public_base_url.rstrip("/")
+    for path, operations in spec.get("paths", {}).items():
+        for operation in operations.values():
+            if not isinstance(operation, dict):
+                continue
+            for response in operation.get("responses", {}).values():
+                content = response.get("content", {}).get("application/problem+json", {})
+                for example in content.get("examples", {}).values():
+                    code = example.get("value", {}).get(CATALOGUE_EXAMPLE_MARK)
+                    if code is None:
+                        continue
+                    entry = CATALOGUE_BY_CODE[code]
+                    example["value"] = {
+                        "type": f"{base}/problems/{entry.slug}",
+                        "title": entry.title,
+                        "status": entry.status,
+                        "detail": entry.description,
+                        "instance": path,
+                        "code": code,
+                        "request_id": "00000000-0000-4000-8000-000000000000",
+                        "errors": None,
+                    }
 
 
 def strip_json_from_error_responses(spec: dict[str, object]) -> None:

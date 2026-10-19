@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_clock, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.booking_rules import RULE_AVAILABILITY
 from app.domain.errors import DoctorNotFound
 from app.models.doctor import Doctor as DoctorModel
 from app.models.working_hours import WorkingHours
@@ -95,6 +96,7 @@ def _matches(if_none_match: str | None, tag: str) -> bool:
 @router.get(
     "/doctors/{doctor_id}/availability",
     response_model=Availability,
+    description=RULE_AVAILABILITY,
     responses={
         **problem_responses(404, 422),
         304: {"description": "The slots have not changed since the ETag in If-None-Match"},

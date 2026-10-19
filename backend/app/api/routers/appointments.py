@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import IdempotencyKey, get_clock, get_relay, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.booking_rules import RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE
 from app.domain.errors import AppointmentNotFound
 from app.models.appointment import Appointment as AppointmentModel
 from app.repositories import appointments as appt_repo
@@ -17,7 +18,13 @@ from app.schemas.appointment import (
     CancelRequest,
     RescheduleRequest,
 )
-from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
+from app.schemas.problem import (
+    REPLAY_HEADER,
+    REPLAYED_HEADER,
+    change_too_late_responses,
+    problem_responses,
+    problem_with_example,
+)
 from app.services import booking
 from app.services.relay import Relay
 
@@ -34,7 +41,12 @@ def _to_schema(appt: AppointmentModel) -> Appointment:
     "/appointments",
     response_model=Appointment,
     status_code=201,
-    responses={**problem_responses(409, 422, 503), **REPLAY_HEADER},
+    description=RULE_BOOK,
+    responses={
+        **problem_responses(409, 503),
+        **problem_with_example(422, "BOOKING_TOO_SOON"),
+        **REPLAY_HEADER,
+    },
 )
 async def create_appointment(
     body: AppointmentCreate,
@@ -82,7 +94,8 @@ async def get_appointment(
 @router.patch(
     "/appointments/{appointment_id}/cancel",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_CANCEL,
+    responses=change_too_late_responses(),
 )
 async def cancel_appointment(
     appointment_id: uuid.UUID,
@@ -90,10 +103,13 @@ async def cancel_appointment(
     response: Response,
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
-    appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    appt = await booking.cancel(
+        session, clock, settings, appointment_id=appointment_id, reason=body.reason
+    )
     await relay.run(clock)
     return _to_schema(appt)
 
@@ -101,7 +117,8 @@ async def cancel_appointment(
 @router.patch(
     "/appointments/{appointment_id}/reschedule",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_RESCHEDULE,
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_appointment(
     appointment_id: uuid.UUID,

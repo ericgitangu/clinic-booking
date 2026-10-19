@@ -9,6 +9,7 @@ from app.domain.errors import (
     CATALOGUE,
     CATALOGUE_BY_CODE,
     BookingTooSoon,
+    ChangeTooLate,
     DateOutOfRange,
     DomainError,
     OutsideWorkingHours,
@@ -22,6 +23,7 @@ DOCS = pathlib.Path(__file__).resolve().parents[3] / "docs" / "api-errors.md"
 DOMAIN_ERRORS: list[type[DomainError]] = [
     SlotInPast,
     BookingTooSoon,
+    ChangeTooLate,
     DateOutOfRange,
     SlotMisaligned,
     OutsideWorkingHours,

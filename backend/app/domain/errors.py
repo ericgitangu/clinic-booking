@@ -73,7 +73,10 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "BOOKING_TOO_SOON",
         422,
         "Booking too soon",
-        "starts_at is less than the minimum lead time ahead of now.",
+        (
+            "A booking, or a reschedule's new time, starts less than the minimum lead time "
+            "(BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now."
+        ),
     ),
     ErrorSpec(
         "DATE_OUT_OF_RANGE",
@@ -116,6 +119,16 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         409,
         "Appointment already cancelled",
         "Cancel or reschedule of an already-cancelled appointment.",
+    ),
+    ErrorSpec(
+        "CHANGE_TOO_LATE",
+        409,
+        "Change too late",
+        (
+            "Changing or cancelling a visit that starts less than the minimum lead time "
+            "(BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is "
+            "BOOKING_TOO_SOON instead."
+        ),
     ),
     ErrorSpec(
         "APPOINTMENT_ALREADY_STARTED",
@@ -266,6 +279,10 @@ class ConcurrentUpdate(DomainError):
 
 class AppointmentAlreadyCancelled(DomainError):
     code = "APPOINTMENT_ALREADY_CANCELLED"
+
+
+class ChangeTooLate(DomainError):
+    code = "CHANGE_TOO_LATE"
 
 
 class AppointmentAlreadyStarted(DomainError):

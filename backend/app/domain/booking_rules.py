@@ -13,11 +13,45 @@ from zoneinfo import ZoneInfo
 from app.domain.errors import (
     BookingTooSoon,
     DateOutOfRange,
+    DomainError,
     OutsideWorkingHours,
     SlotInPast,
     SlotMisaligned,
 )
 from app.domain.slots import Window, grid_for_date
+
+# The words the OpenAPI contract uses for the one-hour rule. The contract test
+# (tests/contract/test_one_hour_contract.py) asserts the generated spec carries them, so the
+# documentation cannot drift from the code.
+# "{lead}" is replaced with the configured BOOKING_MIN_LEAD_MINUTES when the OpenAPI document is
+# built (``fill_lead_time``), so the contract states the value this deployment enforces.
+LEAD_TOKEN = "{lead}"  # noqa: S105  # a placeholder, not a credential
+RULE_BOOK = (
+    f"Refused with 422 BOOKING_TOO_SOON when the appointment begins less than {LEAD_TOKEN} minutes "
+    "from now (BOOKING_MIN_LEAD_MINUTES)."
+)
+RULE_CANCEL = (
+    f"Refused with 409 CHANGE_TOO_LATE when the appointment begins less than {LEAD_TOKEN} minutes "
+    "from now (BOOKING_MIN_LEAD_MINUTES)."
+)
+RULE_RESCHEDULE = (
+    "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than "
+    f"{LEAD_TOKEN} minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON "
+    "when the new start does, exactly as for a fresh booking. Repeating a reschedule that already "
+    "happened (same new start) returns the appointment."
+)
+RULE_AVAILABILITY = f"Slots starting within {LEAD_TOKEN} minutes are never offered."
+
+
+def require_lead_time(
+    starts_at: datetime, now: datetime, lead: timedelta, error: type[DomainError]
+) -> None:
+    """The one-hour rule, in one place: raise ``error`` when ``starts_at`` is less than ``lead``
+    from ``now``. Exactly ``lead`` away is allowed. Booking and a reschedule's new time call this
+    through ``validate_slot`` (BOOKING_TOO_SOON); cancel and a reschedule's current time call it
+    directly (CHANGE_TOO_LATE)."""
+    if starts_at.astimezone(UTC) < now.astimezone(UTC) + lead:
+        raise error()
 
 
 def validate_slot(
@@ -33,8 +67,7 @@ def validate_slot(
 
     if starts_at <= now:
         raise SlotInPast()
-    if starts_at < now + lead:
-        raise BookingTooSoon()
+    require_lead_time(starts_at, now, lead, BookingTooSoon)
 
     local = starts_at.astimezone(tz)
     local_today = now.astimezone(tz).date()
