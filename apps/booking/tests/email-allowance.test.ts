@@ -34,6 +34,7 @@ describe.skipIf(!process.env.REAL_API_URL)(
         timezone: "Africa/Nairobi",
         cancellation_reason: null,
         cancelled_at: null,
+        locked: false,
         created_at: "2026-10-19T04:00:00Z",
         updated_at: "2026-10-19T04:00:00Z",
       };
