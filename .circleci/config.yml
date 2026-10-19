@@ -713,7 +713,7 @@ jobs:
   web-quality:
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
-    resource_class: small
+    resource_class: medium  # small (2 GB) was OOM-killed (exit 137) in pnpm install and next build
     working_directory: ~/repo
     steps:
       - checkout
