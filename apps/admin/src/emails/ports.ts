@@ -4,6 +4,7 @@
 import "server-only";
 import { callApi, type ApiResult, type Caller } from "@clinic/api/call";
 import {
+  markNotifiedInternalAdminAuditAuditIdNotifiedPost,
   releaseEmailInternalEmailsReleasePost,
   reserveEmailInternalEmailsReservePost,
   type EmailReservation,
@@ -79,23 +80,16 @@ export function makePorts(
         sendTimeoutMs,
       ),
 
-    // POST /internal/admin/audit/{audit_id}/notified (backend PR #63). It goes through the generic
-    // client because the generated SDK on main does not have the operation yet.
-    // TODO(debt): once #63 is merged and the client regenerated, replace this body with
-    // markNotifiedInternalAdminAuditAuditIdNotifiedPost({ client, path: { audit_id } }), which also
-    // checks the response against the contract. Until then the response is checked by hand below.
+    // POST /internal/admin/audit/{audit_id}/notified: the caller must be the audit row's actor
+    // (the API enforces it), and a demo row cannot be marked.
     async markNotified(caller, auditId) {
-      const r = await callApi<{ audit_id: string; notified?: boolean }>(
+      const r = await callApi(
         "markNotified",
         (client) =>
-          client.post({
-            url: "/internal/admin/audit/{audit_id}/notified",
+          markNotifiedInternalAdminAuditAuditIdNotifiedPost({
+            client,
             path: { audit_id: auditId },
-          }) as Promise<{
-            data?: { audit_id: string; notified?: boolean };
-            error?: unknown;
-            response?: Response;
-          }>,
+          }),
         { caller, timeoutMs },
       );
       if (!r.ok) return failure(r);
