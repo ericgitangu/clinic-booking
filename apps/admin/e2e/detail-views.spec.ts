@@ -260,6 +260,7 @@ test.describe("a click opens the detail", () => {
       "cancellation date",
     );
     await page.keyboard.press("Escape");
+    await expect(page.getByTestId("figure-gap")).toHaveCount(0);
 
     // The Reschedules card.
     await tap(page.getByRole("button", { name: /^Reschedules\b/ }));
@@ -268,6 +269,7 @@ test.describe("a click opens the detail", () => {
     );
     await expect(page.getByTestId("figure-gap")).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(page.getByTestId("figure-gap")).toHaveCount(0);
 
     // An activity day, from the numbers table: today's own row, as the API's series counts it.
     await page.getByText("Show the numbers as a table").click();

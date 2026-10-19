@@ -97,6 +97,13 @@ export async function tap(locator: Locator): Promise<void> {
  * never half way through a change of theme or a fade.
  */
 export async function settle(page: Page): Promise<void> {
+  // The stylesheet is in: a page whose CSS did not load (a broken build or a half-deleted
+  // environment) has a transparent body, and every colour finding after that would be noise about
+  // the environment. Fail here, saying so, instead.
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    "the page's stylesheet did not load: the build or the environment is broken, not the colours",
+  ).not.toBe("rgba(0, 0, 0, 0)");
   const dark = await page.evaluate(
     () => matchMedia("(prefers-color-scheme: dark)").matches,
   );
