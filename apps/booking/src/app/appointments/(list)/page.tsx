@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
+import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
+import { isForbidden, needsSignIn } from "@/lib/auth-failure";
+import { NoAccess } from "@/components/account/no-access";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -34,9 +38,22 @@ export default async function MyAppointments({
 
   const serverNow = new Date().toISOString();
   const res = await api.myAppointments(callerFor(who));
+  if (!res.ok && isForbidden(res)) {
+    return <NoAccess back={{ href: "/book", label: "Book a visit" }} />;
+  }
+  if (!res.ok && needsSignIn(res)) {
+    return (
+      <SignInPrompt
+        title="My appointments"
+        body="Your session has ended. Sign in again with the Google account you book with."
+        returnTo="/appointments"
+      />
+    );
+  }
   // Someone who has never booked has no patient record yet: that is an empty list, not an error.
   const never =
     !res.ok && res.kind === "problem" && res.code === "PATIENT_NOT_FOUND";
+  // The API lists only visits that have not happened yet; a past one is reached by its own link.
   const upcoming = res.ok
     ? res.data.items.filter((a) => a.status === "booked")
     : [];
@@ -63,22 +80,38 @@ export default async function MyAppointments({
         <>
           <h2 className="mt-8 font-heading text-xl font-semibold">Upcoming</h2>
           {upcoming.length === 0 ? (
-            <p className="mt-3 text-base text-muted-foreground">
-              Nothing booked.
-            </p>
+            <div className="mt-4 flex items-center gap-4 rounded-xl border border-dashed border-border bg-card/60 p-6">
+              <CalendarPlus
+                aria-hidden
+                className="size-8 shrink-0 text-primary"
+              />
+              <p className="text-base text-muted-foreground">Nothing booked.</p>
+            </div>
           ) : (
             <ul className="mt-4 space-y-4">
               {upcoming.map((a) => (
                 <li
                   key={a.id}
-                  className="rounded-xl border border-border bg-card p-5"
+                  className="lift-card rounded-xl border border-border bg-card p-5"
                 >
-                  <p className="text-lg font-semibold">
-                    {formatWhen(a.starts_at)}
-                  </p>
-                  <p className="mt-1 text-base text-muted-foreground">
-                    {a.doctor.full_name}, {a.doctor.specialty}
-                  </p>
+                  <Link
+                    href={`/appointments/${a.id}`}
+                    className="flex items-start gap-4 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                  >
+                    <DoctorAvatar
+                      doctorId={a.doctor_id}
+                      name={a.doctor.full_name}
+                      size={48}
+                    />
+                    <span>
+                      <span className="block text-lg font-semibold underline-offset-4 hover:underline">
+                        {formatWhen(a.starts_at)}
+                      </span>
+                      <span className="mt-1 block text-base text-muted-foreground">
+                        {a.doctor.full_name}, {a.doctor.specialty}
+                      </span>
+                    </span>
+                  </Link>
                   <AppointmentActions
                     id={a.id}
                     when={formatWhen(a.starts_at)}

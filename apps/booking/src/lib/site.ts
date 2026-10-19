@@ -1,6 +1,6 @@
 // One place for the facts every page, icon, sitemap and manifest repeats.
 export const SITE = {
-  name: "Idyllic Clinic Booking",
+  name: "Idyllic Clinic",
   shortName: "Idyllic",
   description:
     "Find a doctor, see free slots in Nairobi time, book a visit, and cancel or reschedule when plans change.",

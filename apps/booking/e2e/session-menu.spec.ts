@@ -1,6 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import { newPerson, sessionCookies } from "./support/auth";
 
+// Better Auth rate-limits per client address (100 requests in 10 s by default) and every context
+// without an address shares one bucket, so under parallel workers the sign-out call could be refused.
+// Each context announces its own address, as the edge would.
+let nextIp = 0;
+const ip = () =>
+  `10.${test.info().workerIndex % 256}.${(Math.floor(nextIp / 250) % 50) + 200}.${(nextIp++ % 250) + 1}`;
+
 // The header follows the session through Better Auth's own hook: real cookies, real app, real
 // browser tabs. Only Google's token endpoint is stood in for (support/oauth-flow.ts).
 
@@ -32,7 +39,9 @@ test("a signed-in visitor sees their account menu, a visitor does not", async ({
   browser,
 }) => {
   const person = newPerson();
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
   const anon = await ctx.newPage();
   await anon.goto("/about");
   await expect(
@@ -50,7 +59,9 @@ test("a signed-in visitor sees their account menu, a visitor does not", async ({
 test("signing out in one tab signs the other tab's header out", async ({
   browser,
 }) => {
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
   await ctx.addCookies(await sessionCookies(newPerson()));
   const a = await ctx.newPage();
   const b = await ctx.newPage();
@@ -67,7 +78,9 @@ test("signing out in one tab signs the other tab's header out", async ({
 test("a session that ends or starts elsewhere shows when the tab comes back", async ({
   browser,
 }) => {
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": ip() },
+  });
   const page = await ctx.newPage();
   await page.goto("/about");
   await expect(trigger(page)).toHaveCount(0);

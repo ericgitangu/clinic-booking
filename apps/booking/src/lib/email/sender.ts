@@ -5,7 +5,7 @@
 // subdomain protects the root domain's reputation.
 export const MAIL_DOMAIN = "mail.ericgitangu.com";
 export const FROM_ADDRESS = `reminders@${MAIL_DOMAIN}`;
-// Idyllic Clinic Booking <reminders@mail.ericgitangu.com>
-export const FROM = `Idyllic Clinic Booking <${FROM_ADDRESS}>`;
+// Idyllic Clinic <reminders@mail.ericgitangu.com>
+export const FROM = `Idyllic Clinic <${FROM_ADDRESS}>`;
 // Replies go to the engineer's own address.
 export const REPLY_TO = "developer.ericgitangu@gmail.com";

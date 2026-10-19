@@ -54,6 +54,12 @@ const latin = localFont({
 });
 
 // Set on <html>; the theme reads --font-sans.
+//
+// "Clinic Digits" (see globals.css) owns only the characters 0 to 9: it points at the visitor's own
+// system face through local(), so no font file is added. Atkinson Hyperlegible draws its zero with a
+// slash by design and has no unslashed alternate (its only OpenType features are ccmp, frac, locl,
+// pnum and tnum; font-feature-settings "zero" 0 changes nothing, checked by rendering it), and a
+// slashed zero in a time or a date reads as a stray mark to patients. Everything else stays Atkinson.
 export const fontVars = {
-  "--font-sans": `${latin.style.fontFamily}, ${latinExt.style.fontFamily}, system-ui, "Segoe UI", Roboto, Arial, sans-serif`,
+  "--font-sans": `"Clinic Digits", ${latin.style.fontFamily}, ${latinExt.style.fontFamily}, system-ui, "Segoe UI", Roboto, Arial, sans-serif`,
 } as React.CSSProperties;

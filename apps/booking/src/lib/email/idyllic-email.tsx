@@ -108,7 +108,7 @@ export function IdyllicEmail(d: EmailData) {
               alt="Idyllic"
             />
             <Text style={{ margin: "8px 0 0", fontSize: 14, color: MUTED }}>
-              Idyllic Clinic Booking
+              Idyllic Clinic
             </Text>
           </Section>
           <Section
@@ -195,7 +195,7 @@ export function IdyllicEmail(d: EmailData) {
               color: MUTED,
             }}
           >
-            You are getting this because you booked on Idyllic Clinic Booking, a
+            You are getting this because you booked on Idyllic Clinic, a
             demonstration made for an assessment, not a real clinic. Replies go
             to the engineer who built it. See{" "}
             <Link href={`${d.siteUrl}/privacy`} style={{ color: LOTUS }}>
