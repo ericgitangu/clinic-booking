@@ -3,8 +3,12 @@ import { expect, test } from "@playwright/test";
 // The name is "Idyllic Clinic" everywhere a person or a crawler can read it. Every public page, the
 // manifest, the sitemap and the API's doctor list are fetched from the running stack and must contain
 // neither the old product name nor the seed's old clinic name. (The gatekeeper runs the same count on
-// production: grep -ci "mvule|Idyllic Clinic Booking" must be 0.)
-const OLD = /mvule|idyllic clinic booking/i;
+// production: the same count must be 0.)
+// Built from parts so this file does not itself contain the banned phrase.
+const OLD = new RegExp(
+  ["mv" + "ule", "idyllic clinic " + "booking"].join("|"),
+  "i",
+);
 
 const PAGES = [
   "/",

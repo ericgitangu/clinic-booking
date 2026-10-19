@@ -36,7 +36,9 @@ export default async function AppointmentPage({
   // 404 for an appointment that is not this person's, the same as for one that does not exist.
   const res = await api.myAppointment(callerFor(who), id);
   if (!res.ok) {
-    // The API refusing the session is a sign-in question, not a missing page.
+    // The API refused this person. 403: signed in but not allowed, so say so and link back (signing
+    // in again would change nothing). 401: the session is no longer good, so sign in again. Anything
+    // else under 500 (including another person's appointment) is the same not-found page.
     if (isForbidden(res))
       return (
         <NoAccess back={{ href: "/appointments", label: "My appointments" }} />
