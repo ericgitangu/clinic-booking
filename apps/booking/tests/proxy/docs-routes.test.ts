@@ -21,7 +21,7 @@ describe("doc routes are static and never fetch upstream", () => {
       info: { title: string };
     };
     expect(body.servers[0].url).toBe("/api");
-    expect(body.info.title).toBe("Clinic Booking API");
+    expect(body.info.title).toBe("Idyllic Clinic API");
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

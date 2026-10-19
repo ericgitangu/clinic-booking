@@ -60,7 +60,7 @@ test("ReDoc renders the contract from this origin", async ({
   const offOrigin = await blockOffOrigin(context);
   await page.goto("/redoc");
   await expect(
-    page.getByRole("heading", { name: "Clinic Booking API", level: 1 }),
+    page.getByRole("heading", { name: "Idyllic Clinic API", level: 1 }),
   ).toBeVisible();
   expect(offOrigin, "requests that left this origin").toEqual([]);
 });

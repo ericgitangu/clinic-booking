@@ -111,6 +111,11 @@ def _validate_no_overlap(doc: DoctorSeed) -> None:
 
 
 async def _seed(conn: AsyncConnection) -> None:
+    # The key "mvule" is an old name and it stays. The id is a uuid5 of this exact string, so
+    # renaming the key makes a different id (03f26da7-... today, 8bf928a1-... for "idyllic").
+    # Production was seeded with the current one, so re-running this seed there would insert a
+    # second clinic and move the doctors to it. The visible name comes from CLINIC_NAME, which was
+    # renamed and is updated in place by the ON CONFLICT below. The id is never shown to anyone.
     clinic_id = _id("clinic", "mvule")
     await conn.execute(
         text(
