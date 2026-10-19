@@ -20,7 +20,7 @@ export function doctorAvatarSrc(doctorId: string): string | null {
     : null;
 }
 
-/** The portrait as src (256 px, 1x) and srcSet (256 px 1x, 512 px 2x), or null when there is none. */
+/** The portrait as src (256 px) and srcSet (256 w and 512 w; the browser picks by the displayed size, see sizes), or null. */
 export function doctorPhoto(
   doctorId: string,
 ): { src: string; srcSet: string } | null {
@@ -28,7 +28,7 @@ export function doctorPhoto(
   const base = `/doctors/${doctorId}`;
   return {
     src: `${base}-256.webp`,
-    srcSet: `${base}-256.webp 1x, ${base}-512.webp 2x`,
+    srcSet: `${base}-256.webp 256w, ${base}-512.webp 512w`,
   };
 }
 

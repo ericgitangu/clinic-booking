@@ -419,7 +419,7 @@ test("the photo disclosure is on the doctor list and in each portrait's descript
   );
   await expect(img).toHaveAttribute(
     "srcset",
-    /-256\.webp 1x, .*-512\.webp 2x$/,
+    /-256\.webp 256w, .*-512\.webp 512w$/,
   );
   await expect(img).toHaveAttribute("alt", /^Dr\. /);
   await page.goto("/");

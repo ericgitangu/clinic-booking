@@ -67,7 +67,7 @@ The files here are the source of truth: per doctor id, `<id>-256.webp` and `<id>
 1x and 2x) and `<id>.svg` (the fallback). `node scripts/avatars/sync.mjs` copies them to
 `apps/booking/public/doctors/` and `apps/admin/public/doctors/` (served as `/doctors/<file>`, so no image
 bytes are inlined into any JavaScript chunk) and writes the manifest `packages/ui/src/lib/doctor-avatar-data.ts`
-that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 256 w 1x, 512 w 2x, explicit width and
+that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 256 w and 512 w with `sizes` set to the displayed width, explicit width and
 height), then the SVG if the portrait fails, then initials. A unit test fails if the sources, the manifest and
 both app copies drift apart. To change a portrait, replace both WebP sizes and run the sync.
 

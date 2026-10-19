@@ -6,8 +6,20 @@
 /* Tailwind scans the shared package for the classes its components use. */
 @source "../../../../packages/ui/src";
 
+/* Digits come from the visitor's own system face (no file is downloaded): their zero has no slash.
+   Only U+0030 to U+0039 are claimed; every other character stays in the page font. If none of these
+   faces is installed the browser moves on to the page font, slashed zero and all. */
+@font-face {
+  font-family: "Clinic Digits";
+  src:
+    local("-apple-system"), local("BlinkMacSystemFont"), local("Segoe UI"),
+    local("Roboto"), local("Helvetica Neue"), local("Arial");
+  unicode-range: U+0030-0039;
+  font-weight: 200 800;
+}
+
 /* Times and dates line up: tabular figures everywhere in the booking app. (The font draws its zero
-   with a slash by design; it has no unslashed alternate to switch to.) */
+   with a slash by design; its digits are replaced by the system face above.) */
 body {
   font-variant-numeric: tabular-nums;
 }

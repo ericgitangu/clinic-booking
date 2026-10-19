@@ -15,12 +15,16 @@ type ViewProps = {
   size: number;
   /** null renders the initials fallback. */
   src: string | null;
-  /** 1x/2x candidates for src (the portrait). */
+  /** 256 w and 512 w candidates for src (the portrait). */
   srcSet?: string;
+  /** The displayed width, so the browser picks the smallest candidate that is sharp enough. */
+  sizes?: string;
   /** Said on hover and as the image's description, not part of the alt text. */
   title?: string;
   onError?: () => void;
   imgRef?: Ref<HTMLImageElement>;
+  /** Load only when it nears the screen (for portraits below the first screen). */
+  lazy?: boolean;
   className?: string;
 };
 
@@ -31,9 +35,11 @@ export function DoctorAvatarView({
   size,
   src,
   srcSet,
+  sizes,
   title,
   onError,
   imgRef,
+  lazy,
   className,
 }: ViewProps) {
   const box = { width: size, height: size };
@@ -60,11 +66,13 @@ export function DoctorAvatarView({
       ref={imgRef}
       src={src}
       srcSet={srcSet}
+      sizes={srcSet ? sizes : undefined}
       alt={name}
       title={title}
       width={size}
       height={size}
       decoding="async"
+      loading={lazy ? "lazy" : undefined}
       onError={onError}
       className={cn(base, "object-cover", className)}
     />
@@ -79,11 +87,13 @@ export function DoctorAvatar({
   doctorId,
   name,
   size = 40,
+  lazy,
   className,
 }: {
   doctorId: string;
   name: string;
   size?: number;
+  lazy?: boolean;
   className?: string;
 }) {
   const photo = doctorPhoto(doctorId);
@@ -123,6 +133,8 @@ export function DoctorAvatar({
       size={size}
       className={className}
       imgRef={imgRef}
+      lazy={lazy}
+      sizes={`${size}px`}
       {...props}
     />
   );

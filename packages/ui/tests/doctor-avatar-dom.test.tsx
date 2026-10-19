@@ -15,7 +15,7 @@ describe("DoctorAvatar (stateful)", () => {
     expect(photo.tagName).toBe("IMG");
     expect(photo.getAttribute("src")).toBe(`/doctors/${ID}-256.webp`);
     expect(photo.getAttribute("srcset")).toBe(
-      `/doctors/${ID}-256.webp 1x, /doctors/${ID}-512.webp 2x`,
+      `/doctors/${ID}-256.webp 256w, /doctors/${ID}-512.webp 512w`,
     );
     expect(photo.getAttribute("title")).toBe(
       "AI-generated portrait of a fictional doctor",

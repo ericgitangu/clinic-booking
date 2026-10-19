@@ -31,7 +31,7 @@ describe("avatar map", () => {
     for (const id of Object.keys(SEEDED)) {
       expect(doctorPhoto(id), id).toEqual({
         src: `/doctors/${id}-256.webp`,
-        srcSet: `/doctors/${id}-256.webp 1x, /doctors/${id}-512.webp 2x`,
+        srcSet: `/doctors/${id}-256.webp 256w, /doctors/${id}-512.webp 512w`,
       });
     }
     expect(doctorPhoto("nope")).toBeNull();
