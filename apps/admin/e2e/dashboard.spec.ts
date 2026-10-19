@@ -701,7 +701,24 @@ test.describe("desk actions", () => {
       has: page.locator(`a[href$="/dashboard/appointments/${id}"]`),
     });
     await expect(row.getByText(/^\s*Booked\s*$/)).toBeVisible();
+    // The first mark is confirmed in a dialog: opening it, or dismissing it, records nothing.
     await tap(row.getByRole("button", { name: "Mark arrived" }));
+    const ask = page.getByRole("dialog", { name: "Mark as arrived?" });
+    await expect(ask).toBeVisible();
+    await expect(ask.getByLabel("Note (optional)")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(ask).toHaveCount(0);
+    const today = localDate(new Date());
+    const unmarked = await internal<{
+      items: { id: string; attendance: string | null }[];
+    }>(
+      "GET",
+      `/internal/admin/appointments?status=booked&from=${today}&to=${addDays(today, 1)}&limit=100`,
+      owner,
+    );
+    expect(unmarked.body.items.find((a) => a.id === id)?.attendance).toBeNull();
+    await tap(row.getByRole("button", { name: "Mark arrived" }));
+    await ask.getByRole("button", { name: "Confirm arrived" }).click();
     await expect(page.getByText("Marked as arrived.")).toBeVisible();
     await expect(row.getByText(/^\s*Arrived\s*$/)).toBeVisible();
     const after = await internal<{

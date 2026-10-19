@@ -333,6 +333,10 @@ test.describe("marking attendance from the appointment page", () => {
     const page = await as("admin");
     await page.goto(`/dashboard/appointments/${id}`);
     await tap(page.getByRole("button", { name: "Mark arrived" }));
+    await page
+      .getByRole("dialog", { name: "Mark as arrived?" })
+      .getByRole("button", { name: "Confirm arrived" })
+      .click();
     await expect(page.getByText("Marked as arrived.")).toBeVisible();
     await expect(page.getByText(/^\s*Arrived\s*$/)).toBeVisible();
     await tap(page.getByRole("button", { name: "Change to no-show" }));
