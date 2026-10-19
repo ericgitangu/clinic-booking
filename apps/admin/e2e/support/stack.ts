@@ -56,7 +56,12 @@ async function send<T>(
     cache: "no-store",
   });
   const raw = await resp.text();
-  return { status: resp.status, body: (raw ? JSON.parse(raw) : null) as T };
+  const json = (resp.headers.get("content-type") ?? "").includes("json");
+  // JSON unless the API sent something else (the day sheet is text/csv).
+  return {
+    status: resp.status,
+    body: (raw ? (json ? JSON.parse(raw) : raw) : null) as T,
+  };
 }
 
 /** A call to /internal/* with a real signed assertion for the given person and claimed role. */

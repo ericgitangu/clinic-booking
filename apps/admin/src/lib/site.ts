@@ -18,10 +18,16 @@ export const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", inline: true },
 ] as const;
 
-// Owners also see where access is managed. Hiding the link is only a convenience: the page and
+// Owners and admins also see where access is managed. Hiding the link is only a convenience: the page and
 // the API check the role themselves.
 export const ACCESS_LINK = {
   href: "/access",
   label: "Access",
+  inline: true,
+} as const;
+
+export const AUDIT_LINK = {
+  href: "/audit",
+  label: "Audit",
   inline: true,
 } as const;

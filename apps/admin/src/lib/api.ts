@@ -4,11 +4,32 @@
 // assertion for `caller`; the two public reads (one appointment, free times) carry none.
 import "server-only";
 import { callApi, type Caller } from "@clinic/api/call";
+import { memo, readKey } from "@/lib/render-cache";
 import {
   cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch,
   changeAccessRoleInternalAdminAccessEmailPatch,
+  acceptInviteInternalAdminInvitesAcceptPost,
+  cancellationReasonsInternalAdminOpsCancellationReasonsGet,
+  changesInternalAdminOpsChangesGet,
+  getAppointmentInternalAdminAppointmentsAppointmentIdGet,
+  createInviteInternalAdminInvitesPost,
+  doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost,
+  listAuditInternalAdminAuditGet,
+  listInvitesInternalAdminInvitesGet,
+  remindNowInternalAdminAppointmentsAppointmentIdRemindPost,
+  revokeInviteInternalAdminInvitesInviteIdDelete,
+  createAppointmentInternalAdminAppointmentsPost,
+  daySheetInternalAdminOpsDaySheetCsvGet,
   doctorAvailabilityDoctorsDoctorIdAvailabilityGet,
-  getAppointmentAppointmentsAppointmentIdGet,
+  gapsInternalAdminOpsGapsGet,
+  heatmapInternalAdminOpsHeatmapGet,
+  kpisInternalAdminOpsKpisGet,
+  markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost,
+  markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost,
+  todayInternalAdminOpsTodayGet,
+  unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost,
+  vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost,
+  listDoctorsDoctorsGet,
   getLineageInternalAdminAppointmentsAppointmentIdLineageGet,
   getMetricsInternalAdminMetricsGet,
   getSessionInfoInternalAdminSessionGet,
@@ -20,27 +41,35 @@ import {
 } from "@clinic/api/generated";
 
 export type { Caller } from "@clinic/api/call";
+export type ChangeReason = NonNullable<
+  Parameters<typeof changesInternalAdminOpsChangesGet>[0]["query"]["reason"]
+>;
 
 export const sessionInfo = (caller: Caller) =>
-  callApi(
-    "sessionInfo",
-    (client) => getSessionInfoInternalAdminSessionGet({ client }),
-    { caller },
+  memo(readKey("sessionInfo", caller, []), () =>
+    callApi(
+      "sessionInfo",
+      (client) => getSessionInfoInternalAdminSessionGet({ client }),
+      { caller },
+    ),
   );
 
 export const metrics = (caller: Caller, from: string, to: string) =>
-  callApi(
-    "metrics",
-    (client) =>
-      getMetricsInternalAdminMetricsGet({
-        client,
-        query: { from, to, bucket: "day" },
-      }),
-    { caller },
+  memo(readKey("metrics", caller, [from, to]), () =>
+    callApi(
+      "metrics",
+      (client) =>
+        getMetricsInternalAdminMetricsGet({
+          client,
+          query: { from, to, bucket: "day" },
+        }),
+      { caller },
+    ),
   );
 
 export interface AppointmentQuery {
   status?: "booked" | "cancelled" | "all";
+  doctor_id?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -48,32 +77,38 @@ export interface AppointmentQuery {
 }
 
 export const appointmentsPage = (caller: Caller, query: AppointmentQuery) =>
-  callApi(
-    "appointments",
-    (client) =>
-      listAppointmentsInternalAdminAppointmentsGet({
-        client,
-        query: { ...query, cursor: query.cursor ?? undefined },
-      }),
-    { caller },
+  memo(readKey("appointmentsPage", caller, [query]), () =>
+    callApi(
+      "appointments",
+      (client) =>
+        listAppointmentsInternalAdminAppointmentsGet({
+          client,
+          query: { ...query, cursor: query.cursor ?? undefined },
+        }),
+      { caller },
+    ),
   );
 
 export const lineage = (caller: Caller, id: string) =>
-  callApi(
-    "lineage",
-    (client) =>
-      getLineageInternalAdminAppointmentsAppointmentIdLineageGet({
-        client,
-        path: { appointment_id: id },
-      }),
-    { caller },
+  memo(readKey("lineage", caller, [id]), () =>
+    callApi(
+      "lineage",
+      (client) =>
+        getLineageInternalAdminAppointmentsAppointmentIdLineageGet({
+          client,
+          path: { appointment_id: id },
+        }),
+      { caller },
+    ),
   );
 
 export const accessList = (caller: Caller) =>
-  callApi(
-    "accessList",
-    (client) => listAccessInternalAdminAccessGet({ client }),
-    { caller },
+  memo(readKey("accessList", caller, []), () =>
+    callApi(
+      "accessList",
+      (client) => listAccessInternalAdminAccessGet({ client }),
+      { caller },
+    ),
   );
 
 export const grantAccess = (
@@ -128,9 +163,7 @@ export const rescheduleForPatient = (
   caller: Caller,
   id: string,
   startsAt: string,
-  // The API requires a reason on every staff write. The reschedule form has no reason field yet
-  // (the admin screens add it), so until then this is the recorded reason.
-  reason = "Rescheduled by clinic staff",
+  reason: string,
 ) =>
   callApi(
     "rescheduleForPatient",
@@ -145,19 +178,272 @@ export const rescheduleForPatient = (
     { caller },
   );
 
-export const getAppointment = (id: string) =>
-  callApi("getAppointment", (client) =>
-    getAppointmentAppointmentsAppointmentIdGet({
-      client,
-      path: { appointment_id: id },
-    }),
+export const availability = (doctorId: string, date: string) =>
+  memo(readKey("availability", null, [doctorId, date]), () =>
+    callApi("doctorAvailability", (client) =>
+      doctorAvailabilityDoctorsDoctorIdAvailabilityGet({
+        client,
+        path: { doctor_id: doctorId },
+        query: { date },
+      }),
+    ),
   );
 
-export const availability = (doctorId: string, date: string) =>
-  callApi("doctorAvailability", (client) =>
-    doctorAvailabilityDoctorsDoctorIdAvailabilityGet({
-      client,
-      path: { doctor_id: doctorId },
-      query: { date },
-    }),
+export const doctors = () =>
+  memo(readKey("doctors", null, []), () =>
+    callApi("listDoctors", (client) => listDoctorsDoctorsGet({ client })),
+  );
+
+// Operations reads. Any staff role may read them; the API decides what a viewer sees (initials,
+// masked phone), never this app.
+export const opsToday = (caller: Caller, date?: string) =>
+  memo(readKey("opsToday", caller, [date]), () =>
+    callApi(
+      "opsToday",
+      (client) =>
+        todayInternalAdminOpsTodayGet({ client, query: date ? { date } : {} }),
+      { caller },
+    ),
+  );
+
+export const opsKpis = (caller: Caller, from: string, to: string) =>
+  memo(readKey("opsKpis", caller, [from, to]), () =>
+    callApi(
+      "opsKpis",
+      (client) => kpisInternalAdminOpsKpisGet({ client, query: { from, to } }),
+      { caller },
+    ),
+  );
+
+export const opsReasons = (caller: Caller, from: string, to: string) =>
+  memo(readKey("opsReasons", caller, [from, to]), () =>
+    callApi(
+      "opsReasons",
+      (client) =>
+        cancellationReasonsInternalAdminOpsCancellationReasonsGet({
+          client,
+          query: { from, to },
+        }),
+      { caller },
+    ),
+  );
+
+export const opsHeatmap = (
+  caller: Caller,
+  from: string,
+  to: string,
+  doctorId?: string,
+) =>
+  memo(readKey("opsHeatmap", caller, [from, to, doctorId]), () =>
+    callApi(
+      "opsHeatmap",
+      (client) =>
+        heatmapInternalAdminOpsHeatmapGet({
+          client,
+          query: { from, to, ...(doctorId ? { doctor_id: doctorId } : {}) },
+        }),
+      { caller },
+    ),
+  );
+
+export const opsGaps = (caller: Caller, hours = 48) =>
+  memo(readKey("opsGaps", caller, [hours]), () =>
+    callApi(
+      "opsGaps",
+      (client) => gapsInternalAdminOpsGapsGet({ client, query: { hours } }),
+      { caller },
+    ),
+  );
+
+export const opsDaySheet = (caller: Caller, date: string) =>
+  callApi(
+    "opsDaySheet",
+    (client) =>
+      daySheetInternalAdminOpsDaySheetCsvGet({ client, query: { date } }),
+    { caller },
+  );
+
+export const markAttendance = (
+  caller: Caller,
+  id: string,
+  kind: "arrived" | "no_show",
+  reason?: string,
+) =>
+  callApi(
+    "markAttendance",
+    (client) =>
+      kind === "arrived"
+        ? markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost({
+            client,
+            path: { appointment_id: id },
+            body: reason ? { reason } : null,
+          })
+        : markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost({
+            client,
+            path: { appointment_id: id },
+            body: reason ? { reason } : null,
+          }),
+    { caller },
+  );
+
+export const staffBook = (
+  caller: Caller,
+  body: {
+    doctor_id: string;
+    starts_at: string;
+    reason: string;
+    patient: { full_name: string; phone?: string; email?: string };
+  },
+) =>
+  callApi(
+    "staffBook",
+    (client) =>
+      createAppointmentInternalAdminAppointmentsPost({ client, body }),
+    { caller },
+  );
+
+export const vetoAppointment = (caller: Caller, id: string, reason: string) =>
+  callApi(
+    "veto",
+    (client) =>
+      vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost({
+        client,
+        path: { appointment_id: id },
+        body: { reason },
+      }),
+    { caller },
+  );
+
+export const unlockAppointment = (caller: Caller, id: string, reason: string) =>
+  callApi(
+    "unlock",
+    (client) =>
+      unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost({
+        client,
+        path: { appointment_id: id },
+        body: { reason },
+      }),
+    { caller },
+  );
+
+export const remindNow = (caller: Caller, id: string, reason?: string) =>
+  callApi(
+    "remindNow",
+    (client) =>
+      remindNowInternalAdminAppointmentsAppointmentIdRemindPost({
+        client,
+        path: { appointment_id: id },
+        body: reason ? { reason } : null,
+      }),
+    { caller },
+  );
+
+export const runningLate = (
+  caller: Caller,
+  doctorId: string,
+  minutes: number,
+  reason?: string,
+) =>
+  callApi(
+    "runningLate",
+    (client) =>
+      doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost({
+        client,
+        path: { doctor_id: doctorId },
+        body: { minutes, ...(reason ? { reason } : {}) },
+      }),
+    { caller },
+  );
+
+export const invitesList = (caller: Caller) =>
+  memo(readKey("invitesList", caller, []), () =>
+    callApi(
+      "invitesList",
+      (client) => listInvitesInternalAdminInvitesGet({ client }),
+      { caller },
+    ),
+  );
+
+export const inviteCreate = (
+  caller: Caller,
+  email: string,
+  role: "admin" | "viewer",
+) =>
+  callApi(
+    "inviteCreate",
+    (client) =>
+      createInviteInternalAdminInvitesPost({ client, body: { email, role } }),
+    { caller },
+  );
+
+export const inviteRevoke = (caller: Caller, id: string) =>
+  callApi(
+    "inviteRevoke",
+    (client) =>
+      revokeInviteInternalAdminInvitesInviteIdDelete({
+        client,
+        path: { invite_id: id },
+      }),
+    { caller },
+  );
+
+export const inviteAccept = (caller: Caller, token: string) =>
+  callApi(
+    "inviteAccept",
+    (client) =>
+      acceptInviteInternalAdminInvitesAcceptPost({ client, body: { token } }),
+    { caller },
+  );
+
+export const auditList = (
+  caller: Caller,
+  query: { limit?: number; cursor?: string | null; appointment_id?: string },
+) =>
+  memo(readKey("auditList", caller, [query]), () =>
+    callApi(
+      "auditList",
+      (client) =>
+        listAuditInternalAdminAuditGet({
+          client,
+          query: { ...query, cursor: query.cursor ?? undefined },
+        }),
+      { caller },
+    ),
+  );
+
+// Changes by the day they were made (bookings, moves, cancellations), the visits behind the figures
+// the dashboard shows as counts.
+export const opsChanges = (
+  caller: Caller,
+  query: {
+    kind: "booked" | "rescheduled" | "cancelled";
+    from: string;
+    to: string;
+    reason?: ChangeReason;
+    doctor_id?: string;
+    limit?: number;
+    cursor?: string;
+  },
+) =>
+  memo(readKey("opsChanges", caller, [query]), () =>
+    callApi(
+      "opsChanges",
+      (client) => changesInternalAdminOpsChangesGet({ client, query }),
+      { caller },
+    ),
+  );
+
+// One appointment as an item of the admin list (same projection by role; 404 for an unknown or
+// synthetic one). Replaces finding the row in a day's list of up to 100.
+export const adminAppointment = (caller: Caller, id: string) =>
+  memo(readKey("adminAppointment", caller, [id]), () =>
+    callApi(
+      "adminAppointment",
+      (client) =>
+        getAppointmentInternalAdminAppointmentsAppointmentIdGet({
+          client,
+          path: { appointment_id: id },
+        }),
+      { caller },
+    ),
   );

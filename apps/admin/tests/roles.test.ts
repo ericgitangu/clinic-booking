@@ -6,7 +6,8 @@ const CAPS: Capability[] = ["view", "manage-appointments", "manage-access"];
 describe("role capabilities", () => {
   const matrix: Record<Role | "none", boolean[]> = {
     owner: [true, true, true],
-    admin: [true, true, false],
+    // The API gate CAN_MANAGE_ACCESS is owner and admin; what an admin may do to whom is the API's rule.
+    admin: [true, true, true],
     viewer: [true, false, false],
     none: [false, false, false],
   };
