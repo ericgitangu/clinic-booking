@@ -6,6 +6,7 @@ import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
 import { Ripples } from "@clinic/ui/components/brand/ripples";
 import { Button } from "@clinic/ui/components/ui/button";
 import { Separator } from "@clinic/ui/components/ui/separator";
+import { Architecture } from "@/components/landing/architecture";
 import { CopyBlock } from "@/components/landing/copy-block";
 import { EvidenceCard } from "@/components/landing/evidence-card";
 import { StatusLine, StatusPending } from "@/components/landing/status-line";
@@ -223,12 +224,16 @@ export default function Home() {
 
       <Separator />
 
+      <Architecture />
+
+      <Separator />
+
       <section aria-labelledby="ai" className="py-12">
         <h2
           id="ai"
           className="font-heading text-2xl font-semibold tracking-tight"
         >
-          Section 4: AI usage
+          AI reflection (README &sect;11)
         </h2>
         <p className="mt-3 max-w-[65ch] text-base leading-7">
           I built this with an AI coding assistant, and how I used it is written
