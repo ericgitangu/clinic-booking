@@ -81,6 +81,39 @@ export type AccountLinked = {
 };
 
 /**
+ * AdminActionEvent
+ *
+ * A staff action that changed no appointment (a reminder sent now, "running late", an
+ * invitation), for a viewer of the live feed: what happened and, for the two patient
+ * notifications, the doctor and the visit time. No person, no reason, no address. Streamed only
+ * by the Go gateway from ``staff_action_audit``; it never travels through the push service.
+ */
+export type AdminActionEvent = {
+    /**
+     * Delay Minutes
+     */
+    delay_minutes: number | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string | null;
+    /**
+     * Kind
+     */
+    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted';
+    /**
+     * Seq
+     *
+     * "<txid>.<id>" of the event.
+     */
+    seq: string;
+    /**
+     * Starts At
+     */
+    starts_at: string | null;
+};
+
+/**
  * AdminAppointment
  */
 export type AdminAppointment = {
@@ -342,7 +375,7 @@ export type AuditEntry = {
     /**
      * Action
      */
-    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke';
+    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke' | 'invite_accept';
     /**
      * Actor Email
      */
@@ -1703,6 +1736,65 @@ export type SlotEvent = {
 };
 
 /**
+ * StaffActionEvent
+ *
+ * The same staff action for an owner or admin: who did it, why, the patient (for a reminder
+ * or "running late") and the invited address and role (for an invitation).
+ */
+export type StaffActionEvent = {
+    /**
+     * Actor Email
+     */
+    actor_email: string;
+    /**
+     * Actor Role
+     */
+    actor_role: 'owner' | 'admin' | 'viewer';
+    /**
+     * Appointment Id
+     */
+    appointment_id: string | null;
+    /**
+     * Delay Minutes
+     */
+    delay_minutes: number | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string | null;
+    /**
+     * Invite Email
+     */
+    invite_email: string | null;
+    /**
+     * Invite Role
+     */
+    invite_role: 'admin' | 'viewer' | null;
+    /**
+     * Kind
+     */
+    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted';
+    /**
+     * Patient Name
+     */
+    patient_name: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Seq
+     *
+     * "<txid>.<id>" of the event.
+     */
+    seq: string;
+    /**
+     * Starts At
+     */
+    starts_at: string | null;
+};
+
+/**
  * StaffAppointmentChange
  *
  * The changed appointment plus what the web app needs to tell the patient.
@@ -1801,6 +1893,75 @@ export type StaffCreateAppointment = {
      * Starts At
      */
     starts_at: string;
+};
+
+/**
+ * StaffEvent
+ *
+ * The same event for an owner or admin on the live feed: it adds the appointment (to link to
+ * it), the patient's name and, for a cancellation, the reason. Only the Go gateway
+ * (``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels
+ * through the push service. A viewer gets ``AdminEvent`` instead.
+ */
+export type StaffEvent = {
+    /**
+     * Actor Email
+     *
+     * The staff member who made the change; null for a patient's own change.
+     */
+    actor_email: string | null;
+    /**
+     * Actor Role
+     */
+    actor_role: 'owner' | 'admin' | 'viewer' | null;
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Cancellation Reason
+     */
+    cancellation_reason: string | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Event Type
+     */
+    event_type: 'booked' | 'rescheduled' | 'cancelled' | 'vetoed' | 'unlocked' | 'arrived' | 'no_show';
+    /**
+     * From Local Date
+     */
+    from_local_date: string | null;
+    /**
+     * From Starts At
+     */
+    from_starts_at: string | null;
+    /**
+     * Local Date
+     */
+    local_date: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Seq
+     *
+     * "<txid>.<id>" of the event.
+     */
+    seq: string;
+    /**
+     * Staff Reason
+     *
+     * The reason the staff member recorded (veto, unlock, attendance, staff booking, reschedule or cancel); null for a patient's own change.
+     */
+    staff_reason: string | null;
+    /**
+     * To Starts At
+     */
+    to_starts_at: string | null;
 };
 
 /**

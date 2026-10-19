@@ -111,6 +111,7 @@ class AuditEntry(BaseModel):
         "running_late",
         "invite_create",
         "invite_revoke",
+        "invite_accept",
     ]
     appointment_id: uuid.UUID | None
     reason: str

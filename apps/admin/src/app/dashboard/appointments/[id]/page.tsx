@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeftIcon } from "lucide-react";
 import { AppointmentActions } from "@/components/appointment-actions";
+import { AppointmentLive } from "@/components/appointment-live";
 import { LineageTimeline } from "@/components/lineage-timeline";
 import { StaffBar } from "@/components/staff-bar";
 import { StatusBadge } from "@/components/status-badge";
@@ -63,6 +64,9 @@ export default async function AppointmentPage({
             <p className="text-muted-foreground">
               Reason: {appt.cancellation_reason}
             </p>
+          )}
+          {staff.role && (
+            <AppointmentLive appointmentId={appt.id} role={staff.role} />
           )}
         </header>
 

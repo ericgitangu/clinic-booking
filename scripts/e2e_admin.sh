@@ -15,12 +15,14 @@ BETTER_AUTH_SECRET="$(openssl rand -hex 24)"
 export INTERNAL_SIGNING_KEY BETTER_AUTH_SECRET
 export ADMIN_EMAILS="owner@clinic.example"
 export E2E_API_URL="${E2E_API_URL:-http://127.0.0.1:8080}"
+# The live-feed gateway (docker compose profile "realtime").
+export E2E_REALTIME_URL="${E2E_REALTIME_URL:-http://127.0.0.1:${REALTIME_HOST_PORT:-8090}}"
 
 cleanup() {
   if [ "${KEEP_STACK:-}" != "1" ]; then docker compose down -v >/dev/null 2>&1 || true; fi
 }
 trap cleanup EXIT
 
-docker compose up -d --build --wait api
+docker compose --profile realtime up -d --build --wait api realtime
 pnpm -C apps/admin build
 pnpm -C apps/admin test:e2e
