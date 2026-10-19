@@ -27,11 +27,11 @@ describe("avatar map", () => {
     );
   });
 
-  it("has a portrait (both sizes) and a fallback illustration for every seeded id", () => {
+  it("has a portrait (all three sizes) and a fallback illustration for every seeded id", () => {
     for (const id of Object.keys(SEEDED)) {
       expect(doctorPhoto(id), id).toEqual({
         src: `/doctors/${id}-256.webp`,
-        srcSet: `/doctors/${id}-256.webp 256w, /doctors/${id}-512.webp 512w`,
+        srcSet: `/doctors/${id}-128.webp 128w, /doctors/${id}-256.webp 256w, /doctors/${id}-512.webp 512w`,
       });
     }
     expect(doctorPhoto("nope")).toBeNull();
@@ -43,12 +43,17 @@ describe("avatar map", () => {
     const files = readdirSync(dir).filter((f) =>
       /\.(svg|webp|png|jpe?g|avif)$/.test(f),
     );
-    const idOf = (f: string) => f.replace(/(-(256|512))?\.[^.]+$/, "");
+    const idOf = (f: string) => f.replace(/(-(128|256|512))?\.[^.]+$/, "");
     expect([...new Set(files.map(idOf))].sort()).toEqual(
       Object.keys(DOCTOR_AVATARS).sort(),
     );
     for (const id of Object.keys(SEEDED)) {
-      for (const f of [`${id}.svg`, `${id}-256.webp`, `${id}-512.webp`])
+      for (const f of [
+        `${id}.svg`,
+        `${id}-128.webp`,
+        `${id}-256.webp`,
+        `${id}-512.webp`,
+      ])
         expect(files, f).toContain(f);
     }
     for (const app of ["booking"]) {
@@ -72,7 +77,7 @@ describe("avatar map", () => {
     ]) {
       expect(src).not.toContain("data:");
       expect(src.startsWith("/doctors/")).toBe(true);
-      expect(src.length).toBeLessThan(140);
+      expect(src.length).toBeLessThan(220);
     }
   });
 

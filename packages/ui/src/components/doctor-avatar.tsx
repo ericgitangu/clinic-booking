@@ -23,6 +23,8 @@ type ViewProps = {
   title?: string;
   onError?: () => void;
   imgRef?: Ref<HTMLImageElement>;
+  /** For the initials badge, so a deferred avatar can be watched until it nears the screen. */
+  boxRef?: Ref<HTMLSpanElement>;
   /** Load only when it nears the screen (for portraits below the first screen). */
   lazy?: boolean;
   className?: string;
@@ -39,6 +41,7 @@ export function DoctorAvatarView({
   title,
   onError,
   imgRef,
+  boxRef,
   lazy,
   className,
 }: ViewProps) {
@@ -47,6 +50,7 @@ export function DoctorAvatarView({
   if (src === null) {
     return (
       <span
+        ref={boxRef}
         role="img"
         aria-label={name}
         style={{ ...box, fontSize: Math.max(10, Math.round(size * 0.38)) }}
@@ -89,34 +93,60 @@ export function DoctorAvatar({
   name,
   size = 40,
   lazy,
+  defer,
   className,
 }: {
   doctorId: string;
   name: string;
   size?: number;
   lazy?: boolean;
+  /**
+   * Request no image until the avatar scrolls into view (initials meanwhile). For portraits below
+   * the first screen: the browser's own lazy loading still fetches anything within a screen or two.
+   */
+  defer?: boolean;
   className?: string;
 }) {
+  const [near, setNear] = useState(!defer);
+  const boxRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (near) return;
+    const el = boxRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        setNear(true);
+        io.disconnect();
+      }
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
   const photo = doctorPhoto(doctorId);
   const svg = doctorAvatarSrc(doctorId);
   const [failure, setFailure] = useState<Failure | null>(null);
   const failed = failure?.id === doctorId ? failure.level : null;
   const showPhoto = photo !== null && failed === null;
   const showSvg = svg !== null && failed !== "svg" && !showPhoto;
-  const props = showPhoto
-    ? {
-        src: photo.src,
-        srcSet: photo.srcSet,
-        title: PORTRAIT_DISCLOSURE,
-        onError: () => setFailure({ id: doctorId, level: "photo" }),
-      }
-    : showSvg
+  const props = !near
+    ? { src: null }
+    : showPhoto
       ? {
-          src: svg,
-          title: ILLUSTRATION_DISCLOSURE,
-          onError: () => setFailure({ id: doctorId, level: "svg" }),
+          src: photo.src,
+          srcSet: photo.srcSet,
+          title: PORTRAIT_DISCLOSURE,
+          onError: () => setFailure({ id: doctorId, level: "photo" }),
         }
-      : { src: null };
+      : showSvg
+        ? {
+            src: svg,
+            title: ILLUSTRATION_DISCLOSURE,
+            onError: () => setFailure({ id: doctorId, level: "svg" }),
+          }
+        : { src: null };
   // The server-rendered <img> may fail before React has attached onError (the event is not
   // replayed), so on mount and whenever the source changes, an image that has already failed moves
   // the chain on. A failed image is complete with no width.
@@ -134,6 +164,7 @@ export function DoctorAvatar({
       size={size}
       className={className}
       imgRef={imgRef}
+      boxRef={boxRef}
       lazy={lazy}
       sizes={`${size}px`}
       {...props}

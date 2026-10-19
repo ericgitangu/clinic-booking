@@ -13,7 +13,7 @@ One portrait and one illustration per seeded doctor, named by the doctor's id
 
 ## Portraits (AI-generated)
 
-Each doctor has a photorealistic portrait: `<id>-256.webp` and `<id>-512.webp` (about 5 KB and 13 KB).
+Each doctor has a photorealistic portrait: `<id>-128.webp`, `<id>-256.webp` and `<id>-512.webp` (about 2, 5 and 13 KB; the 128 px size keeps the 56 px list avatars light).
 They are **AI-generated portraits of fictional doctors**. They are not photographs of real people, and the
 seeded doctors do not exist. The app says so on the doctor list, and each portrait carries that sentence as
 its description (the image's `title`, which screen readers read and hovering shows); the alt text stays the
@@ -33,7 +33,7 @@ doctor's name.
 | Dr. David Mwangi | a Kenyan Black man in his late 40s, obstetrician gynaecologist, short greying hair, trimmed beard, reassuring expression | white shirt and dark tie |
 | Dr. Esther Njeri | a Kenyan Black woman in her early 40s, dentist, shoulder-length relaxed hair, bright smile | lilac scrubs |
 
-- Derivatives: WebP at 256 and 512 px (ImageMagick, quality 82, metadata stripped). The 1024 px originals are
+- Derivatives: WebP at 128, 256 and 512 px (ImageMagick, quality 82, metadata stripped). The 1024 px originals are
   not kept in the repository. `scripts/avatars/portraits.py` (`make avatars`) repeats the run; it reads a
   cached Hugging Face login and never writes the token anywhere.
 - Model licence: **Apache License 2.0**. The model card (`Tongyi-MAI/Z-Image-Turbo`,
@@ -63,12 +63,12 @@ The generated SVGs carry the CC0 rights notice in their own metadata.
 
 ## How the apps use them
 
-The files here are the source of truth: per doctor id, `<id>-256.webp` and `<id>-512.webp` (the portrait,
+The files here are the source of truth: per doctor id, `<id>-128.webp`, `<id>-256.webp` and `<id>-512.webp` (the portrait,
 1x and 2x) and `<id>.svg` (the fallback). `node scripts/avatars/sync.mjs` copies them to
 `apps/booking/public/doctors/` and `apps/admin/public/doctors/` (served as `/doctors/<file>`, so no image
 bytes are inlined into any JavaScript chunk) and writes the manifest `packages/ui/src/lib/doctor-avatar-data.ts`
-that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 256 w and 512 w with `sizes` set to the displayed width, explicit width and
-height), then the SVG if the portrait fails, then initials. A unit test fails if the sources, the manifest and
+that `DoctorAvatar` reads. `DoctorAvatar` shows the portrait (`srcset` 128 w, 256 w and 512 w with `sizes` set to the displayed width, explicit width and
+height), then the SVG if the portrait fails, then initials. Portraits below the first row of the doctor list are deferred: no image is requested until they scroll into view (`defer`). A unit test fails if the sources, the manifest and
 the app copy drift apart. To change a portrait, replace both WebP sizes and run the sync.
 
 ## Regenerate

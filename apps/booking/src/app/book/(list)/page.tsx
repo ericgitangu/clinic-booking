@@ -75,6 +75,7 @@ async function DoctorList() {
                   name={d.full_name}
                   size={56}
                   lazy={i >= 2}
+                  defer={i >= 2}
                 />
                 <div>
                   <h2 className="font-heading text-xl font-semibold">

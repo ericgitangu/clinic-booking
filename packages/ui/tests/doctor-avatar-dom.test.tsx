@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DoctorAvatar } from "../src/components/doctor-avatar";
 
 const ID = "e52e9da0-f7f3-5a6a-93d3-d7f658947afa";
 const NAME = "Dr. Achieng Otieno";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("DoctorAvatar (stateful)", () => {
   it("shows the portrait, then the illustration, then the initials as each fails", () => {
@@ -15,7 +19,7 @@ describe("DoctorAvatar (stateful)", () => {
     expect(photo.tagName).toBe("IMG");
     expect(photo.getAttribute("src")).toBe(`/doctors/${ID}-256.webp`);
     expect(photo.getAttribute("srcset")).toBe(
-      `/doctors/${ID}-256.webp 256w, /doctors/${ID}-512.webp 512w`,
+      `/doctors/${ID}-128.webp 128w, /doctors/${ID}-256.webp 256w, /doctors/${ID}-512.webp 512w`,
     );
     expect(photo.getAttribute("title")).toBe(
       "AI-generated portraits of fictional doctors",
@@ -82,5 +86,37 @@ describe("DoctorAvatar (stateful)", () => {
     expect(img.getAttribute("title")).toMatch(
       /AI-generated portraits of fictional doctors/,
     );
+  });
+});
+
+describe("DoctorAvatar defer", () => {
+  it("asks for no image until it scrolls into view", () => {
+    let fire: (e: { isIntersecting: boolean }[]) => void = () => {};
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: typeof fire) {
+          fire = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    render(<DoctorAvatar doctorId={ID} name={NAME} defer />);
+    expect(document.querySelector("img")).toBeNull();
+    expect(screen.getByRole("img", { name: NAME }).textContent).toBe("AO");
+
+    act(() => fire([{ isIntersecting: false }]));
+    expect(document.querySelector("img")).toBeNull();
+
+    act(() => fire([{ isIntersecting: true }]));
+    expect(document.querySelector("img")?.getAttribute("src")).toBe(
+      `/doctors/${ID}-256.webp`,
+    );
+  });
+
+  it("shows the portrait at once where there is no IntersectionObserver", () => {
+    render(<DoctorAvatar doctorId={ID} name={NAME} defer />);
+    expect(document.querySelector("img")).not.toBeNull();
   });
 });
