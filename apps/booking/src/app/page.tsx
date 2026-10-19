@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { CalendarCheck, GitBranch, Play, Terminal } from "lucide-react";
+import {
+  CalendarCheck,
+  GitBranch,
+  LayoutDashboard,
+  Play,
+  Terminal,
+} from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
@@ -8,6 +14,10 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { Separator } from "@clinic/ui/components/ui/separator";
 import { Architecture } from "@/components/landing/architecture";
 import { CopyBlock } from "@/components/landing/copy-block";
+import {
+  StaffDashboard,
+  STAFF_URL,
+} from "@/components/landing/staff-dashboard";
 import { EvidenceCard } from "@/components/landing/evidence-card";
 import { StatusLine, StatusPending } from "@/components/landing/status-line";
 import {
@@ -71,6 +81,17 @@ export default function Home() {
               variant="outline"
               className="h-12 px-5 text-base"
             >
+              <a href={STAFF_URL}>
+                <LayoutDashboard aria-hidden />
+                Open the staff dashboard
+              </a>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 px-5 text-base"
+            >
               <a href={GITHUB}>
                 <GitBranch aria-hidden />
                 Source on GitHub
@@ -99,6 +120,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <Separator />
+
+      <StaffDashboard />
 
       <Separator />
 
