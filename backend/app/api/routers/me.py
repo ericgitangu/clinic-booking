@@ -25,6 +25,7 @@ from app.api.deps import (
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.booking_rules import RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE
 from app.domain.errors import AppointmentNotFound, PatientNotFound
 from app.models.appointment import Appointment as AppointmentModel
 from app.repositories import accounts as account_repo
@@ -40,7 +41,13 @@ from app.schemas.appointment import (
     PatientAppointments,
     RescheduleRequest,
 )
-from app.schemas.problem import REPLAY_HEADER, REPLAYED_HEADER, problem_responses
+from app.schemas.problem import (
+    REPLAY_HEADER,
+    REPLAYED_HEADER,
+    change_too_late_responses,
+    problem_responses,
+    problem_with_example,
+)
 from app.services import booking
 from app.services.relay import Relay
 
@@ -186,7 +193,12 @@ async def my_appointment(
     "/me/appointments",
     response_model=Appointment,
     status_code=201,
-    responses={**problem_responses(404, 409, 422, 503), **REPLAY_HEADER},
+    description=RULE_BOOK,
+    responses={
+        **problem_responses(404, 409, 503),
+        **problem_with_example(422, "BOOKING_TOO_SOON"),
+        **REPLAY_HEADER,
+    },
 )
 async def book_mine(
     body: MeAppointmentCreate,
@@ -218,7 +230,8 @@ async def book_mine(
 @router.patch(
     "/me/appointments/{appointment_id}/cancel",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_CANCEL,
+    responses=change_too_late_responses(),
 )
 async def cancel_mine(
     appointment_id: uuid.UUID,
@@ -227,12 +240,15 @@ async def cancel_mine(
     who: Principal = Depends(require_verified_identity),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
 ) -> Appointment:
     response.headers.update(_NO_STORE)
     patient_id = await _linked_patient(session, who)
     await _own(session, patient_id, appointment_id)
-    appt = await booking.cancel(session, clock, appointment_id=appointment_id, reason=body.reason)
+    appt = await booking.cancel(
+        session, clock, settings, appointment_id=appointment_id, reason=body.reason
+    )
     await relay.run(clock)
     return _to_schema(appt)
 
@@ -240,7 +256,8 @@ async def cancel_mine(
 @router.patch(
     "/me/appointments/{appointment_id}/reschedule",
     response_model=Appointment,
-    responses=problem_responses(404, 409, 422),
+    description=RULE_RESCHEDULE,
+    responses=change_too_late_responses(new_start=True),
 )
 async def reschedule_mine(
     appointment_id: uuid.UUID,

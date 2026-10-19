@@ -8,7 +8,9 @@ SQLAlchemy Core.
 Every query here leaves out the appointments (and their events) of synthetic patients: the release
 pipeline's smoke test books and cancels real rows on every release, and those are not clinic
 activity. Each statement carries ``NOT p.synthetic`` through a join on the appointment's patient;
-``tests/integration/test_admin_synthetic.py`` fails if any one of them loses it. Patient-facing
+``tests/integration/test_synthetic.py`` fails when the series, upcoming, visits, cancel-action or
+list filter is dropped on its own; the lineage query's filter is covered only together with the
+existence check in front of it, not alone. Patient-facing
 availability is a different code path and still counts a synthetic booking as holding its slot.
 """
 
