@@ -358,6 +358,38 @@ if grep -q "verdict: OK" <<<"$out" && grep -q "exit=0" <<<"$out"; then ok "unver
 if ! grep -q 'echo "SKIP' "$PRISTINE/scripts/cost_check.sh" && [ "$(grep -c '^  *unverified C' "$PRISTINE/scripts/cost_check.sh")" -ge 3 ]; then ok "unverified: the live checks report C11 budgets, C13 and C14 through unverified()"; else bad "unverified: a live check still prints a bare SKIP"; fi
 if grep -q 'COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14"' "$PRISTINE/.circleci/config.yml"; then ok "unverified: CI lists exactly the three checks it cannot run"; else bad "unverified: the CI allowlist is missing or wrong"; fi
 
+echo "== C2: the invokers each service admits (no project needed) =="
+c2() { # <name> <want PASS|FAIL> <service> <iam-disabled> <members...>
+  local name="$1" want="$2" svc="$3" dis="$4" f="$WORK/c2.$RANDOM.txt" out; shift 4
+  printf '%s\n' "$@" > "$f"
+  out="$(bash "$ROOT/scripts/cost_check.sh" --c2 "$svc" "$dis" "$f" 2>&1)"
+  if grep -q "^$want  C2" <<<"$out"; then ok "C2: $name -> $want"; else bad "C2: $name (wanted $want; got $(grep -E '^(PASS|FAIL)' <<<"$out" | head -1))"; fi
+}
+P=sil-clinic-booking
+A="serviceAccount:clinic-admin@$P.iam.gserviceaccount.com"; S="serviceAccount:clinic-smoke@$P.iam.gserviceaccount.com"; W="serviceAccount:clinic-web@$P.iam.gserviceaccount.com"
+c2 "gateway: admin app and smoke only" PASS clinic-realtime false "$A" "$S"
+c2 "gateway: the public proxy must not be bound" FAIL clinic-realtime false "$A" "$S" "$W"
+c2 "gateway: admin only (the smoke could not run)" FAIL clinic-realtime false "$A"
+c2 "gateway: an extra user" FAIL clinic-realtime false "$A" "$S" "user:someone@example.com"
+c2 "gateway: public" FAIL clinic-realtime false "$A" "$S" "allUsers"
+c2 "gateway: invoker check disabled" FAIL clinic-realtime true "$A" "$S"
+c2 "api: web, admin and smoke" PASS clinic-api false "$A" "$S" "$W"
+c2 "api: the web proxy missing" FAIL clinic-api false "$A" "$S"
+c2 "api: invoker check disabled" FAIL clinic-api true "$A" "$S" "$W"
+c2 "api: public" FAIL clinic-api false "$A" "$S" "$W" "allUsers"
+# mutation: judging the gateway like the API (the old loop) is caught by the gateway cases
+mutc2() { # <name> <perl expression> <service> <want> <members...>: the mutated judge must give the WRONG answer on this case
+  local name="$1" expr="$2" svc="$3" want="$4" f="$WORK/c2m.$RANDOM.txt" m="$WORK/cost_check.c2mut.sh" out; shift 4
+  cp "$ROOT/scripts/cost_check.sh" "$m"; perl -pi -e "$expr" "$m"
+  if cmp -s "$m" "$ROOT/scripts/cost_check.sh"; then bad "C2 mutation '$name': the mutation changed nothing"; return; fi
+  printf '%s\n' "$@" > "$f"
+  out="$(bash "$m" --c2 "$svc" false "$f" 2>&1)"
+  if grep -q "^$want  C2" <<<"$out"; then bad "C2 mutation '$name' was NOT caught (the mutated judge still says $want)"; else ok "C2 mutation caught: $name"; fi
+}
+mutc2 "the gateway is expected to admit the web proxy too" 's/if \[ "\$svc" != clinic-realtime \]; then/if true; then/' clinic-realtime PASS "$A" "$S"
+mutc2 "the gateway may have the web proxy bound" 's/\[ "\$got" = "\$want" \] && \[ "\$dis" = false \]/[ "\$dis" = false ]/' clinic-realtime FAIL "$A" "$S" "$W"
+mutc2 "the API is no longer required to have the web proxy" 's/^serviceAccount:clinic-web\@/serviceAccount:clinic-xxx\@/' clinic-api PASS "$A" "$S" "$W"
+
 echo "== a blind scanner must fail, not pass =="
 blind() { ( cd "$DIR" && perl -pi -e "s/run deploy/run dpl/" "$CI" infra/bootstrap.sh ); }
 expect_fail "no deploy commands visible" "scanner is blind" blind
