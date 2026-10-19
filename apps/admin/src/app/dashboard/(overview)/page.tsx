@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { ActivityChart, type ActivityRow } from "@/components/activity-chart";
 import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
@@ -133,6 +134,7 @@ export default async function Dashboard({
           <RefreshButton />
         </div>
       </div>
+      <ZoneNote className="-mt-4" />
 
       <TodayBoard
         board={dash.today}

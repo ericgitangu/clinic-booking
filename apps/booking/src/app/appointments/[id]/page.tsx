@@ -7,6 +7,7 @@ import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
 import { isForbidden, needsSignIn } from "@/lib/auth-failure";
 import { NoAccess } from "@/components/account/no-access";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -111,9 +112,7 @@ export default async function AppointmentPage({
               ? `${doc.data.full_name}, ${doc.data.specialty}`
               : doctorName}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Nairobi time, 30 minutes.
-          </p>
+          <ZoneNote className="mt-1">30 minutes.</ZoneNote>
         </div>
       </div>
       {cancelled ? (

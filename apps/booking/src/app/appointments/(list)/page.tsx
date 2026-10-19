@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { AppointmentActions } from "@/components/booking/appointment-actions";
@@ -67,6 +68,7 @@ export default async function MyAppointments({
       <p className="mt-2 text-base text-muted-foreground">
         Signed in as {who.name}.
       </p>
+      <ZoneNote className="mt-1" />
 
       {!res.ok && !never ? (
         <p

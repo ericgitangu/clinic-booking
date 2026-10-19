@@ -29,6 +29,14 @@ async function clean(page: Page, view: string) {
   ).toEqual([]);
 }
 
+// The zone is named once on a page that shows times, as visible text (not a tooltip, not hidden).
+async function zoneNamedOnce(page: Page) {
+  const note = page.getByTestId("zone-note");
+  await expect(note).toHaveCount(1);
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("Times in Nairobi time (EAT, UTC+3).");
+}
+
 for (const [i, scheme] of (["light", "dark"] as const).entries()) {
   test(`axe is clean on every new view (${scheme})`, async ({
     browser,
@@ -54,6 +62,7 @@ for (const [i, scheme] of (["light", "dark"] as const).entries()) {
     await expect(
       page.getByRole("link", { name: / free, book this time$/ }).first(),
     ).toBeVisible();
+    await zoneNamedOnce(page);
     await clean(page, "slot page");
     await page.goto(`/book/${doctorId}?date=${day}&notice=taken`);
     await expect(
@@ -71,6 +80,7 @@ for (const [i, scheme] of (["light", "dark"] as const).entries()) {
       await page.goto(
         `/book/${doctorId}/details?starts_at=${encodeURIComponent(startsAt)}`,
       );
+      await zoneNamedOnce(page);
       await clean(page, "details");
       await page.getByRole("button", { name: "Confirm booking" }).click();
       await expect(
@@ -79,12 +89,14 @@ for (const [i, scheme] of (["light", "dark"] as const).entries()) {
       return page.url().split("/").pop()!;
     };
     await book(slots[1]);
+    await zoneNamedOnce(page);
     await clean(page, "confirmation");
 
     await page.goto("/appointments");
     await expect(
       page.getByRole("heading", { name: "My appointments" }),
     ).toBeVisible();
+    await zoneNamedOnce(page);
     await clean(page, "my appointments with clickable cards");
     await page.goto("/appointments");
     await page
@@ -97,10 +109,12 @@ for (const [i, scheme] of (["light", "dark"] as const).entries()) {
     await expect(
       page.getByRole("heading", { name: "Your appointment" }),
     ).toBeVisible();
+    await zoneNamedOnce(page);
     await clean(page, "appointment page");
     const id = page.url().split("/").pop()!;
     await page.goto(`/appointments/${id}/reschedule?date=${day}`);
     await expect(page.getByRole("radio").first()).toBeVisible();
+    await zoneNamedOnce(page);
     await clean(page, "reschedule");
 
     await page.goto(`/appointments/${id}`);

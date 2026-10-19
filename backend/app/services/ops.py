@@ -414,7 +414,16 @@ async def day_sheet_csv(
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n")
     writer.writerow(
-        ["doctor", "time", "status", "patient", "phone", "email", "cancellation_reason"]
+        [
+            "doctor",
+            "time",
+            "status",
+            "patient",
+            "phone",
+            "email",
+            "cancellation_reason",
+            "timezone",  # last, so a reader keyed on the earlier columns is unaffected
+        ]
     )
     for r in rows:
         writer.writerow(
@@ -426,6 +435,7 @@ async def day_sheet_csv(
                 _cell(r["phone"] if full else mask_phone(r["phone"])),
                 _cell(r["email"] if full else None),
                 _cell(r["cancellation_reason"] if full else None),
+                r["timezone"],
             ]
         )
     return out.getvalue()

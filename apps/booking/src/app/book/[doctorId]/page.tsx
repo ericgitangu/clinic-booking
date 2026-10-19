@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { SlotChooser } from "@/components/booking/slot-chooser";
 import { DateStrip } from "@/components/booking/date-strip";
 import * as api from "@/lib/api";
@@ -75,7 +76,7 @@ export default async function PickTime({
                 {doctor.data.full_name}
               </h1>
               <p className="mt-1 text-base text-muted-foreground">
-                {doctor.data.specialty}. Times are Nairobi time.
+                {doctor.data.specialty}.
               </p>
             </div>
           </div>
@@ -86,7 +87,9 @@ export default async function PickTime({
         </h1>
       )}
 
-      <div className="mt-6">
+      <ZoneNote className="mt-4" />
+
+      <div className="mt-4">
         <DateStrip
           today={today}
           selected={day}
