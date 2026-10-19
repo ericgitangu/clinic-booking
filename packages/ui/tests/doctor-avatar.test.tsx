@@ -1,16 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { isValidElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import {
-  DoctorAvatar,
-  DoctorAvatarView,
-} from "../src/components/doctor-avatar";
 import {
   DOCTOR_AVATARS,
   doctorAvatarSrc,
   doctorInitials,
+  doctorPhoto,
+  doctorPortraitAlt,
 } from "../src/lib/doctor-avatar";
 
 // The seed is the truth: backend/app/scripts/seed.py (uuid5 of "doctor:<key>").
@@ -25,28 +21,64 @@ const SEEDED = {
 describe("avatar map", () => {
   it("has an avatar for every seeded doctor id", () => {
     for (const id of Object.keys(SEEDED)) {
-      expect(doctorAvatarSrc(id), id).toMatch(/^data:image\/svg\+xml;base64,/);
+      expect(doctorAvatarSrc(id), id).toBe(`/doctors/${id}.svg`);
     }
     expect(Object.keys(DOCTOR_AVATARS).sort()).toEqual(
       Object.keys(SEEDED).sort(),
     );
   });
 
-  it("matches the committed svg files byte for byte", () => {
+  it("has a portrait (all three sizes) and a fallback illustration for every seeded id", () => {
+    for (const id of Object.keys(SEEDED)) {
+      expect(doctorPhoto(id), id).toEqual({
+        src: `/doctors/${id}-256.webp`,
+        srcSet: `/doctors/${id}-128.webp 128w, /doctors/${id}-256.webp 256w, /doctors/${id}-512.webp 512w`,
+      });
+    }
+    expect(doctorPhoto("nope")).toBeNull();
+    expect(doctorPhoto("constructor")).toBeNull();
+  });
+
+  it("has one source set per id, and a byte-identical static copy of every file in the booking app", () => {
     const dir = fileURLToPath(new URL("../assets/doctors/", import.meta.url));
-    const files = readdirSync(dir).filter((f) => f.endsWith(".svg"));
-    expect(files.map((f) => f.replace(".svg", "")).sort()).toEqual(
+    const files = readdirSync(dir).filter((f) =>
+      /\.(svg|webp|png|jpe?g|avif)$/.test(f),
+    );
+    const idOf = (f: string) => f.replace(/(-(128|256|512))?\.[^.]+$/, "");
+    expect([...new Set(files.map(idOf))].sort()).toEqual(
       Object.keys(DOCTOR_AVATARS).sort(),
     );
-    for (const f of files) {
-      const id = f.replace(".svg", "");
-      const encoded = DOCTOR_AVATARS[id]!.replace(
-        "data:image/svg+xml;base64,",
-        "",
+    for (const id of Object.keys(SEEDED)) {
+      for (const f of [
+        `${id}.svg`,
+        `${id}-128.webp`,
+        `${id}-256.webp`,
+        `${id}-512.webp`,
+      ])
+        expect(files, f).toContain(f);
+    }
+    for (const app of ["booking"]) {
+      const pub = fileURLToPath(
+        new URL(`../../../apps/${app}/public/doctors/`, import.meta.url),
       );
-      expect(Buffer.from(encoded, "base64").toString("utf8")).toBe(
-        readFileSync(dir + f, "utf8"),
-      );
+      expect(readdirSync(pub).sort(), app).toEqual([...files].sort());
+      for (const f of files) {
+        expect(
+          readFileSync(pub + f).equals(readFileSync(dir + f)),
+          `${app}/${f}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("never inlines image bytes", () => {
+    for (const src of [
+      ...Object.values(DOCTOR_AVATARS),
+      ...Object.keys(SEEDED).map((id) => doctorPhoto(id)!.srcSet),
+    ]) {
+      expect(src).not.toContain("data:");
+      expect(src.startsWith("/doctors/")).toBe(true);
+      expect(src.length).toBeLessThan(220);
     }
   });
 
@@ -56,52 +88,21 @@ describe("avatar map", () => {
   });
 });
 
+describe("alt text", () => {
+  it("is the full sentence, without a doubled title", () => {
+    const want = "Dr. Brian Kamau, AI-generated portrait of a fictional doctor";
+    expect(doctorPortraitAlt("Dr. Brian Kamau")).toBe(want);
+    expect(doctorPortraitAlt("Brian Kamau")).toBe(want);
+    expect(doctorPortraitAlt("Dr Brian Kamau")).toBe(
+      "Dr Brian Kamau, AI-generated portrait of a fictional doctor",
+    );
+  });
+});
+
 describe("doctorInitials", () => {
   it("skips the title", () => {
     expect(doctorInitials("Dr. Achieng Otieno")).toBe("AO");
     expect(doctorInitials("Esther")).toBe("E");
     expect(doctorInitials("")).toBe("?");
-  });
-});
-
-describe("DoctorAvatar", () => {
-  const [id, name] = Object.entries(SEEDED)[0]!;
-
-  it("renders the img with the doctor's name as alt and explicit size", () => {
-    const html = renderToStaticMarkup(
-      <DoctorAvatar doctorId={id} name={name} size={48} />,
-    );
-    expect(html).toContain(`alt="${name}"`);
-    expect(html).toContain('width="48"');
-    expect(html).toContain('height="48"');
-    expect(html).toContain("rounded-full");
-    expect(html).toContain("data:image/svg+xml;base64,");
-  });
-
-  it("falls back to initials for an unknown id", () => {
-    const html = renderToStaticMarkup(
-      <DoctorAvatar doctorId="unknown" name="Dr. Zed Quinn" size={40} />,
-    );
-    expect(html).not.toContain("<img");
-    expect(html).toContain('aria-label="Dr. Zed Quinn"');
-    expect(html).toContain(">ZQ<");
-    expect(html).toContain("width:40px");
-  });
-
-  it("view swaps to initials once the image has failed, and the img reports errors", () => {
-    const ok = DoctorAvatarView({
-      name,
-      size: 40,
-      src: doctorAvatarSrc(id),
-      onError: () => {},
-    });
-    expect(
-      isValidElement(ok) && typeof (ok.props as { onError?: unknown }).onError,
-    ).toBe("function");
-    const failed = renderToStaticMarkup(
-      <DoctorAvatarView name={name} size={40} src={null} />,
-    );
-    expect(failed).not.toContain("<img");
-    expect(failed).toContain(">AO<");
   });
 });

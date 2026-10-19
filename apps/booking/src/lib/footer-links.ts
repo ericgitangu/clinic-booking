@@ -49,6 +49,12 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
         icon: "list",
       },
       {
+        label: "AI-generated portraits of fictional doctors",
+        href: `${GITHUB}#doctor-portraits-ai-generated`,
+        external: true,
+        icon: "docs",
+      },
+      {
         label: "CI/CD pipelines",
         href: "https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking",
         external: true,

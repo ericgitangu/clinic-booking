@@ -13,7 +13,6 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const outDir = join(root, "packages", "ui", "assets", "doctors");
-const moduleOut = join(root, "packages", "ui", "src", "lib", "doctor-avatar-data.ts");
 
 // Shared across all five: same style, same background, same line and hair colour.
 const COMMON = {
@@ -53,18 +52,9 @@ const svgs = DOCTORS.map((d) => {
   return { ...d, svg };
 });
 
-// The apps consume the art as data URIs from this module, so no public-dir copy or CDN is needed
-// and both Next apps resolve it through @clinic/ui. A test keeps it in sync with the .svg files.
-// Layout matches prettier's output so the committed file is stable under lint-staged.
-const lines = svgs.map(
-  (d) => `  // ${d.name}\n  "${d.id}":\n    "data:image/svg+xml;base64,${Buffer.from(d.svg + "\n").toString("base64")}",`,
-);
-writeFileSync(
-  moduleOut,
-  `// Written by scripts/avatars/generate.mjs from packages/ui/assets/doctors/*.svg. Edit the generator, not this file.\n` +
-    `// Art: DiceBear Lorelei by Lisa Wischofsky, CC0 1.0.\n` +
-    `export const DOCTOR_AVATAR_DATA: Readonly<Record<string, string>> = {\n${lines.join("\n")}\n};\n`,
-);
+// The apps serve the art as static files: sync.mjs copies it to each app's public/doctors and writes
+// the id -> extension manifest.
+await import("./sync.mjs");
 
 const i = process.argv.indexOf("--preview");
 if (i > -1) {

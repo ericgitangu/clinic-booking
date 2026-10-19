@@ -4,7 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 // The status line calls the API on the server; the page test only needs its place in the markup.
-vi.mock("@/components/landing/status-line", () => ({ StatusLine: () => null }));
+vi.mock("@/components/landing/status-line", () => ({
+  StatusLine: () => null,
+  StatusPending: () => null,
+}));
 import Home from "@/app/page";
 import PrivacyPage from "@/app/privacy/page";
 import TermsPage from "@/app/terms/page";

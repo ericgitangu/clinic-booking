@@ -164,9 +164,7 @@ describe("sending", () => {
   });
   it("sends from the verified subdomain with the engineer as reply-to", () => {
     expect(MAIL_DOMAIN).toBe("mail.ericgitangu.com"); // the domain verified in Resend
-    expect(FROM).toBe(
-      "Idyllic Clinic Booking <reminders@mail.ericgitangu.com>",
-    );
+    expect(FROM).toBe("Idyllic Clinic <reminders@mail.ericgitangu.com>");
     expect(REPLY_TO).toBe("developer.ericgitangu@gmail.com");
   });
   it("the sender's domain is the one configured domain, so the two cannot drift", () => {

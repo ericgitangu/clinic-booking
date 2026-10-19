@@ -9,7 +9,10 @@ const PROD = "https://clinic.ericgitangu.com";
 // the library default (on in production builds) applies. Only a test run on this machine lifts it.
 describe("rateLimitFor", () => {
   it("production: 100 per 10 seconds, in memory, `enabled` left to the library", () => {
-    const limit = rateLimitFor({ NODE_ENV: "production", BETTER_AUTH_URL: PROD });
+    const limit = rateLimitFor({
+      NODE_ENV: "production",
+      BETTER_AUTH_URL: PROD,
+    });
     expect(limit).toEqual({ window: 10, max: 100, storage: "memory" });
     expect("enabled" in limit).toBe(false);
   });

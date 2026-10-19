@@ -10,10 +10,13 @@ export const SlotRadios = memo(function SlotRadios({
   chips,
   value,
   onChange,
+  trackRenders = false,
 }: {
   chips: readonly Chip[];
   value: string;
   onChange: (v: string) => void;
+  /** Test runs only (lib/test-run.ts): write the render count into data-renders. */
+  trackRenders?: boolean;
 }) {
   // How many times this grid has rendered, written to the DOM after each commit (no state, so it
   // causes no render). The render-count tests read it: a poll that changes nothing must not move it.
@@ -21,7 +24,8 @@ export const SlotRadios = memo(function SlotRadios({
   const renders = useRef(0);
   useEffect(() => {
     renders.current += 1;
-    field.current?.setAttribute("data-renders", String(renders.current));
+    if (trackRenders)
+      field.current?.setAttribute("data-renders", String(renders.current));
   });
   return (
     <fieldset ref={field}>

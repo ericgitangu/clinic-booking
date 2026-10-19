@@ -7,6 +7,14 @@ import {
   type Page,
 } from "@playwright/test";
 import { hhmm } from "./api";
+import {
+  chip,
+  expectDesignedFocusRing,
+  expectFree,
+  expectInactive,
+  freeLink,
+  tabTo,
+} from "./support/chips";
 import { farCell, sharedLateTime } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";
 import { IDLE_MS } from "../src/lib/polling";
@@ -35,7 +43,8 @@ async function signedIn(browser: Browser, person: Person = newPerson()) {
 const grid = (doctorId: string, day: string) => `/book/${doctorId}?date=${day}`;
 const details = (doctorId: string, startsAt: string) =>
   `/book/${doctorId}/details?starts_at=${encodeURIComponent(startsAt)}`;
-const chip = (page: Page, startsAt: string) =>
+// The reschedule grid keeps radios (its choice is submitted with a form, not followed).
+const radio = (page: Page, startsAt: string) =>
   page.getByRole("radio", { name: new RegExp(`^${hhmm(startsAt)}`) });
 const armed = (page: Page) =>
   expect(page.locator("[data-polling]")).toHaveAttribute(
@@ -65,11 +74,8 @@ test("a time the patient already holds is inactive on the grid and says so", asy
   await bookOn(me.page, doctorId, slots[1]);
 
   await me.page.goto(grid(doctorId, day));
-  const mine = chip(me.page, slots[1]);
-  await expect(mine).toBeDisabled();
-  await expect(mine).toHaveAttribute("aria-disabled", "true");
-  await expect(mine).toHaveAccessibleName(/Your visit/);
-  await expect(chip(me.page, slots[2])).toBeEnabled();
+  await expectInactive(me.page, slots[1], /Your visit/);
+  await expectFree(me.page, slots[2]);
 
   // A visitor who is not signed in learns nothing about it.
   const visitor = await browser.newContext({
@@ -77,7 +83,7 @@ test("a time the patient already holds is inactive on the grid and says so", asy
   });
   const other = await visitor.newPage();
   await other.goto(grid(doctorId, day));
-  await expect(chip(other, slots[2])).toBeEnabled();
+  await expectFree(other, slots[2]);
   await expect(other.getByText("Your visit")).toHaveCount(0);
   await closeAll(me.context, visitor);
 });
@@ -97,9 +103,7 @@ test("a time the patient holds with another doctor is inactive on this doctor's 
   await bookOn(me.page, doctorId, t);
 
   await me.page.goto(grid(elsewhere, day));
-  const c = chip(me.page, t);
-  await expect(c).toBeDisabled();
-  await expect(c).toHaveAccessibleName(/You have another visit/);
+  await expectInactive(me.page, t, /You have another visit/);
   await closeAll(me.context);
 });
 
@@ -151,21 +155,22 @@ test("a time someone else takes stays in place as an inactive Booked chip", asyn
   await page.clock.install();
   await page.goto(grid(doctorId, day));
   await armed(page);
-  const order = () =>
-    page
-      .getByRole("radio")
-      .evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+  const order = async () =>
+    (
+      await page
+        .getByRole("group", { name: "Times" })
+        .getByRole("listitem")
+        .allInnerTexts()
+    ).map((t) => t.split("\n")[0]);
   const before = await order();
 
   const other = await signedIn(browser);
   await bookOn(other.page, doctorId, slots[1]);
 
   await page.clock.runFor(16_000);
-  const gone = chip(page, slots[1]);
-  await expect(gone).toBeDisabled();
   // The API lists every booked time, so the chip says Booked (a time that merely left the list,
   // with no such answer, would read No longer available).
-  await expect(gone).toHaveAccessibleName(/Booked/);
+  await expectInactive(page, slots[1], /Booked/);
   expect(await order()).toEqual(before); // nothing moved under a finger
   await closeAll(viewer, other.context);
 });
@@ -182,8 +187,7 @@ test("after the patient's own booking, going back shows that time inactive witho
   await page.evaluate(() => {
     (window as unknown as { __kept: boolean }).__kept = true;
   });
-  await chip(page, slots[1]).check({ force: true });
-  await page.getByRole("link", { name: "Continue" }).click();
+  await freeLink(page, slots[1]).click();
   await page.getByRole("button", { name: "Confirm booking" }).click();
   await expect(
     page.getByRole("heading", { name: "You are booked" }),
@@ -195,8 +199,7 @@ test("after the patient's own booking, going back shows that time inactive witho
   await page.goBack();
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`/book/${doctorId}\\?date=`));
-  await expect(chip(page, slots[1])).toBeDisabled();
-  await expect(chip(page, slots[1])).toHaveAccessibleName(/Your visit/);
+  await expectInactive(page, slots[1], /Your visit/);
   expect(
     await page.evaluate(
       () => (window as unknown as { __kept?: boolean }).__kept,
@@ -244,8 +247,8 @@ for (const [n, scheme] of [
     await bookOn(me.page, doctorId, slots[1]);
     await me.page.goto(grid(doctorId, day));
     await armed(me.page);
+    await expectInactive(me.page, slots[1], /Your visit/);
     const mine = chip(me.page, slots[1]);
-    await expect(mine).toBeDisabled();
 
     const { violations } = await new AxeBuilder({ page: me.page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -259,21 +262,22 @@ for (const [n, scheme] of [
       ),
     ).toEqual([]);
 
-    // An inactive chip cannot take focus; a free one can.
-    await mine.focus().catch(() => {});
-    expect(
-      await me.page.evaluate(
-        () => (document.activeElement as HTMLInputElement)?.disabled,
-      ),
-    ).not.toBe(true);
+    // An inactive chip is not a tab stop; a free one is, and shows the designed focus ring.
+    await expect(mine.getByRole("link")).toHaveCount(0);
+    const free = freeLink(me.page, slots[2]);
+    await tabTo(me.page, free); // by keyboard, so :focus-visible applies
+    await expect(free).toBeFocused();
+    await expectDesignedFocusRing(free);
     // 44 px targets, also for the inactive ones.
-    const label = me.page.locator("label", { has: mine });
-    expect((await label.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    expect((await label.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    for (const box of [free, mine]) {
+      const r = (await box.boundingBox())!;
+      expect(r.height).toBeGreaterThanOrEqual(44);
+      expect(r.width).toBeGreaterThanOrEqual(44);
+    }
     // No motion when the person asks for none.
-    const duration = await label
-      .locator(".slot-chip-label")
-      .evaluate((el) => getComputedStyle(el).transitionDuration);
+    const duration = await free.evaluate(
+      (el) => getComputedStyle(el).transitionDuration,
+    );
     expect(duration.split(",").every((d) => parseFloat(d) === 0)).toBe(true);
     await closeAll(me.context);
   });
@@ -309,7 +313,7 @@ test("losing the race on a move (a confirmed 409) shows that time as Just taken,
   const id = me.page.url().split("/").pop();
   await me.page.goto(`/appointments/${id}/reschedule?date=${day}`);
   await armed(me.page);
-  await chip(me.page, slots[3]).check({ force: true });
+  await radio(me.page, slots[3]).check({ force: true });
 
   // Someone else takes that time after this page loaded, before the move is sent.
   const other = await signedIn(browser);
@@ -319,7 +323,7 @@ test("losing the race on a move (a confirmed 409) shows that time as Just taken,
   await expect(
     me.page.locator('[role="alert"]:not(#__next-route-announcer__)'),
   ).toContainText("That time was just taken.");
-  const lost = chip(me.page, slots[3]);
+  const lost = radio(me.page, slots[3]);
   await expect(lost).toBeDisabled();
   await expect(lost).toHaveAccessibleName(/Just taken/); // the 409 confirmed it; that wins over the listed "Booked"
   await closeAll(me.context, other.context);

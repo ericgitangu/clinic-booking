@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   startTransition,
   useCallback,
@@ -16,6 +15,7 @@ import { rescheduleAppointment } from "@/app/actions";
 import { initialState } from "@/lib/action-state";
 import { clinicDay, formatTime } from "@/lib/clinic-time";
 import { NextSlots } from "@/components/booking/next-slots";
+import { SlotLinks } from "@/components/booking/slot-links";
 import { SlotRadios } from "@/components/booking/slot-radios";
 import { StickyCta } from "@/components/booking/sticky-cta";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
@@ -26,7 +26,12 @@ import { buildChips, type Chip, type OwnBooking } from "@/lib/slot-chips";
 
 // `availability` is the server-rendered answer for one doctor and day; the chooser keeps it
 // current. `own` is what the signed-in patient already holds (empty when signed out).
-type Props = { own: OwnBooking[]; availability: Availability } & (
+type Props = {
+  own: OwnBooking[];
+  availability: Availability;
+  /** Set by the page from lib/test-run.ts; production leaves it off. */
+  trackRenders?: boolean;
+} & (
   | { mode: "details"; doctorId: string }
   | { mode: "reschedule"; appointmentId: string }
 );
@@ -70,6 +75,21 @@ function LiveNotice({
         data-polling={armed ? "armed" : "pending"}
         data-stream={stream}
       />
+      <p
+        data-testid="live-state"
+        className="mb-1 flex min-h-5 items-center gap-2 text-sm text-muted-foreground"
+      >
+        <span
+          aria-hidden
+          className="live-dot"
+          data-on={stream === "live" && !idle ? "live" : "off"}
+        />
+        {idle
+          ? "Updates paused"
+          : stream === "live"
+            ? "Live: times update as they change"
+            : "Checking for changes every few seconds"}
+      </p>
       <p
         role="status"
         aria-live="polite"
@@ -186,33 +206,18 @@ export function SlotChooser(props: Props) {
   );
 
   if (props.mode === "details") {
-    const href = selected
-      ? `/book/${props.doctorId}/details?starts_at=${encodeURIComponent(selected)}`
-      : "";
+    // No selection step here: a free time is a link to its details page.
     return (
       <>
         {notice}
         {anyFree ? null : none}
         {chips.length > 0 ? (
-          <SlotRadios chips={chips} value={selected} onChange={choose} />
+          <SlotLinks
+            chips={chips}
+            doctorId={props.doctorId}
+            trackRenders={props.trackRenders}
+          />
         ) : null}
-        <StickyCta
-          hint={
-            selected
-              ? `You picked ${formatTime(selected)}.`
-              : "Pick a time to continue."
-          }
-        >
-          {selected ? (
-            <Button asChild size="lg" className="h-12 w-full text-base">
-              <Link href={href}>Continue</Link>
-            </Button>
-          ) : (
-            <Button size="lg" className="h-12 w-full text-base" disabled>
-              Continue
-            </Button>
-          )}
-        </StickyCta>
       </>
     );
   }
@@ -233,7 +238,12 @@ export function SlotChooser(props: Props) {
       {notice}
       {anyFree ? null : none}
       {chips.length > 0 ? (
-        <SlotRadios chips={chips} value={selected} onChange={choose} />
+        <SlotRadios
+          chips={chips}
+          value={selected}
+          onChange={choose}
+          trackRenders={props.trackRenders}
+        />
       ) : null}
       {state.status === "error" && state.code === "SLOT_TAKEN" ? (
         <div

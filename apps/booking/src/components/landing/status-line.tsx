@@ -24,3 +24,15 @@ export async function StatusLine() {
     </p>
   );
 }
+
+// Shown while the readiness answer is on its way. The page streams its first screen without waiting
+// for the API, so the intro text and the buttons arrive at once; this pill has the same size as the
+// real one, so nothing moves when it is replaced.
+export function StatusPending() {
+  return (
+    <p className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-base">
+      <span aria-hidden className="size-2.5 rounded-full bg-muted-foreground" />
+      Checking the API
+    </p>
+  );
+}

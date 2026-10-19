@@ -80,6 +80,8 @@ export function AppointmentActions({
   useActionFeedback(state, () => {
     setOpen(false);
     forgetBooked(qc, startsAt);
+    // The appointment page now shows the cancelled view; the list drops the card.
+    router.refresh();
   });
   // Another tab already cancelled it: the toast says so, then the list catches up.
   useEffect(() => {

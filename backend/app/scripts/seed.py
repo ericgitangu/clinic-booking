@@ -20,7 +20,7 @@ from app.core.config import Settings
 from app.db.session import dispose_engine, get_engine
 
 NAMESPACE = uuid.UUID("6f1c2a52-6a0e-4c7a-9a3e-2b6f2d1c0a11")
-CLINIC_NAME = "Mvule Family Clinic"
+CLINIC_NAME = "Idyllic Clinic"
 CLINIC_TZ = "Africa/Nairobi"
 
 

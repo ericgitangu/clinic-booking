@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowNav } from "@/components/booking/arrow-nav";
 import { addDays, formatDayShort } from "@/lib/clinic-time";
 
 // Two weeks of days as large tap targets, plus a date box for anything further out (up to 90 days
@@ -16,29 +17,31 @@ export function DateStrip({
   return (
     <div>
       <nav aria-label="Pick a day">
-        <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin]">
-          {days.map((d) => {
-            const f = formatDayShort(d);
-            const on = d === selected;
-            return (
-              <li key={d} className="shrink-0">
-                <Link
-                  href={`${basePath}?date=${d}`}
-                  aria-current={on ? "date" : undefined}
-                  className={
-                    "flex min-h-16 w-16 flex-col items-center justify-center rounded-xl border text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring " +
-                    (on
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card hover:bg-accent")
-                  }
-                >
-                  <span className="text-sm">{f.weekday}</span>
-                  <span className="text-base font-semibold">{f.date}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <ArrowNav>
+          <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin]">
+            {days.map((d) => {
+              const f = formatDayShort(d);
+              const on = d === selected;
+              return (
+                <li key={d} className="shrink-0">
+                  <Link
+                    href={`${basePath}?date=${d}`}
+                    aria-current={on ? "date" : undefined}
+                    className={
+                      "flex min-h-16 w-16 flex-col items-center justify-center rounded-xl border text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring " +
+                      (on
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:bg-accent")
+                    }
+                  >
+                    <span className="text-sm">{f.weekday}</span>
+                    <span className="text-base font-semibold">{f.date}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </ArrowNav>
       </nav>
       <form
         action={basePath}

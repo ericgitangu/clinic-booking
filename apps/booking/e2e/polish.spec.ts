@@ -207,7 +207,7 @@ test("the head installs well and every public page says who it is", async ({
   );
   expect(await meta('meta[property="og:url"]')).toMatch(/\/book$/);
   expect(await meta('meta[property="og:title"]')).toBe(
-    "Book a visit | Idyllic Clinic Booking",
+    "Book a visit | Idyllic Clinic",
   );
   expect(await meta('meta[name="mobile-web-app-capable"]')).toBe("yes");
   expect(await meta('meta[name="apple-mobile-web-app-title"]')).toBe("Idyllic");
