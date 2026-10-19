@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.core.config import BOOKING_MIN_LEAD_MINUTES_DEFAULT as _LEAD
-
 
 def _slug(code: str) -> str:
     return code.lower().replace("_", "-")
@@ -77,7 +75,7 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "Booking too soon",
         (
             "A booking, or a reschedule's new time, starts less than the minimum lead time "
-            f"({_LEAD} minutes) ahead of now."
+            "(BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now."
         ),
     ),
     ErrorSpec(
@@ -128,7 +126,8 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "Change too late",
         (
             "Changing or cancelling a visit that starts less than the minimum lead time "
-            f"({_LEAD} minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead."
+            "(BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is "
+            "BOOKING_TOO_SOON instead."
         ),
     ),
     ErrorSpec(

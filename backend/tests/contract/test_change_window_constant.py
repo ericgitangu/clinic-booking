@@ -4,6 +4,7 @@ the two ever differ, or if a deploy file overrides the setting without the apps 
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 
@@ -33,20 +34,28 @@ SKIP_DIRS = {".next", ".venv", ".git", "node_modules", "test-results", "__pycach
     ".drift-tmp",
     "generated",
 }
-# Where a deployed value could be set: workflow, compose, Terraform, scripts, env, Dockerfiles.
+# Where a deployed value could be set: workflow, compose, Terraform, scripts, env files,
+# Dockerfiles, the Makefile, and the code that configures test or export runs (.ts, .js, .py).
 CONFIG_SUFFIXES = {".yml", ".yaml", ".tf", ".tfvars", ".sh", ".env", ".example", ".toml", ".json"}
+CODE_SUFFIXES = {".ts", ".tsx", ".js", ".mjs", ".cjs", ".py"}
+PROSE_PREFIXES = ("docs/", "contracts/", "backend/app/", "backend/tests/")
 
 
 def _config_files() -> list[pathlib.Path]:
     found: list[pathlib.Path] = []
-    for path in ROOT.rglob("*"):
-        if not path.is_file() or SKIP_DIRS & set(path.relative_to(ROOT).parts):
-            continue
-        rel = path.relative_to(ROOT).as_posix()
-        if rel.startswith(("docs/", "contracts/", "backend/app/", "backend/tests/")):
-            continue  # prose and the contract mention the name; the code defines the default
-        if path.name.startswith(("Dockerfile", "Makefile")) or path.suffix in CONFIG_SUFFIXES:
-            found.append(path)
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]  # prune: never enter them
+        for name in filenames:
+            path = pathlib.Path(dirpath) / name
+            rel = path.relative_to(ROOT).as_posix()
+            if rel.startswith(PROSE_PREFIXES):
+                continue  # prose and the contract mention the name; the code defines the default
+            suffix = path.suffix
+            if (
+                name.startswith(("Dockerfile", "Makefile"))
+                or suffix in CONFIG_SUFFIXES | CODE_SUFFIXES
+            ):
+                found.append(path)
     return found
 
 

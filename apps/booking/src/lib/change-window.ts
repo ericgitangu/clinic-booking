@@ -1,5 +1,5 @@
 // The one-hour rule for changes: an appointment that starts in less than an hour can no longer be
-// cancelled or moved (the API answers 409 CHANGE_TOO_LATE). The screen hides the actions in that
+// cancelled or moved (the API answers 409 CHANGE_TOO_LATE). The screen disables the actions in that
 // window so nobody is invited to try; the API stays the authority.
 //
 // DEBT: this file exists twice, in apps/booking/src/lib and apps/admin/src/lib, with different
@@ -24,4 +24,4 @@ export const CHANGE_WINDOW_JUST_OPENED =
   "This visit now starts in less than an hour, so it can no longer be cancelled or moved.";
 
 export const CHANGE_WINDOW_NOTE =
-  "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.";
+  "This visit starts in less than an hour, so it can no longer be cancelled or moved in the app. Please call the clinic.";

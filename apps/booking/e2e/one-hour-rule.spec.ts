@@ -8,9 +8,10 @@ import { newPerson, sessionCookies } from "./support/auth";
 // a request that slips through still gets plain words. The appointment is booked through the UI
 // for a far-off time, then moved into the window in the database, as nothing public can book it.
 
-// Each scenario uses its own doctor and week (doctors 0 to 4 across the five scenarios, week 1 for
-// the two that move a visit): the appointment is moved to the next half hour in the database, and
-// one doctor cannot hold two bookings at the same time, so no two scenarios share a doctor.
+// Each scenario books a visit for a fresh person and then moves it in the database to a time
+// inside (or just outside) the last hour, because nothing public can book it there. Two scenarios
+// share a doctor (4) but move to different times; moveTo frees a slot an earlier run left behind,
+// so the file can be run again on the same database.
 async function bookedPerson(
   browser: import("@playwright/test").Browser,
   doctor: number,
@@ -42,6 +43,14 @@ async function moveTo(
     const slot = `date_trunc('hour', now() + make_interval(mins => $3))
         + CASE WHEN extract(minute FROM now() + make_interval(mins => $3)) >= 30
                THEN interval '30 minutes' ELSE interval '0' END`;
+    // A rerun on the same database finds an earlier run's visit in that slot: free it first.
+    await db.query(
+      `UPDATE appointments
+          SET status = 'cancelled', cancelled_at = now(), cancellation_reason = 'e2e: slot reused'
+        WHERE doctor_id = $2 AND starts_at = ${slot} AND starts_at <> $1::timestamptz
+          AND status = 'booked'`,
+      [originalStart, doctorId, minutesAhead],
+    );
     await db.query(
       `UPDATE appointments
           SET starts_at = ${slot}, ends_at = ${slot} + interval '30 minutes'
@@ -87,7 +96,7 @@ test("the reschedule page for a visit inside the last hour explains instead of o
   await moveIntoWindow(startsAt, doctorId);
   await page.goto(href!);
   await expect(page.getByRole("status")).toContainText(
-    /less than an hour.*contact the clinic/i,
+    /less than an hour.*call the clinic/i,
   );
   await expect(page.getByRole("button", { name: /confirm|move/i })).toHaveCount(
     0,
@@ -106,7 +115,7 @@ test("a cancel that slips through the window is refused in plain words", async (
   await moveIntoWindow(startsAt, doctorId);
   await page.getByRole("button", { name: "Cancel appointment" }).click();
   await expect(
-    page.getByText(/less than an hour.*contact the clinic/i).first(),
+    page.getByText(/less than an hour.*call the clinic/i).first(),
   ).toBeVisible();
   await context.close();
 });
@@ -160,7 +169,7 @@ test("moving a visit that now starts within the hour says so in plain words (CHA
   await moveIntoWindow(startsAt, doctorId);
   await page.getByRole("button", { name: "Move appointment" }).click();
   await expect(alertOf(page)).toContainText(
-    "This visit starts in less than an hour, so it can no longer be cancelled or moved. Please contact the clinic.",
+    "This visit starts in less than an hour, so it can no longer be cancelled or moved in the app. Please call the clinic.",
   );
   await context.close();
 });

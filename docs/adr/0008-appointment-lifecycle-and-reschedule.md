@@ -52,6 +52,6 @@ Decided by the engineer on 2026-10-18. The brief's bonus is "prevention of booki
 - **Staff.** [ADR-0030](0030-staff-roles-and-access.md) says the admin cancel and reschedule apply the same booking rules as the public endpoints, so owners and admins are held to the rule too, with no override. Cancelling a visit that is minutes away is a phone call to the clinic, not a button.
 - **Why 409 and a new code.** The appointment's state (how near it is) conflicts with the change, and the answer changes as time passes, which is the 409 meaning in [ADR-0006](0006-problem-details-error-model.md); `APPOINTMENT_ALREADY_STARTED` would be wrong and untrue before the start.
 - **Trade-off accepted.** A patient who cannot attend a visit under an hour away can no longer free the slot themselves; the clinic can do nothing through the app either. The slot is lost for that day.
-- **Both apps** hide cancel and reschedule inside the window, with a visible explanation tied to the disabled controls (`aria-describedby`).
+- **Both apps** disable cancel and reschedule inside the window, with a visible explanation tied to the disabled controls (`aria-describedby`).
 
 **Note (2026-10-19): the staff exemption.** Staff are held to the one-hour rule today, with no override, because [ADR-0030](0030-staff-roles-and-access.md) gives staff the public booking rules. [ADR-0033](0033-staff-crud-veto-and-invites.md) decides that staff are exempt from the lead-time rules; that exemption is not built yet and lands with the staff-write work, so until then staff follow the rule.

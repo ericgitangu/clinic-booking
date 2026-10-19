@@ -1936,7 +1936,7 @@ export type BookMineInternalMeAppointmentsPostErrors = {
      */
     409: unknown;
     /**
-     * Problem (RFC 9457)
+     * Problem (RFC 9457), including BOOKING_TOO_SOON
      */
     422: unknown;
     /**

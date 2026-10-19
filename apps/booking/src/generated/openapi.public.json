@@ -713,7 +713,7 @@
                     "summary": "BOOKING_TOO_SOON",
                     "value": {
                       "code": "BOOKING_TOO_SOON",
-                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (60 minutes) ahead of now.",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
                       "errors": null,
                       "instance": "/appointments",
                       "request_id": "00000000-0000-4000-8000-000000000000",
@@ -832,7 +832,7 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
                       "errors": null,
                       "instance": "/appointments/{appointment_id}/cancel",
                       "request_id": "00000000-0000-4000-8000-000000000000",
@@ -908,7 +908,7 @@
                     "summary": "CHANGE_TOO_LATE",
                     "value": {
                       "code": "CHANGE_TOO_LATE",
-                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
+                      "detail": "Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead.",
                       "errors": null,
                       "instance": "/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",
@@ -930,7 +930,7 @@
                     "summary": "BOOKING_TOO_SOON",
                     "value": {
                       "code": "BOOKING_TOO_SOON",
-                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (60 minutes) ahead of now.",
+                      "detail": "A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now.",
                       "errors": null,
                       "instance": "/appointments/{appointment_id}/reschedule",
                       "request_id": "00000000-0000-4000-8000-000000000000",

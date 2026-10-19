@@ -80,14 +80,38 @@ def _segments(text: str) -> list[str]:
     parts: list[str] = []
     for block in re.split(r"\n\s*\n", text):
         groups: list[list[str]] = []
+        previous = ""
         for line in block.splitlines():
-            if not groups or re.match(r"\s*([-*]|\d+\.)\s", line):
+            after_table_row = bool(previous.strip().startswith("|"))
+            if not groups or after_table_row or re.match(r"\s*([-*|]|\d+\.)\s?", line):
                 groups.append([])
+            previous = line
             groups[-1].append(_clean(line))
         for group in groups:
             paragraph = " ".join(filter(None, group))
             parts.append(paragraph)
-            parts.extend(re.split(r"(?<=[.;])\s+(?=[A-Z`*(\"'])", paragraph))
+            parts.extend(re.split(r"(?<=[.;])\s+(?=\S)", paragraph))
+    return parts
+
+
+CODE_SUFFIXES = (".ts", ".tsx", ".py")
+_LITERAL = re.compile(
+    r'"""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'',
+)
+_COMMENT = re.compile(r"(?m)^\s*(?://|#|\*|/\*)\s?(.*)$")
+
+
+def _code_segments(text: str) -> list[str]:
+    """For source files, each string literal and each comment line is a segment of its own, so a
+    wrong sentence cannot hide next to a correct one in the same block, array or template."""
+    parts: list[str] = []
+    for literal in _LITERAL.findall(text):
+        body = re.sub(r'^(\"\"\"|\'\'\'|[`"\'])|(\"\"\"|\'\'\'|[`"\'])$', "", literal)
+        body = " ".join(line.strip() for line in body.splitlines())
+        parts.append(body)
+        parts.extend(re.split(r"(?<=[.;])\s+(?=[A-Z`*(])", body))
+    for line in _COMMENT.findall(text):
+        parts.append(line)
     return parts
 
 
@@ -129,7 +153,8 @@ def violations(surfaces: list[tuple[str, str]]) -> list[str]:
         for phrase in BANNED:
             if phrase in text and not _is_dated_history(name, text, phrase):
                 bad.append(f"{name}: banned phrase {phrase!r}")
-        for seg in _segments(text):
+        segments = _code_segments(text) if name.endswith(CODE_SUFFIXES) else []
+        for seg in segments + _segments(text):
             if _paraphrase(seg):
                 bad.append(f"{name}: new slot paired with 409/CHANGE_TOO_LATE: {seg[:120]!r}")
     return bad
@@ -224,3 +249,40 @@ def test_every_surface_catches_a_planted_paraphrase() -> None:
     for name, text in surfaces:
         for planted in PARAPHRASES:
             assert violations([(name, f"{text}\n\n{planted}\n")]), (name, planted)
+
+
+WRONG = "A reschedule to a new time under an hour away is refused with 409 CHANGE_TOO_LATE."
+
+
+def _plant_mid_block(name: str, text: str) -> list[str]:
+    """The wrong sentence dropped into the middle of an existing block, on the lines around the
+    first mention of BOOKING_TOO_SOON (or the middle of the file): as a string literal, a template
+    literal, a comment, and replacing the neighbouring line."""
+    lines = text.splitlines()
+    at = next((i for i, line in enumerate(lines) if "BOOKING_TOO_SOON" in line), len(lines) // 2)
+    variants: list[str] = []
+    if name.endswith(CODE_SUFFIXES):
+        shapes = [f'  "{WRONG}",', f"  `{WRONG}`,", f"  // {WRONG}", f'  summary: "{WRONG}",']
+    elif name.endswith(".json"):
+        shapes = [WRONG]
+    else:
+        shapes = [WRONG]
+    for shape in shapes:
+        for offset in (0, 1):
+            planted = lines[: at + offset] + [shape] + lines[at + offset :]
+            variants.append("\n".join(planted))
+        replaced = list(lines)
+        if replaced:
+            replaced[at] = shape
+        variants.append("\n".join(replaced))
+    return variants
+
+
+def test_a_wrong_sentence_planted_mid_block_is_caught_in_every_surface() -> None:
+    surfaces = _surfaces()
+    assert violations(surfaces) == []
+    for name, text in surfaces:
+        if name.endswith(".json"):
+            continue  # the JSON surfaces are flattened to their strings; covered by the EOF plant
+        for variant in _plant_mid_block(name, text):
+            assert violations([(name, variant)]), (name, variant[:0])

@@ -132,7 +132,7 @@ The brief gives working hours and a fixed 30-minute slot. I derive free slots on
 - Book ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/create_appointment_appointments_post)): `422 BOOKING_TOO_SOON` when the start is under 60 minutes away.
 - Cancel ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/cancel_appointment_appointments__appointment_id__cancel_patch)): `409 CHANGE_TOO_LATE` when the appointment starts in under 60 minutes.
 - Reschedule ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/reschedule_appointment_appointments__appointment_id__reschedule_patch)): `409 CHANGE_TOO_LATE` when its current start is under 60 minutes away, and `422 BOOKING_TOO_SOON` when the new start is (a new time is validated as for a fresh booking).
-- Staff in the admin app are held to the same rule ([ADR-0030](docs/adr/0030-staff-roles-and-access.md)); the web apps hide cancel and reschedule inside the window and say why. A repeated request that already took effect (an idempotent booking, a reschedule to the time it already has) still returns its original result ([ADR-0013](docs/adr/0013-idempotency-keys.md)).
+- Staff in the admin app are held to the same rule ([ADR-0030](docs/adr/0030-staff-roles-and-access.md)); the web apps disable cancel and reschedule inside the window and say why. A repeated request that already took effect (an idempotent booking, a reschedule to the time it already has) still returns its original result ([ADR-0013](docs/adr/0013-idempotency-keys.md)).
 
 The rule is stated in the OpenAPI contract and tested against it; the reasoning is in [ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md).
 

@@ -18,7 +18,7 @@ current state; may succeed later or in another state.
 | UNKNOWN_DOCTOR | 422 | unknown-doctor | Unknown doctor | The body references a non-existent or inactive doctor. |
 | UNKNOWN_PATIENT | 422 | unknown-patient | Unknown patient | The body references a non-existent patient. |
 | SLOT_IN_PAST | 422 | slot-in-past | Slot in the past | starts_at is at or before now. |
-| BOOKING_TOO_SOON | 422 | booking-too-soon | Booking too soon | A booking, or a reschedule's new time, starts less than the minimum lead time (60 minutes) ahead of now. |
+| BOOKING_TOO_SOON | 422 | booking-too-soon | Booking too soon | A booking, or a reschedule's new time, starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) ahead of now. |
 | DATE_OUT_OF_RANGE | 422 | date-out-of-range | Date out of range | The clinic-local date is beyond the booking horizon. |
 | SLOT_MISALIGNED | 422 | slot-misaligned | Slot misaligned | Off the 30-minute grid of a window, or seconds/microseconds are non-zero. |
 | OUTSIDE_WORKING_HOURS | 422 | outside-working-hours | Outside working hours | [start, start + 30 min) is not inside a working window. |
@@ -26,7 +26,7 @@ current state; may succeed later or in another state.
 | SLOT_TAKEN | 409 | slot-taken | Slot taken | Another booking holds this doctor slot (uq_appt_doctor_slot_booked). |
 | PATIENT_DOUBLE_BOOKED | 409 | patient-double-booked | Patient double-booked | The patient already has a booking at this time (uq_appt_patient_slot_booked). |
 | APPOINTMENT_ALREADY_CANCELLED | 409 | appointment-already-cancelled | Appointment already cancelled | Cancel or reschedule of an already-cancelled appointment. |
-| CHANGE_TOO_LATE | 409 | change-too-late | Change too late | Changing or cancelling a visit that starts less than the minimum lead time (60 minutes) from now. A reschedule's new time is BOOKING_TOO_SOON instead. |
+| CHANGE_TOO_LATE | 409 | change-too-late | Change too late | Changing or cancelling a visit that starts less than the minimum lead time (BOOKING_MIN_LEAD_MINUTES, 60 by default) from now. A reschedule's new time is BOOKING_TOO_SOON instead. |
 | APPOINTMENT_ALREADY_STARTED | 409 | appointment-already-started | Appointment already started | Cancel or reschedule when starts_at is at or before now. |
 | PATIENT_PHONE_EXISTS | 409 | patient-phone-exists | Patient phone exists | Another patient already uses this phone (uq_patients_phone). |
 | CONCURRENT_UPDATE | 409 | concurrent-update | Concurrent update | A deadlock or serialization failure persisted after one retry. |
@@ -89,8 +89,8 @@ rule. It fires after the not-found, already-cancelled and already-started checks
 a reschedule that already happened (same new start) still returns the appointment.
 
 What a client should do: do not retry, and do not offer cancel or reschedule for an appointment
-inside the window. Tell the person in plain words that the visit is too close to change and to
-contact the clinic.
+inside the window. Tell the person in plain words that the visit is too close to change in the app and to
+call the clinic (staff are held to the same rule in the app; a phone call is how a visit that close is changed).
 
 The contract in one line: **`422 BOOKING_TOO_SOON` on book and on a reschedule's new start (a new
 time is validated as a fresh booking); `409 CHANGE_TOO_LATE` on cancel and on a reschedule's current

@@ -529,6 +529,8 @@ export const myAppointmentsInternalMeAppointmentsGetOptions = (options?: Options
 
 /**
  * Book Mine
+ *
+ * Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const bookMineInternalMeAppointmentsPostMutation = (options?: Partial<Options<BookMineInternalMeAppointmentsPostData>>): UseMutationOptions<BookMineInternalMeAppointmentsPostResponse, DefaultError, Options<BookMineInternalMeAppointmentsPostData>> => {
     const mutationOptions: UseMutationOptions<BookMineInternalMeAppointmentsPostResponse, DefaultError, Options<BookMineInternalMeAppointmentsPostData>> = {

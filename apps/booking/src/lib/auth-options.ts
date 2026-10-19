@@ -9,22 +9,35 @@ export interface AuthSecrets {
 
 type Env = Record<string, string | undefined>;
 
-// Better Auth's own limiter, written down instead of left to its defaults.
+// Better Auth's own limiter, with its numbers written down.
 //
-// Production: on, in memory, 100 requests per 10 seconds per client address and path (Better Auth's
-// default, now explicit), with its built-in stricter rules for the sign-in and sign-up paths left in
-// place. Each real visitor has an address of their own, so the limit only ever stops a flood.
+// Better Auth turns the limiter on in production builds (and off under `next dev`), 100 requests
+// per 10 seconds per client address and path, in memory, plus stricter built-in rules for the
+// sign-in and sign-up paths. This keeps all of that: `enabled` is NOT set, so the library default
+// still applies, and the numbers are the library's own. A visitor's address comes from the
+// X-Forwarded-For header; with no usable header every request shares one bucket (UNVERIFIED how
+// Vercel shapes that header in production, so do not read this as per-visitor isolation).
 //
-// Test runs: the same limiter with a ceiling no test reaches. The browser tests run many workers
-// from ONE address, and every page load asks for the session, so the suite itself passed 100 a
-// second and the session menu then got 429 and never appeared. The relaxed value applies only when
-// the app was started for tests (E2E=1 or NODE_ENV=test) and never when VERCEL_ENV is production.
+// Test runs: the browser tests run many workers from ONE address, and every page load asks for the
+// session, so the suite itself could pass 100 reads in 10 seconds and the session menu then got
+// 429. Only when the app was started for tests (E2E=1 or NODE_ENV=test) AND is served from this
+// machine (a localhost base URL) is the ceiling lifted; never when VERCEL_ENV is production or the
+// base URL is anything but local.
+export function isLocalUrl(url: string | undefined): boolean {
+  try {
+    const host = new URL(url ?? "").hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
 export function rateLimitFor(env: Env) {
   const testRun =
     env.VERCEL_ENV !== "production" &&
-    (env.NODE_ENV === "test" || env.E2E === "1");
+    (env.NODE_ENV === "test" || env.E2E === "1") &&
+    isLocalUrl(env.BETTER_AUTH_URL);
   return {
-    enabled: true,
     window: 10,
     max: testRun ? 100_000 : 100,
     storage: "memory" as const,

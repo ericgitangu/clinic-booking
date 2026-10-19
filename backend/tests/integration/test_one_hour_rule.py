@@ -241,12 +241,21 @@ async def test_both_starts_under_an_hour_answers_409_the_current_start_is_checke
     client: httpx.AsyncClient, app_with_clock: FastAPI, reset_appointments: None
 ) -> None:
     appt = (await _book(client, app_with_clock, NEAR)).json()["id"]
-    _clock(app_with_clock, _at(30))  # the visit starts in 30 minutes
+    _clock(app_with_clock, _at(15))  # the visit starts in 15 minutes
+    # The target is on the half-hour grid, in working hours, a different time, and 45 minutes away:
+    # under an hour too. Were the new time checked first, this would be 422 BOOKING_TOO_SOON.
+    target = NEAR + timedelta(minutes=30)
     resp = await client.patch(
-        f"/appointments/{appt}/reschedule",
-        json={"starts_at": (NEAR + timedelta(minutes=45)).isoformat()},  # also under an hour away
+        f"/appointments/{appt}/reschedule", json={"starts_at": target.isoformat()}
     )
     assert (resp.status_code, resp.json()["code"]) == (409, "CHANGE_TOO_LATE")
+    # Control: the same target from a visit that is far away is the too-soon-slot error.
+    far = (await _book(client, app_with_clock, FAR)).json()["id"]
+    _clock(app_with_clock, _at(15))
+    other = await client.patch(
+        f"/appointments/{far}/reschedule", json={"starts_at": target.isoformat()}
+    )
+    assert (other.status_code, other.json()["code"]) == (422, "BOOKING_TOO_SOON")
 
 
 async def test_staff_reschedule_follows_the_same_two_codes(reset_appointments: None) -> None:

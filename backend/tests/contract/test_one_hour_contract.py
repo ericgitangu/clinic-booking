@@ -7,7 +7,6 @@ from typing import Any
 import pytest
 
 from app.core.config import Settings
-from app.domain.booking_rules import RULE_AVAILABILITY
 from app.main import create_app
 
 
@@ -60,11 +59,7 @@ def test_booking_declares_422_booking_too_soon_with_an_example() -> None:
 
 def test_availability_states_the_rule() -> None:
     op = _spec()["paths"]["/doctors/{doctor_id}/availability"]["get"]
-    assert (
-        op["description"]
-        == RULE_AVAILABILITY
-        == ("Slots starting within 60 minutes are never offered.")
-    )
+    assert op["description"] == "Slots starting within 60 minutes are never offered."
 
 
 def test_the_problem_code_enum_in_the_contract_includes_change_too_late() -> None:
@@ -136,11 +131,28 @@ def test_changing_the_catalogue_or_the_base_url_changes_the_examples(
     assert ex["type"] == "https://other.test/api/problems/change-too-late"
 
 
-def test_the_lead_time_text_comes_from_the_setting_not_a_typed_number() -> None:
-    from app.core.config import BOOKING_MIN_LEAD_MINUTES_DEFAULT
-    from app.domain.booking_rules import RULE_AVAILABILITY, RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE
+def test_the_lead_time_text_follows_the_configured_setting() -> None:
+    """The contract says what this deployment enforces: a different BOOKING_MIN_LEAD_MINUTES
+    changes every description, and no placeholder is left over."""
+    for minutes in (60, 45):
+        settings = Settings(
+            DATABASE_URL="postgresql+asyncpg://u:p@localhost/db", BOOKING_MIN_LEAD_MINUTES=minutes
+        )
+        paths = create_app(settings).openapi()["paths"]
+        texts = [
+            paths["/appointments"]["post"]["description"],
+            paths["/internal/me/appointments"]["post"]["description"],
+            paths["/appointments/{appointment_id}/cancel"]["patch"]["description"],
+            paths["/appointments/{appointment_id}/reschedule"]["patch"]["description"],
+            paths["/doctors/{doctor_id}/availability"]["get"]["description"],
+        ]
+        for text in texts:
+            assert f"{minutes} minutes" in text and "{lead}" not in text, text
+            other = 45 if minutes == 60 else 60
+            assert f"{other} minutes" not in text, text
 
-    default = Settings(DATABASE_URL="postgresql+asyncpg://u:p@localhost/db")
-    assert default.BOOKING_MIN_LEAD_MINUTES == BOOKING_MIN_LEAD_MINUTES_DEFAULT
-    for text in (RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE, RULE_AVAILABILITY):
-        assert str(BOOKING_MIN_LEAD_MINUTES_DEFAULT) in text
+
+def test_the_signed_in_booking_path_states_the_rule_and_carries_the_example() -> None:
+    op = _spec()["paths"]["/internal/me/appointments"]["post"]
+    assert "422 BOOKING_TOO_SOON" in op["description"]
+    assert _example(op, "422", "BOOKING_TOO_SOON")["code"] == "BOOKING_TOO_SOON"

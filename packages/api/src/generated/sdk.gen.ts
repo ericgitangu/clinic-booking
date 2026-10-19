@@ -408,6 +408,8 @@ export const myAppointmentsInternalMeAppointmentsGet = <ThrowOnError extends boo
 
 /**
  * Book Mine
+ *
+ * Refused with 422 BOOKING_TOO_SOON when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
  */
 export const bookMineInternalMeAppointmentsPost = <ThrowOnError extends boolean = false>(options: Options<BookMineInternalMeAppointmentsPostData, ThrowOnError>): RequestResult<BookMineInternalMeAppointmentsPostResponses, BookMineInternalMeAppointmentsPostErrors, ThrowOnError> => (options.client ?? client).post<BookMineInternalMeAppointmentsPostResponses, BookMineInternalMeAppointmentsPostErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({

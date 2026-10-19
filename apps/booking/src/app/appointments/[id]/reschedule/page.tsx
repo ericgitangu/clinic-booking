@@ -11,6 +11,7 @@ import {
   isValidDay,
 } from "@/lib/clinic-time";
 import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
+import { ChangeWindowWatch } from "@/components/booking/change-window-watch";
 import { ownBooked } from "@/lib/own";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { callerFor, getIdentity } from "@/lib/session";
@@ -90,6 +91,10 @@ export default async function Reschedule({
 
   return (
     <section className="pb-28 pt-8">
+      <ChangeWindowWatch
+        startsAt={appt.data.starts_at}
+        serverNow={new Date().toISOString()}
+      />
       <p className="text-base">
         <Link href="/appointments" className="underline underline-offset-4">
           My appointments

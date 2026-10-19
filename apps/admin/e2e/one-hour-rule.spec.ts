@@ -7,10 +7,11 @@ import { bookOneStraightThroughTheApi } from "./support/booking";
 import { OWNER, internal } from "./support/stack";
 import { expect, test } from "./support/fixtures";
 
-function moveIntoTheLastHour(id: string) {
-  const next30 = `date_trunc('hour', now() + interval '50 minutes')
-    + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
-           THEN interval '30 minutes' ELSE interval '0' END`;
+function moveTo(id: string, minutesAhead: number) {
+  // The half hour at or just before now + minutesAhead, i.e. 0 to 30 minutes earlier than that.
+  const at = `now() + interval '${minutesAhead} minutes'`;
+  const slot = `date_trunc('hour', ${at})
+    + CASE WHEN extract(minute FROM ${at}) >= 30 THEN interval '30 minutes' ELSE interval '0' END`;
   execFileSync(
     "docker",
     [
@@ -26,12 +27,18 @@ function moveIntoTheLastHour(id: string) {
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      `UPDATE appointments SET starts_at = ${next30}, ends_at = ${next30} + interval '30 minutes'
+      // A rerun on the same database finds an earlier run's visit in that slot: free it first.
+      `UPDATE appointments SET status = 'cancelled', cancelled_at = now(),
+           cancellation_reason = 'e2e: slot reused'
+         WHERE starts_at = ${slot} AND status = 'booked' AND id <> '${id}';
+       UPDATE appointments SET starts_at = ${slot}, ends_at = ${slot} + interval '30 minutes'
          WHERE id = '${id}' AND status = 'booked'`,
     ],
     { stdio: "pipe" },
   );
 }
+
+const moveIntoTheLastHour = (id: string) => moveTo(id, 50);
 
 test("inside the last hour staff cannot cancel or move a visit, and are told why", async ({
   as,
@@ -60,4 +67,27 @@ test("inside the last hour staff cannot cancel or move a visit, and are told why
   );
   expect(res.status).toBe(409);
   expect(res.body.code).toBe("CHANGE_TOO_LATE");
+});
+
+test("a dialog open when the visit comes within the hour closes and a toast says why", async ({
+  as,
+}) => {
+  const id = await bookOneStraightThroughTheApi();
+  moveTo(id, 100); // 70 to 100 minutes away: outside the hour when the page is drawn
+  const page = await as("owner");
+  await page.clock.install({ time: new Date() });
+  await page.goto(`/dashboard/appointments/${id}`);
+  await page.getByRole("button", { name: "Cancel appointment" }).click();
+  await expect(page.getByLabel("Reason")).toBeVisible();
+  // 45 minutes pass with the dialog open; the page looks again every 30 seconds.
+  await page.clock.fastForward(45 * 60_000);
+  await expect(page.getByLabel("Reason")).toHaveCount(0);
+  await expect(
+    page.getByText(
+      "This visit now starts in less than an hour, so it can no longer be cancelled or moved.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cancel appointment" }),
+  ).toBeDisabled();
 });

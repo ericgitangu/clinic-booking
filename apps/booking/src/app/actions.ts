@@ -143,41 +143,42 @@ export async function bookAppointment(
     // The patient's own time gets plain words. The list is read only now that the API has refused
     // (never before every booking): with the same doctor the database may name either index first
     // (the doctor's slot or the patient's own time), so a SLOT_TAKEN for a time this patient
-    // holds with that doctor means they hold it themselves.
-    if (
+    // holds with that doctor means they hold it themselves. The two lookups are independent.
+    const refused =
       booked.kind === "problem" &&
-      (booked.code === "PATIENT_DOUBLE_BOOKED" || booked.code === "SLOT_TAKEN")
-    ) {
-      const mine = await api.myAppointments(caller);
-      const held = mine.ok
-        ? mine.data.items.find(
-            (a) =>
-              a.status === "booked" &&
-              Date.parse(a.ends_at) > Date.now() &&
-              Date.parse(a.starts_at) === Date.parse(when),
-          )
-        : undefined;
-      if (
-        held &&
-        (booked.code === "PATIENT_DOUBLE_BOOKED" || held.doctor_id === doctor)
-      ) {
-        return {
-          status: "error",
-          code: "PATIENT_DOUBLE_BOOKED",
-          severity: "warning",
-          message: heldMessage({
-            sameDoctor: held.doctor_id === doctor,
-            when: formatWhen(when),
-            doctor: held.doctor.full_name,
-          }),
-        };
-      }
-    }
+      (booked.code === "PATIENT_DOUBLE_BOOKED" || booked.code === "SLOT_TAKEN");
     const taken = booked.kind === "problem" && booked.code === "SLOT_TAKEN";
-    return failed(booked, {
-      nextSlots: taken ? await nextFreeSlots(doctor, when) : undefined,
-      doctorId: doctor,
-    });
+    const [mine, next] = refused
+      ? await Promise.all([
+          api.myAppointments(caller),
+          taken ? nextFreeSlots(doctor, when) : Promise.resolve(undefined),
+        ])
+      : [undefined, undefined];
+    const held = mine?.ok
+      ? mine.data.items.find(
+          (a) =>
+            a.status === "booked" &&
+            Date.parse(a.ends_at) > Date.now() &&
+            Date.parse(a.starts_at) === Date.parse(when),
+        )
+      : undefined;
+    if (
+      held &&
+      booked.kind === "problem" &&
+      (booked.code === "PATIENT_DOUBLE_BOOKED" || held.doctor_id === doctor)
+    ) {
+      return {
+        status: "error",
+        code: "PATIENT_DOUBLE_BOOKED",
+        severity: "warning",
+        message: heldMessage({
+          sameDoctor: held.doctor_id === doctor,
+          when: formatWhen(when),
+          doctor: held.doctor.full_name,
+        }),
+      };
+    }
+    return failed(booked, { nextSlots: next, doctorId: doctor });
   }
   // After the response has gone, so the email can never hold up the confirmation page.
   const made = booked.data;

@@ -97,7 +97,7 @@ def problem_with_example(status: int, *codes: str) -> dict[int | str, dict[str, 
 
     Only the codes are named here. The example bodies are written when the OpenAPI document is
     built (``fill_problem_examples``), from the error catalogue and the configured public base URL,
-    so an example is the body the handler would really send and cannot drift from it.
+    so an example is built the way the handler builds its body and cannot drift from it.
     """
     return {
         status: {
@@ -125,10 +125,30 @@ def change_too_late_responses(*, new_start: bool = False) -> dict[int | str, dic
     }
 
 
+def fill_lead_time(node: Any, minutes: int) -> None:
+    """In place: replace the lead-time token in every string of the document with the configured
+    value, so the contract states what this deployment enforces."""
+    from app.domain.booking_rules import LEAD_TOKEN
+
+    items = (
+        node.items()
+        if isinstance(node, dict)
+        else enumerate(node)
+        if isinstance(node, list)
+        else ()
+    )
+    for key, value in list(items):
+        if isinstance(value, str):
+            node[key] = value.replace(LEAD_TOKEN, str(minutes))
+        else:
+            fill_lead_time(value, minutes)
+
+
 def fill_problem_examples(spec: dict[str, Any], public_base_url: str) -> None:
     """Write each marked example from ``CATALOGUE_BY_CODE`` and ``public_base_url``: the same
-    fields, built the same way, as ``app.core.problems.build_problem`` (``instance`` is the
-    operation's path template, ``errors`` is null)."""
+    fields, built the same way, as ``app.core.problems.build_problem``. Two differences, both
+    because an example is not a request: ``instance`` is the operation's path template (the handler
+    sends the concrete request path) and ``request_id`` is a fixed placeholder."""
     from app.domain.errors import CATALOGUE_BY_CODE
 
     base = public_base_url.rstrip("/")

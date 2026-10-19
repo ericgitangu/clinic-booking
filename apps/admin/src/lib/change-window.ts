@@ -1,5 +1,5 @@
 // The one-hour rule for changes: an appointment that starts in less than an hour can no longer be
-// cancelled or moved (the API answers 409 CHANGE_TOO_LATE). The screen hides the actions in that
+// cancelled or moved (the API answers 409 CHANGE_TOO_LATE). The screen disables the actions in that
 // window so nobody is invited to try; the API stays the authority.
 //
 // DEBT: this file exists twice, in apps/booking/src/lib and apps/admin/src/lib, with different
