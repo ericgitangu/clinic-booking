@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -30,18 +31,19 @@ _GET = text(
 
 _UPSERT = text(
     """
-    INSERT INTO staff_access (email, role, granted_by)
-    VALUES (CAST(:email AS citext), CAST(:role AS staff_role), :actor)
+    INSERT INTO staff_access (email, role, granted_by, granted_at)
+    VALUES (CAST(:email AS citext), CAST(:role AS staff_role), :actor, :now)
     ON CONFLICT (email) DO UPDATE
       SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by,
-          granted_at = now(), revoked_at = NULL
+          granted_at = EXCLUDED.granted_at, revoked_at = NULL
     RETURNING email::text AS email, role::text AS role, granted_by, granted_at, revoked_at
     """
 )
 
 _SET_ROLE = text(
     """
-    UPDATE staff_access SET role = CAST(:role AS staff_role)
+    UPDATE staff_access
+    SET role = CAST(:role AS staff_role), granted_by = :actor, granted_at = :now
     WHERE email = CAST(:email AS citext) AND revoked_at IS NULL
     RETURNING email::text AS email, role::text AS role, granted_by, granted_at, revoked_at
     """
@@ -49,7 +51,7 @@ _SET_ROLE = text(
 
 _REVOKE = text(
     """
-    UPDATE staff_access SET revoked_at = now()
+    UPDATE staff_access SET revoked_at = :now
     WHERE email = CAST(:email AS citext) AND revoked_at IS NULL
     RETURNING email::text AS email, role::text AS role, granted_by, granted_at, revoked_at
     """
@@ -76,19 +78,28 @@ async def get_for_update(session: AsyncSession, email: str) -> dict[str, Any] | 
     return dict(row) if row else None
 
 
-async def upsert(session: AsyncSession, *, email: str, role: str, actor: str) -> dict[str, Any]:
+async def upsert(
+    session: AsyncSession, *, email: str, role: str, actor: str, now: datetime
+) -> dict[str, Any]:
     row = (
-        await session.execute(_UPSERT, {"email": email, "role": role, "actor": actor})
+        await session.execute(_UPSERT, {"email": email, "role": role, "actor": actor, "now": now})
     ).mappings()
     return dict(row.one())
 
 
-async def set_role(session: AsyncSession, *, email: str, role: str) -> dict[str, Any]:
-    return dict((await session.execute(_SET_ROLE, {"email": email, "role": role})).mappings().one())
+async def set_role(
+    session: AsyncSession, *, email: str, role: str, actor: str, now: datetime
+) -> dict[str, Any]:
+    """Change the role; ``granted_by`` and ``granted_at`` become the person who changed it and
+    when (the full history is in staff_access_audit)."""
+    row = await session.execute(
+        _SET_ROLE, {"email": email, "role": role, "actor": actor, "now": now}
+    )
+    return dict(row.mappings().one())
 
 
-async def revoke(session: AsyncSession, *, email: str) -> dict[str, Any]:
-    return dict((await session.execute(_REVOKE, {"email": email})).mappings().one())
+async def revoke(session: AsyncSession, *, email: str, now: datetime) -> dict[str, Any]:
+    return dict((await session.execute(_REVOKE, {"email": email, "now": now})).mappings().one())
 
 
 async def audit(

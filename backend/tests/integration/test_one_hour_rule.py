@@ -2,7 +2,7 @@
 
 An appointment (or a new time) less than 60 minutes away is refused; exactly 60 is allowed.
 A booking and a reschedule's new start answer 422 BOOKING_TOO_SOON; cancel and a reschedule's
-current start answer 409 CHANGE_TOO_LATE; staff are held to the same rule;
+current start answer 409 CHANGE_TOO_LATE; staff are exempt from both (and from nothing else);
 availability never offers a slot inside the window; and a repeat of a change that already
 happened still returns its result.
 """
@@ -132,7 +132,9 @@ async def test_availability_never_offers_a_slot_inside_the_window(
     assert (NEAR in starts) is (minutes >= 60)  # exactly 60 minutes away is offered
 
 
-async def test_staff_are_held_to_the_same_rule(reset_appointments: None) -> None:
+async def test_staff_are_exempt_from_the_rule_the_patient_is_held_to(
+    reset_appointments: None,
+) -> None:
     key = secrets.token_hex(24)
     owner = "owner@clinic.example"
     app = create_app(make_settings(INTERNAL_SIGNING_KEY=key, ADMIN_EMAILS=owner))
@@ -149,6 +151,7 @@ async def test_staff_are_held_to_the_same_rule(reset_appointments: None) -> None
             "m": "PATCH",
             "p": path,
             "bh": body_hash(body),
+            "ev": True,
         }
         return {
             "X-Internal-Assertion": sign(claims, key.encode()),
@@ -165,13 +168,13 @@ async def test_staff_are_held_to_the_same_rule(reset_appointments: None) -> None
         ).json()["id"]
         path = f"/internal/admin/appointments/{appt}/cancel"
         body = b'{"reason":"staff cancel"}'
-        for minutes, want in [(59, 409), (60, 200)]:
-            now = _at(minutes)
-            _clock(app, now)
-            r = await c.patch(path, content=body, headers=headers(path, body, now))
-            assert r.status_code == want, (minutes, r.text)
-            if want == 409:
-                assert r.json()["code"] == "CHANGE_TOO_LATE"
+        now = _at(59)
+        _clock(app, now)
+        patient = await c.patch(f"/appointments/{appt}/cancel", json={"reason": "patient cancel"})
+        assert patient.status_code == 409
+        assert patient.json()["code"] == "CHANGE_TOO_LATE"
+        staff = await c.patch(path, content=body, headers=headers(path, body, now))
+        assert staff.status_code == 200, staff.text
 
 
 async def test_a_replayed_booking_still_returns_the_original_inside_the_window(
@@ -258,7 +261,7 @@ async def test_both_starts_under_an_hour_answers_409_the_current_start_is_checke
     assert (other.status_code, other.json()["code"]) == (422, "BOOKING_TOO_SOON")
 
 
-async def test_staff_reschedule_follows_the_same_two_codes(reset_appointments: None) -> None:
+async def test_staff_reschedule_is_exempt_from_both_codes(reset_appointments: None) -> None:
     owner = "owner@clinic.example"
     app = create_app(make_settings(INTERNAL_SIGNING_KEY=_KEY, ADMIN_EMAILS=owner))
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
@@ -291,12 +294,25 @@ async def test_staff_reschedule_follows_the_same_two_codes(reset_appointments: N
                 headers=_headers(now, "PATCH", path, sub="s", email=owner, role="owner", body=body),
             )
 
-        # the visit within the hour: 409 for reschedule from it
-        r = await patch(near, "reschedule", _at(30), {"starts_at": FAR.isoformat()})
-        assert (r.status_code, r.json()["code"]) == (409, "CHANGE_TOO_LATE")
-        # a far visit moved to a too-soon time: 422, as for a fresh booking
-        r = await patch(far, "reschedule", _at(30), {"starts_at": NEAR.isoformat()})
-        assert (r.status_code, r.json()["code"]) == (422, "BOOKING_TOO_SOON")
+        # Staff are exempt from the lead-time rule and only from it: moving a visit that is
+        # within the hour, and moving a far one to a too-soon time, both go through.
+        r = await patch(
+            near,
+            "reschedule",
+            _at(30),
+            {"starts_at": (FAR + timedelta(minutes=30)).isoformat(), "reason": "doctor is free"},
+        )
+        assert r.status_code == 200, r.text
+        r = await patch(
+            far,
+            "reschedule",
+            _at(30),
+            {
+                "starts_at": (NEAR + timedelta(minutes=30)).isoformat(),
+                "reason": "walk-in at the desk",
+            },
+        )
+        assert r.status_code == 200, r.text
 
 
 async def test_a_signed_in_patient_cancels_and_reschedules_under_the_same_rules(

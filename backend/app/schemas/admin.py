@@ -69,15 +69,24 @@ class AdminAppointment(ClinicZoned):
     doctor_id: uuid.UUID
     doctor_name: str
     patient_id: uuid.UUID
+    # Chosen by the API from the caller's role. Owner and admin: the full name, phone, email and the
+    # reason. Viewer: initials ("J. D."), a masked phone, no email and no reason text.
     patient_name: str
+    patient_phone: str | None
+    patient_email: str | None
     starts_at: _dt.datetime
     ends_at: _dt.datetime
     status: AppointmentStatus
     cancellation_reason: str | None
+    staff_locked: bool
+    # The latest attendance mark: arrived, no_show, or null (not marked).
+    attendance: Literal["arrived", "no_show"] | None = None
     created_at: _dt.datetime
 
 
 class AdminAppointmentPage(BaseModel):
+    # "minimised" when the caller is a viewer, so the UI can say why a value looks cut down.
+    view: Literal["full", "minimised"]
     items: list[AdminAppointment]
     next_cursor: str | None
 
@@ -88,6 +97,8 @@ class LineageEvent(BaseModel):
     from_starts_at: _dt.datetime | None
     to_starts_at: _dt.datetime | None
     occurred_at: _dt.datetime
+    # Who made the change; null for events recorded before staff actions were recorded.
+    actor: Literal["patient", "staff"] | None = None
 
 
 class Lineage(BaseModel):
