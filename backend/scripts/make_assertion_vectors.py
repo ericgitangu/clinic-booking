@@ -7,11 +7,13 @@ this one file, so the two implementations of the scheme cannot drift apart.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import pathlib
 from datetime import UTC, datetime
 
-from app.core.assertion import AUDIENCE, body_hash, sign
+from app.core.assertion import AUDIENCE, _b64, body_hash, canonical, sign
 
 KEY = "k" * 32
 NOW = datetime(2026, 10, 19, 4, 0, tzinfo=UTC)
@@ -79,7 +81,29 @@ def build() -> dict[str, object]:
         _case("float times", _claims(iat=float(t), exp=float(t + 60)), "bad times"),
         _case("boolean times", _claims(iat=True, exp=t + 60), "bad times"),
         _case("missing identity", _without("role"), "missing identity"),
+        # Far outside any real clock: refused before arithmetic, so an int64 verifier cannot
+        # overflow on exp - iat or exp + skew.
+        _case("times beyond 2^40", _claims(iat=-(2**62), exp=-(2**62) + 10), "bad times"),
+        _case("exp beyond 2^40", _claims(iat=t, exp=2**63 - 1), "bad times"),
     ]
+    # A correctly signed payload with bytes after the claims object: the JSON must be the whole
+    # payload, not its first value.
+    trailing = _b64((canonical(_claims()) + " {}").encode("utf-8"))
+    cases.append(
+        {
+            "name": "trailing bytes after the claims",
+            "header": "v1."
+            + trailing
+            + "."
+            + _b64(hmac.new(KEY.encode(), trailing.encode("ascii"), hashlib.sha256).digest()),
+            "method": "GET",
+            "path": PATH,
+            "body": "",
+            "now": t,
+            "expect": "bad payload",
+            "principal": None,
+        }
+    )
     forged = sign(_claims(role="owner"), b"x" * 32)
     cases.append(
         {

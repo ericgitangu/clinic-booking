@@ -4,6 +4,34 @@
   "additionalProperties": false,
   "description": "The same event for an owner or admin on the live feed: it adds the appointment (to link to\nit), the patient's name and, for a cancellation, the reason. Only the Go gateway\n(``services/realtime``) sends it, over the admin app's IAM-protected stream; it never travels\nthrough the push service. A viewer gets ``AdminEvent`` instead.",
   "properties": {
+    "actor_email": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The staff member who made the change; null for a patient's own change.",
+      "title": "Actor Email"
+    },
+    "actor_role": {
+      "anyOf": [
+        {
+          "enum": [
+            "owner",
+            "admin",
+            "viewer"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Actor Role"
+    },
     "appointment_id": {
       "format": "uuid",
       "title": "Appointment Id",
@@ -77,6 +105,18 @@
       "title": "Seq",
       "type": "string"
     },
+    "staff_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The reason the staff member recorded (veto, unlock, attendance, staff booking, reschedule or cancel); null for a patient's own change.",
+      "title": "Staff Reason"
+    },
     "to_starts_at": {
       "anyOf": [
         {
@@ -100,7 +140,10 @@
     "seq",
     "appointment_id",
     "patient_name",
-    "cancellation_reason"
+    "cancellation_reason",
+    "actor_email",
+    "actor_role",
+    "staff_reason"
   ],
   "title": "StaffEvent",
   "type": "object"

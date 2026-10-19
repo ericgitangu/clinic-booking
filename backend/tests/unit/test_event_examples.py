@@ -18,12 +18,32 @@ from typing import Any
 import pytest
 
 from app.domain.realtime import ADMIN_CHANNEL, OutboxEvent, messages_for
-from app.schemas.events import AdminEvent, StaffEvent
+from app.schemas.events import AdminActionEvent, AdminEvent, StaffActionEvent, StaffEvent
 
 ROOT = pathlib.Path(__file__).resolve().parents[3] / "contracts" / "events"
 DOC: dict[str, Any] = json.loads((ROOT / "examples.v1.json").read_text())
 VIEWER_SCHEMA = json.loads((ROOT / "admin-event.v1.schema.json").read_text())
 STAFF_SCHEMA = json.loads((ROOT / "staff-event.v1.schema.json").read_text())
+ACTIONS: dict[str, Any] = json.loads((ROOT / "action-examples.v1.json").read_text())
+VIEWER_ACTION_SCHEMA = json.loads((ROOT / "admin-action.v1.schema.json").read_text())
+STAFF_ACTION_SCHEMA = json.loads((ROOT / "staff-action.v1.schema.json").read_text())
+STAFF_ONLY = (
+    "appointment_id",
+    "patient_name",
+    "cancellation_reason",
+    "actor_email",
+    "actor_role",
+    "staff_reason",
+)
+ACTION_STAFF_ONLY = (
+    "appointment_id",
+    "patient_name",
+    "actor_email",
+    "actor_role",
+    "reason",
+    "invite_email",
+    "invite_role",
+)
 
 
 def _outbox(row: dict[str, Any]) -> OutboxEvent:
@@ -60,7 +80,7 @@ def test_both_shapes_validate_and_staff_extends_viewer(case: dict[str, Any]) -> 
     AdminEvent.model_validate(case["viewer"])
     StaffEvent.model_validate(case["staff"])
     staff = dict(case["staff"])
-    for extra in ("appointment_id", "patient_name", "cancellation_reason"):
+    for extra in STAFF_ONLY:
         staff.pop(extra)
     assert staff == case["viewer"]
 
@@ -68,8 +88,7 @@ def test_both_shapes_validate_and_staff_extends_viewer(case: dict[str, Any]) -> 
 def test_viewer_schema_names_no_person_and_staff_schema_does() -> None:
     banned = ("appointment", "patient", "reason", "name", "phone", "email")
     assert not any(w in " ".join(VIEWER_SCHEMA["properties"]) for w in banned)
-    extras = {"appointment_id", "patient_name", "cancellation_reason"}
-    assert extras <= set(STAFF_SCHEMA["properties"])
+    assert set(STAFF_ONLY) <= set(STAFF_SCHEMA["properties"])
 
 
 def test_a_viewer_message_with_a_personal_field_is_rejected() -> None:
@@ -83,3 +102,28 @@ def test_only_cancellations_carry_a_reason() -> None:
     reasons = {c["row"]["event_type"]: c["staff"]["cancellation_reason"] for c in DOC["cases"]}
     assert reasons["cancelled"] == "Family emergency"
     assert reasons["booked"] is None and reasons["rescheduled"] is None
+
+
+def test_staff_annotations_carry_who_and_why_for_staff_only() -> None:
+    by_type = {c["row"]["event_type"]: c for c in DOC["cases"]}
+    veto = by_type["vetoed"]
+    assert veto["staff"]["actor_email"] and veto["staff"]["staff_reason"]
+    assert "actor_email" not in veto["viewer"] and "staff_reason" not in veto["viewer"]
+    assert by_type["booked"]["staff"]["actor_email"] is None
+
+
+@pytest.mark.parametrize("case", ACTIONS["cases"], ids=lambda c: c["name"])
+def test_action_shapes_validate_and_staff_extends_viewer(case: dict[str, Any]) -> None:
+    AdminActionEvent.model_validate(case["viewer"])
+    StaffActionEvent.model_validate(case["staff"])
+    staff = dict(case["staff"])
+    for extra in ACTION_STAFF_ONLY:
+        staff.pop(extra)
+    assert staff == case["viewer"]
+
+
+def test_action_viewer_schema_names_no_person() -> None:
+    banned = ("appointment", "patient", "reason", "name", "phone", "email", "actor")
+    assert not any(w in " ".join(VIEWER_ACTION_SCHEMA["properties"]) for w in banned)
+    assert VIEWER_ACTION_SCHEMA["additionalProperties"] is False
+    assert set(ACTION_STAFF_ONLY) <= set(STAFF_ACTION_SCHEMA["properties"])

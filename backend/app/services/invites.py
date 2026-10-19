@@ -251,4 +251,20 @@ async def accept(
             new_role=row["role"],
         )
         await repo.consume_invite(session, invite_id=row["id"], now=now)
+        # Audited like creating and revoking one (and streamed to the live feed from here). The
+        # actor is the person who accepted, in the role they now hold; the address stays a hash.
+        await repo.insert_audit(
+            session,
+            actor_email=address,
+            actor_role=row["role"],
+            action="invite_accept",
+            appointment_id=None,
+            reason="Invitation accepted",
+            before={},
+            after={
+                "invite_id": str(row["id"]),
+                "email_hash": email_hash(address),
+                "role": row["role"],
+            },
+        )
     return AccessEntry(**granted, source="db")

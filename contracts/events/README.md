@@ -3,12 +3,28 @@
 What the API pushes to browsers over the push service's SSE endpoint. The JSON Schemas here are
 exported from `backend/app/schemas/events.py` by `make openapi`; the same models are in
 `contracts/openapi.json` (components `SlotEvent`, `AdminEvent`), so `make gen-client` produces their
-types and zod schemas. Nothing here names a person or an appointment.
+types and zod schemas. Nothing the push service carries names a person or an appointment; the
+staff shapes further down do, and only the Go gateway sends them.
 
 | Channel | Message | Schema |
 |---|---|---|
 | `slots:{doctor_id}:{local_date}` | `slot_taken`, `slot_freed` | `slot-event.v1.schema.json` |
 | `admin:events` | `booked`, `rescheduled`, `cancelled` | `admin-event.v1.schema.json` |
+
+The admin channel also carries the staff annotations `vetoed`, `unlocked`, `arrived` and `no_show`
+in the same `AdminEvent` shape.
+
+The Go gateway (`services/realtime`, ADR-0021) streams the admin feed to the admin app over its own
+IAM-protected SSE stream, never through the push service. A viewer gets the shapes on the left, an
+owner or admin the ones on the right:
+
+| Source | Events | Viewer | Owner, admin |
+|---|---|---|---|
+| `appointment_events` | the seven event types above | `admin-event.v1.schema.json` | `staff-event.v1.schema.json` (adds the appointment, patient, cancellation reason and, for a staff change, `actor_email`, `actor_role`, `staff_reason`) |
+| `staff_action_audit` | `reminder_now`, `running_late`, `invite_created`, `invite_revoked`, `invite_accepted` | `admin-action.v1.schema.json` | `staff-action.v1.schema.json` (adds who, why, the patient and the invited address) |
+
+Both sources share one cursor, `<txid>.<id>` (migration 0014). `examples.v1.json` and
+`action-examples.v1.json` pin the Python models and the Go encoder to the same messages.
 
 A reschedule is a `slot_freed` (old time, old day's channel) plus a `slot_taken` (new time).
 `starts_at` is a UTC instant: compare instants, not strings, with the offset-bearing times of the

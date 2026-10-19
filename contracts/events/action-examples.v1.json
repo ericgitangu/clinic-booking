@@ -1,0 +1,204 @@
+{
+  "cases": [
+    {
+      "name": "reminder sent now",
+      "row": {
+        "txid": 860,
+        "id": 31,
+        "action": "reminder_now",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T06:30:00.000000Z",
+        "delay_minutes": null,
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "actor_email": "admin@clinic.example",
+        "actor_role": "admin",
+        "reason": "Reminder sent now at staff request",
+        "invite_email": null,
+        "invite_role": null,
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "reminder_now",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T06:30:00.000000Z",
+        "delay_minutes": null,
+        "seq": "860.31"
+      },
+      "staff": {
+        "kind": "reminder_now",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T06:30:00.000000Z",
+        "delay_minutes": null,
+        "seq": "860.31",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "actor_email": "admin@clinic.example",
+        "actor_role": "admin",
+        "reason": "Reminder sent now at staff request",
+        "invite_email": null,
+        "invite_role": null
+      }
+    },
+    {
+      "name": "doctor running late",
+      "row": {
+        "txid": 861,
+        "id": 32,
+        "action": "running_late",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T07:00:00.000000Z",
+        "delay_minutes": 20,
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Doctor running about 20 minutes late",
+        "invite_email": null,
+        "invite_role": null,
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "running_late",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T07:00:00.000000Z",
+        "delay_minutes": 20,
+        "seq": "861.32"
+      },
+      "staff": {
+        "kind": "running_late",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "starts_at": "2026-10-21T07:00:00.000000Z",
+        "delay_minutes": 20,
+        "seq": "861.32",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Doctor running about 20 minutes late",
+        "invite_email": null,
+        "invite_role": null
+      }
+    },
+    {
+      "name": "invitation created",
+      "row": {
+        "txid": 862,
+        "id": 33,
+        "action": "invite_create",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Invited as viewer",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer",
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "invite_created",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "862.33"
+      },
+      "staff": {
+        "kind": "invite_created",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "862.33",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Invited as viewer",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer"
+      }
+    },
+    {
+      "name": "invitation revoked",
+      "row": {
+        "txid": 863,
+        "id": 34,
+        "action": "invite_revoke",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Invitation revoked",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer",
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "invite_revoked",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "863.34"
+      },
+      "staff": {
+        "kind": "invite_revoked",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "863.34",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Invitation revoked",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer"
+      }
+    },
+    {
+      "name": "invitation accepted",
+      "row": {
+        "txid": 864,
+        "id": 35,
+        "action": "invite_accept",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "new.viewer@clinic.example",
+        "actor_role": "viewer",
+        "reason": "Invitation accepted",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer",
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "invite_accepted",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "864.35"
+      },
+      "staff": {
+        "kind": "invite_accepted",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "864.35",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "new.viewer@clinic.example",
+        "actor_role": "viewer",
+        "reason": "Invitation accepted",
+        "invite_email": "new.viewer@clinic.example",
+        "invite_role": "viewer"
+      }
+    }
+  ]
+}

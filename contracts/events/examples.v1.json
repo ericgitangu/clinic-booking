@@ -15,7 +15,10 @@
         "from_starts_at": null,
         "to_starts_at": "2026-10-21T06:30:00.000000Z",
         "local_date": "2026-10-21",
-        "from_local_date": null
+        "from_local_date": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       },
       "viewer": {
         "event_type": "booked",
@@ -36,7 +39,10 @@
         "seq": "845.17",
         "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
         "patient_name": "Wanjiru Kamau",
-        "cancellation_reason": null
+        "cancellation_reason": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       }
     },
     {
@@ -53,7 +59,10 @@
         "from_starts_at": "2026-10-21T06:30:00.000000Z",
         "to_starts_at": null,
         "local_date": "2026-10-21",
-        "from_local_date": null
+        "from_local_date": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       },
       "viewer": {
         "event_type": "cancelled",
@@ -74,7 +83,10 @@
         "seq": "845.18",
         "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
         "patient_name": "Wanjiru Kamau",
-        "cancellation_reason": "Family emergency"
+        "cancellation_reason": "Family emergency",
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       }
     },
     {
@@ -91,7 +103,10 @@
         "from_starts_at": "2026-10-21T06:30:00.000000Z",
         "to_starts_at": "2026-10-22T07:00:00.000000Z",
         "local_date": "2026-10-22",
-        "from_local_date": "2026-10-21"
+        "from_local_date": "2026-10-21",
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       },
       "viewer": {
         "event_type": "rescheduled",
@@ -112,7 +127,10 @@
         "seq": "845.19",
         "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
         "patient_name": "Wanjiru Kamau",
-        "cancellation_reason": null
+        "cancellation_reason": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       }
     },
     {
@@ -129,7 +147,10 @@
         "from_starts_at": "2026-10-21T06:30:00.000000Z",
         "to_starts_at": "2026-10-21T08:00:00.000000Z",
         "local_date": "2026-10-21",
-        "from_local_date": null
+        "from_local_date": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
       },
       "viewer": {
         "event_type": "rescheduled",
@@ -150,7 +171,98 @@
         "seq": "900.20",
         "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
         "patient_name": "Wanjiru Kamau",
-        "cancellation_reason": null
+        "cancellation_reason": null,
+        "actor_email": null,
+        "actor_role": null,
+        "staff_reason": null
+      }
+    },
+    {
+      "name": "vetoed by staff, with who and why for staff only",
+      "row": {
+        "txid": 851,
+        "id": 24,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "synthetic": false,
+        "event_type": "vetoed",
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "actor_email": "admin@clinic.example",
+        "actor_role": "admin",
+        "staff_reason": "Doctor asked to keep the original time"
+      },
+      "viewer": {
+        "event_type": "vetoed",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "851.24"
+      },
+      "staff": {
+        "event_type": "vetoed",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "851.24",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "actor_email": "admin@clinic.example",
+        "actor_role": "admin",
+        "staff_reason": "Doctor asked to keep the original time"
+      }
+    },
+    {
+      "name": "arrived, marked at the desk",
+      "row": {
+        "txid": 852,
+        "id": 25,
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "synthetic": false,
+        "event_type": "arrived",
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "staff_reason": "Marked arrived at the desk"
+      },
+      "viewer": {
+        "event_type": "arrived",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "852.25"
+      },
+      "staff": {
+        "event_type": "arrived",
+        "doctor_id": "e52e9da0-f7f3-5a6a-93d3-d7f658947afa",
+        "local_date": "2026-10-21",
+        "from_local_date": null,
+        "from_starts_at": null,
+        "to_starts_at": "2026-10-21T06:30:00.000000Z",
+        "seq": "852.25",
+        "appointment_id": "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+        "patient_name": "Wanjiru Kamau",
+        "cancellation_reason": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "staff_reason": "Marked arrived at the desk"
       }
     }
   ]

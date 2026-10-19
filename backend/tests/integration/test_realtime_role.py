@@ -38,12 +38,18 @@ async def rt_conn() -> AsyncIterator[asyncpg.Connection]:
 async def test_granted_columns_are_readable(rt_conn: asyncpg.Connection) -> None:
     await rt_conn.fetch(
         "SELECT id, txid, appointment_id, doctor_id, event_type, from_starts_at, to_starts_at,"
-        " local_date, from_local_date, occurred_at FROM appointment_events LIMIT 1"
+        " local_date, from_local_date, occurred_at, actor FROM appointment_events LIMIT 1"
     )
     await rt_conn.fetch(
-        "SELECT id, patient_id, status, cancellation_reason FROM appointments LIMIT 1"
+        "SELECT id, patient_id, doctor_id, starts_at, status, cancellation_reason, predecessor_id"
+        " FROM appointments LIMIT 1"
     )
     await rt_conn.fetch("SELECT id, full_name, synthetic FROM patients LIMIT 1")
+    await rt_conn.fetch(
+        "SELECT stream_id, txid, actor_email, actor_role, action, appointment_id, reason, after,"
+        " occurred_at FROM staff_action_audit LIMIT 1"
+    )
+    await rt_conn.fetch("SELECT id, email, role FROM staff_invites LIMIT 1")
     await rt_conn.fetch("SELECT email, role, revoked_at FROM staff_access LIMIT 1")
     horizon = await rt_conn.fetchval("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
     assert horizon is not None
@@ -51,7 +57,14 @@ async def test_granted_columns_are_readable(rt_conn: asyncpg.Connection) -> None
 
 DENIED = {
     "patient accounts": "SELECT * FROM patient_accounts",
-    "appointment start time": "SELECT starts_at FROM appointments",
+    "appointment idempotency key": "SELECT idempotency_key FROM appointments",
+    "staff audit before": "SELECT before FROM staff_action_audit",
+    "staff audit notified": "SELECT notified FROM staff_action_audit",
+    "invite token hash": "SELECT token_hash FROM staff_invites",
+    "invite inviter": "SELECT invited_by FROM staff_invites",
+    "attendance": "SELECT * FROM appointment_attendance",
+    "invite attempts": "SELECT * FROM invite_accept_cap",
+    "insert audit": "INSERT INTO staff_action_audit (reason) VALUES ('xxx')",
     "patient email": "SELECT email FROM patients",
     "patient phone": "SELECT phone FROM patients",
     "staff grantor": "SELECT granted_by FROM staff_access",
@@ -108,3 +121,22 @@ def test_runbook_grants_equal_the_migration() -> None:
     sql = (REPO / "scripts/ops/realtime_grants.sql").read_text()
     body = "\n".join(line for line in sql.splitlines() if not line.startswith("--"))
     assert textwrap.dedent(block).strip() == body.strip()
+
+
+async def test_audit_rows_get_a_stream_position_in_the_event_order(
+    owner_conn: asyncpg.Connection,
+) -> None:
+    """Migration 0014: an audit row written with no stream columns (as the API writes it) gets the
+    writing transaction and an id from the event log's sequence, so one cursor orders both."""
+    async with owner_conn.transaction():
+        audit = await owner_conn.fetchrow(
+            "INSERT INTO staff_action_audit (actor_email, actor_role, action, reason)"
+            " VALUES ('order@realtime-role.test', 'owner', 'invite_revoke', 'ordering probe')"
+            " RETURNING txid::text AS txid, stream_id, pg_current_xact_id()::text AS now_txid"
+        )
+        seq_next = await owner_conn.fetchval(
+            "SELECT nextval(pg_get_serial_sequence('appointment_events', 'id'))"
+        )
+    assert audit is not None
+    assert audit["txid"] == audit["now_txid"]
+    assert seq_next > audit["stream_id"]

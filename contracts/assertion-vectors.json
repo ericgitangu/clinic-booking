@@ -162,6 +162,36 @@
     },
     {
       "body": "",
+      "expect": "bad times",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6LTQ2MTE2ODYwMTg0MjczODc4OTQsImlhdCI6LTQ2MTE2ODYwMTg0MjczODc5MDQsIm0iOiJHRVQiLCJwIjoiL3N0cmVhbT9jdXJzb3I9MTIuMzQiLCJyb2xlIjoiYWRtaW4iLCJzdWIiOiJnb29nbGUtc3ViLTEifQ.w2VmyRWvHtPLlQyQTNi-c4Ox0AL0EPKEmNbN_PUGReA",
+      "method": "GET",
+      "name": "times beyond 2^40",
+      "now": 1792382400,
+      "path": "/stream?cursor=12.34",
+      "principal": null
+    },
+    {
+      "body": "",
+      "expect": "bad times",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6OTIyMzM3MjAzNjg1NDc3NTgwNywiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.v6HD3JXdbE977rJBADTG_tjjqzRbUFuKLwt8m9-KXwU",
+      "method": "GET",
+      "name": "exp beyond 2^40",
+      "now": 1792382400,
+      "path": "/stream?cursor=12.34",
+      "principal": null
+    },
+    {
+      "body": "",
+      "expect": "bad payload",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0ge30.HU6uFoSLxIwKOsvTmC7y1xuYaEBdv9YvCZkNoZOS89o",
+      "method": "GET",
+      "name": "trailing bytes after the claims",
+      "now": 1792382400,
+      "path": "/stream?cursor=12.34",
+      "principal": null
+    },
+    {
+      "body": "",
       "expect": "bad signature",
       "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6Im93bmVyIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.leO1Rna_e39bJcX_SzZN8khL2D8yNxaRuBKPA12mUmc",
       "method": "GET",
