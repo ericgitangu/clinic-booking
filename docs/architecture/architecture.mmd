@@ -1,0 +1,43 @@
+flowchart LR
+  accTitle: Idyllic Clinic architecture
+  accDescr: The browser reaches the booking and admin apps on Vercel. They call clinic-api on Cloud Run, which uses Neon Postgres. The admin app streams the staff live feed from clinic-realtime, a read-only Go service on Cloud Run that reads Neon Postgres. The API publishes slot events to Ably after each commit and the patient booking page subscribes. The browser gets a reCAPTCHA token, and the booking app verifies it with reCAPTCHA Enterprise using a federated access token, and calls Resend. CircleCI pushes images to Artifact Registry, runs the clinic-migrate job and deploys. Secret Manager supplies the API and the migration job.
+  B(["Browser<br/>PWA shell, polling fallback"])
+  GO["Google sign-in"]
+  subgraph V["Vercel"]
+    BK["Booking app<br/>Better Auth, server actions,<br/>BFF, after() emails"]
+    AD["Admin app<br/>Better Auth, roles, BFF"]
+  end
+  RC["reCAPTCHA Enterprise"]
+  RS["Resend"]
+  subgraph GC["Google Cloud us-east4"]
+    API["clinic-api: FastAPI on Cloud Run<br/>IAM-only, outbox relay"]
+    RT["clinic-realtime: Go on Cloud Run<br/>read-only, 0 to 2 instances"]
+    MIG["clinic-migrate: Cloud Run Job<br/>alembic as clinic_owner"]
+    SM["Secret Manager"]
+    AR["Artifact Registry"]
+  end
+  DB[("Neon Postgres 17<br/>partial unique index")]
+  AB["Ably"]
+  CRON["Vercel cron<br/>daily 15:00 UTC"]
+  CI["CircleCI<br/>OIDC to WIF, keyless"]
+  B -->|HTTPS| V
+  B -->|OAuth| GO
+  CRON -->|CRON_SECRET| BK
+  B -->|"reCAPTCHA token"| RC
+  BK -->|"assessment per action, via OIDC to WIF access token"| RC
+  BK -->|"after() on actions, cron reminders inline; 5 s abort"| RS
+  V ==>|"ID token via OIDC to WIF; + HMAC assertion on /internal"| API
+  AD ==>|"ID token + staff assertion; SSE live feed"| RT
+  RT -->|"SELECT only, role clinic_realtime"| DB
+  SM -->|"set-secrets at deploy"| API
+  SM -->|"DATABASE_URL (migrate)"| MIG
+  AR -->|image| API
+  AR -->|image| MIG
+  AR -->|image| RT
+  MIG -->|"alembic, role clinic_owner"| DB
+  API -->|"asyncpg, role clinic_app"| DB
+  API -->|"relay after each commit"| AB
+  AB -->|"SSE: patient booking page"| B
+  CI -->|"push image"| AR
+  CI --> GC
+  CI --> V

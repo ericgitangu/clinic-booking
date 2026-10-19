@@ -113,7 +113,7 @@ describe("landing page", () => {
       "What the brief asked for, and where to try it",
       "Verify the claims in 10 minutes",
       "How it\u2019s built",
-      "Section 4: AI usage",
+      "AI reflection (README \u00a711)",
     ]) {
       expect(html, t).toContain(t);
     }
