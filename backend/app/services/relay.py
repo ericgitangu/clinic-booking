@@ -16,6 +16,22 @@ nothing more. A batch that provably never left this process (nothing was sent) r
 debit included. A repeat inside the push service's duplicate window is dropped by id, and
 consumers also order by ``seq``.
 
+A trigger that finds nothing to send is not always "nothing to send". Another relay may hold the
+cursor row (``SKIP LOCKED`` makes the loser return at once), and the holder may have read its batch
+before the loser's event committed; the event would then wait for the next trigger. So the
+roles are fixed: a LOSER returns immediately (no sleep, no retry, so a booking never pays for
+someone else's slow publish), and the HOLDER drains: after each pass it takes a fresh snapshot and
+reads again, until a pass finds nothing new (at most ``MAX_PASSES`` passes, inside the time budget).
+Events committed by other writers while it was publishing are above its earlier snapshot and are
+picked up by the next pass. A failed publish ends the loop (the breaker handles it). Every pass
+starts from the cursor, which only moves in the transaction that publishes, so an event goes out
+once however many passes there are; the publish budget is debited in that same transaction
+(``debited_through`` guards a repeat), and the ``xmin`` guard is untouched: nothing is published
+before its transaction is visible. An event held back by an older open transaction is sent by the
+trigger that follows that transaction's commit. The token mints run the same relay (holder or
+loser the same way), so an open page asking for a new token also flushes what is stranded; the
+clients' poll stays as the last safety net.
+
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
 There is no always-on worker, so an event stuck behind a concurrent open transaction waits for
@@ -82,15 +98,38 @@ _MARK_DEBITED = text(
     """
 )
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
+# A holder starts another pass only when the time left covers the slowest pass so far with this
+# margin, and never less than the floor. A pass is never started to be cancelled mid-publish.
+PASS_MARGIN = 1.25
+PASS_FLOOR = 0.05
+
+# Passes a holder makes in one trigger: each re-reads from a fresh snapshot, and the loop ends as
+# soon as a pass finds nothing. Bounded so a steady stream of writers cannot keep one request busy;
+# the relay's time budget bounds it in seconds as well.
+MAX_PASSES = 8
 
 BREAKER_FAILURES = 3
 BREAKER_PAUSE = timedelta(seconds=60)
+
+
+@dataclass
+class _Progress:
+    """What one trigger has done so far: kept outside the drain so a failure or the time limit in a
+    later pass cannot hide the messages an earlier pass sent."""
+
+    published: int = 0
+    failed: bool = False
 
 
 @dataclass(frozen=True)
 class RelayResult:
     published: int = 0
     failed: bool = False
+    # Another relay held the cursor row: this one is a loser and returns at once.
+    contended: bool = False
+    # Rows the pass moved the cursor past (sent, or skipped as too old or unpaid for): the holder
+    # reads again after a pass that consumed any.
+    consumed: int = 0
 
 
 class _NothingSent(Exception):
@@ -131,7 +170,7 @@ async def _relay_in(
 ) -> RelayResult:
     cursor = (await session.execute(_CURSOR)).first()
     if cursor is None:
-        return RelayResult()  # another relay holds the cursor row
+        return RelayResult(contended=True)  # another relay holds the cursor row
     rows = (
         await session.execute(_EVENTS, {"txid": cursor.txid, "id": cursor.id, "limit": limit})
     ).all()
@@ -165,7 +204,7 @@ async def _relay_in(
             return RelayResult(failed=True)
         published = len(messages)
     await session.execute(_ADVANCE, {"txid": str(last.txid), "id": last.id, "now": now})
-    return RelayResult(published=published)
+    return RelayResult(published=published, consumed=len(rows))
 
 
 async def relay_once(
@@ -226,20 +265,19 @@ class Relay:
         now = clock.now()
         if self._paused_until is not None and now < self._paused_until:
             return 0  # breaker open: skip the attempt, the clients' poll covers the gap
+        progress = _Progress()
         try:
-            result = await asyncio.wait_for(
-                relay_once(
-                    self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
-                ),
-                timeout=self._timeout,
-            )
+            # The drain stops itself before the budget; this is the backstop for a pass that hangs.
+            await asyncio.wait_for(self._drain(clock, progress), timeout=self._timeout)
         except Exception:  # noqa: BLE001  # a push problem must never fail the booking response
             _log.warning("realtime relay failed; a later trigger retries", exc_info=True)
-            result = RelayResult(failed=True)
-        if not result.failed:
+            progress.failed = True
+        if not progress.failed:
             self._failures = 0
             self._paused_until = None
-            return result.published
+            return progress.published
+        # A failure counts once toward the breaker, even when earlier passes of the same trigger
+        # published (those messages are returned and are not undone: the cursor moved with them).
         self._failures += 1
         if self._failures >= BREAKER_FAILURES and self._paused_until is None:
             self._paused_until = now + BREAKER_PAUSE
@@ -250,4 +288,29 @@ class Relay:
             )
         elif self._failures >= BREAKER_FAILURES:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
-        return 0
+        return progress.published
+
+    async def _drain(self, clock: Clock, progress: _Progress) -> None:
+        """One trigger. A loser returns at once. A holder passes again from a fresh snapshot after
+        every pass that moved the cursor, until a pass finds nothing, ``MAX_PASSES``, or too little
+        time is left for another pass of the length seen so far: it never starts a publish the
+        time budget would cancel in flight (a cancelled publish may be accepted over there with the
+        cursor not moved, so the next trigger would send it again). A failed publish ends it.
+        ``progress`` collects what was sent, so a later failure or timeout cannot hide it."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._timeout
+        slowest = 0.0
+        for attempt in range(MAX_PASSES):
+            begun = loop.time()
+            if attempt > 0 and deadline - begun < max(slowest * PASS_MARGIN, PASS_FLOOR):
+                return  # the remainder goes out with the next trigger (see the module docstring)
+            result = await relay_once(
+                self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
+            )
+            slowest = max(slowest, loop.time() - begun)
+            progress.published += result.published
+            if result.failed:
+                progress.failed = True
+                return
+            if result.contended or result.consumed == 0:
+                return
