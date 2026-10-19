@@ -33,6 +33,8 @@ export interface LiveStreamOptions {
   onRefresh(): void;
   /** Where to read from; defaults to the admin app's own route. */
   url?: string;
+  /** Only this appointment's events (the appointment page); a canonical UUID. */
+  appointment?: string;
   fetchImpl?: typeof fetch;
   isHidden?: () => boolean;
   timers?: {
@@ -53,6 +55,7 @@ export class LiveStream {
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private pausedByHidden = false;
   private failures = 0;
+  private droppedCursor = false;
   /** Counts connection attempts, so a test (or a trace) can see that a hidden tab opened none. */
   attempts = 0;
 
@@ -166,9 +169,11 @@ export class LiveStream {
     const signal = this.abort.signal;
     const doFetch = this.o.fetchImpl ?? fetch;
     const base = this.o.url ?? "/live/stream";
-    const url = this.lastId
-      ? `${base}?cursor=${encodeURIComponent(this.lastId)}`
-      : base;
+    const query = new URLSearchParams();
+    if (this.o.appointment) query.set("appointment", this.o.appointment);
+    if (this.lastId) query.set("cursor", this.lastId);
+    const qs = query.toString();
+    const url = qs ? `${base}?${qs}` : base;
     let res: Response;
     try {
       res = await doFetch(url, {
@@ -184,6 +189,21 @@ export class LiveStream {
       this.set("denied");
       return;
     }
+    if (res.status === 400 && this.lastId !== null && !this.droppedCursor) {
+      // The gateway will not resume from this cursor: start fresh, once. The page refreshes its
+      // numbers so nothing missed in between stays missing.
+      this.droppedCursor = true;
+      this.lastId = null;
+      this.o.onRefresh();
+      void this.connect();
+      return;
+    }
+    if (res.status === 400) {
+      // Refused without a cursor to drop (a filter the gateway will not take): retrying would
+      // repeat the same request, so stop.
+      this.set("denied");
+      return;
+    }
     if (res.status === 429 || res.status === 503) {
       const wait = Number(res.headers.get("retry-after")) * 1000;
       this.set("busy");
@@ -196,6 +216,7 @@ export class LiveStream {
       return;
     }
     this.failures = 0;
+    this.droppedCursor = false;
     this.stopRefreshing();
     this.set("live");
 

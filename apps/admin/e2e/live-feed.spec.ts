@@ -37,10 +37,36 @@ async function book(name: string) {
       patient_id: patient.body.id,
       starts_at: slot.starts_at,
     });
-    if (res.status === 201) return { id: res.body.id, name };
+    if (res.status === 201)
+      return { id: res.body.id, name, date, startsAt: slot.starts_at };
   }
   throw new Error("no free slot to book");
 }
+
+/** The patient moves their own booking to another free time the same day. */
+async function patientReschedules(made: {
+  id: string;
+  date: string;
+  startsAt: string;
+}) {
+  const { doctorId } = seeded();
+  const avail = await publicApi<{ slots: Slot[] }>(
+    "GET",
+    `/doctors/${doctorId}/availability?date=${made.date}`,
+  );
+  const to = avail.body.slots.find(
+    (s) => Date.parse(s.starts_at) !== Date.parse(made.startsAt),
+  );
+  if (!to) throw new Error("no second free slot that day");
+  const moved = await publicApi(
+    "PATCH",
+    `/appointments/${made.id}/reschedule`,
+    { starts_at: to.starts_at },
+  );
+  expect(moved.status).toBe(200);
+}
+
+const ADMIN = { email: EMAIL.admin, role: "admin" };
 
 async function live(page: import("@playwright/test").Page) {
   await page.goto("/dashboard");
@@ -109,32 +135,62 @@ test.describe("live feed", () => {
     expect(html).not.toContain(name);
     expect(html).not.toContain(made.id);
 
-    // The same stream, read directly with the viewer's own session: no personal field at all.
+    // The same stream, read directly with the viewer's own session: no personal field at all. The
+    // page lets go of its stream first (the local gateway serves one at a time), so the direct
+    // read must get 200: a 429 here would mean the test proved nothing.
+    const second = `Hidden Again ${Date.now()}`;
+    await page.exposeFunction("bookNow", async () => {
+      await book(second);
+    });
+    await page.goto("/live-feed-e2e-no-stream");
     const raw = await page.evaluate(async () => {
+      const w = window as unknown as { bookNow: () => Promise<void> };
+      let res: Response | null = null;
       const ctl = new AbortController();
-      const res = await fetch("/live/stream", { signal: ctl.signal });
+      // The gateway frees the slot when it notices the page's stream is gone: allow it a moment.
+      for (let i = 0; i < 40; i++) {
+        res = await fetch("/live/stream", { signal: ctl.signal });
+        if (res.status === 200) break;
+        await res.body?.cancel();
+        await new Promise((ok) => setTimeout(ok, 250));
+      }
+      if (!res || res.status !== 200)
+        return { status: res?.status ?? 0, text: "" };
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
       let text = "";
-      const until = Date.now() + 1500;
-      while (Date.now() < until) {
+      let booked = false;
+      const until = Date.now() + 8000;
+      while (Date.now() < until && !text.includes("event: booked")) {
         const r = await Promise.race([
           reader.read(),
           new Promise<{ done: true; value: undefined }>((ok) =>
-            setTimeout(() => ok({ done: true, value: undefined }), 1500),
+            setTimeout(() => ok({ done: true, value: undefined }), 1000),
           ),
         ]);
-        if (r.done) break;
-        text += dec.decode(r.value);
+        if (r.value) text += dec.decode(r.value);
+        if (!booked && text.includes("event: hello")) {
+          booked = true;
+          await w.bookNow();
+        }
+        if (r.done && !r.value && !booked) break;
       }
       ctl.abort();
       return { status: res.status, text };
     });
-    // The page itself holds the one slot, so a second reader is told to wait: nothing to leak.
-    expect([200, 429]).toContain(raw.status);
-    expect(raw.text).not.toContain(name);
-    expect(raw.text).not.toContain("patient_name");
-    expect(raw.text).not.toContain("appointment_id");
+    expect(raw.status).toBe(200);
+    expect(raw.text).toContain("event: booked");
+    for (const secret of [
+      name,
+      second,
+      made.id,
+      "patient_name",
+      "appointment_id",
+      "actor_email",
+      "staff_reason",
+    ]) {
+      expect(raw.text).not.toContain(secret);
+    }
   });
 
   test("a second viewer is told the feed is busy, and the page keeps refreshing instead", async ({
@@ -194,5 +250,50 @@ test.describe("live feed", () => {
       { timeout: 15_000 },
     );
     await context.close();
+  });
+
+  test("a staff veto shows in the feed, and on the open appointment page, within 2 seconds", async ({
+    as,
+  }) => {
+    const page = await as("owner");
+    await live(page);
+    const first = await book(`Live Veto ${Date.now()}`);
+    await patientReschedules(first);
+
+    const vetoed = await internal(
+      "POST",
+      `/internal/admin/appointments/${first.id}/veto`,
+      ADMIN,
+      { reason: "Doctor asked to keep the original time" },
+    );
+    expect(vetoed.status).toBe(200);
+    const row = page
+      .getByTestId("live-event")
+      .filter({ hasText: `Vetoed by ${EMAIL.admin}` });
+    await expect(row).toBeVisible({ timeout: 2000 });
+    await expect(row).toHaveAttribute("data-kind", "vetoed");
+    await expect(row).toContainText("Doctor asked to keep the original time");
+    await expect(row).toContainText(first.name);
+
+    // The appointment page holds its own stream, filtered to that appointment. Opening it lets go
+    // of the dashboard's (one stream per person).
+    const second = await book(`Live Veto Page ${Date.now()}`);
+    await patientReschedules(second);
+    await page.goto(`/dashboard/appointments/${second.id}`);
+    const status = page.getByTestId("appointment-live");
+    await expect(status).toHaveAttribute("data-status", "live");
+    const moves = page.getByTestId("lineage-rescheduled");
+    await expect(moves).toHaveCount(1);
+
+    const again = await internal(
+      "POST",
+      `/internal/admin/appointments/${second.id}/veto`,
+      ADMIN,
+      { reason: "Keep the booked time" },
+    );
+    expect(again.status).toBe(200);
+    // The veto moves the visit back: the history gains that move without a reload.
+    await expect(moves).toHaveCount(2, { timeout: 2000 });
+    await expect(status).not.toHaveAttribute("data-updated-at", "");
   });
 });

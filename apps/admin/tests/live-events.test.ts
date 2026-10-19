@@ -4,6 +4,7 @@ import {
   addEvent,
   after,
   describe as sentence,
+  isAboutAppointment,
   parseLiveEvent,
   type LiveEvent,
 } from "@/lib/live-events";
@@ -26,6 +27,28 @@ const staff = (over: Record<string, unknown> = {}) =>
     appointment_id: APPT,
     patient_name: "Wanjiru Kamau",
     cancellation_reason: null,
+    actor_email: null,
+    actor_role: null,
+    staff_reason: null,
+    ...over,
+  });
+const viewerAction = (over: Record<string, unknown> = {}) => ({
+  kind: "reminder_now",
+  doctor_id: DOCTOR,
+  starts_at: "2026-10-21T06:30:00.000000Z",
+  delay_minutes: null,
+  seq: "860.31",
+  ...over,
+});
+const staffAction = (over: Record<string, unknown> = {}) =>
+  viewerAction({
+    appointment_id: APPT,
+    patient_name: "Wanjiru Kamau",
+    actor_email: "admin@clinic.example",
+    actor_role: "admin",
+    reason: "Reminder sent now at staff request",
+    invite_email: null,
+    invite_role: null,
     ...over,
   });
 
@@ -52,7 +75,14 @@ describe("parseLiveEvent", () => {
   });
 
   it("refuses a viewer's message that carries any personal field", () => {
-    for (const k of ["patient_name", "appointment_id", "cancellation_reason"]) {
+    for (const k of [
+      "patient_name",
+      "appointment_id",
+      "cancellation_reason",
+      "actor_email",
+      "actor_role",
+      "staff_reason",
+    ]) {
       expect(
         parseLiveEvent(JSON.stringify(viewer({ [k]: "x" })), "viewer"),
       ).toBeNull();
@@ -98,6 +128,13 @@ describe("ordering", () => {
     appointmentId: null,
     patientName: null,
     cancellationReason: null,
+    startsAt: null,
+    delayMinutes: null,
+    actorEmail: null,
+    actorRole: null,
+    staffReason: null,
+    inviteEmail: null,
+    inviteRole: null,
   });
 
   it("keeps the newest first and drops a repeat", () => {
@@ -155,5 +192,91 @@ describe("describe", () => {
     expect(sentence(cx, undefined, "owner")).toContain(
       "Reason: Family emergency",
     );
+  });
+});
+
+describe("staff annotations and actions", () => {
+  const veto = staff({
+    event_type: "vetoed",
+    actor_email: "admin@clinic.example",
+    actor_role: "admin",
+    staff_reason: "Doctor asked to keep the original time",
+  });
+
+  it("an owner reads who vetoed and why; a viewer reads only that it happened", () => {
+    const ev = parseLiveEvent(JSON.stringify(veto), "owner")!;
+    expect(sentence(ev, undefined, "owner")).toBe(
+      "Vetoed by admin@clinic.example: Doctor asked to keep the original time. Wanjiru Kamau, Wed 21 Oct 09:30",
+    );
+    const v = parseLiveEvent(
+      JSON.stringify(viewer({ event_type: "vetoed" })),
+      "viewer",
+    )!;
+    const text = sentence(v, undefined, "viewer");
+    expect(text).toBe("Vetoed. Wed 21 Oct 09:30");
+    expect(text).not.toContain("admin@");
+  });
+
+  it("describes attendance, reminders and running late", () => {
+    const arrived = parseLiveEvent(
+      JSON.stringify(staff({ event_type: "arrived" })),
+      "admin",
+    )!;
+    expect(sentence(arrived, undefined, "admin")).toMatch(/^Marked arrived: /);
+    const remind = parseLiveEvent(JSON.stringify(staffAction()), "owner")!;
+    expect(sentence(remind, undefined, "owner")).toBe(
+      "Reminder sent: Wanjiru Kamau, Wed 21 Oct 09:30 by admin@clinic.example",
+    );
+    const late = parseLiveEvent(
+      JSON.stringify(viewerAction({ kind: "running_late", delay_minutes: 20 })),
+      "viewer",
+    )!;
+    expect(sentence(late, undefined, "viewer")).toBe(
+      "Running late (about 20 min): Wed 21 Oct 09:30",
+    );
+  });
+
+  it("names the invited address for owners and admins only", () => {
+    const invite = {
+      kind: "invite_created",
+      doctor_id: null,
+      starts_at: null,
+      delay_minutes: null,
+      seq: "862.33",
+    };
+    const s = parseLiveEvent(
+      JSON.stringify({
+        ...invite,
+        appointment_id: null,
+        patient_name: null,
+        actor_email: "owner@clinic.example",
+        actor_role: "owner",
+        reason: "Invited as viewer",
+        invite_email: "new.viewer@clinic.example",
+        invite_role: "viewer",
+      }),
+      "admin",
+    )!;
+    expect(sentence(s, undefined, "admin")).toBe(
+      "Invite sent to new.viewer@clinic.example (viewer) by owner@clinic.example",
+    );
+    expect(isAboutAppointment(s)).toBe(false);
+    const v = parseLiveEvent(JSON.stringify(invite), "viewer")!;
+    expect(sentence(v, undefined, "viewer")).toBe("Invite sent");
+  });
+
+  it("refuses a viewer action carrying any staff field, and a staff action missing them", () => {
+    for (const k of ["reason", "actor_email", "invite_email", "patient_name"]) {
+      expect(
+        parseLiveEvent(JSON.stringify(viewerAction({ [k]: "x" })), "viewer"),
+      ).toBeNull();
+    }
+    expect(parseLiveEvent(JSON.stringify(viewerAction()), "owner")).toBeNull();
+    expect(
+      parseLiveEvent(
+        JSON.stringify(viewerAction({ kind: "teleported" })),
+        "viewer",
+      ),
+    ).toBeNull();
   });
 });

@@ -34,7 +34,7 @@ function sse() {
 
 function setup(
   responses: (Response | "network")[],
-  over: { hidden?: () => boolean } = {},
+  over: { hidden?: () => boolean; appointment?: string } = {},
 ) {
   const urls: string[] = [];
   const streams: ReturnType<typeof sse>[] = [];
@@ -58,6 +58,7 @@ function setup(
     onStatus: (s) => statuses.push(s),
     onRefresh: refresh,
     isHidden: over.hidden,
+    appointment: over.appointment,
   });
   return { live, urls, events, statuses, refresh, streams };
 }
@@ -246,5 +247,57 @@ describe("LiveStream", () => {
     await tick(10 * 60_000);
     expect(t.refresh).not.toHaveBeenCalled();
     expect(t.live.attempts).toBe(1);
+  });
+
+  it("the appointment page asks for its own appointment, and resumes with the filter kept", async () => {
+    const id = "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8";
+    const a = sse();
+    const b = sse();
+    const t = setup([a.response, b.response], { appointment: id });
+    t.streams.push(a, b);
+    t.live.start();
+    await tick();
+    a.push("id: 5.0\nevent: hello\ndata: {}\n\n");
+    a.push('event: reconnect\ndata: {"reason":"lifetime"}\n\n');
+    a.end();
+    await tick();
+    expect(t.urls).toEqual([
+      `/live/stream?appointment=${id}`,
+      `/live/stream?appointment=${id}&cursor=5.0`,
+    ]);
+    t.live.stop();
+  });
+
+  it("a refused cursor (400) is dropped once: a fresh stream and a refresh, never a retry loop", async () => {
+    const a = sse();
+    const c = sse();
+    const t = setup([
+      a.response,
+      new Response(null, { status: 400 }),
+      c.response,
+    ]);
+    t.streams.push(a, c);
+    t.live.start();
+    await tick();
+    a.push("id: 9.4\nevent: hello\ndata: {}\n\n");
+    a.push('event: reconnect\ndata: {"reason":"lifetime"}\n\n');
+    a.end();
+    await tick();
+    expect(t.urls).toEqual([
+      "/live/stream",
+      "/live/stream?cursor=9.4",
+      "/live/stream",
+    ]);
+    expect(t.refresh).toHaveBeenCalledTimes(1);
+    expect(t.live.current).toBe("live");
+    t.live.stop();
+  });
+
+  it("a 400 with no cursor to drop stops instead of retrying", async () => {
+    const t = setup([new Response(null, { status: 400 })]);
+    t.live.start();
+    await tick(10 * 60_000);
+    expect(t.urls).toHaveLength(1);
+    expect(t.live.current).toBe("denied");
   });
 });

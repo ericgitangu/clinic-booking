@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
+  BellRingIcon,
   CalendarClockIcon,
   CalendarPlusIcon,
   CalendarXIcon,
+  ClockAlertIcon,
+  LockIcon,
+  LockOpenIcon,
+  MailCheckIcon,
+  MailIcon,
+  MailXIcon,
   RadioIcon,
+  UserCheckIcon,
+  UserXIcon,
 } from "lucide-react";
 import {
   Card,
@@ -32,6 +41,15 @@ const ICON: Record<LiveKind, typeof RadioIcon> = {
   booked: CalendarPlusIcon,
   rescheduled: CalendarClockIcon,
   cancelled: CalendarXIcon,
+  vetoed: LockIcon,
+  unlocked: LockOpenIcon,
+  arrived: UserCheckIcon,
+  no_show: UserXIcon,
+  reminder_now: BellRingIcon,
+  running_late: ClockAlertIcon,
+  invite_created: MailIcon,
+  invite_revoked: MailXIcon,
+  invite_accepted: MailCheckIcon,
 };
 
 const STATUS_TEXT: Record<LiveStatus, string> = {
@@ -44,7 +62,8 @@ const STATUS_TEXT: Record<LiveStatus, string> = {
 };
 
 /**
- * Bookings, reschedules and cancellations as they happen. The numbers above and the list below
+ * Bookings, reschedules, cancellations and staff actions (vetoes, attendance, reminders,
+ * invitations) as they happen. The numbers above and the list below
  * follow: each event asks for a fresh page, at most once every two seconds.
  *
  * The stream is held open only while it is useful: a tab hidden for five minutes lets go of it, the
@@ -140,8 +159,8 @@ export function LiveFeed({
         </div>
         <CardDescription>
           {canSeePeople(role)
-            ? "New bookings, reschedules and cancellations, with the patient."
-            : "New bookings, reschedules and cancellations. Patient details are not shown to viewers."}
+            ? "Bookings, changes and staff actions, with the patient, who acted and why."
+            : "Bookings, changes and staff actions. Patient and staff details are not shown to viewers."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -155,7 +174,11 @@ export function LiveFeed({
           <ul className="space-y-2" aria-live="polite">
             {events.map((ev) => {
               const Icon = ICON[ev.kind];
-              const text = describe(ev, names.get(ev.doctorId), role);
+              const text = describe(
+                ev,
+                ev.doctorId ? names.get(ev.doctorId) : undefined,
+                role,
+              );
               return (
                 <li
                   key={ev.seq}
