@@ -87,6 +87,16 @@ flowchart LR
 
 Go: the staff live feed runs on a small read-only Go service, clinic-realtime on Cloud Run, which README section 3.7 describes. I first closed PR 37 without merging and reversed that on 2026-10-19. The cost reasoning is unchanged. The closing comment on PR 37 says: "The Cloud Run gateway billed about 900 vCPU-s per connected hour against roughly 21,619 vCPU-s of shared free-tier headroom, and capped the system at 2 concurrent streams." I read the 900 as per instance (0.25 vCPU for 3,600 seconds), and the service is built to that shape: 0.25 vCPU and at most 2 instances. The measured figure is still pending.
 
+### Why each runtime
+
+**Python and FastAPI** ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)). This is the single system of record. The booking rules, the one-hour rule, the partial unique index that decides double booking, idempotency keys and the problem+json errors all live here, and every write in the system goes through it. The brief's one hard requirement is that a booked slot is never offered or booked twice, so I wanted that guarantee in one codebase with one test suite.
+
+**TypeScript and Next.js** ([ADR-0010](docs/adr/0010-thin-nextjs-booking-ui.md), [ADR-0011](docs/adr/0011-openapi-codegen-contract.md)). The booking and admin apps are thin UIs, and their server-side BFFs sign the staff assertion and hold the Google sign-in. They carry no booking rules. Their types, zod schemas and SDK are generated from the API's OpenAPI contract, and the lint job fails if the generated files differ from a fresh run, so a contract change that the UI has not picked up fails the build.
+
+**Go** ([ADR-0021](docs/adr/0021-go-realtime-gateway.md)). The staff live feed. Its events carry patient names, cancellation reasons and who acted, so the feed stays inside Google Cloud and is read straight from Postgres with a `SELECT`-only role. It is a separate Cloud Run service so that open streams cannot use up clinic-api's concurrency and starve booking. Go gives a small distroless image, a fast cold start on a service that scales to zero, and cheap idle streams, though at this scale the small image and the cold start are the reasons that count (the goroutine argument is an expectation I have not measured). The trade-off is stated plainly: Cloud Run requires concurrency 1 below 1 vCPU, and the service is capped at two instances to stay at $0, so two staff can watch at once. The admin app shares one stream per browser across its tabs.
+
+**Ably** ([ADR-0031](docs/adr/0031-realtime-push-via-ably-sse.md)). Patient slot events, which carry no personal data. It fans out to any number of anonymous patients (up to the free package's 200 connections) at $0, with no socket infrastructure of mine. Events reach it from the outbox relay in the API after each commit, and the booking page also polls every 60 seconds while push is healthy, so a missed message costs at most a minute of staleness and never a wrong booking.
+
 ## 1. Live URLs
 
 | What | Where |
