@@ -73,7 +73,7 @@ executors:
   lint:
     docker:
       - image: mirror.gcr.io/cimg/python:3.12-node
-    resource_class: small
+    resource_class: medium  # pnpm install was OOM-killed on small (2 GB)
     working_directory: ~/repo
 
   backend_db:
@@ -631,7 +631,7 @@ jobs:
         type: string
     docker:
       - image: mirror.gcr.io/cimg/node:24.14
-    resource_class: small
+    resource_class: medium  # pnpm install was OOM-killed on small (2 GB)
     working_directory: ~/repo
     steps:
       - checkout
