@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarCheck, GitBranch, Keyboard, Play } from "lucide-react";
+import { CalendarCheck, GitBranch, Play, Terminal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
@@ -82,7 +82,7 @@ export default function Home() {
               className="h-12 px-5 text-base"
             >
               <a href={`${GITHUB}/blob/main/docs/api/README.md#run-it`}>
-                <Keyboard aria-hidden />
+                <Terminal aria-hidden />
                 Run the API collection
               </a>
             </Button>
