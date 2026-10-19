@@ -20,6 +20,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 TARGET="${1:-local}"
+# The one place the newman image is pinned (tag and digest). Image pins live beside the code that
+# runs them, as with the ZAP digest in scripts/ci/zap_prod_baseline.sh; scripts/ci/test_ci_scripts.sh
+# checks the pin's form and that no other file names a newman image. 6.1.3 is the newest published
+# image; the collection also passes on newman 6.2.3.
 NEWMAN_IMAGE="postman/newman:6.1.3-alpine@sha256:d9b5e780ead0026bbb37f3759cd7b10fc8a88cd4030c8266a7c5e343d75a5198"
 # JUnit output. CI points REPORT_DIR at the directory it stores as test results; otherwise it is a
 # temporary directory removed on exit.
