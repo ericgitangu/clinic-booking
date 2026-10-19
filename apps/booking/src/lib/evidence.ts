@@ -59,9 +59,10 @@ export const REQUIRED: Evidence[] = [
     operationId:
       "cancel_appointment_appointments__appointment_id__cancel_patch",
     summary:
-      "Cancels an appointment. A reason of 3 to 500 characters is required.",
+      "Cancels an appointment. A reason of 3 to 500 characters is required. A visit that starts within the hour cannot be cancelled (CHANGE_TOO_LATE).",
     errors: [
       { status: 409, code: "APPOINTMENT_ALREADY_CANCELLED" },
+      { status: 409, code: "CHANGE_TOO_LATE" },
       { status: 409, code: "APPOINTMENT_ALREADY_STARTED" },
       { status: 404, code: "APPOINTMENT_NOT_FOUND" },
     ],
@@ -74,10 +75,11 @@ export const REQUIRED: Evidence[] = [
     operationId:
       "reschedule_appointment_appointments__appointment_id__reschedule_patch",
     summary:
-      "Moves an appointment to another free slot, under the same rules as booking.",
+      "Moves an appointment to another free slot, validated as a fresh booking (a new time under an hour away is BOOKING_TOO_SOON). A visit that starts within the hour cannot be moved (CHANGE_TOO_LATE).",
     errors: [
       { status: 409, code: "SLOT_TAKEN" },
       { status: 409, code: "APPOINTMENT_ALREADY_CANCELLED" },
+      { status: 409, code: "CHANGE_TOO_LATE" },
       { status: 422, code: "BOOKING_TOO_SOON" },
     ],
     screen: MINE,

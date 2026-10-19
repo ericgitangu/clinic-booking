@@ -27,6 +27,8 @@ const COPY: Record<string, string> = {
   OWNER_PROTECTED: "The owner's access is fixed and cannot be changed.",
   APPOINTMENT_ALREADY_CANCELLED: "This appointment is already cancelled.",
   APPOINTMENT_ALREADY_STARTED: "This appointment has already started.",
+  CHANGE_TOO_LATE:
+    "This visit starts in less than an hour, so it can no longer be cancelled or moved.",
   SLOT_TAKEN: "That time was just taken. Pick another.",
   SLOT_IN_PAST: "That time has passed. Pick a later one.",
   BOOKING_TOO_SOON: "That time is too soon to book. Pick a later one.",

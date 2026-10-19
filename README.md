@@ -126,6 +126,16 @@ erDiagram
 
 The brief gives working hours and a fixed 30-minute slot. I derive free slots on request: cut each working window into 30-minute steps in UTC, subtract the booked starts for that clinic-local day, and drop anything before `now + 60 min`. It is a pure function, `domain/slots.py::generate_slots`, backed by two indexed queries per request ([ADR-0004](docs/adr/0004-computed-slots.md)). The cost is that there is no slot row to lock, so uniqueness cannot live on the slot. It has to live on the appointment, which is the next section.
 
+**The 1-hour rule.** Nothing is booked, moved or cancelled less than 60 minutes before it starts (`BOOKING_MIN_LEAD_MINUTES`; exactly 60 is allowed). One shared helper, `domain/booking_rules.py::require_lead_time`, applies it to every operation:
+
+- Free slots (`GET /doctors/{id}/availability`) never include a slot starting within 60 minutes.
+- Book ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/create_appointment_appointments_post)): `422 BOOKING_TOO_SOON` when the start is under 60 minutes away.
+- Cancel ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/cancel_appointment_appointments__appointment_id__cancel_patch)): `409 CHANGE_TOO_LATE` when the appointment starts in under 60 minutes.
+- Reschedule ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/reschedule_appointment_appointments__appointment_id__reschedule_patch)): `409 CHANGE_TOO_LATE` when its current start is under 60 minutes away, and `422 BOOKING_TOO_SOON` when the new start is (a new time is validated as for a fresh booking).
+- Staff in the admin app are held to the same rule ([ADR-0030](docs/adr/0030-staff-roles-and-access.md)); the web apps disable cancel and reschedule inside the window and say why. A repeated request that already took effect (an idempotent booking, a reschedule to the time it already has) still returns its original result ([ADR-0013](docs/adr/0013-idempotency-keys.md)).
+
+The rule is stated in the OpenAPI contract and tested against it; the reasoning is in [ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md).
+
 ### 3.4 The concurrency guarantee
 
 The brief says a booked slot must not be available to others. Two concurrent POSTs for the same slot is the case that breaks check-then-insert, and `SELECT ... FOR UPDATE` cannot lock a row that does not exist yet.
@@ -228,6 +238,8 @@ The live, interactive reference is [Swagger UI](https://clinic.ericgitangu.com/d
 | `PATCH /appointments/{id}/cancel`, `/reschedule` | Change state | 200 |
 | `GET /health`, `GET /ready`, `GET /problems/{slug}` | Liveness, readiness (`SELECT 1`), error type documents | 200 |
 
+The one-hour rule uses two codes: `422 BOOKING_TOO_SOON` for a too-soon slot (a booking, or a reschedule's new time) and `409 CHANGE_TOO_LATE` for changing or cancelling a visit that starts within the hour ([section 8](#8-ambiguities--decisions), [ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md)).
+
 The `/internal/*` endpoints serve the web apps and need a signed assertion; they are in the contract but not callable from Swagger. Every non-2xx is `application/problem+json` with a stable `code` and a `request_id`. The status rule: 404 means the resource in the path does not exist; 422 means the request is well-formed but resending it unchanged can never succeed; 409 means it conflicts with current state and might succeed later. The full code table is in [`docs/api-errors.md`](docs/api-errors.md), which a test checks against the code ([ADR-0006](docs/adr/0006-problem-details-error-model.md)).
 
 ## 6. Code structure
@@ -262,6 +274,11 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 - **Overlap.** With fixed 30-minute slots, "overlapping" means "same `starts_at`", so a unique index is enough ([ADR-0003](docs/adr/0003-double-booking-partial-unique-index.md)).
 - **Lead time and horizon.** A booking needs at least 60 minutes of notice and at most 90 days ahead (`BOOKING_MIN_LEAD_MINUTES`, `BOOKING_HORIZON_DAYS`).
+- **I extended the bonus rule to changes.** The brief's bonus is "prevention of bookings within 1 hour of now"; it does not mention cancelling or moving a visit. I extended it (decided 2026-10-18; [ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md)): a patient cannot cancel, or reschedule from, a visit that starts within the hour. Contract: `422 BOOKING_TOO_SOON` for a too-soon slot (a booking, or a reschedule's new start, validated as for a fresh booking); `409 CHANGE_TOO_LATE` for changing a visit that starts within the hour (cancel, or a reschedule's current start). One line per operation:
+  - book: `422 BOOKING_TOO_SOON` under 60 minutes ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/create_appointment_appointments_post));
+  - cancel: `409 CHANGE_TOO_LATE` when the appointment starts in under 60 minutes ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/cancel_appointment_appointments__appointment_id__cancel_patch));
+  - reschedule: `409 CHANGE_TOO_LATE` when the current start is under 60 minutes away, `422 BOOKING_TOO_SOON` when the new start is ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/reschedule_appointment_appointments__appointment_id__reschedule_patch));
+  - staff follow the same rule for now, with no override; the exemption decided in [ADR-0033](docs/adr/0033-staff-crud-veto-and-invites.md) lands with the staff-write work.
 - **Cancelling or rescheduling an appointment that has started** is `409 APPOINTMENT_ALREADY_STARTED` ([ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md)).
 - **Which timezone is "a day".** The clinic's, stored as data ([ADR-0005](docs/adr/0005-time-and-timezone-model.md)).
 - **Who may cancel.** Through the public API, anyone with the id (the brief has no auth). In the web apps, only the signed-in patient who owns it, or staff ([ADR-0012](docs/adr/0012-identity-and-abuse-controls-deferred.md), [ADR-0029](docs/adr/0029-booking-flow.md)).
