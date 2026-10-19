@@ -202,7 +202,11 @@ async def book(
     if idempotency_key is not None and patient_id is None:
         raise ValueError("an Idempotency-Key needs a patient_id")
     key_patient = patient_id
-    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    lead = (
+        timedelta(0)
+        if staff and staff.lead_exempt
+        else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    )
     fingerprint = request_fingerprint(doctor_id, starts_at) if idempotency_key is not None else None
 
     async def _do() -> Booked:
@@ -341,7 +345,11 @@ async def cancel(
     staff: StaffAction | None = None,
 ) -> Appointment:
     # Staff are exempt from the lead-time rule: a zero lead never refuses a start still ahead.
-    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    lead = (
+        timedelta(0)
+        if staff and staff.lead_exempt
+        else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    )
 
     async def _do() -> Appointment:
         appt = await appt_repo.get_for_update(session, appointment_id)
@@ -396,7 +404,11 @@ async def reschedule(
     staff: StaffAction | None = None,
     expect_event_id: int | None = None,
 ) -> Appointment:
-    lead = timedelta(0) if staff else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    lead = (
+        timedelta(0)
+        if staff and staff.lead_exempt
+        else timedelta(minutes=settings.BOOKING_MIN_LEAD_MINUTES)
+    )
 
     async def _do() -> Appointment:
         appt = await appt_repo.get_for_update(session, appointment_id)

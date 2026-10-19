@@ -125,8 +125,13 @@ async def create(
         if used >= DAILY_LIMIT:
             wait = int(((oldest or now) + WINDOW - now).total_seconds())
             raise RateLimited(max(wait, 1), "At most 10 invitations a day per person.")
-        if await access_repo.active_role(session, email) is not None:
+        before = await access_repo.get_for_update(session, email)
+        if before is not None and before["revoked_at"] is None:
             raise AccessExists()
+        if before is not None and actor.role != "owner":
+            # Access that was revoked stays revoked unless the owner says otherwise, whatever role
+            # the new invitation offers.
+            raise RoleEscalation("Only the owner can invite someone whose access was revoked.")
         for closed in await repo.supersede_open(session, email=email, by=inviter, now=now):
             await _audit(
                 session, actor, "invite_revoke", "Superseded by a new invitation", closed, email
@@ -175,6 +180,8 @@ async def revoke(
         row = await repo.get_invite_for_update(session, invite_id)
         if row is None or row["consumed_at"] is not None or row["revoked_at"] is not None:
             raise InviteInvalid()
+        if row["role"] == "admin" and actor.role != "owner":
+            raise RoleEscalation("Only the owner can revoke an invitation to be an admin.")
         row = await repo.revoke_invite(
             session, invite_id=invite_id, by=normalize_email(actor.email), now=now
         )
@@ -194,6 +201,10 @@ async def accept(
 ) -> AccessEntry:
     now = clock.now()
     address = normalize_email(who.email)
+    if not who.email_verified:
+        # Refused before it is counted: someone else's address, unverified, must not be able to
+        # use up that person's attempts for the day.
+        raise InviteInvalid()
     # Counted in a transaction of its own, so a failed attempt still costs one.
     async with session.begin():
         allowed = await repo.take_accept_attempt(

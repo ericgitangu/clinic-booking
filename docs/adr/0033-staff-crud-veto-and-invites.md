@@ -45,11 +45,13 @@ Option 1.
 | View appointments | Full PII | Full PII | Minimised (initials, masked phone, no email, no reason) |
 | Create, reschedule, cancel | Yes | Yes | No (403) |
 | Veto, lock, unlock | Yes | Yes | No (403) |
-| Invite a viewer | Yes | Yes | No (403) |
+| Invite a viewer (a new address) | Yes | Yes | No (403) |
+| Invite an address whose access was revoked | Yes | No (`ROLE_ESCALATION`) | No (403) |
 | Invite an admin | Yes | No (`ROLE_ESCALATION`) | No (403) |
 | Change or revoke a viewer | Yes | Yes | No (403) |
 | Change or revoke an admin | Yes | No (`ROLE_ESCALATION`) | No (403) |
-| Revoke an open invite | Yes | Yes | No (403) |
+| Revoke an open invite to be a viewer | Yes | Yes | No (403) |
+| Revoke an open invite to be an admin | Yes | No (`ROLE_ESCALATION`) | No (403) |
 | Read the audit trail | Yes | Yes | No (403) |
 | Lead-time exemption | Yes | Yes | Not applicable |
 | Grant owner, or act on the owner | Nobody (`OWNER_PROTECTED`) | Nobody (`OWNER_PROTECTED`) | Nobody (`OWNER_PROTECTED`) |
@@ -91,6 +93,10 @@ These refine the text above; nothing above is removed.
 - **Vetoes.** Only a change recorded as the patient's can be vetoed. An event from before actors were recorded (a NULL actor) cannot be shown to be the patient's, so it is left alone and the answer is `NOTHING_TO_VETO`. A patient trying to take back the slot of a vetoed cancel gets `APPOINTMENT_LOCKED`. When two vetoes race, or a veto races a staff re-booking of the same slot, the loser is told `NOTHING_TO_VETO`, never `SLOT_TAKEN`.
 - **Invite emails** are compared after Unicode NFKC and case folding, at creation and at accept. Accept attempts are limited to 20 per person per day (`RATE_LIMITED`), counted whether or not they succeed; the invalid-invite body is unchanged.
 - **Who granted.** After a role change, `granted_by` and `granted_at` name the person who made the change and when; the full history is in `staff_access_audit`.
+- **Revoked access stays revoked.** An address whose access was revoked can be invited again only by the owner, at any role. An admin invites new addresses as viewers. Revoking an invitation to be an admin is also the owner's; an admin revokes invitations to be a viewer.
+- **The switch covers the exemption.** With `STAFF_CRUD_ENABLED=false`, staff using the existing cancel and reschedule routes are held to the patient rules exactly (`CHANGE_TOO_LATE`, `BOOKING_TOO_SOON`); the lead-time exemption exists only while the switch is on. An unverified identity cannot spend a person's accept attempts: it is refused before it is counted.
+- **What the audit trigger is for.** The check that only the actor can set `notified` stops mistakes and unscoped writers. It reads a transaction-local setting that any runtime session could set, so it is not a defence against a compromised runtime role.
+- **Migrations edited before merge.** Migrations 0009 and 0010 were changed in place while unmerged; no persistent database has applied them, so a preview database that already did needs to be recreated or downgraded and upgraded.
 - **Invitations are audited.** Creating and revoking an invitation (including one superseded by a new invitation) each write a `staff_action_audit` row in the same transaction (`invite_create`, `invite_revoke`), with an id, the role and a SHA-256 of the address, never the address. The create response carries `audit_id`, `deliver` and `outcome`. The web app emails the link `/invite/<token>` when `deliver` is true and then marks the row notified; a reserved example address is recorded as "demo, not sent" and nothing is sent.
 - **Downgrade.** Both migrations refuse to downgrade while the audit trail, invitations, attendance marks or annotation events exist, so append-only data is never dropped by a rollback.
 

@@ -91,7 +91,7 @@ async def test_an_admin_cannot_bring_back_an_admin_the_owner_revoked(
     assert accepted.status_code == 200 and accepted.json()["role"] == "admin"
 
 
-# --- 5: an unverified email is refused on every staff route -----------------------------------
+# --- 5: an unverified email is refused on every staff route ---
 
 
 @pytest.mark.parametrize("verified", [False, None])
@@ -120,7 +120,7 @@ async def test_a_verified_email_is_let_through(env: Env) -> None:
     assert (await env.req("GET", "/internal/admin/appointments", verified=True)).status_code == 200
 
 
-# --- 6: staff never act on synthetic patients --------------------------------------------------
+# --- 6: staff never act on synthetic patients ---
 
 
 @pytest_asyncio.fixture
@@ -187,7 +187,7 @@ async def test_staff_cannot_book_for_a_synthetic_patient(env: Env, synthetic: uu
     assert resp.json()["code"] == "UNKNOWN_PATIENT"
 
 
-# --- 8: invite and accept compare addresses after NFKC + casefold ------------------------------
+# --- 8: invite and accept compare addresses after NFKC + casefold ---
 
 
 async def accept(env: Env, token: str, email: str) -> httpx.Response:
@@ -233,7 +233,7 @@ async def test_a_lookalike_address_is_still_a_different_person(env: Env) -> None
     assert other.status_code == 404
 
 
-# --- 9: accepting is attempt-limited -----------------------------------------------------------
+# --- 9: accepting is attempt-limited ---
 
 
 async def test_accept_attempts_are_limited_per_person_per_day(
@@ -283,7 +283,7 @@ async def test_accept_attempts_are_limited_per_person_per_day(
 _UNUSED = (ADMIN, OWNER)
 
 
-# --- 7: who may mark an audit row notified -----------------------------------------------------
+# --- 7: who may mark an audit row notified ---
 
 
 async def test_only_the_actor_can_mark_their_audit_row(
@@ -344,7 +344,7 @@ async def test_an_action_that_sends_no_email_cannot_be_marked_notified(
         )
 
 
-# --- 10: the patient re-booking a vetoed slot is told it is locked -----------------------------
+# --- 10: the patient re-booking a vetoed slot is told it is locked ---
 
 
 async def test_a_patient_rebooking_a_vetoed_cancel_gets_locked_not_slot_taken(env: Env) -> None:
@@ -371,7 +371,7 @@ async def test_a_patient_rebooking_a_vetoed_cancel_gets_locked_not_slot_taken(en
     assert stranger.json()["code"] == "SLOT_TAKEN"  # someone else's slot is still just taken
 
 
-# --- 11: concurrent vetoes -----------------------------------------------------------------------
+# --- 11: concurrent vetoes ---
 
 
 @pytest.fixture
@@ -452,7 +452,7 @@ async def test_a_veto_racing_a_staff_rebooking_never_reports_slot_taken(
         assert create.json()["code"] == "SLOT_TAKEN"
 
 
-# --- 12: events from before actors were recorded -----------------------------------------------
+# --- 12: events from before actors were recorded ---
 
 
 async def test_an_event_with_no_recorded_actor_cannot_be_vetoed(
@@ -479,7 +479,7 @@ async def test_an_event_with_no_recorded_actor_cannot_be_vetoed(
     assert known.status_code == 200
 
 
-# --- 13: granted_by records who changed the role -------------------------------------------------
+# --- 13: granted_by records who changed the role ---
 
 
 async def test_a_role_change_records_who_made_it(env: Env, owner_conn: asyncpg.Connection) -> None:
@@ -502,7 +502,7 @@ async def test_a_role_change_records_who_made_it(env: Env, owner_conn: asyncpg.C
     assert tuple(audit) == (ADMIN, "change")
 
 
-# --- a too-short or too-long reason says so in words ---------------------------------------------
+# --- a too-short or too-long reason says so in words ---
 
 
 @pytest.mark.parametrize(
@@ -542,7 +542,7 @@ async def test_a_bad_reason_is_explained_in_plain_words(
     assert "items" not in resp.text
 
 
-# --- invitations are audited and carry what the email sender needs -------------------------------
+# --- invitations are audited and carry what the email sender needs ---
 
 
 async def test_creating_and_revoking_an_invite_each_leave_one_audit_row(
@@ -608,7 +608,7 @@ async def test_the_sender_marks_an_invite_notified_and_a_demo_invite_cannot_be(
     assert flags == {real.json()["audit_id"]: True, demo.json()["audit_id"]: False}
 
 
-# --- the database holds the notified and invite limits itself ---------------------------------
+# --- the database holds the notified and invite limits itself ---
 
 
 async def test_notified_needs_the_actor_even_for_a_direct_writer(
@@ -652,7 +652,7 @@ async def test_an_invite_row_can_change_only_in_its_life_columns(
         await app_conn.execute("DELETE FROM staff_invites WHERE id = $1", invite_id)
 
 
-# --- addresses the database cannot lower the same way ---------------------------------------------
+# --- addresses the database cannot lower the same way ---
 
 
 @pytest.mark.parametrize(
@@ -793,3 +793,159 @@ async def test_access_timestamps_come_from_the_injected_clock(
         "SELECT revoked_at FROM staff_access WHERE email = 'clock.test@clinic.co.ke'"
     )
     assert revoked == datetime(2031, 3, 6, 5, 6, tzinfo=UTC)
+
+
+# --- revoked access stays revoked unless the owner says otherwise ---
+
+
+@pytest.mark.parametrize("role", ["admin", "viewer"])
+@pytest.mark.parametrize("was", ["admin", "viewer"])
+async def test_an_admin_cannot_invite_an_address_whose_access_was_revoked(
+    env: Env, owner_conn: asyncpg.Connection, was: str, role: str
+) -> None:
+    address = "revoked.person@clinic.co.ke"
+    await owner_conn.execute(
+        "INSERT INTO staff_access (email, role, granted_by) VALUES ($1, $2, $3)",
+        address,
+        was,
+        OWNER,
+    )
+    assert (await env.req("DELETE", f"/internal/admin/access/{address}")).status_code == 200
+    again = await env.req(
+        "POST", "/internal/admin/invites", role="admin", body={"email": address, "role": role}
+    )
+    assert again.status_code == 403 and again.json()["code"] == "ROLE_ESCALATION"
+    assert await owner_conn.fetchval("SELECT count(*) FROM staff_invites") == 0
+    by_owner = await env.req(
+        "POST", "/internal/admin/invites", body={"email": address, "role": role}
+    )
+    assert by_owner.status_code == 201
+    accepted = await accept(env, by_owner.json()["token"], address)
+    assert accepted.status_code == 200 and accepted.json()["role"] == role
+
+
+async def test_an_admin_can_still_invite_a_new_address_as_a_viewer(env: Env) -> None:
+    resp = await env.req(
+        "POST",
+        "/internal/admin/invites",
+        role="admin",
+        body={"email": "fresh@clinic.co.ke", "role": "viewer"},
+    )
+    assert resp.status_code == 201
+
+
+# --- an owner's pending admin invitation is the owner's to revoke ---
+
+
+async def test_only_the_owner_can_revoke_an_admin_invitation(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    sent = await env.req(
+        "POST",
+        "/internal/admin/invites",
+        body={"email": "future.admin@clinic.co.ke", "role": "admin"},
+    )
+    invite_id = sent.json()["id"]
+    refused = await env.req("DELETE", f"/internal/admin/invites/{invite_id}", role="admin")
+    assert refused.status_code == 403 and refused.json()["code"] == "ROLE_ESCALATION"
+    assert (
+        await owner_conn.fetchval(
+            "SELECT revoked_at FROM staff_invites WHERE id = $1", uuid.UUID(invite_id)
+        )
+        is None
+    )
+    assert (await env.req("DELETE", f"/internal/admin/invites/{invite_id}")).status_code == 200
+    # An admin still revokes invitations to be a viewer.
+    viewer = await env.req(
+        "POST",
+        "/internal/admin/invites",
+        role="admin",
+        body={"email": "future.viewer@clinic.co.ke", "role": "viewer"},
+    )
+    assert (
+        await env.req("DELETE", f"/internal/admin/invites/{viewer.json()['id']}", role="admin")
+    ).status_code == 200
+
+
+# --- unverified identities cannot spend a person's attempts ---
+
+
+async def test_an_unverified_identity_cannot_use_up_someone_elses_accept_attempts(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    await owner_conn.execute("TRUNCATE invite_accept_cap")
+    victim = "victim@clinic.co.ke"
+    for _ in range(25):
+        r = await env.req(
+            "POST",
+            "/internal/admin/invites/accept",
+            role="none",
+            email=victim,
+            verified=False,
+            body={"token": secrets.token_urlsafe(32)},
+        )
+        assert r.status_code == 404
+    assert await owner_conn.fetchval("SELECT count(*) FROM invite_accept_cap") == 0
+    sent = await env.req(
+        "POST", "/internal/admin/invites", body={"email": victim, "role": "viewer"}
+    )
+    ok = await accept(env, sent.json()["token"], victim)
+    assert ok.status_code == 200
+
+
+# --- the switch also turns the staff exemption off on the existing routes ---
+
+
+async def make_env(flag: bool) -> tuple[Env, httpx.AsyncClient]:
+    from app.api.deps import get_clock
+    from app.core.clock import FakeClock
+    from app.main import create_app
+    from tests.conftest import FIXED_NOW, make_settings
+    from tests.integration.staff_support import KEY
+
+    clock = FakeClock(FIXED_NOW)
+    app = create_app(
+        make_settings(INTERNAL_SIGNING_KEY=KEY, ADMIN_EMAILS=OWNER, STAFF_CRUD_ENABLED=flag)
+    )
+    app.dependency_overrides[get_clock] = lambda: clock
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://testserver",
+    )
+    return Env(client, clock), client
+
+
+@pytest.mark.parametrize("flag", [True, False])
+async def test_the_switch_governs_the_staff_lead_time_exemption(
+    env: Env, owner_conn: asyncpg.Connection, flag: bool
+) -> None:
+    appt = await env.patient_book(TUE_10)
+    appt2 = await env.patient_book("2026-10-27T11:00:00+03:00")
+    other, client = await make_env(flag)
+    try:
+        other.clock.set(datetime(2026, 10, 27, 6, 20, tzinfo=UTC))  # 09:20, 40 minutes before 10:00
+        cancel = await other.req(
+            "PATCH",
+            f"/internal/admin/appointments/{appt}/cancel",
+            body={"reason": "doctor called in sick"},
+        )
+        move_new = await other.req(
+            "PATCH",
+            f"/internal/admin/appointments/{appt2}/reschedule",
+            body={"starts_at": "2026-10-27T09:30:00+03:00", "reason": "walk-in at the desk"},
+        )
+        if flag:
+            assert cancel.status_code == 200 and move_new.status_code == 200
+        else:
+            assert (cancel.status_code, cancel.json()["code"]) == (409, "CHANGE_TOO_LATE")
+            assert (move_new.status_code, move_new.json()["code"]) == (422, "BOOKING_TOO_SOON")
+            # nothing changed, nothing audited
+            assert (
+                await owner_conn.fetchval(
+                    "SELECT status FROM appointments WHERE id = $1", uuid.UUID(appt)
+                )
+                == "booked"
+            )
+            assert await audit_rows(owner_conn) == []
+    finally:
+        await client.aclose()

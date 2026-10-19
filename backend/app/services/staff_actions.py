@@ -37,7 +37,12 @@ from app.services import booking
 
 
 def _ctx(
-    actor: Principal, action: StaffActionName, reason: str, *, lock: bool = False
+    actor: Principal,
+    action: StaffActionName,
+    reason: str,
+    *,
+    lock: bool = False,
+    lead_exempt: bool = True,
 ) -> StaffAction:
     return StaffAction(
         action=action,
@@ -45,6 +50,7 @@ def _ctx(
         actor_role=actor.role,
         reason=reason,
         lock=lock,
+        lead_exempt=lead_exempt,
     )
 
 
@@ -78,7 +84,7 @@ async def create(
     actor: Principal,
     body: StaffCreateAppointment,
 ) -> StaffAppointmentChange:
-    ctx = _ctx(actor, "book", body.reason)
+    ctx = _ctx(actor, "book", body.reason, lead_exempt=settings.STAFF_CRUD_ENABLED)
     booked = await booking.book(
         session,
         clock,
@@ -101,7 +107,7 @@ async def cancel(
     appointment_id: uuid.UUID,
     reason: str,
 ) -> StaffAppointmentChange:
-    ctx = _ctx(actor, "cancel", reason)
+    ctx = _ctx(actor, "cancel", reason, lead_exempt=settings.STAFF_CRUD_ENABLED)
     appt = await booking.cancel(
         session, clock, settings, appointment_id=appointment_id, reason=reason, staff=ctx
     )
@@ -118,7 +124,7 @@ async def reschedule(
     starts_at: datetime,
     reason: str,
 ) -> StaffAppointmentChange:
-    ctx = _ctx(actor, "reschedule", reason)
+    ctx = _ctx(actor, "reschedule", reason, lead_exempt=settings.STAFF_CRUD_ENABLED)
     appt = await booking.reschedule(
         session,
         clock,

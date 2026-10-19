@@ -35,6 +35,9 @@ class StaffAction:
     reason: str
     # A veto sets the lock in the same transaction as the reversal.
     lock: bool = False
+    # Whether this write skips the one-hour (lead-time) rule. Follows STAFF_CRUD_ENABLED: with the
+    # switch off, staff on the existing routes are held to exactly the patient rules.
+    lead_exempt: bool = True
     # Outputs, filled by the service inside the transaction: the audit row (None when the call
     # changed nothing, so wrote nothing) and the start the appointment had before a move or cancel.
     audit_id: uuid.UUID | None = None
