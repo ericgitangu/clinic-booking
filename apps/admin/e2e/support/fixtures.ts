@@ -99,6 +99,12 @@ export { expect } from "@playwright/test";
  * comes. React marks every hydrated element with an internal props key; wait for it.
  */
 export async function tap(locator: Locator): Promise<void> {
+  await hydrated(locator);
+  await locator.click();
+}
+
+/** Waits until React has attached to this element, so a click on it reaches its handler. */
+export async function hydrated(locator: Locator): Promise<void> {
   await expect
     .poll(() =>
       locator.evaluate((el) =>
@@ -106,7 +112,6 @@ export async function tap(locator: Locator): Promise<void> {
       ),
     )
     .toBe(true);
-  await locator.click();
 }
 
 /**
