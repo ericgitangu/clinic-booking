@@ -483,6 +483,13 @@ async def test_an_event_with_no_recorded_actor_cannot_be_vetoed(
 
 
 async def test_a_role_change_records_who_made_it(env: Env, owner_conn: asyncpg.Connection) -> None:
+    # Seed the original grant from the fake clock, a day earlier, so the comparison does not depend
+    # on the wall clock the database happens to run under.
+    await owner_conn.execute(
+        "UPDATE staff_access SET granted_at = $2 WHERE email = $1",
+        VIEWER,
+        env.clock.now() - timedelta(days=1),
+    )
     before = await owner_conn.fetchrow(
         "SELECT granted_by, granted_at FROM staff_access WHERE email = $1", VIEWER
     )
@@ -495,7 +502,8 @@ async def test_a_role_change_records_who_made_it(env: Env, owner_conn: asyncpg.C
     after = await owner_conn.fetchrow(
         "SELECT granted_by, granted_at FROM staff_access WHERE email = $1", VIEWER
     )
-    assert after["granted_by"] == ADMIN and after["granted_at"] >= before["granted_at"]
+    assert after["granted_by"] == ADMIN
+    assert after["granted_at"] == env.clock.now() > before["granted_at"]
     audit = await owner_conn.fetchrow(
         "SELECT actor_email, action FROM staff_access_audit ORDER BY id DESC LIMIT 1"
     )
