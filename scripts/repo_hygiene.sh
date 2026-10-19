@@ -120,5 +120,12 @@ while IFS= read -r md; do
 done < <(git ls-files 'README.md' 'docs/*.md' 'docs/**/*.md')
 rm -f "$TRACKED"
 
+# ---- d) the retired clinic name ----------------------------------------------------------
+# The clinic is "Idyllic Clinic" everywhere. Only the migration that renames existing rows may still
+# name the old one (it has to, to find them). The pattern is written so this line does not match itself.
+while IFS= read -r l; do
+  report "$l: retired-name: the clinic is Idyllic Clinic; only the rename migration may name the old name"
+done < <(git grep -n -I -i '[m]vule' -- . ':!backend/migrations/versions/0011_idyllic_clinic_name.py' | cut -d: -f1,2)
+
 if [ "$FAILS" -eq 0 ]; then echo "repo-hygiene: OK"; else echo "repo-hygiene: $FAILS finding(s)"; fi
 [ "$FAILS" -eq 0 ]

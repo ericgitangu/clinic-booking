@@ -947,8 +947,7 @@ done
 expect "public build env: the committed file covers every NEXT_PUBLIC_* the real sources reference" "$real_ok" 0
 expect "public build env: the committed file holds only NEXT_PUBLIC_* names" "$(grep -vE '^(#|$)' "$HERE/public-build.env" | grep -vcE '^[a-z]+ NEXT_PUBLIC_[A-Z0-9_]+=')" 0
 
-# =========================================================================================
-# realtime_prereqs.sh: the steps only a person can do fail with the command to run, not a mystery.
+# ==================================================================================# realtime_prereqs.sh: the steps only a person can do fail with the command to run, not a mystery.
 # =========================================================================================
 mkdir -p "$WORK/bin-rt"
 cat > "$WORK/bin-rt/gcloud" <<'FAKE'
@@ -1203,6 +1202,47 @@ expect "sse probe: nothing it prints holds the assertion or the token" "$(grep -
 expect "sse probe: it is plain http.client, no subprocess and no curl" "$(grep -cE '^import subprocess|^from subprocess|curl' "$HERE/sse_probe.py")" 0
 expect "realtime smoke: every stream read is the bounded probe (no long-held httpx stream)" \
   "$(grep -c '\.stream(' "$HERE/realtime_smoke.py"):$(grep -c '^STREAM_SECONDS = 5 ' "$HERE/realtime_smoke.py")" "0:1"
+
+# ---- retired names: the check that no public surface still shows the old names -----------------
+# A real local HTTP server on a free port serving a small site (no stand-in for our own script).
+rn_site() { # <name>: a clean site under $WORK/rn.<name>
+  RN="$WORK/rn.$1"; rm -rf "$RN"; mkdir -p "$RN/api"
+  printf '<urlset><url><loc>https://x.example</loc></url><url><loc>https://x.example/book</loc></url></urlset>' > "$RN/sitemap.xml"
+  echo '<h1>Idyllic Clinic</h1>' > "$RN/index.html"; echo '<h1>Book</h1>' > "$RN/book"
+  echo '{"name":"Idyllic Clinic"}' > "$RN/manifest.webmanifest"; echo 'User-agent: *' > "$RN/robots.txt"
+  echo '{"items":[{"clinic":{"name":"Idyllic Clinic"}}]}' > "$RN/api/doctors"
+}
+rn_serve() { # starts the server on a free port; sets RN_URL and RN_PID
+  rm -f "$RN/.port"
+  ( cd "$RN" && python3 -c '
+import http.server, socketserver
+class H(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def guess_type(self, path): return "text/plain"
+with socketserver.TCPServer(("127.0.0.1", 0), H) as s:
+    open(".port", "w").write(str(s.server_address[1])); s.serve_forever()
+' ) >/dev/null 2>&1 &
+  RN_PID=$!
+  for _ in $(seq 1 50); do [ -s "$RN/.port" ] && break; sleep 0.1; done
+  RN_URL="http://127.0.0.1:$(cat "$RN/.port")"
+}
+rn_run() { out="$(bash "$HERE/check_retired_names.sh" "$@" 2>&1)"; rc=$?; }
+rn_site clean; rn_serve; rn_run "$RN_URL"
+expect "retired names: a clean site passes" "$rc" 0
+expect "retired names: it checked the sitemap pages, the manifest and /api/doctors" "$(grep -c -e '/book$' -e '/manifest.webmanifest$' -e '/api/doctors$' <<<"$out")" 3
+kill "$RN_PID" 2>/dev/null
+rn_site oldclinic; echo '{"items":[{"clinic":{"name":"Mv'ule' Family Clinic"}}]}' > "$RN/api/doctors"; rn_serve; rn_run "$RN_URL"
+expect "retired names: the old clinic name in /api/doctors fails" "$rc:$(grep -c '^1 .*/api/doctors' <<<"$out")" "1:1"
+kill "$RN_PID" 2>/dev/null
+rn_site oldproduct; echo '<h1>Welcome to Idyllic Clinic Booking</h1>' > "$RN/book"; rn_serve; rn_run "$RN_URL"
+expect "retired names: the old product name on a page fails" "$rc:$(grep -c '^1 .*/book' <<<"$out")" "1:1"
+kill "$RN_PID" 2>/dev/null
+rn_site missing; rm "$RN/manifest.webmanifest"; rn_serve; rn_run "$RN_URL"
+expect "retired names: a surface that cannot be fetched fails, it does not pass" "$rc:$(grep -c 'could not be fetched' <<<"$out")" "1:1"
+expect "retired names: admin-only mode checks only the admin surfaces" "$(bash "$HERE/check_retired_names.sh" - "$RN_URL" 2>&1 | grep -c '/api/doctors')" 0
+kill "$RN_PID" 2>/dev/null
+rn_run "http://127.0.0.1:9"
+expect "retired names: an unreachable site fails" "$rc" 1
 
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
