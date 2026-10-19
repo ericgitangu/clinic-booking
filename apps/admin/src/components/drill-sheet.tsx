@@ -31,7 +31,7 @@ import {
   type DrillRow,
   type StatusChoice,
 } from "@/lib/drill";
-import { loadDrill, type DrillResult } from "@/lib/drill-actions";
+import type { DrillResult } from "@/lib/drill-read";
 import { formatLead } from "@/lib/kpi-delta";
 import { shownName } from "@/lib/shown-name";
 
@@ -79,12 +79,24 @@ export function DrillSheet({
   const read = useCallback(
     (f: string, t: string) => {
       start(async () => {
-        const res = await loadDrill({
-          ...config.spec,
-          from: f,
-          to: t,
-          doctorId: undefined,
-        });
+        let res: DrillResult;
+        try {
+          const q = new URLSearchParams({
+            from: f,
+            to: t,
+            status: config.spec.status,
+          });
+          res = (await (
+            await fetch(`/dashboard/read/drill?${q.toString()}`, {
+              cache: "no-store",
+            })
+          ).json()) as DrillResult;
+        } catch {
+          res = {
+            ok: false,
+            message: "The clinic service did not answer. Try again.",
+          };
+        }
         if (res.ok) {
           setData(res);
           setError(null);

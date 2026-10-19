@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import type { AuditEntry, LineageEvent } from "@clinic/api/generated";
 import { auditList, getAppointment } from "@/lib/api";

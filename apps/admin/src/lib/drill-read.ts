@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { appointmentsPage } from "@/lib/api";
 import type { DrillRow, DrillSpec } from "@/lib/drill";

@@ -27,7 +27,7 @@ import { StaffControls } from "@/components/staff-controls";
 import { StatusBadge } from "@/components/status-badge";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
 import { formatSlot, localDate } from "@/lib/clinic-time";
-import { loadDetail, type AppointmentDetail } from "@/lib/detail-actions";
+import type { AppointmentDetail, DetailResult } from "@/lib/detail-read";
 import { shownName } from "@/lib/shown-name";
 import { canVeto } from "@/lib/veto";
 
@@ -71,7 +71,19 @@ export function AppointmentLink({
 
   const read = useCallback(() => {
     start(async () => {
-      const res = await loadDetail(id);
+      let res: DetailResult;
+      try {
+        res = (await (
+          await fetch(`/dashboard/read/appointment/${id}`, {
+            cache: "no-store",
+          })
+        ).json()) as DetailResult;
+      } catch {
+        res = {
+          ok: false,
+          message: "The clinic service did not answer. Try again.",
+        };
+      }
       if (res.ok) {
         setDetail(res.detail);
         setError(null);
