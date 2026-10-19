@@ -225,13 +225,45 @@ async def test_a_backlog_larger_than_a_batch_arrives_complete_in_order_once(
 async def test_events_older_than_the_max_age_are_dropped_not_replayed(
     realtime_clean: None, owner_conn: asyncpg.Connection
 ) -> None:
+    # An event's age is the relay clock minus the database's own timestamp of the write. The test
+    # must not rely on the two being far apart (a CI run near FIXED_NOW would see a "fresh"
+    # event), so the write happens with push off and its timestamp is then set an hour before the
+    # relay's clock, whatever the wall clock says.
+    quiet = make_realtime_app(None, key=None)
+    async with await _client(quiet) as c:
+        assert (await c.post("/appointments", json=_body())).status_code == 201
+    await owner_conn.execute(
+        "UPDATE appointment_events SET occurred_at = $1", FIXED_NOW - timedelta(hours=1)
+    )
     publisher = RecordingPublisher()
     app = make_realtime_app(publisher, REALTIME_MAX_EVENT_AGE_SECONDS=600)
-    async with await _client(app) as c:
-        # The test clock is far from the database's real clock, so this booking's event is "old".
-        assert (await c.post("/appointments", json=_body())).status_code == 201
-    assert publisher.messages == []
+    sessionmaker = get_sessionmaker(app.state.settings)
+    budget = PublishBudget(sessionmaker, 25_000)
+    result = await relay_once(
+        sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=timedelta(seconds=600)
+    )
+    assert result.published == 0 and publisher.messages == []
     assert await _cursor(owner_conn) == (await _events(owner_conn))[-1]  # moved past, not stuck
+
+
+async def test_an_event_inside_the_max_age_is_published(
+    realtime_clean: None, owner_conn: asyncpg.Connection
+) -> None:
+    """The other side of the same rule, with the timestamp set relative to the relay's clock."""
+    quiet = make_realtime_app(None, key=None)
+    async with await _client(quiet) as c:
+        assert (await c.post("/appointments", json=_body())).status_code == 201
+    await owner_conn.execute(
+        "UPDATE appointment_events SET occurred_at = $1", FIXED_NOW - timedelta(seconds=30)
+    )
+    publisher = RecordingPublisher()
+    app = make_realtime_app(publisher, REALTIME_MAX_EVENT_AGE_SECONDS=600)
+    sessionmaker = get_sessionmaker(app.state.settings)
+    budget = PublishBudget(sessionmaker, 25_000)
+    result = await relay_once(
+        sessionmaker, publisher, budget, FakeClock(FIXED_NOW), max_age=timedelta(seconds=600)
+    )
+    assert result.published == 2 and len(publisher.messages) == 2
 
 
 async def test_the_budget_stops_publishing_logs_once_and_resets_next_month(
