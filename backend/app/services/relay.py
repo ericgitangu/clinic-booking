@@ -27,17 +27,18 @@ picked up by the next pass. A failed publish ends the loop (the breaker handles 
 starts from the cursor, which only moves in the transaction that publishes, so an event goes out
 once however many passes there are; the publish budget is debited in that same transaction
 (``debited_through`` guards a repeat), and the ``xmin`` guard is untouched: nothing is published
-before its transaction is visible. An event held back by an older open transaction is waited for by the
-holder for at most ``HORIZON_WAIT``: that transaction may end in a rollback (a lost booking race),
-which triggers no relay, so nothing else would send the event. The token mints run the same relay (holder or
-loser the same way), so an open page asking for a new token also flushes what is stranded; the
-clients' poll stays as the last safety net.
+before its transaction is visible. An event held back by an older open transaction is waited for
+by the holder for at most ``HORIZON_WAIT``: that transaction may end in a rollback (a lost booking
+race), which triggers no relay, so nothing else would send the event. The token mints run the same
+relay (holder or loser the same way), so an open page asking for a new token also flushes what is
+stranded; the clients' poll stays as the last safety net.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
 There is no always-on worker, so an event stuck behind a transaction that stays open past
-``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll covers that gap. After three failed publishes in a
-row the relay stops trying for a minute (a circuit breaker, logged once when it opens).
+``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll covers that gap. After
+three failed publishes in a row the relay stops trying for a minute (a circuit breaker, logged
+once when it opens).
 """
 
 from __future__ import annotations
