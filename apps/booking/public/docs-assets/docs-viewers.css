@@ -9,9 +9,12 @@
 [data-viewer="swagger"] { background: #fff; color: #3b4151; }
 html.dark [data-viewer="swagger"] { background: var(--card); }
 html.dark [data-viewer="swagger"] .swagger-ui {
-  background: #eef2fb;
+  /* Chosen so that, after the filter, the panel is the site's own card colour (#111a42, near enough),
+     not black. Computed from the filter's matrix. */
+  background: #dae3ff;
   filter: invert(1) hue-rotate(180deg);
 }
+html.dark [data-viewer="swagger"] .swagger-ui .scheme-container { background: #dae3ff; }
 html.dark [data-viewer="swagger"] .swagger-ui img { filter: invert(1) hue-rotate(180deg); }
 
 /* Swagger's palette fails WCAG AA in places (white on #49cc90 is 2:1; its blue link is 3.3:1). Same

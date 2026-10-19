@@ -22,7 +22,6 @@
 
     function label() {
       theme.setAttribute("aria-label", dark ? "Switch to the light theme" : "Switch to the dark theme");
-      theme.textContent = dark ? "Light" : "Dark";
     }
     if (theme) {
       label();

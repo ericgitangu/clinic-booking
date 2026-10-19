@@ -11,6 +11,20 @@ import { FOOTER_NOTICE, SITE } from "@/lib/site";
 // same-origin) style and wire them. Debt, on purpose: the markup and CSS are a second copy of
 // components/app-shell, kept in step by e2e/shell.spec.ts, which runs the same checks on these pages.
 
+// The same two icons the React header uses (lucide Sun and Moon), drawn inline.
+const ICON = (cls: string, paths: string) =>
+  `<svg class="${cls}" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const SUN = ICON(
+  "i-sun",
+  '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+);
+const MOON = ICON(
+  "i-moon",
+  '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+);
+const CHEVRON_LEFT = ICON("i-chev", '<path d="m15 18-6-6 6-6"/>');
+const CHEVRON_RIGHT = ICON("i-chev", '<path d="m9 18 6-6-6-6"/>');
+
 const esc = (s: string) =>
   s
     .replaceAll("&", "&amp;")
@@ -31,7 +45,7 @@ function header(path: string): string {
       )
         .map((l) => link(l, "shell-link"))
         .join("")}</nav>
-      <button type="button" class="shell-icon-btn" id="shell-theme" aria-label="Switch theme"></button>
+      <button type="button" class="shell-icon-btn" id="shell-theme" aria-label="Switch theme">${SUN}${MOON}</button>
       <details class="shell-menu" id="shell-menu">
         <summary class="shell-icon-btn" aria-label="Menu"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></summary>
         <nav aria-label="Menu" class="shell-panel">${NAV_LINKS.map((l) => link(l, "shell-panel-link")).join("")}</nav>
@@ -48,11 +62,11 @@ function trail(path: string): string {
     .map((c, i) =>
       i === crumbs.length - 1
         ? `<li><span aria-current="page">${esc(c.label)}</span></li>`
-        : `<li><a href="${esc(c.href)}">${esc(c.label)}</a></li><li aria-hidden="true" class="shell-sep">/</li>`,
+        : `<li><a href="${esc(c.href)}">${esc(c.label)}</a></li><li aria-hidden="true" class="shell-sep">${CHEVRON_RIGHT}</li>`,
     )
     .join("");
   return `<nav aria-label="Breadcrumb" class="shell-trail" data-shell="trail">
-  <a class="shell-back" href="${esc(parent.href)}">Back to the app</a>
+  <a class="shell-back" href="${esc(parent.href)}">${CHEVRON_LEFT}Back to the app</a>
   <ol>${items}</ol>
 </nav>`;
 }
