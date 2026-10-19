@@ -27,15 +27,18 @@ export function ShellHeader({
 }) {
   const pathname = usePathname();
   const active = activeHref(links, pathname);
-  const [scrolled, setScrolled] = useState(false);
   // The menu is open for the page it was opened on; navigating closes it without an effect.
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt !== null && openAt === (pathname ?? "");
   const header = useRef<HTMLElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
 
+  // The lifted look is one attribute, written straight to the element: scrolling never re-renders
+  // the header (it used to set state, which re-rendered it once per direction change).
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 0);
+    const el = header.current;
+    const onScroll = () =>
+      el?.setAttribute("data-scrolled", String(window.scrollY > 0));
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -59,7 +62,7 @@ export function ShellHeader({
     <header
       ref={header}
       data-shell="header"
-      data-scrolled={scrolled}
+      data-scrolled="false"
       className="shell-header sticky top-0 z-40 border-b border-border bg-background pt-[env(safe-area-inset-top)]"
       onKeyDown={(e) => {
         if (e.key === "Escape" && open) {

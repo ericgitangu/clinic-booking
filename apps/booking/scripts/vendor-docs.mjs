@@ -53,7 +53,8 @@ const theme = readFileSync(
   "utf8",
 );
 const blocks = theme.match(/^(?::root|\.dark) \{[\s\S]*?^\}/gm) ?? [];
-if (blocks.length < 3) throw new Error("vendor-docs: theme.css tokens not found");
+if (blocks.length < 3)
+  throw new Error("vendor-docs: theme.css tokens not found");
 writeFileSync(
   join(out, "shell-tokens.css"),
   `/* Copied by scripts/vendor-docs.mjs from packages/ui/src/theme.css; change the theme, not this file. */\n${blocks.join("\n\n")}\n`,

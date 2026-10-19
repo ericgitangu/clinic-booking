@@ -1,27 +1,32 @@
 import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
-// Relative on purpose: this file is loaded before the workspace packages are set up for the app.
-import { ABLY_HOSTS, buildCsp } from "../../packages/ui/src/lib/csp";
+import { CSP_OPTIONS } from "./src/lib/csp-options";
+import { SECURITY_HEADERS, buildCsp } from "../../packages/ui/src/lib/csp";
 
-// reCAPTCHA Enterprise loads its script from www.google.com, its helper code from www.gstatic.com, talks
-// to both, and draws its (hidden) badge frame from www.google.com. The push service is Ably. Everything
-// else, including the Go gateway, is reached through the same-origin /api proxy, so it needs no entry.
-const CSP = buildCsp({
-  dev: process.env.NODE_ENV !== "production",
-  script: ["https://www.google.com", "https://www.gstatic.com"],
-  connect: [
-    "https://www.google.com",
-    "https://www.gstatic.com",
-    ...ABLY_HOSTS,
-    // Set only when running the live-update scenarios against the local stand-in for the push
-    // service (E2E_PUSH_LOCAL=1, e2e/support/fake-push.mjs); never in a real build.
-    ...(process.env.CSP_EXTRA_CONNECT?.split(",").filter(Boolean) ?? []),
-  ],
-  frame: ["https://www.google.com", "https://recaptcha.google.com"],
-  img: ["https://lh3.googleusercontent.com", "https://www.gstatic.com"],
-});
+// Pages built once and served from cache have no per-request moment to mint a nonce, so each carries
+// the hashes of its own inline scripts instead. The tokens below are replaced after `next build` by
+// scripts/csp-hashes.mjs, which reads them out of the built HTML (the build fails if it cannot).
+// Everything rendered per request is handled in proxy.ts with a nonce: "/", /book*, /appointments*.
+// The e2e error fixture is rendered per request too but, as a test page, takes the catch-all policy.
+// `next dev` has no built HTML, so there the pages get 'unsafe-inline'. The two docs pages send their
+// own stricter policy, and the route handlers (/api, /auth, /cron) send HTML to nobody.
+const HASHED_PAGES = ["about", "data", "privacy", "terms"] as const;
+const NOT_FOUND_PAGE = "_not-found";
+const hashToken = (name: string) => `__INLINE_SCRIPT_HASHES:${name}__`;
+const policyFor = (name: string) =>
+  buildCsp({
+    ...CSP_OPTIONS,
+    script: CSP_OPTIONS.dev
+      ? { kind: "inline" }
+      : { kind: "hashes", hashes: [hashToken(name)] },
+  });
+const RENDERED_PER_REQUEST = `book(?:/|$)|appointments(?:/|$)|docs$|redoc$|api(?:/|$)|auth(?:/|$)|cron(?:/|$)${process.env.SHELL_E2E === "1" ? "|e2e-shell(?:/|$)" : ""}`;
+const NOT_A_HASHED_PAGE = HASHED_PAGES.map((p) => `${p}(?:/|$)`).join("|");
+// Not on assets (_next/*, anything with a file extension): a header of this size on every script,
+// stylesheet and image was +0.8 KB per response for nothing.
+const CATCH_ALL_PAGES = `/((?!_next(?:/|$)|${RENDERED_PER_REQUEST}|${NOT_A_HASHED_PAGE}|.*\\.).+)`;
+const PAGES_ONLY = "/((?!_next(?:/|$)|docs$|redoc$|.*\\.).*)";
 
-// Cost: no image optimization (it bills), no rewrites (the proxy is an explicit route).
 const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
@@ -30,8 +35,18 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
-  // The avatars are static files with stable names: let the browser keep them for a day and revalidate
-  // in the background, so a swapped portrait shows within a day without a hashed file name.
+  // The e2e error fixture (src/app/e2e-shell/error/page.e2e.tsx) is a route only when the build is made
+  // with SHELL_E2E=1, so it can not exist in a real build.
+  pageExtensions: [
+    "tsx",
+    "ts",
+    "jsx",
+    "js",
+    ...(process.env.SHELL_E2E === "1" ? ["e2e.tsx"] : []),
+  ],
+  transpilePackages: ["@clinic/ui", "@clinic/api"],
+  // The avatars are static files with stable names: let the browser keep them for a day and
+  // revalidate in the background, so a swapped portrait shows within a day without a hashed name.
   async headers() {
     return [
       {
@@ -43,15 +58,22 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      { source: PAGES_ONLY, headers: [...SECURITY_HEADERS] },
+      ...HASHED_PAGES.map((p) => ({
+        source: `/${p}`,
+        headers: [{ key: "Content-Security-Policy", value: policyFor(p) }],
+      })),
       {
-        // Not /docs or /redoc: those two send their own, stricter policy (lib/docs-page.ts), and a
-        // header set here would replace it rather than add to it.
-        source: "/((?!docs$|redoc$).*)",
-        headers: [{ key: "Content-Security-Policy", value: CSP }],
+        source: CATCH_ALL_PAGES,
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: policyFor(NOT_FOUND_PAGE),
+          },
+        ],
       },
     ];
   },
-  transpilePackages: ["@clinic/ui", "@clinic/api"],
 };
 
 export default withSerwist(nextConfig);

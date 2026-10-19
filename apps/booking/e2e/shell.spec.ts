@@ -71,6 +71,13 @@ const CASES: Case[] = [
     parentName: "Home",
   },
   {
+    name: "one appointment",
+    path: (i) => `/appointments/${i.appointmentId}`,
+    parent: "/appointments",
+    parentName: "My appointments",
+    signedIn: true,
+  },
+  {
     name: "reschedule",
     path: (i) => `/appointments/${i.appointmentId}/reschedule`,
     parent: "/appointments",
@@ -111,6 +118,14 @@ const CASES: Case[] = [
     status: 500,
   },
 ];
+
+// What "Back to ..." says after each parent's label: sentence case, not the label itself.
+const BACK: Record<string, string> = {
+  Home: "home",
+  "Book a visit": "doctors",
+  "Choose a time": "times",
+  "My appointments": "my appointments",
+};
 
 let ids: Ids;
 let cookies: Awaited<ReturnType<typeof sessionCookies>>;
@@ -191,7 +206,9 @@ test.describe("every route has the header, the footer and a way back", () => {
       if (c.parent === null) {
         await expect(back).toHaveCount(0);
       } else {
-        await expect(back).toHaveText(c.phoneText ?? `Back to ${c.parentName}`);
+        await expect(back).toHaveText(
+          c.phoneText ?? `Back to ${BACK[c.parentName!]}`,
+        );
         expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         await expect(back).toHaveAttribute("href", parentOf(c)!);
         await back.click();
@@ -654,61 +671,190 @@ const PIXEL = Buffer.from(
   "base64",
 );
 
+const cspOf = async (
+  request: import("@playwright/test").APIRequestContext,
+  path: string,
+) => {
+  const res = await request.get(path);
+  return res
+    .headersArray()
+    .filter((h) => h.name.toLowerCase() === "content-security-policy")
+    .map((h) => h.value);
+};
+
+// Pages rendered per request carry a nonce; the pages built once (named debt) allow inline script.
+const DYNAMIC = ["/", "/book", `/book/00000000-0000-0000-0000-000000000000`];
+// Built once, with the hashes of their own scripts (apps/booking/scripts/csp-hashes.mjs).
+const STATIC = ["/privacy", "/about", "/data", "/terms", "/no-such-page"];
+
 test.describe("the Content-Security-Policy", () => {
-  test("is sent on pages, errors and the docs, with the directives that matter", async ({
+  test("every dynamic page gets a fresh nonce with strict-dynamic, and no host in script-src", async ({
     request,
   }) => {
-    for (const path of [
-      "/",
-      "/book",
-      "/privacy",
-      "/no-such-page",
-      "/docs-assets/docs-shell.js",
-    ]) {
+    const nonces = new Set<string>();
+    for (const path of DYNAMIC) {
+      const all = await cspOf(request, path);
+      expect(all, path).toHaveLength(1);
+      const script = /script-src ([^;]+)/.exec(all[0])![1];
+      const nonce = /'nonce-([^']+)'/.exec(script)?.[1];
+      expect(nonce, `${path}: ${script}`).toBeTruthy();
+      nonces.add(nonce!);
+      expect(script, path).toContain("'strict-dynamic'");
+      expect(script, path).not.toContain("unsafe-inline");
+      expect(script, path).not.toMatch(/https?:|\*/);
+      expect(all[0], path).toContain("upgrade-insecure-requests");
+    }
+    expect(nonces.size, "one nonce per response").toBe(DYNAMIC.length);
+  });
+
+  test("pages built once carry the hashes of their own inline scripts, and no unsafe-inline", async ({
+    request,
+  }) => {
+    const seen = new Map<string, string>();
+    for (const path of STATIC) {
+      const all = await cspOf(request, path);
+      expect(all, path).toHaveLength(1);
+      const script = /script-src ([^;]+)/.exec(all[0])![1];
+      expect(script, path).toMatch(/^'self' ('sha256-[A-Za-z0-9+/=]+' ?)+$/);
+      expect(script, path).not.toContain("unsafe-inline");
+      expect(script, path).not.toContain("nonce");
+      expect(script, path).not.toContain("__INLINE_SCRIPT_HASHES");
+      seen.set(path, script);
+    }
+    // Each page's payload differs, so each has its own set (the 404 has its own too).
+    expect(new Set(seen.values()).size).toBe(STATIC.length);
+  });
+
+  test("every page keeps the directives that matter, and the other security headers", async ({
+    request,
+  }) => {
+    for (const path of [...DYNAMIC, ...STATIC]) {
       const res = await request.get(path);
-      const all = res
-        .headersArray()
-        .filter((h) => h.name.toLowerCase() === "content-security-policy")
-        .map((h) => h.value);
-      expect(all.length, path).toBeGreaterThan(0);
-      const csp = all[0];
+      const csp = (await cspOf(request, path))[0];
       for (const d of [
         "default-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
         "frame-ancestors 'none'",
+        "form-action 'self'",
         "https://lh3.googleusercontent.com",
-        "https://www.google.com",
-        "https://www.gstatic.com",
-        "wss://realtime.ably.net",
-        "https://*.ably.net",
+        "connect-src 'self' https://www.google.com https://www.gstatic.com https://main.realtime.ably.net",
       ])
         expect(csp, `${path}: ${d}`).toContain(d);
-      expect(csp, path).not.toMatch(/script-src[^;]*\*/);
       expect(csp, path).not.toContain("unsafe-eval");
+      expect(csp, path).not.toContain("ably.io");
+      const h = res.headers();
+      expect(h["x-content-type-options"], path).toBe("nosniff");
+      expect(h["referrer-policy"], path).toBe(
+        "strict-origin-when-cross-origin",
+      );
+      expect(h["permissions-policy"], path).toContain("camera=()");
     }
+    // Scripts, stylesheets and images carry none of these (a header on each cost bytes for nothing).
+    const asset = await request.get("/docs-assets/docs-shell.js");
+    expect(asset.headers()["content-security-policy"]).toBeUndefined();
     // The two docs pages keep their own, stricter policy: nothing but this origin, scripts included.
     for (const path of ["/docs", "/redoc"]) {
-      const docs = (await request.get(path))
-        .headersArray()
-        .filter((h) => h.name.toLowerCase() === "content-security-policy");
+      const docs = await cspOf(request, path);
       expect(docs, path).toHaveLength(1);
-      expect(docs[0].value, path).toContain("default-src 'none'");
-      expect(docs[0].value, path).toMatch(/script-src 'self'(;|$)/);
+      expect(docs[0], path).toContain("default-src 'none'");
+      expect(docs[0], path).toMatch(/script-src 'self'(;|$)/);
     }
   });
 
-  test("lets reCAPTCHA, Ably and Google profile pictures through, and blocks any other host", async ({
+  for (const path of [...DYNAMIC.slice(0, 2), ...STATIC]) {
+    test(`an injected inline script is blocked on ${path}`, async ({
+      browser,
+    }, testInfo) => {
+      testInfo.annotations.push({ type: "csp-expected" });
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(path);
+      const result = await page.evaluate(async () => {
+        const seen: string[] = [];
+        document.addEventListener("securitypolicyviolation", (e) =>
+          seen.push(e.effectiveDirective),
+        );
+        // What an attacker's markup does: HTML the parser reads, with an inline script and an inline
+        // handler in it. (A script added from running code is trusted by 'strict-dynamic'; markup is not.)
+        const frame = document.createElement("iframe");
+        frame.srcdoc =
+          '<script>parent.__injected = "script"</' +
+          "script><img src=x onerror=\"parent.__injected = 'img'\">";
+        document.body.append(frame);
+        await new Promise((r) => setTimeout(r, 500));
+        return {
+          ran:
+            (window as unknown as { __injected?: string }).__injected ?? null,
+          seen,
+        };
+      });
+      // Neither the inline handler nor the inline script ran.
+      expect(result.ran).toBeNull();
+      await context.close();
+    });
+  }
+
+  test("the page's own scripts do run under the nonce: the theme applies and the grid hydrates", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/book");
+    // The inline theme script is allowed by its hash and set the class before paint.
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    // A client component only works if Next's nonced scripts ran.
+    await expect(page.getByRole("banner")).toBeVisible();
+    await context.close();
+  });
+
+  test("reCAPTCHA's script chain loads under strict-dynamic, with no Google host in script-src", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    // Stand-ins for Google's two hosts: the first script loads the second, as the real one does.
+    await context.route(
+      "https://www.google.com/recaptcha/enterprise.js**",
+      (r) =>
+        r.fulfill({
+          contentType: "text/javascript",
+          body: `window.__rc1 = true;
+          const s = document.createElement("script");
+          s.src = "https://www.gstatic.com/recaptcha/releases/x/recaptcha__en.js";
+          document.head.append(s);`,
+        }),
+    );
+    await context.route("https://www.gstatic.com/recaptcha/**", (r) =>
+      r.fulfill({
+        contentType: "text/javascript",
+        body: "window.__rc2 = true;",
+      }),
+    );
+    const page = await context.newPage();
+    await page.goto("/book");
+    await page.evaluate(() => {
+      // The way use-recaptcha.ts loads it: a script element added from running code.
+      const el = document.createElement("script");
+      el.id = "recaptcha-enterprise";
+      el.src = "https://www.google.com/recaptcha/enterprise.js?render=k";
+      document.head.append(el);
+    });
+    await page.waitForFunction(
+      () => (window as unknown as { __rc2?: boolean }).__rc2 === true,
+    );
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __rc1?: boolean }).__rc1,
+      ),
+    ).toBe(true);
+    await context.close();
+  });
+
+  test("lets Ably and Google profile pictures through, and blocks any other host (pages built once)", async ({
     browser,
   }, testInfo) => {
     testInfo.annotations.push({ type: "csp-expected" });
     const context = await browser.newContext();
-    await context.route("https://www.google.com/recaptcha/**", (r) =>
-      r.fulfill({ contentType: "text/javascript", body: "" }),
-    );
-    await context.route("https://www.gstatic.com/**", (r) =>
-      r.fulfill({ contentType: "image/png", body: PIXEL }),
-    );
     await context.route("https://main.realtime.ably.net/**", (r) =>
       r.fulfill({ contentType: "application/json", body: "{}" }),
     );
@@ -718,15 +864,10 @@ test.describe("the Content-Security-Policy", () => {
     const page = await context.newPage();
     await page.goto("/privacy");
     const allowed = await probe(page, {
-      script: "https://www.google.com/recaptcha/enterprise.js?render=k",
       connect: "https://main.realtime.ably.net/event-stream?channels=x",
       img: "https://lh3.googleusercontent.com/a/x=s96-c",
     });
-    expect(allowed.out).toEqual({
-      script: "loaded",
-      connect: "loaded",
-      img: "loaded",
-    });
+    expect(allowed.out).toEqual({ connect: "loaded", img: "loaded" });
     expect(allowed.violations).toEqual([]);
     const blocked = await probe(page, {
       script: "https://evil.example/x.js",
@@ -739,6 +880,11 @@ test.describe("the Content-Security-Policy", () => {
       img: "blocked",
     });
     expect(blocked.violations).toHaveLength(3);
+    // Other hosts of the same company are not let through by accident.
+    const near = await probe(page, {
+      connect: "https://rest.ably.io/time",
+    });
+    expect(near.out).toEqual({ connect: "blocked" });
     await context.close();
   });
 

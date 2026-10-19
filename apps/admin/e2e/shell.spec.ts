@@ -103,7 +103,7 @@ test.describe("every route has the header, the footer and a way back", () => {
         await expect(back).toHaveCount(0);
         return;
       }
-      await expect(back).toHaveText(`Back to ${c.parentName}`);
+      await expect(back).toHaveText("Back to dashboard");
       await expect(back).toHaveAttribute("href", c.parent);
       expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     });
@@ -352,27 +352,99 @@ const PIXEL = Buffer.from(
 );
 
 test.describe("the Content-Security-Policy", () => {
-  test("is sent on pages, the 404 and the sign-in gate, with the directives that matter", async ({
+  test("every page gets a fresh nonce with strict-dynamic, and no host in script-src", async ({
     as,
     request,
   }) => {
     await as("owner");
-    for (const path of ["/", "/dashboard", "/no-such-page"]) {
+    const nonces = new Set<string>();
+    const paths = ["/", "/dashboard", "/access"];
+    for (const path of paths) {
       const res = await request.get(path);
       const csp = res.headers()["content-security-policy"];
       expect(csp, path).toBeTruthy();
+      const script = /script-src ([^;]+)/.exec(csp)![1];
+      const nonce = /'nonce-([^']+)'/.exec(script)?.[1];
+      expect(nonce, `${path}: ${script}`).toBeTruthy();
+      nonces.add(nonce!);
+      expect(script, path).toContain("'strict-dynamic'");
+      expect(script, path).not.toContain("unsafe-inline");
+      expect(script, path).not.toMatch(/https?:|\*/);
       for (const d of [
         "default-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
         "frame-ancestors 'none'",
+        "form-action 'self'",
         "https://lh3.googleusercontent.com",
-        "https://accounts.google.com",
+        "upgrade-insecure-requests",
       ])
         expect(csp, `${path}: ${d}`).toContain(d);
-      expect(csp, path).not.toMatch(/script-src[^;]*\*/);
+      expect(csp, path).not.toContain("accounts.google.com");
       expect(csp, path).not.toContain("unsafe-eval");
+      const h = res.headers();
+      expect(h["x-content-type-options"], path).toBe("nosniff");
+      expect(h["referrer-policy"], path).toBe(
+        "strict-origin-when-cross-origin",
+      );
+      expect(h["permissions-policy"], path).toContain("camera=()");
     }
+    expect(nonces.size, "one nonce per response").toBe(paths.length);
+  });
+
+  test("the 404 page is built once and carries the hashes of its own scripts", async ({
+    request,
+  }) => {
+    const res = await request.get("/no-such-page");
+    expect(res.status()).toBe(404);
+    const csp = res.headers()["content-security-policy"];
+    const script = /script-src ([^;]+)/.exec(csp)![1];
+    expect(script).toMatch(/^'self' ('sha256-[A-Za-z0-9+/=]+' ?)+$/);
+    expect(script).not.toContain("unsafe-inline");
+    expect(script).not.toContain("nonce");
+  });
+
+  test("an injected inline script is blocked on the signed-in dashboard", async ({
+    as,
+    page,
+  }, testInfo) => {
+    testInfo.annotations.push({ type: "csp-expected" });
+    await as("owner");
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("kpi-upcoming-booked")).toHaveText(/^\d+$/);
+    const result = await page.evaluate(async () => {
+      const seen: string[] = [];
+      document.addEventListener("securitypolicyviolation", (e) =>
+        seen.push(e.effectiveDirective),
+      );
+      // What an attacker's markup does: HTML the parser reads, with an inline script and an inline
+      // handler in it. (A script added from running code is trusted by 'strict-dynamic'; markup is not.)
+      const frame = document.createElement("iframe");
+      frame.srcdoc =
+        '<script>parent.__injected = "script"</' +
+        "script><img src=x onerror=\"parent.__injected = 'img'\">";
+      document.body.append(frame);
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        ran: (window as unknown as { __injected?: string }).__injected ?? null,
+        seen,
+      };
+    });
+    expect(result.ran).toBeNull();
+  });
+
+  test("the dashboard and its live feed load with no policy violation, and the theme script runs", async ({
+    as,
+    page,
+  }) => {
+    // Any violation fails the test (the guard in support/fixtures.ts); this one waits long enough
+    // for the live stream to connect before it looks.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await as("owner");
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("kpi-upcoming-booked")).toHaveText(/^\d+$/);
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await page.waitForTimeout(2000);
   });
 
   test("lets Google profile pictures through and blocks any other host", async ({
@@ -389,15 +461,10 @@ test.describe("the Content-Security-Policy", () => {
     expect(ok.out).toEqual({ img: "loaded" });
     expect(ok.violations).toEqual([]);
     const bad = await probe(page, {
-      script: "https://evil.example/x.js",
       connect: "https://evil.example/collect",
       img: "https://evil.example/p.png",
     });
-    expect(bad.out).toEqual({
-      script: "blocked",
-      connect: "blocked",
-      img: "blocked",
-    });
-    expect(bad.violations).toHaveLength(3);
+    expect(bad.out).toEqual({ connect: "blocked", img: "blocked" });
+    expect(bad.violations).toHaveLength(2);
   });
 });

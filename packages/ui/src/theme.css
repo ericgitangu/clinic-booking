@@ -313,7 +313,8 @@ html:has([data-sticky-cta]) {
 /* Once the page has scrolled, the header lifts off the content with a shadow. The surface itself is
    always solid; nothing is blurred or see-through. */
 .shell-header[data-scrolled="true"] {
-  box-shadow: 0 6px 16px -12px color-mix(in oklab, var(--foreground) 55%, transparent);
+  box-shadow: 0 6px 16px -12px
+    color-mix(in oklab, var(--foreground) 55%, transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {

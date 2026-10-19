@@ -1,13 +1,19 @@
 "use client";
 
 import "./globals.css";
-import { PageShell } from "@clinic/ui/components/layout/page-shell";
+import dynamic from "next/dynamic";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
 import { Button } from "@clinic/ui/components/ui/button";
 import { FOOTER_COLUMNS } from "@/lib/footer";
 import { fontVars } from "@/lib/fonts";
 import { SHELL_ROUTES } from "@/lib/shell-routes";
 import { FOOTER_NOTICE, NAV_LINKS, SITE } from "@/lib/site";
+
+// The shell is imported lazily: this file is part of every page's client code, and the frame is needed
+// only on the rare page that fails (it was 5 KB on every page before).
+const PageShell = dynamic(() =>
+  import("@clinic/ui/components/layout/page-shell").then((m) => m.PageShell),
+);
 
 // Replaces the root layout when the layout itself fails, so it brings its own <html> and the same
 // frame as every other page. It cannot look up who is signed in (that lookup may be what failed),
