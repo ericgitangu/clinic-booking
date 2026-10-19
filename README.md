@@ -102,6 +102,8 @@ make api-check
 
 Observed on 2026-10-19: 42 requests (the 41 in the collection and one slot lookup), 219 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production: 13 requests, 62 assertions, 0 failed on 2026-10-19. `API_WRITES=1 make api-check-prod` also runs the writes, and those leave two "Reviewer …" patients and two cancelled appointments in the production database.
 
+No install needed: **Run the API checks** on the landing page (<https://clinic.ericgitangu.com/#api-checks>) runs the collection's GET requests from your browser against `/api`, reading the expectations from the same collection file newman uses. An opt-in toggle adds the writes and leaves two test patients and a cancelled visit behind. Observed on 2026-10-19 (production build, compose stack): 12 of 12 requests and 62 assertions passed read-only, 21 of 21 and 103 with writes.
+
 To click through it instead, start the API with `make up` (or use production), then in Postman Import the three files in `docs/api/` and pick the `local` or `production` environment. newman and Postman are the supported tools; [`docs/api/README.md`](docs/api/README.md#postman-and-newman) says why Insomnia is not. Folder 08 needs the second API that only `make api-check` starts ([how to send it by hand](docs/api/README.md#the-journey)). No request needs a key.
 
 ## 3. System design

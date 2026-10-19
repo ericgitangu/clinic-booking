@@ -6,6 +6,7 @@ import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
 import { Ripples } from "@clinic/ui/components/brand/ripples";
 import { Button } from "@clinic/ui/components/ui/button";
 import { Separator } from "@clinic/ui/components/ui/separator";
+import { ApiChecksPanel } from "@/components/landing/api-checks-panel";
 import { CopyBlock } from "@/components/landing/copy-block";
 import { EvidenceCard } from "@/components/landing/evidence-card";
 import { StatusLine, StatusPending } from "@/components/landing/status-line";
@@ -180,6 +181,29 @@ export default function Home() {
             README section 2
           </a>
           .
+        </p>
+      </section>
+
+      <Separator />
+
+      <section aria-labelledby="api-checks" className="py-12">
+        <h2
+          id="api-checks"
+          className="font-heading text-2xl font-semibold tracking-tight"
+        >
+          Run the API checks
+        </h2>
+        <p className="mt-3 max-w-[65ch] text-base leading-7 text-muted-foreground">
+          Runs the read requests from the{" "}
+          <a className={LINK} href={`${GITHUB}/tree/main/docs/api`}>
+            Postman collection
+          </a>{" "}
+          in your browser, against this site&rsquo;s <code>/api</code>.
+        </p>
+        <ApiChecksPanel />
+        <p className="mt-4 max-w-[65ch] text-base leading-7 text-muted-foreground">
+          The full suite, including <code>409 CHANGE_TOO_LATE</code>, runs
+          locally with <code>make api-check</code>.
         </p>
       </section>
 
