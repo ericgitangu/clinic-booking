@@ -243,6 +243,10 @@ case "$*" in
     # what `gcloud ... --format='value(name)'` prints today: the bare package name (STUB_PKG_FULL=1: the full resource path)
     pre=""; [ -n "${STUB_PKG_FULL:-}" ] && pre="projects/p/locations/us-east4/repositories/clinic/packages/"
     printf '%s\n' "${pre}clinic-api" ${STUB_GO:+"${pre}clinic-realtime"} ;;
+  *"artifacts versions list"*) printf '[%s]\n' "$(seq 1 "${STUB_C6_ALL:-2}" | sed 's/.*/{"name":"v&"}/' | paste -sd, -)" ;;
+  *"docker images list"*"/clinic/clinic-"*) # C6: the per-package listing, tags decide
+    n="${STUB_C6_TAGGED:-2}"; tot="${STUB_C6_ALL:-2}"
+    printf '[%s]\n' "$(for i in $(seq 1 "$tot"); do if [ "$i" -le "$n" ]; then echo "{\"tags\":[\"sha-$i\"]}"; else echo '{"tags":[]}'; fi; done | paste -sd, -)" ;;
   *"docker images list"*)
     if [ -n "${STUB_IMAGES_ERR:-}" ]; then echo "ERROR: (gcloud.artifacts.docker.images.list) PERMISSION_DENIED: deployer@sil-clinic-booking.iam.gserviceaccount.com lacks permission" >&2; exit 1; fi
     cat "$STUB_IMAGES" ;;
@@ -275,7 +279,7 @@ live_run() { # <script> <env assignments...> ; prints the C5 / C7 / C12 lines
   local script="$1"; shift
   rm -f "$STUB/curl.argv" "$STUB/curl.stdin"
   ( cd "$PRISTINE" && env PATH="$STUB/bin:$PATH" STUB_DIR="$STUB" STUB_IMAGES="$STUB/images.json" CIRCLECI=true \
-      COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14" PROJECT=p "$@" bash "$script" --live 2>&1 ) | grep -E "C5|C7|C12|^note" || true
+      COST_CHECK_ALLOW_UNVERIFIED="C11-budgets C13 C14" PROJECT=p "$@" bash "$script" --live 2>&1 ) | grep -E "C5|C6|C7|C12|^note" || true
 }
 L="scripts/cost_check.sh"
 out="$(live_run "$L" STUB_GO=1 STUB_SIZE=543337040 STUB_SECRETS=5)"
@@ -309,6 +313,15 @@ if grep -q "^PASS  C7 active secret versions=1" <<<"$out" && grep -q "^PASS  C5 
 out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_VERSIONS_N=1000 STUB_SECRETS=1)"
 if grep -q "^FAIL  C7 active secret versions=1000 > 6" <<<"$out"; then ok "secret count: 1,000 versions is read as 1,000 and fails C7's bound"; else bad "secret count: 1,000 should fail C7's bound (got: $(grep C7 <<<"$out" | head -2 | tr '\n' '|'))"; fi
 if ar --ar-ceiling 0005 | grep -q "bad secret version count '0005'" && ar --ar-ceiling 12345 | grep -q "^[0-9]*$" ; then ok "secret count: a leading-zero count is rejected by the ceiling helper"; else bad "secret count: leading zeros should be rejected"; fi
+
+# C6 counts tagged versions only: untagged ones are the cleanup policy's pending work (a note), not a failure
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_C6_ALL=10 STUB_C6_TAGGED=2)"
+if grep -q "^PASS  C6 clinic-api tagged versions=2" <<<"$out" && grep -q "^PASS  C6 clinic-realtime tagged versions=2" <<<"$out" && grep -q "^note  C6 clinic-realtime has 8 untagged version(s) pending" <<<"$out" && ! grep -q "^FAIL  .*C6\|^FAIL  C6 artifact-registry" <<<"$out"; then ok "C6 live: 10 versions with 2 tagged passes and notes the 8 untagged (both packages)"; else bad "C6 live: 10 versions / 2 tagged should pass with a note (got: $(grep C6 <<<"$out" | head -3 | tr '\n' '|'))"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_C6_ALL=10 STUB_C6_TAGGED=3)"
+if grep -q "^FAIL  C6 artifact-registry clinic-realtime tagged versions=3 > 2" <<<"$out" && grep -q "^FAIL  C6 artifact-registry clinic-api tagged versions=3 > 2" <<<"$out"; then ok "C6 live: 3 tagged versions fails for every package"; else bad "C6 live: 3 tagged should fail (got: $(grep C6 <<<"$out" | head -3 | tr '\n' '|'))"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=420000000 STUB_C6_ALL=2 STUB_C6_TAGGED=2)"
+if grep -q "^PASS  C6 clinic-api tagged versions=2" <<<"$out" && ! grep -q "^note  C6" <<<"$out"; then ok "C6 live: 2 of 2 tagged passes with no note"; else bad "C6 live: 2 of 2 tagged should pass quietly"; fi
+if ar --c6 p 10 2 | grep -q "^PASS  C6 p tagged versions=2" && ar --c6 p 10 3 | grep -q "^FAIL  C6 artifact-registry p tagged versions=3 > 2"; then ok "C6 --c6: the judgement on its own (10 versions/2 tagged passes, 3 tagged fails)"; else bad "C6 --c6 judgement wrong"; fi
 
 # the access token never appears on a command line (C5 and C12), only on stdin
 live_run "$L" STUB_GO=1 STUB_SIZE=420000000 >/dev/null

@@ -11,12 +11,94 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Read first.** [3.4 The concurrency guarantee](#34-the-concurrency-guarantee) and the two ADRs behind it, [ADR-0003](docs/adr/0003-double-booking-partial-unique-index.md) and [ADR-0018](docs/adr/0018-testing-strategy.md). If that logic is wrong, nothing else matters.
 - **Run.** [Section 2](#2-verify-the-claims-in-10-minutes) is a copy-paste path against production: 20 simultaneous bookings of one slot, then cancelling twice.
 - **Try the API.** `make api-check` runs a Postman collection of the whole booking journey against a local stack; the same files import into Postman ([Try the API](#try-the-api)).
+- **Architecture.** One diagram and a table with the choice and the reason for each component, including the Go service: [Architecture](#architecture).
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and an [ADR](docs/adr/README.md) that names what it costs. [`docs/architecture/overview.md`](docs/architecture/overview.md) has the diagrams (context, containers, booking, push, release, data handling), [`docs/engineering/decisions.md`](docs/engineering/decisions.md) the long decisions index, and [`docs/engineering/verification.md`](docs/engineering/verification.md) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **Demo data.** The admin dashboard is filled with about 100 invented patients and four weeks of bookings so it can be reviewed ([`docs/runbooks/demo-seed.md`](docs/runbooks/demo-seed.md)). They are AI-generated, fictional and Nairobi-local, created to make the clinic reviewable; no real people. Earlier test rows from the release checks are excluded from the admin views, not deleted.
 - **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](docs/runbooks/admin-access.md)), so a reviewer cannot sign in. I can grant access if you want to see it.
 - **Reviewer access.** The API side of [ADR-0033](docs/adr/0033-staff-crud-veto-and-invites.md) (invitations, roles, audit trail) is built and is in pull request #63; the invitation email and the admin screens that use it are separate pull requests (#68 and the admin revamp) and are not live until they merge. Once they are, the owner invites the reviewer as admin through `/access`; the invitation expires in 72 hours and must be accepted with the same Google email it was sent to. Until then, ask me and I grant access by hand.
 - **AI use** is described by me in [section 11](#11-ai-reflection). The records it draws on (what I decided, what agents did, the stop rules) are in [`docs/engineering/ai-usage-facts.md`](docs/engineering/ai-usage-facts.md).
 - **Live versus declared.** What runs in production and what is only designed is stated in [the architecture overview](docs/architecture/overview.md#what-is-running-and-what-is-declared) and in the status column of [`decisions.md`](docs/engineering/decisions.md#beyond-the-brief).
+
+## Architecture
+
+Every edge in this diagram is one I checked against the code. The relay is called synchronously by the API routes after each committing write, secrets reach Cloud Run through `--set-secrets` at deploy, and Vercel reaches Cloud Run by exchanging its OIDC token at Google STS and calling `generateIdToken` (`packages/api/src/proxy/gcp-id-token.ts`). The same diagram, pre-rendered, is on the booking app's landing page; its source is [`docs/architecture/architecture.mmd`](docs/architecture/architecture.mmd). Sequence diagrams, data handling and the release pipeline are in [`docs/architecture/overview.md`](docs/architecture/overview.md).
+
+```mermaid
+flowchart LR
+  accTitle: Idyllic Clinic architecture
+  accDescr: The browser reaches the booking and admin apps on Vercel. They call clinic-api on Cloud Run, which uses Neon Postgres. The admin app streams the staff live feed from clinic-realtime, a read-only Go service on Cloud Run that reads Neon Postgres. The API publishes slot events to Ably after each commit and the patient booking page subscribes. The browser gets a reCAPTCHA token, and the booking app verifies it with reCAPTCHA Enterprise using a federated access token, and calls Resend. CircleCI pushes images to Artifact Registry, runs the clinic-migrate job and deploys. Secret Manager supplies the API and the migration job.
+  B(["Browser<br/>PWA shell, polling fallback"])
+  GO["Google sign-in"]
+  subgraph V["Vercel"]
+    BK["Booking app<br/>Better Auth, server actions,<br/>BFF, after() emails"]
+    AD["Admin app<br/>Better Auth, roles, BFF"]
+  end
+  RC["reCAPTCHA Enterprise"]
+  RS["Resend"]
+  subgraph GC["Google Cloud us-east4"]
+    API["clinic-api: FastAPI on Cloud Run<br/>IAM-only, outbox relay"]
+    RT["clinic-realtime: Go on Cloud Run<br/>read-only, 0 to 2 instances"]
+    MIG["clinic-migrate: Cloud Run Job<br/>alembic as clinic_owner"]
+    SM["Secret Manager"]
+    AR["Artifact Registry"]
+  end
+  DB[("Neon Postgres 17<br/>partial unique index")]
+  AB["Ably"]
+  CRON["Vercel cron<br/>daily 15:00 UTC"]
+  CI["CircleCI<br/>OIDC to WIF, keyless"]
+  B -->|HTTPS| V
+  B -->|OAuth| GO
+  CRON -->|CRON_SECRET| BK
+  B -->|"reCAPTCHA token"| RC
+  BK -->|"assessment per action, via OIDC to WIF access token"| RC
+  BK -->|"after() on actions, cron reminders inline; 5 s abort"| RS
+  V ==>|"ID token via OIDC to WIF; + HMAC assertion on /internal"| API
+  AD ==>|"ID token + staff assertion; SSE live feed"| RT
+  RT -->|"SELECT only, role clinic_realtime"| DB
+  SM -->|"set-secrets at deploy"| API
+  SM -->|"DATABASE_URL (migrate)"| MIG
+  AR -->|image| API
+  AR -->|image| MIG
+  AR -->|image| RT
+  MIG -->|"alembic, role clinic_owner"| DB
+  API -->|"asyncpg, role clinic_app"| DB
+  API -->|"relay after each commit"| AB
+  AB -->|"SSE: patient booking page"| B
+  CI -->|"push image"| AR
+  CI --> GC
+  CI --> V
+```
+
+| Component | Choice | Why |
+|---|---|---|
+| Browser | Next.js pages with a shell-only service worker; polling as the fallback | A stale slot list is the UX failure of the race the brief names. Push is an optimisation and polling is the floor. |
+| Booking and admin apps | Two Next.js apps on Vercel in one pnpm workspace | Separate auth surfaces and deploys without publishing shared packages. |
+| Sign-in and roles | Better Auth with Google and stateless cookies; staff roles looked up on every request | Maintained, no auth database, and a revoke applies on the next request. |
+| Calls to the API | Server-side BFF: Vercel's OIDC token exchanged at Google STS (workload identity federation) for a Cloud Run ID token, plus an HMAC-signed assertion of who is calling on /internal | No credential in the browser and no stored key; the API checks the role again. |
+| API | FastAPI on Cloud Run, IAM-only, 0 to 3 instances | One system of record for every rule; a direct request gets a 403. |
+| Database | Neon Postgres 17; a partial unique index decides double booking | The engine enforces it across instances, with no application lock. |
+| Live updates | Outbox rows relayed to Ably right after each commit; the patient booking page subscribes over SSE with a 5 minute token (staff get their own feed from the Go service below) | Ably's free package needs no card, and no server of ours holds streams open. |
+| Staff live feed | clinic-realtime, a small Go service on Cloud Run: read-only database role, 0 to 2 instances, one stream per instance, IAM-only, streaming to the admin app over SSE | Staff events carry patient names, so they stay inside Google Cloud instead of going to a third-party pub/sub. |
+| Email | Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders | A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send. |
+| Human check | The browser gets a reCAPTCHA token; the booking server creates a reCAPTCHA Enterprise assessment for each booking, cancel and reschedule, with an access token it gets through the same Vercel OIDC federation | It runs on the server for every screen flow, and no secret is stored because the call uses the Vercel identity. |
+| Migrations | clinic-migrate, a Cloud Run Job that runs alembic as the clinic_owner role with its own database secret, before each deploy | The running service has no DDL rights, and migrations are expand-only so the previous revision keeps working. |
+| Images | Artifact Registry, with CircleCI pushing each image by digest and only the two newest versions kept | A rollback needs the previous image, and the registry's free tier is small. |
+| Delivery | CircleCI with keyless OIDC to workload identity federation for Cloud Run and a per-project token for Vercel; a tagged no-traffic deploy, a smoke test, promotion and automatic rollback | No long-lived GCP credential exists, and only a smoke-tested revision gets traffic. |
+| Secrets | Secret Manager, mounted into Cloud Run and the migration job at deploy (database URLs, signing key, Ably key); the web apps keep theirs in Vercel environment variables | Nothing secret is in an image or in the repository; Cloud Run reads them through its runtime service account. |
+
+Go: the staff live feed runs on a small read-only Go service, clinic-realtime on Cloud Run, which README section 3.7 describes. I first closed PR 37 without merging and reversed that on 2026-10-19. The cost reasoning is unchanged. The closing comment on PR 37 says: "The Cloud Run gateway billed about 900 vCPU-s per connected hour against roughly 21,619 vCPU-s of shared free-tier headroom, and capped the system at 2 concurrent streams." I read the 900 as per instance (0.25 vCPU for 3,600 seconds), and the service is built to that shape: 0.25 vCPU and at most 2 instances. The measured figure is still pending.
+
+### Why each runtime
+
+Four runtimes is a cost for an app this size, so each one has to earn its place: it does one job here that the others would do worse under the brief's constraints (correct booking, no personal data outside Google Cloud, $0 to run).
+
+**Python and FastAPI** ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)). This is the single system of record. The booking rules, the one-hour rule, the partial unique index that decides double booking, idempotency keys and the problem+json errors all live here, and every write in the system goes through it. The brief's one hard requirement is that a booked slot is never offered or booked twice, so I wanted that guarantee in one codebase with one test suite.
+
+**TypeScript and Next.js** ([ADR-0010](docs/adr/0010-thin-nextjs-booking-ui.md), [ADR-0011](docs/adr/0011-openapi-codegen-contract.md)). The booking and admin apps are thin UIs, and their server-side BFFs sign the staff assertion and hold the Google sign-in. They carry no booking rules. Their types, zod schemas and SDK are generated from the API's OpenAPI contract, and the lint job fails if the generated files differ from a fresh run, so a contract change that the UI has not picked up fails the build.
+
+**Go** ([ADR-0021](docs/adr/0021-go-realtime-gateway.md)). The staff live feed. Its events carry patient names, cancellation reasons and who acted, so the feed stays inside Google Cloud and is read straight from Postgres with a `SELECT`-only role. It is a separate Cloud Run service so that open streams cannot use up clinic-api's concurrency and starve booking. Go earns its place with a small distroless image and a fast cold start, which matter on a service that scales to zero and whose first request is a browser waiting for a stream. Cheap idle streams (a goroutine each) are the usual argument for Go, but at two viewers it does not apply, and I have not measured it. The trade-off is stated plainly: Cloud Run requires concurrency 1 below 1 vCPU, and the service is capped at two instances to stay at $0, so two staff can watch at once. The admin app shares one stream per browser across its tabs.
+
+**Ably** ([ADR-0031](docs/adr/0031-realtime-push-via-ably-sse.md)). Patient slot events, which carry no personal data. It fans out to up to 200 patients at once on the free package, at $0, with no socket infrastructure of mine. Events reach it from the outbox relay in the API after each commit, and the booking page also polls every 60 seconds while push is healthy, so a missed message costs at most a minute of staleness and never a wrong booking.
 
 ## 1. Live URLs
 
@@ -29,7 +111,7 @@ A clinic appointment API in which the database, not application code, is what ma
 | ReDoc | <https://clinic.ericgitangu.com/redoc> |
 | OpenAPI spec | <https://clinic.ericgitangu.com/openapi.json> |
 | Admin app (allowlisted) | <https://clinic-admin.ericgitangu.com> |
-| Pipelines | <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
+| Pipelines | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
 
 The earlier address, <https://sil-clinic-booking.vercel.app>, answers with a 308 redirect to the host above. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
@@ -111,15 +193,7 @@ This section is the shape of the system. Section 4 is why I chose it over the al
 
 ### 3.1 Context and containers
 
-```mermaid
-flowchart LR
-  P([Patient or reviewer]) -->|HTTPS| W[web: Next.js on Vercel iad1<br/>landing page, static /docs, /api proxy]
-  W -->|Google ID token via Vercel OIDC| A[clinic-api: FastAPI on Cloud Run us-east4<br/>IAM-only, min 0 / max 3]
-  A -->|asyncpg, role clinic_app| D[(PostgreSQL 17: Neon aws-us-east-1)]
-  M[clinic-migrate: Cloud Run Job] -->|alembic, role clinic_owner| D
-```
-
-One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Booking, moving and cancelling send the signed-in patient an email through Resend, from `Idyllic Clinic <reminders@mail.ericgitangu.com>` (the verified subdomain, which keeps the root domain's reputation separate) with replies going to my own address. Mail goes only to verified, linked Google accounts. A daily Vercel cron at 15:00 UTC (18:00 in Nairobi) emails a reminder for every appointment tomorrow. Emails are sent after the response with a 5-second abort, and the day (100) and month (3,000) allowances are reserved atomically in the database before a send, so a failed or slow email never fails a booking ([ADR-0025](docs/adr/0025-email-with-resend.md)). `mail.ericgitangu.com` was the only domain showing Verified on my Resend Domains page when it was checked on 2026-10-18 ([`verification.md`](docs/engineering/verification.md)). Booking and cancellation emails were verified live on 2026-10-18 (recorded in [`verification.md`](docs/engineering/verification.md)); the daily reminder cron's first send is still unconfirmed. Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
+The diagram for this section is the one in [Architecture](#architecture), so there is a single picture to keep true. In short: the browser reaches two Vercel apps, which call one IAM-only Cloud Run service over a federated identity, and that service owns the one Postgres database. One service owns every business rule and one database holds the state. The browser never talks to Cloud Run directly: the Vercel project is the only public entry point, and Cloud Run has no `allUsers` invoker ([ADR-0014](docs/adr/0014-hosting-region-and-cost.md), [ADR-0023](docs/adr/0023-zero-cost-edge-front-door.md)). The admin app is a second Vercel project that reaches the same API the same way ([ADR-0027](docs/adr/0027-two-apps-in-a-workspace.md)). Booking, moving and cancelling send the signed-in patient an email through Resend, from `Idyllic Clinic <reminders@mail.ericgitangu.com>` (the verified subdomain, which keeps the root domain's reputation separate) with replies going to my own address. Mail goes only to verified, linked Google accounts. A daily Vercel cron at 15:00 UTC (18:00 in Nairobi) emails a reminder for every appointment tomorrow. Emails are sent after the response with a 5-second abort, and the day (100) and month (3,000) allowances are reserved atomically in the database before a send, so a failed or slow email never fails a booking ([ADR-0025](docs/adr/0025-email-with-resend.md)). `mail.ericgitangu.com` was the only domain showing Verified on my Resend Domains page when it was checked on 2026-10-18 ([`verification.md`](docs/engineering/verification.md)). Booking and cancellation emails were verified live on 2026-10-18 (recorded in [`verification.md`](docs/engineering/verification.md)); the daily reminder cron's first send is still unconfirmed. Code layers inside the API are `api/` (parse and serialize), `services/` (own the transaction), `domain/` (pure, no I/O) and `repositories/` (SQL and constraint mapping) ([ADR-0002](docs/adr/0002-fastapi-single-system-of-record.md)).
 
 ### 3.2 Data model
 
@@ -265,7 +339,7 @@ The status of each item (shipped, declared, descoped) and what it costs is in [`
 
 ## 5. API reference & error catalogue
 
-The live, interactive reference is [Swagger UI](https://clinic.ericgitangu.com/docs); the contract is committed at `contracts/openapi.json`. The public endpoints:
+The live, interactive reference is [Swagger UI](https://clinic.ericgitangu.com/docs); the contract is committed at `contracts/openapi.json`. The public base is `/api` (`https://clinic.ericgitangu.com/api`), and the brief's paths sit under it unchanged: `POST /api/appointments` is the brief's `POST /appointments`. The public endpoints:
 
 | Method and path | Purpose | Success |
 |---|---|---|
@@ -344,7 +418,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **CI runs on CircleCI, not GitHub Actions.** GitHub Actions was not available on my account because of a billing issue, so the pipeline runs on CircleCI; the repository stays on GitHub ([ADR-0016](docs/adr/0016-cicd-circleci-keyless-deploy.md)).
 
-**Which branch deploys.** Only `main`. Pull requests run the verify jobs: lint, backend quality, tests and contract tests, gitleaks, semgrep, pip-audit, an image build with a trivy scan, ZAP, web quality, `e2e-real` and the static cost check. A push to `main` runs the same jobs and then ships: build and push the image by digest, run migrations (expand-only, as `clinic_owner`), deploy a no-traffic revision, run `scripts/verify_claims.py` against its tagged URL, and promote it only if the commit is still the head of `main`. The booking and admin apps deploy to Vercel after the API. The deploy contexts are restricted to `main` and so is the workload identity federation condition, so a branch pipeline cannot deploy even if someone edits the config file.
+**Which branch deploys.** Only `main`. Pull requests run the verify jobs: lint, backend quality, tests and contract tests, the real-Ably test (`ably-real`), gitleaks, semgrep, pip-audit, an image build with a trivy scan, the ZAP API scan (`dast`), web quality, `e2e-real`, `admin-e2e` and the static cost check. A push to `main` runs the same jobs except `dast`: the ZAP API scan is a pull-request job, and the release runs a ZAP baseline against the public URL (`zap-prod`) after the deploy instead. Then it ships: build and push the image by digest, run migrations (expand-only, as `clinic_owner`), deploy a no-traffic revision, run `scripts/verify_claims.py` against its tagged URL, and promote it only if the commit is still the head of `main`. The booking and admin apps deploy to Vercel after the API. The deploy contexts are restricted to `main` and so is the workload identity federation condition, so a branch pipeline cannot deploy even if someone edits the config file.
 
 **Rollback.** Going back is a traffic move, not a rebuild. After the web deploy, `verify-release` checks the public URL with no credentials (including `/ready`, which runs `SELECT 1` against Neon); if that fails, one job puts the API back on the revision that was live before and a second job, run only if the first succeeded, points the Vercel alias at the previous deployment, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. The runbook is [`docs/runbooks/rollback.md`](docs/runbooks/rollback.md).
 
