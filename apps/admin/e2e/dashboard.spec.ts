@@ -262,27 +262,35 @@ test.describe("owner dashboard", () => {
     const patient = (await first.locator("td").nth(1).innerText()).split(
       ",",
     )[0]!;
-    await expect(first.getByText(/^\s*(Booked|Cancelled)\s*$/)).toBeVisible();
+    // Name the row by its appointment id, once. Everything after this (the click, the sheet, the
+    // full page) is checked against that id, never against "whatever row is first or sits at these
+    // coordinates now": the live feed above the table grows and shrinks while the page settles, so
+    // a position read a moment ago can belong to another row by the time it is clicked.
+    const id = (await first.getByRole("link").getAttribute("href"))!
+      .split("/")
+      .pop()!;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    const row = page
+      .getByTestId("appointments-table")
+      .locator("tbody tr")
+      .filter({ has: page.locator(`a[href$="/${id}"]`) });
+    await expect(row.getByText(/^\s*(Booked|Cancelled)\s*$/)).toBeVisible();
     // Click the doctor cell, not the link: the whole row is the target. The link's overlay sits
-    // on top of the cell, so a real mouse click at the cell's centre is what a person does.
-    // The live panel above the table can change height while it connects, which moves the row
-    // between measuring and clicking, so measure and click again until the page has moved.
-    await expect(async () => {
-      await first.scrollIntoViewIfNeeded();
-      const cell = await first.locator("td").nth(2).boundingBox();
-      await page.mouse.click(
-        cell!.x + cell!.width / 2,
-        cell!.y + cell!.height / 2,
-      );
-      await expect(page.getByTestId("sheet-patient")).toBeVisible({
-        timeout: 2500,
-      });
-    }).toPass({ timeout: 15_000 });
+    // on top of the cell, so a real mouse click at the cell's centre is what a person does. The
+    // point is worked out by Playwright in the same step as the click (force skips only its
+    // "would another element take this click" wait, which the overlay always trips), so there is no
+    // measure-then-click gap for the page to move in.
+    await row.locator("td").nth(2).click({ force: true });
+    await expect(page.getByTestId("sheet-patient")).toBeVisible();
+    // The sheet must be for that row's id, whatever else is on the page.
+    await expect(
+      page.getByRole("link", { name: "Open the full page" }),
+    ).toHaveAttribute("href", `/dashboard/appointments/${id}`);
     // A click opens the appointment in a sheet over the dashboard, with the same patient; the full
     // page is one link away.
     await expect(page.getByTestId("sheet-patient")).toHaveText(patient.trim());
     await page.getByRole("link", { name: "Open the full page" }).click();
-    await expect(page).toHaveURL(/\/dashboard\/appointments\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(new RegExp(`/dashboard/appointments/${id}$`));
     await expect(page.getByTestId("appointment-patient")).toHaveText(
       patient.trim(),
     );
