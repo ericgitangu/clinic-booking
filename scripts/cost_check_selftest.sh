@@ -239,7 +239,10 @@ cat > "$STUB/bin/gcloud" <<'FAKE'
 case "$*" in
   *"auth print-access-token"*) printf '%s\n' "${STUB_TOKEN-SECRETTOKEN123}" ;;
   *"repositories describe clinic"*) echo '{"cleanupPolicies":{"delete-old":{},"delete-untagged":{},"keep-2":{}}}' ;;
-  *"packages list"*) printf '%s\n' "projects/p/locations/us-east4/repositories/clinic/packages/clinic-api" ${STUB_GO:+projects/p/locations/us-east4/repositories/clinic/packages/clinic-realtime} ;;
+  *"packages list"*)
+    # what `gcloud ... --format='value(name)'` prints today: the bare package name (STUB_PKG_FULL=1: the full resource path)
+    pre=""; [ -n "${STUB_PKG_FULL:-}" ] && pre="projects/p/locations/us-east4/repositories/clinic/packages/"
+    printf '%s\n' "${pre}clinic-api" ${STUB_GO:+"${pre}clinic-realtime"} ;;
   *"docker images list"*)
     if [ -n "${STUB_IMAGES_ERR:-}" ]; then echo "ERROR: (gcloud.artifacts.docker.images.list) PERMISSION_DENIED: deployer@sil-clinic-booking.iam.gserviceaccount.com lacks permission" >&2; exit 1; fi
     cat "$STUB_IMAGES" ;;
@@ -310,6 +313,13 @@ if ar --ar-ceiling 0005 | grep -q "bad secret version count '0005'" && ar --ar-c
 # the access token never appears on a command line (C5 and C12), only on stdin
 live_run "$L" STUB_GO=1 STUB_SIZE=420000000 >/dev/null
 if [ -s "$STUB/curl.argv" ] && ! grep -q "SECRETTOKEN123" "$STUB/curl.argv" && grep -q "Authorization: Bearer SECRETTOKEN123" "$STUB/curl.stdin" && [ "$(grep -c 'Authorization: Bearer' "$STUB/curl.stdin")" -ge 2 ]; then ok "the token is sent on stdin for both the registry (C5) and the monitoring (C12) call, and is in no curl argv"; else bad "the token must be on stdin for C5 and C12 and in no argv"; fi
+# the Go package is recognised in the format gcloud prints today and in the full-path format
+out="$(live_run "$L" STUB_GO=1 STUB_SIZE=543337040 STUB_SECRETS=5)"
+if grep -q "go images in repository: yes, projected add: 0 B" <<<"$out"; then ok "C5 live: the realtime package is recognised from the bare name gcloud prints"; else bad "C5 live: a bare 'clinic-realtime' package name should count as pushed (got: $(grep 'C5 AR repository' <<<"$out" | head -1 | cut -c1-200))"; fi
+out="$(live_run "$L" STUB_GO=1 STUB_PKG_FULL=1 STUB_SIZE=543337040 STUB_SECRETS=5)"
+if grep -q "go images in repository: yes, projected add: 0 B" <<<"$out"; then ok "C5 live: the realtime package is recognised from the full resource path too"; else bad "C5 live: a full-path package name should count as pushed"; fi
+out="$(live_run "$L" STUB_SIZE=543337040 STUB_SECRETS=5)"
+if grep -q "go images in repository: no, projected add: 50000000 B" <<<"$out"; then ok "C5 live: without a realtime package the Go cap is projected"; else bad "C5 live: no realtime package should project the Go cap"; fi
 # a threshold hidden anywhere in the live C5 is caught by behaviour, whatever its spelling
 live_mutant() { # <name> <perl expression> [size] [pristine PASS count] [mutant PASS count]
   local size="${3:-420000000}" want_good="${4:-1}" want_bad="${5:-0}"
