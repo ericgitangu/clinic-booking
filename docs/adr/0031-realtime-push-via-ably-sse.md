@@ -53,7 +53,7 @@ Ably, over plain SSE, for patients and admins. Server-side only keys; the browse
 
 - Good: no always-on resource and no compute of ours on the push path; the free package asks for no card at signup (<https://ably.com/docs/platform/pricing/free>).
 - Good: a failure of push degrades to polling, which already works.
-- Good (observed on production 649103c, 2026-10-20, in a real browser): with the staff feed on the Go gateway, the patient side stayed correct through a booking, a reschedule (13:30 to 14:00) and the owner's veto, and was back at 13:30 after the veto.
+- Good (observed in CI on 649103c, 2026-10-20): the booking app's realtime scenarios passed against the real API and Ably, including a slot taken by another viewer disappearing within 2 s and a cancelled slot coming back after one refetch. The same day's live check in a real browser covered the staff feed (ADR-0021), not the patient push.
 - Bad (a new data processor): Ably sees slot events. They are non-PII by design (doctor, local date, start time, kind, sequence). README section 10 lists it.
 - Bad (token in the URL), no longer applies: I expected to fall back to an `accessToken` query parameter if the header was unsupported. The live CI tests show `Authorization: Bearer` works, so the token stays out of URLs and logs. The mitigations (five-minute TTL, one subscribe-only channel, non-PII events) remain.
 - Bad (relay-trigger debt): there is no always-on worker. An event that is blocked behind a concurrent open transaction waits for the next trigger (the next write or admin metrics request). The 60 s safety-net poll covers the UI. The real fix is a scheduled or always-on relay, which costs money or a platform we have avoided; not taken.
