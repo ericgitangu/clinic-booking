@@ -38,9 +38,16 @@ export default defineConfig({
     },
     {
       name: "metrics-cache",
-      // one-hour-rule books a visit and leaves it, which changes the clinic-wide numbers.
-      testMatch: ["**/metrics-cache.spec.ts", "**/one-hour-rule.spec.ts"],
+      testMatch: "**/metrics-cache.spec.ts",
       dependencies: ["dashboard"],
+    },
+    {
+      // Books a visit and leaves it, which changes the clinic-wide numbers. Its own project, after
+      // metrics-cache: two files in one project run side by side with more than one worker, and
+      // the cache spec asserts the numbers do not move while it runs.
+      name: "one-hour-rule",
+      testMatch: "**/one-hour-rule.spec.ts",
+      dependencies: ["metrics-cache"],
     },
   ],
   use: {

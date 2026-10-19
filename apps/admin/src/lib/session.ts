@@ -45,7 +45,8 @@ async function identity(): Promise<Identity | null> {
 }
 
 export function callerFor(who: Identity, role: Role | "none"): Caller {
-  return { sub: who.sub, email: who.email, role };
+  // identity() has already refused an unverified email; the API now insists on the claim.
+  return { sub: who.sub, email: who.email, role, emailVerified: true };
 }
 
 async function resolveRole(who: Identity): Promise<Role | null> {

@@ -72,6 +72,7 @@ export function internal<T = unknown>(
       sub: `e2e-${who.email}`,
       email: who.email,
       role: who.role,
+      emailVerified: true,
       method,
       path,
       body: text,

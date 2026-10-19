@@ -8,6 +8,8 @@ from collections.abc import AsyncIterator
 import asyncpg
 import pytest_asyncio
 
+from tests.integration.staff_support import env  # noqa: F401  # shared fixture
+
 
 @pytest_asyncio.fixture
 async def other_clinic(zone: str, owner_conn: asyncpg.Connection) -> AsyncIterator[uuid.UUID]:

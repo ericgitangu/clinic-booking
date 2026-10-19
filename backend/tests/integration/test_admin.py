@@ -80,6 +80,7 @@ def signed() -> Signer:
             "m": method,
             "p": path,
             "bh": body_hash(body),
+            "ev": True,
         }
         return {"X-Internal-Assertion": sign(claims, key.encode("utf-8"))}
 
@@ -447,7 +448,7 @@ async def test_list_empty_range(
         admin_client, signed, "/internal/admin/appointments?from=2027-01-01&to=2027-01-08"
     )
     assert resp.status_code == 200
-    assert resp.json() == {"items": [], "next_cursor": None}
+    assert resp.json() == {"view": "full", "items": [], "next_cursor": None}
 
 
 @pytest.mark.parametrize(

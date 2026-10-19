@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "AcceptRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 20,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "AcceptRequest",
+        "type": "object"
+      },
       "AccessEntry": {
         "properties": {
           "email": {
@@ -118,6 +135,21 @@
       },
       "AdminAppointment": {
         "properties": {
+          "attendance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "arrived",
+                  "no_show"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance"
+          },
           "cancellation_reason": {
             "anyOf": [
               {
@@ -153,6 +185,17 @@
             "title": "Id",
             "type": "string"
           },
+          "patient_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Email"
+          },
           "patient_id": {
             "format": "uuid",
             "title": "Patient Id",
@@ -161,6 +204,21 @@
           "patient_name": {
             "title": "Patient Name",
             "type": "string"
+          },
+          "patient_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Phone"
+          },
+          "staff_locked": {
+            "title": "Staff Locked",
+            "type": "boolean"
           },
           "starts_at": {
             "format": "date-time",
@@ -187,10 +245,13 @@
           "doctor_name",
           "patient_id",
           "patient_name",
+          "patient_phone",
+          "patient_email",
           "starts_at",
           "ends_at",
           "status",
           "cancellation_reason",
+          "staff_locked",
           "created_at"
         ],
         "title": "AdminAppointment",
@@ -215,9 +276,18 @@
               }
             ],
             "title": "Next Cursor"
+          },
+          "view": {
+            "enum": [
+              "full",
+              "minimised"
+            ],
+            "title": "View",
+            "type": "string"
           }
         },
         "required": [
+          "view",
           "items",
           "next_cursor"
         ],
@@ -237,7 +307,11 @@
             "enum": [
               "booked",
               "rescheduled",
-              "cancelled"
+              "cancelled",
+              "vetoed",
+              "unlocked",
+              "arrived",
+              "no_show"
             ],
             "title": "Event Type",
             "type": "string"
@@ -512,6 +586,143 @@
         "title": "AppointmentWithDoctor",
         "type": "object"
       },
+      "AttendanceRequest": {
+        "additionalProperties": false,
+        "description": "The reason is optional for a first mark and required to change an earlier one.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "AttendanceRequest",
+        "type": "object"
+      },
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "enum": [
+              "book",
+              "reschedule",
+              "cancel",
+              "veto",
+              "unlock",
+              "arrived",
+              "no_show",
+              "reminder_now",
+              "running_late",
+              "invite_create",
+              "invite_revoke"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_email": {
+            "title": "Actor Email",
+            "type": "string"
+          },
+          "actor_role": {
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ],
+            "title": "Actor Role",
+            "type": "string"
+          },
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notified": {
+            "title": "Notified",
+            "type": "boolean"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor_email",
+          "actor_role",
+          "action",
+          "appointment_id",
+          "reason",
+          "before",
+          "after",
+          "notified",
+          "occurred_at"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
+      "AuditPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "AuditPage",
+        "type": "object"
+      },
       "Availability": {
         "properties": {
           "cursor": {
@@ -565,6 +776,129 @@
           "taken"
         ],
         "title": "Availability",
+        "type": "object"
+      },
+      "BoardAppointment": {
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Phone"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "arrived",
+              "no_show",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "id",
+          "starts_at",
+          "ends_at",
+          "status",
+          "patient_name",
+          "patient_phone",
+          "locked"
+        ],
+        "title": "BoardAppointment",
+        "type": "object"
+      },
+      "BoardGap": {
+        "description": "Back-to-back free 30-minute slots, merged.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "slots": {
+            "title": "Slots",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "starts_at",
+          "ends_at",
+          "slots"
+        ],
+        "title": "BoardGap",
+        "type": "object"
+      },
+      "BoardTotals": {
+        "properties": {
+          "arrived": {
+            "title": "Arrived",
+            "type": "integer"
+          },
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "no_show": {
+            "title": "No Show",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "booked",
+          "arrived",
+          "no_show",
+          "cancelled"
+        ],
+        "title": "BoardTotals",
         "type": "object"
       },
       "CancelRequest": {
@@ -732,6 +1066,69 @@
           "working_hours"
         ],
         "title": "Doctor",
+        "type": "object"
+      },
+      "DoctorBoard": {
+        "properties": {
+          "appointments": {
+            "items": {
+              "$ref": "#/components/schemas/BoardAppointment"
+            },
+            "title": "Appointments",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "free_slots": {
+            "title": "Free Slots",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running_behind": {
+            "$ref": "#/components/schemas/RunningBehind"
+          },
+          "specialty": {
+            "title": "Specialty",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "name",
+          "specialty",
+          "timezone",
+          "date",
+          "appointments",
+          "next_gap",
+          "free_slots",
+          "running_behind"
+        ],
+        "title": "DoctorBoard",
         "type": "object"
       },
       "DoctorList": {
@@ -967,13 +1364,74 @@
         "title": "ErrorItem",
         "type": "object"
       },
+      "FreeSlot": {
+        "properties": {
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "doctor_id",
+          "doctor_name",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "FreeSlot",
+        "type": "object"
+      },
+      "GapList": {
+        "properties": {
+          "hours": {
+            "title": "Hours",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FreeSlot"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hours",
+          "items",
+          "truncated"
+        ],
+        "title": "GapList",
+        "type": "object"
+      },
       "GrantRequest": {
         "additionalProperties": false,
         "properties": {
           "email": {
             "maxLength": 254,
             "minLength": 3,
-            "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
             "title": "Email",
             "type": "string"
           },
@@ -1020,6 +1478,430 @@
         "title": "Health",
         "type": "object"
       },
+      "HeatCell": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "hour": {
+            "title": "Hour",
+            "type": "integer"
+          },
+          "weekday": {
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "hour",
+          "count"
+        ],
+        "title": "HeatCell",
+        "type": "object"
+      },
+      "Heatmap": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/HeatCell"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "range": {
+            "$ref": "#/components/schemas/DateRange"
+          }
+        },
+        "required": [
+          "range",
+          "doctor_id",
+          "max",
+          "cells"
+        ],
+        "title": "Heatmap",
+        "type": "object"
+      },
+      "Invite": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_by": {
+            "title": "Invited By",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "expired",
+              "consumed",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invited_by",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "Invite",
+        "type": "object"
+      },
+      "InviteCreated": {
+        "description": "Returned once, on creation. ``token`` is the raw secret for the email link: it is not\nstored (only its SHA-256 is), not logged and cannot be read again.\n\nTo email the invitation: when ``deliver`` is true, send the link ``/invite/<token>`` to\n``email`` (Idempotency-Key ``invite/<id>``), then POST ``/internal/admin/audit/<audit_id>/\nnotified``. A reserved example address is \"demo, not sent\": ``deliver`` is false, the audit row\nsays so and nothing may be sent.",
+        "properties": {
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deliver": {
+            "title": "Deliver",
+            "type": "boolean"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_by": {
+            "title": "Invited By",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "to send",
+              "demo, not sent",
+              "no email on file"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "expired",
+              "consumed",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invited_by",
+          "status",
+          "created_at",
+          "expires_at",
+          "token",
+          "audit_id",
+          "deliver",
+          "outcome"
+        ],
+        "title": "InviteCreated",
+        "type": "object"
+      },
+      "InviteList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Invite"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InviteList",
+        "type": "object"
+      },
+      "InviteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ],
+        "title": "InviteRequest",
+        "type": "object"
+      },
+      "InviteRevoked": {
+        "properties": {
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_by": {
+            "title": "Invited By",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "expired",
+              "consumed",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invited_by",
+          "status",
+          "created_at",
+          "expires_at",
+          "audit_id"
+        ],
+        "title": "InviteRevoked",
+        "type": "object"
+      },
+      "KpiCounts": {
+        "properties": {
+          "arrived": {
+            "title": "Arrived",
+            "type": "integer"
+          },
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "no_show": {
+            "title": "No Show",
+            "type": "integer"
+          },
+          "offered": {
+            "title": "Offered",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "offered",
+          "booked",
+          "cancelled",
+          "arrived",
+          "no_show"
+        ],
+        "title": "KpiCounts",
+        "type": "object"
+      },
+      "KpiValue": {
+        "properties": {
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "previous",
+          "delta"
+        ],
+        "title": "KpiValue",
+        "type": "object"
+      },
+      "Kpis": {
+        "properties": {
+          "cancellation_rate": {
+            "$ref": "#/components/schemas/KpiValue"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/KpiCounts"
+          },
+          "fill_rate": {
+            "$ref": "#/components/schemas/KpiValue"
+          },
+          "median_lead_minutes": {
+            "$ref": "#/components/schemas/KpiValue"
+          },
+          "no_show_rate": {
+            "$ref": "#/components/schemas/KpiValue"
+          },
+          "previous_range": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "range": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "reschedules": {
+            "$ref": "#/components/schemas/KpiValue"
+          },
+          "utilisation": {
+            "$ref": "#/components/schemas/KpiValue"
+          }
+        },
+        "required": [
+          "range",
+          "previous_range",
+          "utilisation",
+          "fill_rate",
+          "cancellation_rate",
+          "no_show_rate",
+          "median_lead_minutes",
+          "reschedules",
+          "counts"
+        ],
+        "title": "Kpis",
+        "type": "object"
+      },
       "Lineage": {
         "properties": {
           "appointment_id": {
@@ -1044,6 +1926,21 @@
       },
       "LineageEvent": {
         "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "enum": [
+                  "patient",
+                  "staff"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
           "event_type": {
             "enum": [
               "booked",
@@ -1158,6 +2055,106 @@
           "per_doctor"
         ],
         "title": "Metrics",
+        "type": "object"
+      },
+      "Notified": {
+        "properties": {
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "notified": {
+            "const": true,
+            "default": true,
+            "title": "Notified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "audit_id"
+        ],
+        "title": "Notified",
+        "type": "object"
+      },
+      "NotifyItem": {
+        "description": "One patient to tell. `deliver` is true only when the outcome is \"to send\": the web app\nsends the email (Idempotency-Key = `audit_id`) and then marks the audit row notified. For a\ndemo or address-less patient nothing is to be sent and `email` is null.",
+        "properties": {
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "deliver": {
+            "title": "Deliver",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "outcome": {
+            "enum": [
+              "to send",
+              "demo, not sent",
+              "no email on file"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audit_id",
+          "appointment_id",
+          "starts_at",
+          "patient_name",
+          "email",
+          "deliver",
+          "outcome"
+        ],
+        "title": "NotifyItem",
+        "type": "object"
+      },
+      "NotifyResult": {
+        "properties": {
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotifyItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "doctor_name",
+          "items"
+        ],
+        "title": "NotifyResult",
         "type": "object"
       },
       "Patient": {
@@ -1351,6 +2348,7 @@
         "enum": [
           "UNAUTHENTICATED",
           "FORBIDDEN",
+          "ROLE_ESCALATION",
           "CLIENT_ADDRESS_UNKNOWN",
           "VALIDATION_ERROR",
           "TIMEZONE_REQUIRED",
@@ -1371,8 +2369,12 @@
           "CONCURRENT_UPDATE",
           "RATE_LIMITED",
           "IDEMPOTENCY_KEY_CONSUMED",
+          "APPOINTMENT_LOCKED",
+          "ATTENDANCE_WINDOW_CLOSED",
+          "NOTHING_TO_VETO",
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
+          "INVITE_INVALID",
           "ACCESS_NOT_FOUND",
           "DOCTOR_NOT_FOUND",
           "PATIENT_NOT_FOUND",
@@ -1455,6 +2457,64 @@
         "title": "RealtimeToken",
         "type": "object"
       },
+      "ReasonBreakdown": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonShare"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "range": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "range",
+          "total",
+          "items"
+        ],
+        "title": "ReasonBreakdown",
+        "type": "object"
+      },
+      "ReasonShare": {
+        "properties": {
+          "category": {
+            "enum": [
+              "transport",
+              "illness",
+              "travel",
+              "work",
+              "weather",
+              "felt_better",
+              "insurance",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "share": {
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "count",
+          "share"
+        ],
+        "title": "ReasonShare",
+        "type": "object"
+      },
       "ReminderBatch": {
         "description": "What one run may send now: the claimed appointments and the day's email budget.",
         "properties": {
@@ -1486,6 +2546,27 @@
           "daily_limit"
         ],
         "title": "ReminderBatch",
+        "type": "object"
+      },
+      "ReminderRequest": {
+        "additionalProperties": false,
+        "description": "Why the reminder goes now. Optional: it defaults to a standard line in the audit row.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "ReminderRequest",
         "type": "object"
       },
       "ReminderSent": {
@@ -1542,6 +2623,68 @@
           "starts_at"
         ],
         "title": "RescheduleRequest",
+        "type": "object"
+      },
+      "RunningBehind": {
+        "description": "True when the earliest booked, unmarked appointment of today began more than 10 minutes\nago (nobody has marked the patient arrived or no-show). `minutes` is how long ago it began.",
+        "properties": {
+          "appointment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "behind": {
+            "title": "Behind",
+            "type": "boolean"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "behind",
+          "minutes",
+          "appointment_id"
+        ],
+        "title": "RunningBehind",
+        "type": "object"
+      },
+      "RunningLateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "minutes": {
+            "description": "How late the doctor expects to be.",
+            "maximum": 240.0,
+            "minimum": 5.0,
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "minutes"
+        ],
+        "title": "RunningLateRequest",
         "type": "object"
       },
       "SeriesPoint": {
@@ -1667,6 +2810,263 @@
           "seq"
         ],
         "title": "SlotEvent",
+        "type": "object"
+      },
+      "StaffAppointmentChange": {
+        "description": "The changed appointment plus what the web app needs to tell the patient.\n\n``audit_id`` is the audit row of this write and the patient email's idempotency key; it is null\nonly when nothing changed (a reschedule to the time it already has). The patient fields are\nfull values: these routes are owner and admin only.",
+        "properties": {
+          "audit_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Id"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "patient_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Email"
+          },
+          "patient_id": {
+            "format": "uuid",
+            "title": "Patient Id",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "previous_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Starts At"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "id",
+          "doctor_id",
+          "patient_id",
+          "starts_at",
+          "ends_at",
+          "status",
+          "cancellation_reason",
+          "cancelled_at",
+          "created_at",
+          "updated_at",
+          "audit_id",
+          "patient_name",
+          "patient_email",
+          "doctor_name",
+          "previous_starts_at"
+        ],
+        "title": "StaffAppointmentChange",
+        "type": "object"
+      },
+      "StaffCreateAppointment": {
+        "additionalProperties": false,
+        "description": "Book for a patient: an existing ``patient_id``, or ``patient`` details (exactly one).",
+        "properties": {
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "doctor_id",
+          "starts_at"
+        ],
+        "title": "StaffCreateAppointment",
+        "type": "object"
+      },
+      "StaffReasonRequest": {
+        "additionalProperties": false,
+        "description": "Cancel, veto and unlock carry only the reason.",
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "StaffReasonRequest",
+        "type": "object"
+      },
+      "StaffRescheduleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "starts_at"
+        ],
+        "title": "StaffRescheduleRequest",
+        "type": "object"
+      },
+      "TodayBoard": {
+        "properties": {
+          "doctors": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorBoard"
+            },
+            "title": "Doctors",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/BoardTotals"
+          },
+          "view": {
+            "enum": [
+              "full",
+              "minimised"
+            ],
+            "title": "View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "view",
+          "doctors",
+          "totals"
+        ],
+        "title": "TodayBoard",
         "type": "object"
       },
       "Totals": {
@@ -2389,7 +3789,6 @@
             "schema": {
               "maxLength": 254,
               "minLength": 3,
-              "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
               "title": "Email",
               "type": "string"
             }
@@ -2452,7 +3851,6 @@
             "schema": {
               "maxLength": 254,
               "minLength": 3,
-              "pattern": "^[^@\\s,]+@[^@\\s,]+\\.[^@\\s,]+$",
               "title": "Email",
               "type": "string"
             }
@@ -2649,11 +4047,152 @@
         "tags": [
           "admin"
         ]
+      },
+      "post": {
+        "description": "Book for a patient: an existing `patient_id`, or `patient` details (exactly one). Staff are exempt from the lead-time rule; the slot, working-hours and double-booking rules still apply. A reason is required and is recorded in the audit trail.",
+        "operationId": "create_appointment_internal_admin_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffCreateAppointment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Create Appointment",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/arrived": {
+      "post": {
+        "description": "Record that the patient arrived. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.",
+        "operationId": "mark_arrived_internal_admin_appointments__appointment_id__arrived_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AttendanceRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Mark Arrived",
+        "tags": [
+          "admin"
+        ]
       }
     },
     "/internal/admin/appointments/{appointment_id}/cancel": {
       "patch": {
-        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).",
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.",
         "operationId": "cancel_for_patient_internal_admin_appointments__appointment_id__cancel_patch",
         "parameters": [
           {
@@ -2682,7 +4221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Appointment"
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
                 }
               }
             },
@@ -2798,9 +4337,171 @@
         ]
       }
     },
+    "/internal/admin/appointments/{appointment_id}/no-show": {
+      "post": {
+        "description": "Record that the patient did not turn up. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.",
+        "operationId": "mark_no_show_internal_admin_appointments__appointment_id__no_show_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AttendanceRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Mark No Show",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/remind": {
+      "post": {
+        "description": "Remind the patient of this appointment now. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as \"demo, not sent\" and never has `deliver: true`.",
+        "operationId": "remind_now_internal_admin_appointments__appointment_id__remind_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReminderRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotifyResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Remind Now",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/internal/admin/appointments/{appointment_id}/reschedule": {
       "patch": {
-        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.",
+        "description": "Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment. Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.",
         "operationId": "reschedule_for_patient_internal_admin_appointments__appointment_id__reschedule_patch",
         "parameters": [
           {
@@ -2818,7 +4519,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RescheduleRequest"
+                "$ref": "#/components/schemas/StaffRescheduleRequest"
               }
             }
           },
@@ -2829,7 +4530,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Appointment"
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
                 }
               }
             },
@@ -2899,6 +4600,567 @@
           }
         },
         "summary": "Reschedule For Patient",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/unlock": {
+      "post": {
+        "description": "Lift the lock so the patient can change the appointment again.",
+        "operationId": "unlock_appointment_internal_admin_appointments__appointment_id__unlock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Unlock Appointment",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/appointments/{appointment_id}/veto": {
+      "post": {
+        "description": "Undo the patient's latest change and lock the appointment against further patient changes. A reschedule is moved back (same appointment). A cancel is undone by booking the same slot again as a NEW appointment (the response carries its id) that starts locked. 409 NOTHING_TO_VETO when the latest change is not the patient's or is already undone.",
+        "operationId": "veto_appointment_internal_admin_appointments__appointment_id__veto_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAppointmentChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Veto Appointment",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/audit": {
+      "get": {
+        "description": "Staff actions, newest first. Owner and admin only.",
+        "operationId": "list_audit_internal_admin_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appointment_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Appointment Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "List Audit",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/audit/{audit_id}/notified": {
+      "post": {
+        "description": "Record that the patient was emailed about this action. Only the person who made the action can mark it, only for an action that emails the patient, and never for a row recorded as \"demo, not sent\" or \"no email on file\". The flag only goes from false to true (marking twice is fine); nothing else in the audit row can change. Anything else is the same 404 as an unknown id.",
+        "operationId": "mark_notified_internal_admin_audit__audit_id__notified_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "audit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Audit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notified"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Notified",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/doctors/{doctor_id}/running-late": {
+      "post": {
+        "description": "Tell the doctor's remaining patients of today (booked, not yet marked, not synthetic; at most 50) that the doctor is running late. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as \"demo, not sent\" and never has `deliver: true`. One audit row per patient.",
+        "operationId": "doctor_running_late_internal_admin_doctors__doctor_id__running_late_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doctor_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Doctor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunningLateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotifyResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Doctor Running Late",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/invites": {
+      "get": {
+        "operationId": "list_invites_internal_admin_invites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "List Invites",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Invite an email as admin (owner only) or viewer; valid 72 hours. The raw `token` is in this response only (for the email link): the API keeps its hash. Re-inviting an email supersedes its open invite. At most 10 a day per person (429 RATE_LIMITED). An audit row (`audit_id`) is written; when `deliver` is true the web app emails the link and then marks that row notified.",
+        "operationId": "create_invite_internal_admin_invites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Create Invite",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/invites/accept": {
+      "post": {
+        "description": "Accept an invite. The caller is whoever the web app signed in with Google; the verified email in the signed assertion must equal the invited email. Every failure (unknown, used, expired, revoked, other email, unverified email) is the same 404 INVITE_INVALID with the same body.",
+        "operationId": "accept_invite_internal_admin_invites_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Accept Invite",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/invites/{invite_id}": {
+      "delete": {
+        "operationId": "revoke_invite_internal_admin_invites__invite_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invite Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteRevoked"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Invite",
         "tags": [
           "admin"
         ]
@@ -2975,6 +5237,407 @@
           }
         },
         "summary": "Get Metrics",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/cancellation-reasons": {
+      "get": {
+        "description": "Cancellations in [from, to) grouped by the reason text into transport, illness, travel, work, weather, felt_better, insurance and other. Counts only: no reason text.",
+        "operationId": "cancellation_reasons_internal_admin_ops_cancellation_reasons_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasonBreakdown"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Cancellation Reasons",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/day-sheet.csv": {
+      "get": {
+        "description": "The day's appointments as CSV (one row each: doctor, time, status, patient, phone, email, cancellation reason), for `date` (clinic-local) and optionally one doctor. Owner and admin get full details; a viewer gets initials and a masked phone and no email or reason. Cells that would run as a spreadsheet formula are neutralised.",
+        "operationId": "day_sheet_internal_admin_ops_day_sheet_csv_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doctor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {},
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "One row per appointment"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {},
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {},
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {},
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Day Sheet",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/gaps": {
+      "get": {
+        "description": "Free 30-minute slots starting within the next `hours` (default 48), soonest first. Staff may book any of them, including inside the lead-time window.",
+        "operationId": "gaps_internal_admin_ops_gaps_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "hours",
+            "required": false,
+            "schema": {
+              "default": 48,
+              "maximum": 96,
+              "minimum": 1,
+              "title": "Hours",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Gaps",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/heatmap": {
+      "get": {
+        "description": "Booked appointments by weekday (1 = Monday) and local start hour over [from, to), for the clinic or one doctor.",
+        "operationId": "heatmap_internal_admin_ops_heatmap_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doctor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Heatmap"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Heatmap",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/kpis": {
+      "get": {
+        "description": "Utilisation, fill rate, cancellation rate, no-show rate, median booking lead time and reschedules over the clinic-local days [from, to), each with the previous period of the same length and the difference. A rate is null when its denominator is zero.",
+        "operationId": "kpis_internal_admin_ops_kpis_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Kpis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Kpis",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/ops/today": {
+      "get": {
+        "description": "Each active doctor's day as a timeline with statuses booked, arrived, no_show and cancelled, the next free gap and a running-behind flag. `date` is a clinic-local day; without it, each doctor's clinic's today. Synthetic patients are left out. A viewer gets initials and a masked phone.",
+        "operationId": "today_internal_admin_ops_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayBoard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Today",
         "tags": [
           "admin"
         ]

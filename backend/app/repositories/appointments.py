@@ -89,6 +89,8 @@ async def insert_appointment(
     timezone: str,
     idempotency_key: str | None = None,
     request_fingerprint: str | None = None,
+    predecessor_id: uuid.UUID | None = None,
+    staff_locked_at: datetime | None = None,
 ) -> Appointment:
     appt = Appointment(
         id=uuid.uuid4(),
@@ -99,6 +101,8 @@ async def insert_appointment(
         status="booked",
         idempotency_key=idempotency_key,
         request_fingerprint=request_fingerprint,
+        predecessor_id=predecessor_id,
+        staff_locked_at=staff_locked_at,
     )
     appt.timezone = timezone
     session.add(appt)
@@ -128,3 +132,46 @@ async def upcoming_for_patient(
         appt.timezone = str(row[2])
         out.append((appt, doctor))
     return out
+
+
+async def locked_booking_exists(
+    session: AsyncSession, doctor_id: uuid.UUID, patient_id: uuid.UUID, starts_at: datetime
+) -> bool:
+    """A staff-locked, booked appointment of this patient with this doctor at this time."""
+    result = await session.execute(
+        select(Appointment.id)
+        .where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.patient_id == patient_id,
+            Appointment.starts_at == starts_at,
+            Appointment.status == "booked",
+            Appointment.staff_locked_at.is_not(None),
+        )
+        .limit(1)
+    )
+    return result.first() is not None
+
+
+async def booked_same_slot(
+    session: AsyncSession, doctor_id: uuid.UUID, patient_id: uuid.UUID, starts_at: datetime
+) -> bool:
+    """The patient already holds a booked appointment with this doctor at this time."""
+    result = await session.execute(
+        select(Appointment.id)
+        .where(
+            Appointment.doctor_id == doctor_id,
+            Appointment.patient_id == patient_id,
+            Appointment.starts_at == starts_at,
+            Appointment.status == "booked",
+        )
+        .limit(1)
+    )
+    return result.first() is not None
+
+
+async def has_successor(session: AsyncSession, appointment_id: uuid.UUID) -> bool:
+    """True when staff already booked a replacement for this cancelled appointment."""
+    result = await session.execute(
+        select(Appointment.id).where(Appointment.predecessor_id == appointment_id).limit(1)
+    )
+    return result.first() is not None
