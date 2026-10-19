@@ -98,6 +98,11 @@ _MARK_DEBITED = text(
     """
 )
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
+# A holder starts another pass only when the time left covers the slowest pass so far with this
+# margin, and never less than the floor. A pass is never started to be cancelled mid-publish.
+PASS_MARGIN = 1.25
+PASS_FLOOR = 0.05
+
 # Passes a holder makes in one trigger: each re-reads from a fresh snapshot, and the loop ends as
 # soon as a pass finds nothing. Bounded so a steady stream of writers cannot keep one request busy;
 # the relay's time budget bounds it in seconds as well.
@@ -105,6 +110,15 @@ MAX_PASSES = 8
 
 BREAKER_FAILURES = 3
 BREAKER_PAUSE = timedelta(seconds=60)
+
+
+@dataclass
+class _Progress:
+    """What one trigger has done so far: kept outside the drain so a failure or the time limit in a
+    later pass cannot hide the messages an earlier pass sent."""
+
+    published: int = 0
+    failed: bool = False
 
 
 @dataclass(frozen=True)
@@ -251,15 +265,19 @@ class Relay:
         now = clock.now()
         if self._paused_until is not None and now < self._paused_until:
             return 0  # breaker open: skip the attempt, the clients' poll covers the gap
+        progress = _Progress()
         try:
-            result = await asyncio.wait_for(self._drain(clock), timeout=self._timeout)
+            # The drain stops itself before the budget; this is the backstop for a pass that hangs.
+            await asyncio.wait_for(self._drain(clock, progress), timeout=self._timeout)
         except Exception:  # noqa: BLE001  # a push problem must never fail the booking response
             _log.warning("realtime relay failed; a later trigger retries", exc_info=True)
-            result = RelayResult(failed=True)
-        if not result.failed:
+            progress.failed = True
+        if not progress.failed:
             self._failures = 0
             self._paused_until = None
-            return result.published
+            return progress.published
+        # A failure counts once toward the breaker, even when earlier passes of the same trigger
+        # published (those messages are returned and are not undone: the cursor moved with them).
         self._failures += 1
         if self._failures >= BREAKER_FAILURES and self._paused_until is None:
             self._paused_until = now + BREAKER_PAUSE
@@ -270,19 +288,29 @@ class Relay:
             )
         elif self._failures >= BREAKER_FAILURES:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
-        return 0
+        return progress.published
 
-    async def _drain(self, clock: Clock) -> RelayResult:
+    async def _drain(self, clock: Clock, progress: _Progress) -> None:
         """One trigger. A loser returns at once. A holder passes again from a fresh snapshot after
-        every pass that moved the cursor, until a pass finds nothing (or ``MAX_PASSES``). A failed
-        publish ends it. The result counts the messages of every pass."""
-        published = 0
-        result = RelayResult()
-        for _ in range(MAX_PASSES):
+        every pass that moved the cursor, until a pass finds nothing, ``MAX_PASSES``, or too little
+        time is left for another pass of the length seen so far: it never starts a publish the
+        time budget would cancel in flight (a cancelled publish may be accepted over there with the
+        cursor not moved, so the next trigger would send it again). A failed publish ends it.
+        ``progress`` collects what was sent, so a later failure or timeout cannot hide it."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._timeout
+        slowest = 0.0
+        for attempt in range(MAX_PASSES):
+            begun = loop.time()
+            if attempt > 0 and deadline - begun < max(slowest * PASS_MARGIN, PASS_FLOOR):
+                return  # the remainder goes out with the next trigger (see the module docstring)
             result = await relay_once(
                 self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
             )
-            published += result.published
-            if result.contended or result.failed or result.consumed == 0:
-                break
-        return RelayResult(published=published, failed=result.failed)
+            slowest = max(slowest, loop.time() - begun)
+            progress.published += result.published
+            if result.failed:
+                progress.failed = True
+                return
+            if result.contended or result.consumed == 0:
+                return
