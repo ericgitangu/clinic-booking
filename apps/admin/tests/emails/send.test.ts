@@ -5,7 +5,6 @@ import {
   sendInviteEmail,
   sendStaffEmail,
   staffBooked,
-  staffInvite,
   STAFF_FROM,
   type StaffEmailInput,
 } from "@/emails";
@@ -500,49 +499,95 @@ describe("leaks, ids and release", () => {
 
 describe("sendInviteEmail", () => {
   const INVITE = "0e6d8f3a-5b0c-4a77-8f5e-2f9d1f6c7b10";
-  const invite = (to: string | null = "new.admin@clinic.co.ke") => ({
+  const invite = (
+    over: Partial<Parameters<typeof sendInviteEmail>[0]> = {},
+  ): Parameters<typeof sendInviteEmail>[0] => ({
     caller,
     inviteId: INVITE,
-    to,
-    mail: staffInvite({
-      role: "admin",
-      token: TOKEN_LIKE,
-      expiresAt: "2026-10-21T18:00:00+03:00",
-    }),
+    auditId: AUDIT,
+    to: "new.admin@clinic.co.ke",
+    deliver: true,
+    role: "admin",
+    expiresAt: "2026-10-21T18:00:00+03:00",
+    token: TOKEN_LIKE,
+    ...over,
   });
 
-  it("reserves, sends keyed on the invite id (not the token) and never calls /notified", async () => {
+  it("reserves, sends keyed on the invite id (not the token), then marks the audit row notified", async () => {
     const r = await sendInviteEmail(invite());
     expect(r).toEqual({
-      auditId: INVITE,
+      auditId: AUDIT,
       outcome: "sent",
       sent: true,
-      notified: false,
+      notified: true,
     });
     expect(resendHits).toHaveLength(1);
     const key = resendHits[0]!.headers["idempotency-key"];
     expect(key).toBe(`invite/${INVITE}`);
     expect(String(key)).not.toContain(TOKEN_LIKE);
-    expect(apiHits.map((h) => h.url)).toEqual(["/internal/emails/reserve"]);
+    expect(apiHits.map((h) => h.url)).toEqual([
+      "/internal/emails/reserve",
+      `/internal/admin/audit/${AUDIT}/notified`,
+    ]);
     const body = JSON.parse(resendHits[0]!.body);
+    expect(body.to).toBe("new.admin@clinic.co.ke");
     expect(body.text).toContain(`/invite/${TOKEN_LIKE}`);
     expect(body.text).not.toMatch(/[?&#]token=/);
   });
 
-  it("honours the cap, demo domains and a failed send exactly as staff mail does", async () => {
+  it("deliver:false (a demo invite) reaches nothing, and is never marked", async () => {
+    const r = await sendInviteEmail(
+      invite({ deliver: false, to: "reviewer@example.com" }),
+    );
+    expect(r).toMatchObject({ outcome: "not-deliverable", notified: false });
+    expect(resendHits).toHaveLength(0);
+    expect(apiHits).toHaveLength(0);
+  });
+
+  it("a demo address is refused even if deliver is wrongly true", async () => {
+    const r = await sendInviteEmail(invite({ to: "x@a.example.org" }));
+    expect(r.outcome).toBe("demo-recipient");
+    expect(resendHits).toHaveLength(0);
+    expect(apiHits).toHaveLength(0);
+  });
+
+  it("honours the cap, a missing id or address and a failed send exactly as staff mail does", async () => {
     logs();
     cap = "day";
     expect((await sendInviteEmail(invite())).outcome).toBe("cap-hit");
     cap = "none";
-    expect((await sendInviteEmail(invite("x@example.com"))).outcome).toBe(
-      "demo-recipient",
+    expect((await sendInviteEmail(invite({ to: null }))).outcome).toBe(
+      "no-recipient",
     );
-    expect((await sendInviteEmail(invite(null))).outcome).toBe("no-recipient");
+    expect((await sendInviteEmail(invite({ auditId: "" }))).outcome).toBe(
+      "no-id",
+    );
     expect(resendHits).toHaveLength(0);
+    expect(apiHits.map((h) => h.url).join(" ")).not.toContain("/notified");
+    apiHits.length = 0;
     resendStatus = 400;
     expect((await sendInviteEmail(invite())).outcome).toBe("send-failed");
-    expect(apiHits.map((h) => h.url).join(" ")).not.toContain("/notified");
-    expect(apiHits.map((h) => h.url)).toContain("/internal/emails/release");
+    expect(apiHits.map((h) => h.url)).toEqual([
+      "/internal/emails/reserve",
+      "/internal/emails/release",
+    ]);
+  });
+
+  it("a throw after the reservation gives the unit back", async () => {
+    logs();
+    const calls: string[] = [];
+    const r = await sendInviteEmail(invite(), {
+      ...defaultPorts,
+      send: async () => {
+        throw new Error("x");
+      },
+      release: async () => {
+        calls.push("release");
+        return { ok: true, data: true };
+      },
+    });
+    expect(r.outcome).toBe("error");
+    expect(calls).toEqual(["release"]);
   });
 
   it("never writes the token or the link to a log", async () => {

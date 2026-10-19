@@ -26,22 +26,27 @@
 //   veto                       StaffAppointmentChange    staffVetoed            patient_email, true
 //   remind now                 NotifyResult.items[]      staffRemind            item.email, item.deliver; one call per item
 //   doctor running late        NotifyResult.items[]      staffRunningLate       item.email, item.deliver; one call per item
-//   invite (admin + viewer)    InviteCreated (no audit)  staffInvite             sendInviteEmail, NOT sendStaffEmail
+//   invite (admin + viewer)    InviteCreated + audit_id  staffInvite (inside)    sendInviteEmail: id, audit_id, email, deliver, token
 //
 // Today's actions in apps/admin/src/lib/actions.ts (cancelAppointment, rescheduleAppointment) are the
 // first two call sites once the client is regenerated; the others are new actions in #60.
 // For remind and running late call staffRunningLate only after checking `minutes` (5 to 240): it
 // returns { ok: false, error: "INVALID_MINUTES" } otherwise and there is nothing to send.
 //
-// INVITES have no audit row, so they use sendInviteEmail({ caller, inviteId, to, mail }): the Resend
-// idempotency key is `invite/<inviteId>` (the id, never the token, which is a secret and must not
-// leave for a third party as a key), the same demo and allowance handling applies, and /notified is
-// not called. The link points at /invite/<token> on the admin origin. That page belongs to #60, and
-// it must: serve Referrer-Policy: no-referrer and Cache-Control: no-store (next.config.ts already
-// sets both for /invite/:path*), never log the URL or the token, and take the token from the path
-// on the server only. Residual risk, accepted: the token sits in the path, so Vercel's access log
-// for that one request holds it. It is single use, expires in 72 hours and is bound to the invited
-// Google address, so a logged token alone grants nothing.
+// INVITES have an audit row too (POST /internal/admin/invites returns id, email, role, expires_at,
+// token, audit_id, deliver, outcome). Call sendInviteEmail({ caller, inviteId: id, auditId: audit_id,
+// to: email, deliver, role, expiresAt: expires_at, token }); it builds the staffInvite mail itself.
+// The Resend idempotency key is `invite/<inviteId>` (the id, never the token, which is a secret and
+// must not leave for a third party as a key), and on success it calls POST /audit/<auditId>/notified
+// as the same signed-in person (the API enforces that the caller is the audit row's actor). A demo
+// address comes back deliver:false and its row cannot be marked notified, so nothing is sent or
+// marked. Revoking an invite returns an audit_id but has no email to send. The link points at
+// /invite/<token> on the admin origin. That page belongs to #60, and it must: serve
+// Referrer-Policy: no-referrer and Cache-Control: no-store (next.config.ts already sets both for
+// /invite/:token), never log the URL or the token, and take the token from the path on the server
+// only. Residual risk, accepted: the token sits in the path, so Vercel's access log for that one
+// request holds it. It is single use, expires in 72 hours and is bound to the invited Google
+// address, so a logged token alone grants nothing.
 //
 // What both senders do, in order: refuse (no reserve, no send, no /notified) when deliver is false,
 // the id is missing, there is no recipient, or the recipient is a demo address (isDemoRecipient);
@@ -65,6 +70,7 @@ import {
   type Reservation,
   type StaffEmailPorts,
 } from "@/emails/ports";
+import { staffInvite } from "@/emails/templates";
 
 // RFC 2606 / 6761 names that can never reach a person: the three example domains, and the reserved
 // top-level names test, example, invalid and localhost. A name matches when it is one of these or
@@ -93,7 +99,7 @@ export function isDemoRecipient(email: string): boolean {
 export type StaffEmailOutcome =
   | "sent" // Resend accepted it; `notified` says whether the audit row was marked
   | "not-deliverable" // deliver was false
-  | "no-id" // no audit id (or invite id) to key the send on
+  | "no-id" // no audit id to key the send on and to mark
   | "no-recipient" // no address on file
   | "demo-recipient" // a reserved name: never sent
   | "not-configured" // RESEND_API_KEY is not set in this app
@@ -106,7 +112,7 @@ export interface StaffEmailResult {
   auditId: string;
   outcome: StaffEmailOutcome;
   sent: boolean;
-  /** True only when the API accepted POST /audit/{id}/notified. Always false for invites. */
+  /** True only when the API accepted POST /audit/{id}/notified. */
   notified: boolean;
 }
 
@@ -120,10 +126,19 @@ export interface StaffEmailInput {
 
 export interface InviteEmailInput {
   caller: Caller;
-  /** `id` of the invite (InviteCreated.id). Not the token. */
+  /** `id` of the invite. Keys the Resend send; not the token. */
   inviteId: string;
+  /** `audit_id` of the invite's audit row: logged, and marked notified after the send. */
+  auditId: string;
+  /** `email` of the invite. */
   to: string | null | undefined;
-  mail: Composed;
+  /** The API's `deliver`; false for a demo address. */
+  deliver: boolean;
+  role: "admin" | "viewer";
+  /** `expires_at`. */
+  expiresAt: string;
+  /** The raw token from the create response. Goes into the link path only. */
+  token: string;
 }
 
 const result = (
@@ -137,12 +152,12 @@ interface Job {
   caller: Caller;
   /** Idempotency-Key for Resend. */
   key: string;
-  /** What the log and the result call it: an audit id or an invite id. */
+  /** The audit id: what the log, the result and /notified use. */
   id: string;
   to: string | null | undefined;
   deliver: boolean;
   mail: Composed;
-  /** Marks the audit row after a send; absent for invites. */
+  /** Marks the audit row after a send. */
   mark?: boolean;
 }
 
@@ -251,7 +266,7 @@ export const sendStaffEmail = (
     ports,
   );
 
-/** The invitation email. Invites have no audit row, so there is no /notified call. */
+/** The invitation email: keyed on the invite id, marked notified on the invite's audit row. */
 export const sendInviteEmail = (
   input: InviteEmailInput,
   ports: StaffEmailPorts = defaultPorts,
@@ -260,10 +275,15 @@ export const sendInviteEmail = (
     {
       caller: input.caller,
       key: `invite/${input.inviteId}`,
-      id: input.inviteId,
+      id: input.auditId,
       to: input.to,
-      deliver: true,
-      mail: input.mail,
+      deliver: input.deliver,
+      mail: staffInvite({
+        role: input.role,
+        token: input.token,
+        expiresAt: input.expiresAt,
+      }),
+      mark: true,
     },
     ports,
   );
