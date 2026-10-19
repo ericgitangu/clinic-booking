@@ -76,12 +76,13 @@ The inline relay could return having sent nothing while a committed event was st
 - **Failures.** A failed publish ends the drain. The messages that earlier passes of the same trigger sent are returned and are not undone (the cursor moved with them). The failure counts once toward the circuit breaker, even when an earlier pass succeeded. A failed pass keeps its budget debit (the answer may have been counted), and `debited_through` stops the next trigger from debiting it again.
 - **Unchanged.** The `xmin` guard (nothing is published before its transaction is visible), the cursor moving only in the transaction that publishes (an event goes out once however many passes there are), the publish budget debited in that transaction (cap 25,000 a month), and the 60-second poll. The token mints (patient and admin) run the same relay, as holder or loser the same way. A mint whose request ends up holding the cursor waits for that drain, so it can take up to the 2-second relay budget before the token is returned; a loser's mint returns at once.
 
-**What can still wait.** An event can still wait for a later trigger in four exact cases:
+**The last look.** A pass that finds nothing used to end the drain while it still held the cursor row, so an event that committed during that pass, whose relay was then refused the row, waited for a later trigger. The holder now makes one lock-free check after it has released the row: does any visible event sort after the cursor? A loser refused the row committed its event before the holder released it, so a fresh snapshot taken after the release sees it, and the holder passes again. The check takes no lock and so opens no window of its own, and it needs no flag shared between processes: the loser may be in another instance. It costs one indexed read per drain. Test: `test_an_event_that_commits_during_the_holders_last_empty_pass_is_still_sent` (fails without it).
 
-1. it commits after the holder's last read (the pass that finds nothing) and reaches the cursor lock before the holder commits that pass, so its own relay is a loser;
-2. the holder stops at the eighth pass;
-3. the holder stops at the deadline: with a push round trip of about 0.8 s or more the second pass does not fit (at 1.0 s the holder sends its own batch and returns at about 1 s);
-4. an older transaction is still open, which keeps the event above the snapshot horizon until the trigger that follows that transaction's commit.
+**What can still wait.** An event can still wait for a later trigger in three exact cases:
+
+1. the holder stops at the eighth pass;
+2. the holder stops at the deadline: with a push round trip of about 0.8 s or more the second pass does not fit (at 1.0 s the holder sends its own batch and returns at about 1 s);
+3. an older transaction is still open, which keeps the event above the snapshot horizon until the trigger that follows that transaction's commit.
 
 In each case the event is sent by the next booking's relay, or the next token mint (an open page asks for one on user input), or at the latest by the clients' 60-second poll; nothing is lost and nothing goes out twice.
 
