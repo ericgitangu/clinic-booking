@@ -2,6 +2,6 @@
   "git": { "deploymentEnabled": false },
   "regions": ["iad1"],
   "functions": {
-    "src/app/live/stream/route.ts": { "memory": 256, "maxDuration": 300 }
+    "src/app/live/stream/route.ts": { "memory": 256, "maxDuration": 300, "supportsCancellation": true }
   }
 }
