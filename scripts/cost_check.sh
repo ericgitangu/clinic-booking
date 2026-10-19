@@ -261,15 +261,79 @@ static_checks() {
 # ------------------------------------------------------------------------------------------
 REGION=us-east4
 
-# C5: the Artifact Registry repository must stay under this many bytes (the free tier is 0.5 GiB,
-# 536,870,912 bytes). Raised from 400 MB to 450 MB on 2026-10-18: the repository reports 417.198 MB
-# for two images of about 64 MB; the reasoning and the review trigger are in docs/adr/0014.
-AR_SIZE_BOUND_BYTES=450000000
+# C5 (Artifact Registry): a cost guard with two bounds and a note that is not a bound.
+#
+# 1. The ceiling comes from the approved monthly total, not from a free tier. Artifact Registry's
+#    free 0.5 GiB is per ACCOUNT (cloud.google.com/artifact-registry/pricing, read 2026-10-19:
+#    "0.5 gibibyte month and above $0.000136986 / 1 gibibyte hour, per 1 month / account"), and this
+#    project shares its billing account with projects that already use it up, so every byte of ours is
+#    billed: $0.000136986 x 730 h = $0.10 per GiB-month. The approved total is $0.50 a month.
+#    Secret Manager takes $0.06 per active version, counted LIVE (C7) so a new secret lowers the
+#    registry's share instead of silently breaking the total. What is left, at $0.10 per GiB, is the
+#    ceiling. With 5 live versions that is $0.20, 2 GiB; with 4 it is 2.6 GiB.
+# 2. The kept versions' `metadata.imageSizeBytes`, summed (shared layers are counted once per image, so
+#    this over-counts: the conservative direction). Two API images of about 64.1 MB plus two Go images
+#    of at most 25 MB = 178.2 MB, rounded up to 200 MB. The Go gateway is not built yet (#71), so this
+#    bound already budgets for an image that is not in the registry.
+# 3. The repository `sizeBytes` is larger than the kept images while layers of deleted images wait for
+#    the registry's daily garbage collection ("Deleting images doesn't immediately delete the referenced
+#    layers. Unreferenced layers are deleted daily", docs.cloud.google.com/artifact-registry/docs/docker/manage-images).
+#    The difference is reported, not judged.
+# The ceiling is checked against sizeBytes PLUS the Go images that are not in the repository yet, at the
+# 25 MB cap the Go build is to enforce (a cap, not a measured size: replace it with the measured size once
+# #71 builds the image), so the headroom printed is the one that will be left.
+AR_PRICE_MICRODOLLARS_PER_GIB_MONTH=100000   # $0.000136986 per GiB-hour x 730 h
+COST_CEILING_MICRODOLLARS=500000             # the approved total: $0.50 a month (raised from about $0.34 by the engineer, 2026-10-19)
+SECRET_VERSION_MICRODOLLARS=60000            # Secret Manager, per active version a month
+GIB_BYTES=1073741824
+AR_KEPT_IMAGES_BOUND_BYTES=200000000
+AR_GO_PACKAGE=clinic-realtime                # not built yet (#71): counted as projected until it exists
+AR_GO_VERSIONS=2
+AR_GO_IMAGE_BYTES=25000000                   # the cap for the Go image, not a measurement
+MAX_DIGITS=15                                # sizes above this are not sizes; also keeps the arithmetic far from overflow
 
-# ar_size_within_bound <bytes>: success only for a whole number strictly under the bound.
-ar_size_within_bound() {
-  case "$1" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$1" -lt "$AR_SIZE_BOUND_BYTES" ]
+# A whole number: digits only, no leading zero (08 and 0777 are octal traps in shell arithmetic), at
+# most MAX_DIGITS long.
+is_whole_number() {
+  case "$1" in
+    0) return 0 ;;
+    ''|0*|*[!0-9]*) return 1 ;;
+  esac
+  [ "${#1}" -le "$MAX_DIGITS" ]
+}
+# ar_budget_ceiling_bytes <live secret versions>: the registry's share of the approved total, in bytes.
+ar_budget_ceiling_bytes() {
+  is_whole_number "$1" || return 1
+  local left=$((COST_CEILING_MICRODOLLARS - $1 * SECRET_VERSION_MICRODOLLARS))
+  [ "$left" -gt 0 ] || { echo 0; return 0; }
+  echo $((left * GIB_BYTES / AR_PRICE_MICRODOLLARS_PER_GIB_MONTH))
+}
+# ar_projected_bytes <sizeBytes> <go_in_repository yes|no>: the Go images not yet pushed are added.
+ar_projected_bytes() {
+  if [ "$2" = yes ]; then echo "$1"; else echo $(($1 + AR_GO_VERSIONS * AR_GO_IMAGE_BYTES)); fi
+}
+# ar_repo_within_budget <sizeBytes> <go yes|no> <live secret versions>: strictly under the ceiling after the projection.
+ar_repo_within_budget() {
+  is_whole_number "$1" && is_whole_number "${3:-}" || return 1
+  [ "$(ar_projected_bytes "$1" "${2:-no}")" -lt "$(ar_budget_ceiling_bytes "$3")" ]
+}
+# ar_headroom_bytes <sizeBytes> <go yes|no> <live secret versions>
+ar_headroom_bytes() { echo $(($(ar_budget_ceiling_bytes "$3") - $(ar_projected_bytes "$1" "${2:-no}"))); }
+ar_kept_within_bound() { is_whole_number "$1" && [ "$1" -ge 1 ] && [ "$1" -le "$AR_KEPT_IMAGES_BOUND_BYTES" ]; }
+# dollars <microdollars>: 500000 -> 0.5000
+dollars() { printf '%d.%04d' $(($1 / 1000000)) $((($1 % 1000000) / 100)); }
+# redact: no account names in CI output
+redact() { sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<account>/g'; }
+
+# Checks that could not run in this environment are UNVERIFIED, never a quiet pass. Each one is named;
+# the run ends PARTIAL, and exits non-zero unless COST_CHECK_ALLOW_UNVERIFIED lists it.
+UNVERIFIED=""
+unverified() { # <id> <reason>
+  UNVERIFIED="$UNVERIFIED $1"; printf 'UNVERIFIED  %s: %s\n' "$1" "$2"
+}
+# finish_unverified <allow list>: prints the verdict line parts, returns 0 when every unverified id is allowed.
+unverified_allowed() {
+  local id; for id in $UNVERIFIED; do case " ${1:-} " in *" $id "*) ;; *) return 1 ;; esac; done
 }
 
 gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
@@ -278,6 +342,31 @@ gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
 
 gcb() { # billing-account reads, as BILLING_GCLOUD_ACCOUNT (callers check it is set)
   gcloud --account "$BILLING_GCLOUD_ACCOUNT" "$@"
+}
+
+# is_secret_count: a count of versions, 1 to 4 digits and no leading zero (no octal reading, no overflow).
+is_secret_count() { is_whole_number "$1" && [ "${#1}" -le 4 ]; }
+# count_secrets: sets SECRET_VERSIONS_LIVE (active versions over every secret) and SECRET_REPL. If any
+# call fails, the list is empty, or a count is not a number, SECRET_VERSIONS_LIVE stays empty and
+# SECRET_COUNT_ERROR says why: a count that could not be read is never taken as 0, because 0 versions
+# would turn into the largest possible registry ceiling.
+count_secrets() {
+  local s n names vjson desc
+  SECRET_VERSIONS_LIVE=""; SECRET_REPL=""; SECRET_COUNT_ERROR=""
+  names="$(gc secrets list --project "$PROJECT" --format='value(name)' 2>/dev/null)" || { SECRET_COUNT_ERROR="listing the secrets failed"; return; }
+  [ -n "$names" ] || { SECRET_COUNT_ERROR="the secret list is empty (wrong project or missing scope), so no count can be trusted"; return; }
+  local total=0
+  while IFS= read -r s; do
+    [ -z "$s" ] && continue
+    vjson="$(gc secrets versions list "$s" --project "$PROJECT" --filter='state!=DESTROYED' --format=json 2>/dev/null)" || { SECRET_COUNT_ERROR="listing the versions of a secret failed"; return; }
+    n="$(jq 'length' <<<"$vjson" 2>/dev/null)" || { SECRET_COUNT_ERROR="the versions of a secret were not a list"; return; }
+    is_secret_count "$n" || [ "$n" = 0 ] || { SECRET_COUNT_ERROR="a secret reported a version count that is not a number"; return; }
+    total=$((total + n))
+    desc="$(gc secrets describe "$s" --project "$PROJECT" --format=json 2>/dev/null)" || { SECRET_COUNT_ERROR="describing a secret failed"; return; }
+    SECRET_REPL="$SECRET_REPL $(jq -r '.replication | keys[0]' <<<"$desc" 2>/dev/null)"
+  done <<<"$names"
+  is_secret_count "$total" || [ "$total" = 0 ] || { SECRET_COUNT_ERROR="the total version count is out of range"; return; }
+  SECRET_VERSIONS_LIVE="$total"
 }
 
 live_checks() {
@@ -335,16 +424,70 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   c4="$(gc run jobs describe clinic-migrate --region "$REGION" --project "$PROJECT" --format=json 2>/dev/null | jq -r '[.spec.template.spec.template.spec.maxRetries, .spec.template.spec.template.spec.timeoutSeconds] | map(tostring) | join(" ")')"
   [ "$c4" = "0 600" ] && pass "C4 migrate job maxRetries=0 timeout=600" || fail "C4 migrate job '$c4' (want '0 600')"
 
-  # C5: Artifact Registry cleanup policies and size. A missing sizeBytes field is a FAIL, not a pass.
-  local c5
+  # C5: cleanup policies, then the cost ceiling and the kept images. A missing sizeBytes field, an empty
+  # image list or a refused call is a FAIL, never a pass, and each says which it was.
   # gcloud's JSON for a repository omits sizeBytes (it only prints it as text), so the size comes
-  # from the REST API, billed to this project.
-  local c5_policies c5_size tok
-  tok="$(gc auth print-access-token 2>/dev/null)"
+  # from the REST API, billed to this project. The token goes in through a header file on stdin,
+  # never on curl's command line.
+  local c5_policies c5_size c5_kept c5_versions c5_http c5_body c5_go c5_pkgs c5_tok c5_err c5_head c5_ceil c5_ar_micro
+  count_secrets
+  c5_ceil=""
+  if [ -n "$SECRET_COUNT_ERROR" ]; then
+    fail "C5 AR the registry ceiling cannot be worked out: $SECRET_COUNT_ERROR"
+  else
+    c5_ceil="$(ar_budget_ceiling_bytes "$SECRET_VERSIONS_LIVE")"
+  fi
   c5_policies="$(gc artifacts repositories describe clinic --location "$REGION" --project "$PROJECT" --format=json 2>/dev/null | jq -r '(.cleanupPolicies // {}) | keys | sort | join(",")' 2>/dev/null)"
-  c5_size="$(curl -s -H "Authorization: Bearer $tok" -H "x-goog-user-project: $PROJECT" "https://artifactregistry.googleapis.com/v1/projects/$PROJECT/locations/$REGION/repositories/clinic" | jq -r '(.sizeBytes // empty) | tonumber | (. < 400000000) | tostring' 2>/dev/null)"
-  c5="$c5_policies $c5_size"
-  [ "$c5" = "delete-old,delete-untagged,keep-2 true" ] && pass "C5 AR cleanup policies and size" || fail "C5 AR '${c5:-no sizeBytes or unreadable}'"
+  [ "$c5_policies" = "delete-old,delete-untagged,keep-2" ] && pass "C5 AR cleanup policies" || fail "C5 AR cleanup policies '${c5_policies:-unreadable}' (want delete-old,delete-untagged,keep-2)"
+  c5_tok="$(gc auth print-access-token 2>/dev/null)"
+  c5_body="$(mktemp)"; c5_http=""
+  if [ -z "$c5_tok" ]; then
+    fail "C5 AR could not mint an access token for the CI identity, so the repository size is unknown"
+  else
+    c5_http="$(printf 'Authorization: Bearer %s\n' "$c5_tok" | curl -s -o "$c5_body" -w '%{http_code}' -H @- -H "x-goog-user-project: $PROJECT" "https://artifactregistry.googleapis.com/v1/projects/$PROJECT/locations/$REGION/repositories/clinic")"
+  fi
+  c5_size="$(jq -r '.sizeBytes // empty' "$c5_body" 2>/dev/null)"
+  rm -f "$c5_body"
+  c5_go=no
+  c5_pkgs="$(gc artifacts packages list --repository clinic --location "$REGION" --project "$PROJECT" --format='value(name)' 2>/dev/null)" || echo "note  C5 AR could not list the packages; the Go images are counted as not pushed yet"
+  grep -qx "projects/$PROJECT/locations/$REGION/repositories/clinic/packages/$AR_GO_PACKAGE" <<<"$c5_pkgs" && c5_go=yes
+  if [ -n "$c5_tok" ] && [ -z "$SECRET_COUNT_ERROR" ]; then
+    if [ "$c5_http" != 200 ]; then
+      fail "C5 AR repository read refused or failed (HTTP ${c5_http:-none}); the size is unknown"
+    elif ! is_whole_number "$c5_size"; then
+      fail "C5 AR repository sizeBytes is '${c5_size:-missing from an HTTP 200 response}', not a size"
+    else
+      c5_ar_micro=$((c5_size * AR_PRICE_MICRODOLLARS_PER_GIB_MONTH / GIB_BYTES))
+      if ar_repo_within_budget "$c5_size" "$c5_go" "$SECRET_VERSIONS_LIVE"; then
+        c5_head="$(ar_headroom_bytes "$c5_size" "$c5_go" "$SECRET_VERSIONS_LIVE")"
+        pass "C5 AR repository sizeBytes=$c5_size, headroom $c5_head B under the $c5_ceil B ceiling ($SECRET_VERSIONS_LIVE live secret versions leave \$$(dollars $((COST_CEILING_MICRODOLLARS - SECRET_VERSIONS_LIVE * SECRET_VERSION_MICRODOLLARS))) of the \$$(dollars "$COST_CEILING_MICRODOLLARS") total; go images in repository: $c5_go, projected add: $([ "$c5_go" = yes ] && echo 0 || echo $((AR_GO_VERSIONS * AR_GO_IMAGE_BYTES))) B)"
+      else
+        fail "C5 AR the approved total \$$(dollars "$COST_CEILING_MICRODOLLARS") a month cannot hold: $SECRET_VERSIONS_LIVE live secret versions cost \$$(dollars $((SECRET_VERSIONS_LIVE * SECRET_VERSION_MICRODOLLARS))) and the registry's $c5_size B about \$$(dollars "$c5_ar_micro"), over the $c5_ceil B ceiling (Go images already pushed: $c5_go; if not, $((AR_GO_VERSIONS * AR_GO_IMAGE_BYTES)) B are added). The engineer decides: reclaim storage, drop a secret version, or raise the approved total in COST_CEILING_MICRODOLLARS with an ADR note."
+      fi
+    fi
+  fi
+  c5_err="$(mktemp)"
+  c5_versions="$(gc artifacts docker images list "$REGION-docker.pkg.dev/$PROJECT/clinic" --include-tags --project "$PROJECT" --format=json 2>"$c5_err")"
+  if ! jq -e 'type == "array"' <<<"$c5_versions" >/dev/null 2>&1; then
+    if grep -q "PERMISSION_DENIED" "$c5_err"; then
+      fail "C5 AR the CI identity may not list docker images in the clinic repository: it needs artifactregistry.dockerimages.list (roles/artifactregistry.reader or writer on the repository)"
+    else
+      fail "C5 AR kept images unreadable: the registry call failed ($(redact <"$c5_err" | tr '\n' ' ' | head -c 150))"
+    fi
+  elif [ "$(jq 'length' <<<"$c5_versions")" -lt 1 ]; then
+    fail "C5 AR the registry returned no images at all (wrong repository path, missing scope, or an emptied repository); an empty list is not a pass"
+  else
+    c5_kept="$(jq -r '[.[].metadata.imageSizeBytes | tonumber] | add' <<<"$c5_versions" 2>/dev/null)"
+    if ar_kept_within_bound "$c5_kept"; then
+      pass "C5 AR kept images total $c5_kept B <= $AR_KEPT_IMAGES_BOUND_BYTES"
+      if is_whole_number "$c5_size" && [ "$c5_size" -gt "$c5_kept" ]; then
+        echo "note  C5 AR repository holds $((c5_size - c5_kept)) B more than the kept images' sizes (layers shared between the images count once there, and layers of deleted images wait for the daily garbage collection)"
+      fi
+    else
+      fail "C5 AR kept images total '${c5_kept:-unreadable}' is not within 1 to $AR_KEPT_IMAGES_BOUND_BYTES"
+    fi
+  fi
+  rm -f "$c5_err"
 
   # C6: <= 2 versions per package (the listed name is a full path; use its basename).
   local pkg base cnt
@@ -355,15 +498,14 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     if [ "$cnt" -le 2 ]; then pass "C6 $base versions=$cnt"; else fail "artifact-registry $base versions=$cnt > 2"; fi
   done < <(gc artifacts packages list --repository clinic --location "$REGION" --project "$PROJECT" --format='value(name)' 2>/dev/null)
 
-  # C7 + C8: <= 6 active secret versions, automatic replication.
-  local s total=0 repl=""
-  while IFS= read -r s; do
-    [ -z "$s" ] && continue
-    total=$((total + $(gc secrets versions list "$s" --project "$PROJECT" --filter='state!=DESTROYED' --format=json | jq length)))
-    repl="$repl $(gc secrets describe "$s" --project "$PROJECT" --format=json | jq -r '.replication | keys[0]')"
-  done < <(gc secrets list --project "$PROJECT" --format='value(name)')
-  if [ "$total" -le 6 ]; then pass "C7 active secret versions=$total (<= 6)"; else fail "C7 active secret versions=$total > 6"; fi
-  if [ "$(printf '%s\n' $repl | sort -u | tr '\n' ' ')" = "automatic " ] || [ -z "$repl" ]; then pass "C8 secret replication automatic"; else fail "C8 replication:$repl"; fi
+  # C7 + C8: <= 6 active secret versions, automatic replication. The count also sets C5's ceiling.
+  if [ -n "$SECRET_COUNT_ERROR" ]; then
+    fail "C7 active secret versions cannot be counted: $SECRET_COUNT_ERROR"
+    fail "C8 secret replication cannot be read: $SECRET_COUNT_ERROR"
+  else
+    if [ "$SECRET_VERSIONS_LIVE" -le 6 ]; then pass "C7 active secret versions=$SECRET_VERSIONS_LIVE (<= 6)"; else fail "C7 active secret versions=$SECRET_VERSIONS_LIVE > 6"; fi
+    if [ "$(printf '%s\n' $SECRET_REPL | sort -u | tr '\n' ' ')" = "automatic " ]; then pass "C8 secret replication automatic"; else fail "C8 replication:$SECRET_REPL"; fi
+  fi
 
   # C9: state bucket in a free region, STANDARD class, soft delete off.
   local c9
@@ -381,7 +523,7 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   # so it is judged from the recorded console evidence (spend_cap_evidence).
   spend_cap_evidence
   if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ] && [ -n "${CIRCLECI:-}" ]; then
-    echo "SKIP  C11 budgets: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
+    unverified C11-budgets "billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
   elif [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
     fail "C11 BILLING_GCLOUD_ACCOUNT unset: the billing user (not the project Owner) must read the budgets"
   elif [ -n "${BILLING_ACCOUNT:-}" ]; then
@@ -400,7 +542,8 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
   local c12_tok c12_body c12_code c12_n
   c12_tok="$(gc auth print-access-token 2>/dev/null)"
   c12_body="$(mktemp)"
-  c12_code="$(curl -s -o "$c12_body" -w '%{http_code}' -H "Authorization: Bearer $c12_tok" -H "x-goog-user-project: $PROJECT" \
+  # the token goes in as a header file on stdin, never on curl's command line
+  c12_code="$(printf 'Authorization: Bearer %s\n' "$c12_tok" | curl -s -o "$c12_body" -w '%{http_code}' -H @- -H "x-goog-user-project: $PROJECT" \
     -G "https://monitoring.googleapis.com/v3/projects/$PROJECT/alertPolicies" --data-urlencode 'filter=display_name="clinic-run-egress-daily"')"
   c12_n="$(jq -r '(.alertPolicies // []) | length' "$c12_body" 2>/dev/null)"
   if [ "$c12_code" = 200 ] && [ "${c12_n:-0}" -ge 1 ]; then
@@ -416,14 +559,14 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
     c13="$(neonctl projects get "$NEON_PROJECT_ID" -o json 2>/dev/null | jq -r '[.region_id, .default_endpoint_settings.autoscaling_limit_min_cu, .default_endpoint_settings.autoscaling_limit_max_cu] | map(tostring) | join(" ")')"
     [ "$c13" = "aws-us-east-1 0.25 0.25" ] && pass "C13 Neon aws-us-east-1 fixed 0.25 CU" || fail "C13 Neon '${c13:-unreadable}'"
   else
-    echo "SKIP  C13 Neon region and size: needs neonctl and NEON_PROJECT_ID (check the console instead)"
+    unverified C13 "Neon region and size need neonctl and NEON_PROJECT_ID (check the console instead)"
   fi
 
   # C14: the billing account is SHARED (PLAN 11.1 Q14), so the free tiers are shared with the
   # projects in scripts/shared_billing_projects.txt. A project that joins (or leaves) the account
   # changes the headroom and must be re-measured with scripts/shared_headroom.py first.
   if [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ] && [ -n "${CIRCLECI:-}" ]; then
-    echo "SKIP  C14 project list: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
+    unverified C14 "project list: billing checks run locally as BILLING_GCLOUD_ACCOUNT (the CI deployer has no billing role on the shared account)"
   elif [ -z "${BILLING_GCLOUD_ACCOUNT:-}" ]; then
     fail "C14 BILLING_GCLOUD_ACCOUNT unset: the billing user must list the projects on the billing account"
   elif [ -n "${BILLING_ACCOUNT:-}" ]; then
@@ -461,11 +604,26 @@ serviceAccount:clinic-web@${PROJECT}.iam.gserviceaccount.com"
 case "$MODE" in
   --static) static_checks ;;
   --live) live_checks ;;
-  # the size judgement on its own, so the selftest can prove the bound without a registry
-  --ar-size) if ar_size_within_bound "${2:-}"; then pass "C5 size ${2:-} < $AR_SIZE_BOUND_BYTES"; else fail "C5 size '${2:-}' is not under $AR_SIZE_BOUND_BYTES"; fi ;;
-  *) echo "usage: $0 [--static|--live|--ar-size BYTES]"; exit 2 ;;
+  # the two judgements on their own, so the selftest can prove them without a registry
+  --ar-size) if ar_repo_within_budget "${2:-}" "${3:-no}" "${4:-}"; then pass "C5 repository size ${2:-} (go in repository: ${3:-no}, secret versions: ${4:-}) leaves $(ar_headroom_bytes "$2" "${3:-no}" "$4") B under $(ar_budget_ceiling_bytes "$4")"; else fail "C5 repository size '${2:-}' (go in repository: ${3:-no}, secret versions: '${4:-}') is not under the ceiling"; fi ;;
+  --ar-ceiling) ar_budget_ceiling_bytes "${2:-}" || { echo "bad secret version count '${2:-}'" >&2; exit 2; } ;;
+  # the verdict logic on its own: --verdict "<unverified ids>" "<allowed ids>"
+  --verdict) UNVERIFIED=" ${2:-}" ;;
+  --ar-kept) if ar_kept_within_bound "${2:-}"; then pass "C5 kept images ${2:-} <= $AR_KEPT_IMAGES_BOUND_BYTES"; else fail "C5 kept images '${2:-}' is not within $AR_KEPT_IMAGES_BOUND_BYTES"; fi ;;
+  *) echo "usage: $0 [--static|--live|--ar-size BYTES yes|no VERSIONS|--ar-kept BYTES|--ar-ceiling VERSIONS|--verdict 'IDS' 'ALLOWED']"; exit 2 ;;
 esac
 
 echo
-if [ "$FAILS" -eq 0 ]; then echo "cost-check $MODE: OK"; else echo "cost-check $MODE: $FAILS failure(s)"; fi
-[ "$FAILS" -eq 0 ]
+ALLOW="${COST_CHECK_ALLOW_UNVERIFIED:-}"
+[ "$MODE" = --verdict ] && ALLOW="${3:-}"
+if [ "$FAILS" -ne 0 ]; then
+  echo "cost-check $MODE: $FAILS failure(s)"; exit 1
+elif [ -n "${UNVERIFIED// /}" ]; then
+  if unverified_allowed "$ALLOW"; then
+    echo "cost-check $MODE: PARTIAL, not OK. UNVERIFIED (allowlisted in COST_CHECK_ALLOW_UNVERIFIED):${UNVERIFIED}"; exit 0
+  else
+    echo "cost-check $MODE: UNVERIFIED and not allowlisted:${UNVERIFIED}"; exit 3
+  fi
+else
+  echo "cost-check $MODE: OK"; exit 0
+fi
