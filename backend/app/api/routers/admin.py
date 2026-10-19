@@ -36,7 +36,7 @@ from app.schemas.access import (
     GrantRequest,
     SessionInfo,
 )
-from app.schemas.admin import AdminAppointmentPage, Bucket, Lineage, Metrics
+from app.schemas.admin import AdminAppointment, AdminAppointmentPage, Bucket, Lineage, Metrics
 from app.schemas.appointment import CancelRequest
 from app.schemas.problem import change_too_late_responses, problem_responses
 from app.schemas.staff import StaffAppointmentChange, StaffRescheduleRequest
@@ -131,6 +131,26 @@ async def list_appointments(
         cursor=cursor,
         role=who.role,
     )
+
+
+@router.get(
+    "/appointments/{appointment_id}",
+    response_model=AdminAppointment,
+    responses=problem_responses(404, 422),
+    description=(
+        "One appointment as an item of the admin list: same fields and the same projection by "
+        "role (a viewer gets initials, a masked phone, no email and no reason). Appointments of "
+        "synthetic patients are not shown in admin views and answer 404, like an unknown id."
+    ),
+)
+async def get_appointment(
+    response: Response,
+    appointment_id: uuid.UUID,
+    who: Principal = Depends(ANY_STAFF),
+    session: AsyncSession = Depends(get_session),
+) -> AdminAppointment:
+    response.headers.update(_NO_STORE)
+    return await service.appointment(session, appointment_id, role=who.role)
 
 
 @router.get(
