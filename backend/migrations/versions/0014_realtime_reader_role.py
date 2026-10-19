@@ -35,8 +35,8 @@ from __future__ import annotations
 from alembic import op
 
 revision = "0014"
-# Parallel branches renumber on rebase: this revises the head at merge time (0013 once the open
-# staff, seed and avatar migrations land). ``alembic heads | wc -l`` must stay 1.
+# Chained onto main's head at rebase time (0008). If the open migrations 0009/0010 merge first,
+# this is re-pointed onto the new head; ``alembic heads | wc -l`` must stay 1.
 down_revision = "0008"
 branch_labels = None
 depends_on = None

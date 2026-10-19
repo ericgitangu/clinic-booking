@@ -9,7 +9,7 @@ export DB_HOST_PORT
 export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
-        contract lint fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin
+        contract lint lint-go fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -29,15 +29,17 @@ migrate: ## Run migrations (one-shot)
 seed: ## Run the seed against the running stack
 	docker compose exec -T api python -m app.scripts.seed
 
-lint: ## markdown, TypeScript, Python (ruff + mypy --strict) and Go, zero warnings (husky and CI call this)
+lint: ## markdown, TypeScript, Python (ruff + mypy --strict), zero warnings (husky and the CI lint job call this)
 	pnpm exec markdownlint-cli2
 	pnpm -r --if-present lint
 	pnpm -r --if-present typecheck
 	($(BE) ruff check .) && ($(BE) ruff format --check .)
 	$(BE) mypy --strict app tests migrations
-	@if [ -d services/realtime ]; then \
-	  cd services/realtime && test -z "$$(gofmt -l .)" && go vet ./... && golangci-lint run ./...; \
-	else echo "skipped: no Go module"; fi
+	@echo "lint: Go checks are not part of this target; they run in 'make lint-go' (the go-quality CI job and the pre-push hook)"
+
+# Split from `lint` because the CI lint image has no Go toolchain; go-quality (Go image) calls this.
+lint-go: ## Go: gofmt, go vet, staticcheck, golangci-lint (pinned, strict); go-quality and husky call this
+	$(MAKE) -C services/realtime vet staticcheck lint
 
 hygiene: ## Repo hygiene: tracked junk, untracked files, AI-code smells
 	bash scripts/repo_hygiene.sh
