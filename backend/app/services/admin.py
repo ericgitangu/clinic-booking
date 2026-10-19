@@ -43,6 +43,38 @@ def _in_zone(value: datetime | None, zone: str) -> datetime | None:
     return value.astimezone(ZoneInfo(zone)) if value is not None else None
 
 
+FULL_VIEW_ROLES = frozenset({"owner", "admin"})
+
+
+def initials(full_name: str) -> str:
+    """ "Jane Mary Doe" -> "J. M. D." (letters and digits only; at most three)."""
+    letters = [w[0].upper() for w in full_name.split() if w and w[0].isalnum()]
+    return " ".join(f"{c}." for c in letters[:3]) or "?"
+
+
+def mask_phone(phone: str | None) -> str | None:
+    """Only the last two digits are shown: +254712345678 -> +***********78. A number too short
+    to hide anything behind two digits is masked entirely."""
+    if phone is None:
+        return None
+    lead = "+" if phone.startswith("+") else ""
+    digits = phone[len(lead) :]
+    if len(digits) < 7:
+        return lead + "*" * len(digits)
+    return lead + "*" * (len(digits) - 2) + digits[-2:]
+
+
+def project_for_viewer(item: AdminAppointment) -> AdminAppointment:
+    return item.model_copy(
+        update={
+            "patient_name": initials(item.patient_name),
+            "patient_phone": mask_phone(item.patient_phone),
+            "patient_email": None,
+            "cancellation_reason": None,
+        }
+    )
+
+
 def encode_cursor(starts_at: datetime, appointment_id: uuid.UUID) -> str:
     body = {"s": starts_at.astimezone(UTC).isoformat(), "i": str(appointment_id)}
     raw = json.dumps(body, separators=(",", ":")).encode("utf-8")
@@ -127,6 +159,7 @@ async def appointments(
     end: date | None,
     limit: int,
     cursor: str | None,
+    role: str,
 ) -> AdminAppointmentPage:
     if start is not None and end is not None and end <= start:
         raise InvalidAdminQuery("'to' must be after 'from'")
@@ -143,8 +176,15 @@ async def appointments(
     )
     page, has_more = rows[:limit], len(rows) > limit
     items = [AdminAppointment.model_validate(r) for r in page]
+    # The projection is decided here, from the role the database confirmed: only owner and admin
+    # ever receive a full name, an unmasked phone, an email or a reason.
+    minimised = role not in FULL_VIEW_ROLES
+    if minimised:
+        items = [project_for_viewer(i) for i in items]
     next_cursor = encode_cursor(page[-1]["starts_at"], page[-1]["id"]) if has_more else None
-    return AdminAppointmentPage(items=items, next_cursor=next_cursor)
+    return AdminAppointmentPage(
+        view="minimised" if minimised else "full", items=items, next_cursor=next_cursor
+    )
 
 
 async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
@@ -159,6 +199,7 @@ async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
             from_starts_at=_in_zone(r["from_starts_at"], r["timezone"]),
             to_starts_at=_in_zone(r["to_starts_at"], r["timezone"]),
             occurred_at=r["occurred_at"].astimezone(ZoneInfo(r["timezone"])),
+            actor=r["actor"],
         )
         for r in rows
     ]

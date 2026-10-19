@@ -52,3 +52,11 @@ class Appointment(Base):
     reminder_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Set when staff veto a patient's change: from then on only staff can change the appointment
+    # (a patient's cancel or reschedule is APPOINTMENT_LOCKED). A reschedule updates this same row,
+    # so the lock follows it.
+    staff_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set on the appointment staff book to undo a patient's cancel: the cancelled one it replaces.
+    predecessor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=True
+    )

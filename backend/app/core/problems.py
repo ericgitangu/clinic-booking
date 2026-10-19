@@ -86,17 +86,46 @@ async def _domain_error_handler(request: Request, exc: Exception) -> JSONRespons
     return build_problem(request, exc.code, detail=exc.detail, headers=headers)
 
 
+def _plain_message(error: dict[str, Any]) -> str:
+    """Pydantic's wording for a string that is too short or too long, in plain words a person can
+    act on; every other message is passed through unchanged."""
+    kind = error.get("type")
+    ctx = error.get("ctx") or {}
+    field = error.get("loc", ["value"])[-1]
+    if ctx.get("field_type") not in (None, "Value", "String"):
+        return str(error.get("msg", ""))  # a list or set: leave pydantic's wording
+    if kind in ("string_too_short", "too_short") and "min_length" in ctx:
+        n = ctx["min_length"]
+        if field == "reason":
+            return f"Give a reason of at least {n} characters."
+        return f"Give at least {n} characters."
+    if kind in ("string_too_long", "too_long") and "max_length" in ctx:
+        n = ctx["max_length"]
+        if field == "reason":
+            return f"Keep the reason to {n} characters or fewer."
+        return f"Keep it to {n} characters or fewer."
+    return str(error.get("msg", ""))
+
+
 async def _validation_handler(request: Request, exc: Exception) -> JSONResponse:
     exc = cast(RequestValidationError, exc)
     raw = exc.errors()
     errors = [
-        {"loc": list(e.get("loc", [])), "msg": e.get("msg", ""), "type": e.get("type", "")}
+        {"loc": list(e.get("loc", [])), "msg": _plain_message(e), "type": e.get("type", "")}
         for e in raw
     ]
     all_tz = bool(raw) and all(e.get("type") == "timezone_aware" for e in raw)
     if all_tz:
         return build_problem(request, "TIMEZONE_REQUIRED")
-    return build_problem(request, "VALIDATION_ERROR", errors=errors)
+    # One length problem reads best as the sentence itself.
+    only_length = len(raw) == 1 and raw[0].get("type") in (
+        "string_too_short",
+        "string_too_long",
+        "too_short",
+        "too_long",
+    )
+    detail = errors[0]["msg"] if only_length else None
+    return build_problem(request, "VALIDATION_ERROR", detail=detail, errors=errors)
 
 
 async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:

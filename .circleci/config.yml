@@ -110,6 +110,7 @@ jobs:
           name: migration lint (expand-only) + single head
           command: |
             bash scripts/migration_lint.sh
+            python3 scripts/alembic_single_head.py
             test "$(cd backend && uv run alembic heads | wc -l | tr -d ' ')" -eq 1
       - run:
           name: OpenAPI contract is fresh

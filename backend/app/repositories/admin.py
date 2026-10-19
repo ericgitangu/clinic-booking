@@ -24,9 +24,19 @@ from sqlalchemy import func, select, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.appointment import Appointment
+from app.models.attendance import AppointmentAttendance
 from app.models.clinic import Clinic
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+
+# The latest attendance mark of the appointment, as a column of the same SELECT.
+_LATEST_ATTENDANCE = (
+    select(AppointmentAttendance.kind)
+    .where(AppointmentAttendance.appointment_id == Appointment.id)
+    .order_by(AppointmentAttendance.id.desc())
+    .limit(1)
+    .scalar_subquery()
+)
 
 _SERIES = text(
     """
@@ -113,7 +123,7 @@ _DOCTORS = text(
 
 _LINEAGE = text(
     """
-    SELECT e.id, e.event_type, e.from_starts_at, e.to_starts_at, e.occurred_at,
+    SELECT e.id, e.event_type, e.from_starts_at, e.to_starts_at, e.occurred_at, e.actor,
            c.timezone AS timezone
     FROM appointment_events e
     JOIN appointments a ON a.id = e.appointment_id
@@ -121,6 +131,7 @@ _LINEAGE = text(
     JOIN doctors d ON d.id = e.doctor_id
     JOIN clinics c ON c.id = d.clinic_id
     WHERE NOT p.synthetic AND e.appointment_id = :id
+      AND e.event_type IN ('booked', 'rescheduled', 'cancelled')
     ORDER BY e.id
     """
 )
@@ -211,10 +222,14 @@ async def appointments_page(
             Doctor.full_name.label("doctor_name"),
             Appointment.patient_id,
             Patient.full_name.label("patient_name"),
+            Patient.phone.label("patient_phone"),
+            Patient.email.label("patient_email"),
             Appointment.starts_at,
             Appointment.ends_at,
             Appointment.status,
             Appointment.cancellation_reason,
+            (Appointment.staff_locked_at.is_not(None)).label("staff_locked"),
+            _LATEST_ATTENDANCE.label("attendance"),
             Appointment.created_at,
             Clinic.timezone.label("timezone"),
         )
@@ -247,3 +262,7 @@ async def appointments_page(
         stmt = stmt.where(tuple_(Appointment.starts_at, Appointment.id) < tuple_(*after))
     rows = await session.execute(stmt)
     return [dict(r) for r in rows.mappings()]
+
+
+# The clinic-local day range, as bind values, for the other read-model repositories.
+range_params = _range_params

@@ -17,11 +17,13 @@ from app.api.routers import (
     doctors,
     health,
     me,
+    ops,
     patients,
     problems,
     realtime,
     reminders,
     smoke,
+    staff,
 )
 from app.core.clinic_zone import set_default_zone
 from app.core.config import Settings
@@ -73,9 +75,14 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(patients.router)
     app.include_router(appointments.router)
     app.include_router(admin.router)
+    app.include_router(ops.router)
     app.include_router(admin.identity_router)
     app.include_router(admin.manage_router)
     app.include_router(admin.access_router)
+    app.include_router(staff.appointments_router)
+    app.include_router(staff.doctors_router)
+    app.include_router(staff.invites_router)
+    app.include_router(staff.audit_router)
     app.include_router(me.router)
     app.include_router(realtime.router)
     app.include_router(realtime.admin_router)

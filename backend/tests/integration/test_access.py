@@ -69,6 +69,7 @@ def _headers(
         "m": method,
         "p": path,
         "bh": body_hash(body),
+        "ev": True,
     }
     return {"X-Internal-Assertion": sign(claims, KEY.encode()), "content-type": "application/json"}
 
@@ -123,11 +124,23 @@ ACCESS_CALLS = [
 
 
 @pytest.mark.parametrize(("method", "path", "body"), ACCESS_CALLS)
-@pytest.mark.parametrize("role", ["admin", "viewer", "none", "patient"])
-async def test_only_the_owner_can_manage_access(
+@pytest.mark.parametrize("role", ["viewer", "none", "patient"])
+async def test_only_owner_and_admin_can_manage_access(
     call: Call, staff: None, method: str, path: str, body: str | None, role: str
 ) -> None:
     resp = await call(method, path, as_role=role, json_body=body)
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "FORBIDDEN"
+
+
+async def test_an_admin_cannot_grant_directly(call: Call, staff: None) -> None:
+    # Granting skips the email binding, so it stays with the owner; admins invite instead.
+    resp = await call(
+        "POST",
+        "/internal/admin/access",
+        as_role="admin",
+        json_body='{"email":"new@clinic.example","role":"viewer"}',
+    )
     assert resp.status_code == 403
     assert resp.json()["code"] == "FORBIDDEN"
 
@@ -359,7 +372,7 @@ async def test_reschedule_for_a_patient_by_role(
 ) -> None:
     appt = await _book(api)
     path = f"/internal/admin/appointments/{appt}/reschedule"
-    body = '{"starts_at":"2026-10-26T10:00:00+03:00"}'
+    body = '{"starts_at":"2026-10-26T10:00:00+03:00","reason":"clinic asked to move it"}'
     resp = await call("PATCH", path, as_role=role, json_body=body)
     after = (await api.get(f"/appointments/{appt}")).json()
     if allowed:

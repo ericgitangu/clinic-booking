@@ -128,6 +128,9 @@ export const rescheduleForPatient = (
   caller: Caller,
   id: string,
   startsAt: string,
+  // The API requires a reason on every staff write. The reschedule form has no reason field yet
+  // (the admin screens add it), so until then this is the recorded reason.
+  reason = "Rescheduled by clinic staff",
 ) =>
   callApi(
     "rescheduleForPatient",
@@ -136,7 +139,7 @@ export const rescheduleForPatient = (
         {
           client,
           path: { appointment_id: id },
-          body: { starts_at: startsAt },
+          body: { starts_at: startsAt, reason },
         },
       ),
     { caller },

@@ -32,3 +32,5 @@ class AppointmentEvent(Base):
     occurred_at: Mapped[_dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    # 'patient' or 'staff'; NULL on rows written before the column existed.
+    actor: Mapped[str | None] = mapped_column(String, nullable=True)

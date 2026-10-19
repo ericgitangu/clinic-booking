@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * AcceptRequest
+ */
+export type AcceptRequest = {
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
  * AccessEntry
  */
 export type AccessEntry = {
@@ -75,6 +85,10 @@ export type AccountLinked = {
  */
 export type AdminAppointment = {
     /**
+     * Attendance
+     */
+    attendance?: 'arrived' | 'no_show' | null;
+    /**
      * Cancellation Reason
      */
     cancellation_reason: string | null;
@@ -99,6 +113,10 @@ export type AdminAppointment = {
      */
     id: string;
     /**
+     * Patient Email
+     */
+    patient_email: string | null;
+    /**
      * Patient Id
      */
     patient_id: string;
@@ -106,6 +124,14 @@ export type AdminAppointment = {
      * Patient Name
      */
     patient_name: string;
+    /**
+     * Patient Phone
+     */
+    patient_phone: string | null;
+    /**
+     * Staff Locked
+     */
+    staff_locked: boolean;
     /**
      * Starts At
      */
@@ -132,6 +158,10 @@ export type AdminAppointmentPage = {
      * Next Cursor
      */
     next_cursor: string | null;
+    /**
+     * View
+     */
+    view: 'full' | 'minimised';
 };
 
 /**
@@ -147,7 +177,7 @@ export type AdminEvent = {
     /**
      * Event Type
      */
-    event_type: 'booked' | 'rescheduled' | 'cancelled';
+    event_type: 'booked' | 'rescheduled' | 'cancelled' | 'vetoed' | 'unlocked' | 'arrived' | 'no_show';
     /**
      * From Local Date
      */
@@ -294,6 +324,82 @@ export type AppointmentWithDoctor = {
 };
 
 /**
+ * AttendanceRequest
+ *
+ * The reason is optional for a first mark and required to change an earlier one.
+ */
+export type AttendanceRequest = {
+    /**
+     * Reason
+     */
+    reason?: string | null;
+};
+
+/**
+ * AuditEntry
+ */
+export type AuditEntry = {
+    /**
+     * Action
+     */
+    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke';
+    /**
+     * Actor Email
+     */
+    actor_email: string;
+    /**
+     * Actor Role
+     */
+    actor_role: 'owner' | 'admin' | 'viewer';
+    /**
+     * After
+     */
+    after: {
+        [key: string]: unknown;
+    };
+    /**
+     * Appointment Id
+     */
+    appointment_id: string | null;
+    /**
+     * Before
+     */
+    before: {
+        [key: string]: unknown;
+    };
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Notified
+     */
+    notified: boolean;
+    /**
+     * Occurred At
+     */
+    occurred_at: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * AuditPage
+ */
+export type AuditPage = {
+    /**
+     * Items
+     */
+    items: Array<AuditEntry>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+};
+
+/**
  * Availability
  */
 export type Availability = {
@@ -329,6 +435,90 @@ export type Availability = {
      * Timezone
      */
     timezone: string;
+};
+
+/**
+ * BoardAppointment
+ */
+export type BoardAppointment = {
+    /**
+     * Ends At
+     */
+    ends_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Locked
+     */
+    locked: boolean;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Patient Phone
+     */
+    patient_phone: string | null;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Status
+     */
+    status: 'booked' | 'arrived' | 'no_show' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
+};
+
+/**
+ * BoardGap
+ *
+ * Back-to-back free 30-minute slots, merged.
+ */
+export type BoardGap = {
+    /**
+     * Ends At
+     */
+    ends_at: string;
+    /**
+     * Slots
+     */
+    slots: number;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
+};
+
+/**
+ * BoardTotals
+ */
+export type BoardTotals = {
+    /**
+     * Arrived
+     */
+    arrived: number;
+    /**
+     * Booked
+     */
+    booked: number;
+    /**
+     * Cancelled
+     */
+    cancelled: number;
+    /**
+     * No Show
+     */
+    no_show: number;
 };
 
 /**
@@ -447,6 +637,42 @@ export type Doctor = {
      * Working Hours
      */
     working_hours: Array<WorkingWindow>;
+};
+
+/**
+ * DoctorBoard
+ */
+export type DoctorBoard = {
+    /**
+     * Appointments
+     */
+    appointments: Array<BoardAppointment>;
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Free Slots
+     */
+    free_slots: number;
+    /**
+     * Name
+     */
+    name: string;
+    next_gap: BoardGap | null;
+    running_behind: RunningBehind;
+    /**
+     * Specialty
+     */
+    specialty: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
 };
 
 /**
@@ -606,6 +832,50 @@ export type ErrorItem = {
 };
 
 /**
+ * FreeSlot
+ */
+export type FreeSlot = {
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Ends At
+     */
+    ends_at: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
+};
+
+/**
+ * GapList
+ */
+export type GapList = {
+    /**
+     * Hours
+     */
+    hours: number;
+    /**
+     * Items
+     */
+    items: Array<FreeSlot>;
+    /**
+     * Truncated
+     */
+    truncated: boolean;
+};
+
+/**
  * GrantRequest
  */
 export type GrantRequest = {
@@ -640,6 +910,256 @@ export type Health = {
 };
 
 /**
+ * HeatCell
+ */
+export type HeatCell = {
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Hour
+     */
+    hour: number;
+    /**
+     * Weekday
+     */
+    weekday: number;
+};
+
+/**
+ * Heatmap
+ */
+export type Heatmap = {
+    /**
+     * Cells
+     */
+    cells: Array<HeatCell>;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string | null;
+    /**
+     * Max
+     */
+    max: number;
+    range: DateRange;
+};
+
+/**
+ * Invite
+ */
+export type Invite = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Invited By
+     */
+    invited_by: string;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'open' | 'expired' | 'consumed' | 'revoked';
+};
+
+/**
+ * InviteCreated
+ *
+ * Returned once, on creation. ``token`` is the raw secret for the email link: it is not
+ * stored (only its SHA-256 is), not logged and cannot be read again.
+ *
+ * To email the invitation: when ``deliver`` is true, send the link ``/invite/<token>`` to
+ * ``email`` (Idempotency-Key ``invite/<id>``), then POST ``/internal/admin/audit/<audit_id>/
+ * notified``. A reserved example address is "demo, not sent": ``deliver`` is false, the audit row
+ * says so and nothing may be sent.
+ */
+export type InviteCreated = {
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Deliver
+     */
+    deliver: boolean;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Invited By
+     */
+    invited_by: string;
+    /**
+     * Outcome
+     */
+    outcome: 'to send' | 'demo, not sent' | 'no email on file';
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'open' | 'expired' | 'consumed' | 'revoked';
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
+ * InviteList
+ */
+export type InviteList = {
+    /**
+     * Items
+     */
+    items: Array<Invite>;
+};
+
+/**
+ * InviteRequest
+ */
+export type InviteRequest = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+};
+
+/**
+ * InviteRevoked
+ */
+export type InviteRevoked = {
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Invited By
+     */
+    invited_by: string;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'open' | 'expired' | 'consumed' | 'revoked';
+};
+
+/**
+ * KpiCounts
+ */
+export type KpiCounts = {
+    /**
+     * Arrived
+     */
+    arrived: number;
+    /**
+     * Booked
+     */
+    booked: number;
+    /**
+     * Cancelled
+     */
+    cancelled: number;
+    /**
+     * No Show
+     */
+    no_show: number;
+    /**
+     * Offered
+     */
+    offered: number;
+};
+
+/**
+ * KpiValue
+ */
+export type KpiValue = {
+    /**
+     * Delta
+     */
+    delta: number | null;
+    /**
+     * Previous
+     */
+    previous: number | null;
+    /**
+     * Value
+     */
+    value: number | null;
+};
+
+/**
+ * Kpis
+ */
+export type Kpis = {
+    cancellation_rate: KpiValue;
+    counts: KpiCounts;
+    fill_rate: KpiValue;
+    median_lead_minutes: KpiValue;
+    no_show_rate: KpiValue;
+    previous_range: DateRange;
+    range: DateRange;
+    reschedules: KpiValue;
+    utilisation: KpiValue;
+};
+
+/**
  * Lineage
  */
 export type Lineage = {
@@ -657,6 +1177,10 @@ export type Lineage = {
  * LineageEvent
  */
 export type LineageEvent = {
+    /**
+     * Actor
+     */
+    actor?: 'patient' | 'staff' | null;
     /**
      * Event Type
      */
@@ -713,6 +1237,72 @@ export type Metrics = {
      */
     series: Array<SeriesPoint>;
     totals: Totals;
+};
+
+/**
+ * Notified
+ */
+export type Notified = {
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Notified
+     */
+    notified?: true;
+};
+
+/**
+ * NotifyItem
+ *
+ * One patient to tell. `deliver` is true only when the outcome is "to send": the web app
+ * sends the email (Idempotency-Key = `audit_id`) and then marks the audit row notified. For a
+ * demo or address-less patient nothing is to be sent and `email` is null.
+ */
+export type NotifyItem = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Deliver
+     */
+    deliver: boolean;
+    /**
+     * Email
+     */
+    email: string | null;
+    /**
+     * Outcome
+     */
+    outcome: 'to send' | 'demo, not sent' | 'no email on file';
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+};
+
+/**
+ * NotifyResult
+ */
+export type NotifyResult = {
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Items
+     */
+    items: Array<NotifyItem>;
 };
 
 /**
@@ -825,7 +1415,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'ROLE_ESCALATION' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'APPOINTMENT_LOCKED' | 'ATTENDANCE_WINDOW_CLOSED' | 'NOTHING_TO_VETO' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'INVITE_INVALID' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -881,6 +1471,39 @@ export type RealtimeToken = {
 };
 
 /**
+ * ReasonBreakdown
+ */
+export type ReasonBreakdown = {
+    /**
+     * Items
+     */
+    items: Array<ReasonShare>;
+    range: DateRange;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
+ * ReasonShare
+ */
+export type ReasonShare = {
+    /**
+     * Category
+     */
+    category: 'transport' | 'illness' | 'travel' | 'work' | 'weather' | 'felt_better' | 'insurance' | 'other';
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Share
+     */
+    share: number;
+};
+
+/**
  * ReminderBatch
  *
  * What one run may send now: the claimed appointments and the day's email budget.
@@ -902,6 +1525,18 @@ export type ReminderBatch = {
      * Sent Today
      */
     sent_today: number;
+};
+
+/**
+ * ReminderRequest
+ *
+ * Why the reminder goes now. Optional: it defaults to a standard line in the audit row.
+ */
+export type ReminderRequest = {
+    /**
+     * Reason
+     */
+    reason?: string | null;
 };
 
 /**
@@ -942,6 +1577,43 @@ export type RescheduleRequest = {
      * Starts At
      */
     starts_at: string;
+};
+
+/**
+ * RunningBehind
+ *
+ * True when the earliest booked, unmarked appointment of today began more than 10 minutes
+ * ago (nobody has marked the patient arrived or no-show). `minutes` is how long ago it began.
+ */
+export type RunningBehind = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string | null;
+    /**
+     * Behind
+     */
+    behind: boolean;
+    /**
+     * Minutes
+     */
+    minutes: number;
+};
+
+/**
+ * RunningLateRequest
+ */
+export type RunningLateRequest = {
+    /**
+     * Minutes
+     *
+     * How late the doctor expects to be.
+     */
+    minutes: number;
+    /**
+     * Reason
+     */
+    reason?: string | null;
 };
 
 /**
@@ -1028,6 +1700,148 @@ export type SlotEvent = {
      * The slot's start as a UTC instant (…Z).
      */
     starts_at: string;
+};
+
+/**
+ * StaffAppointmentChange
+ *
+ * The changed appointment plus what the web app needs to tell the patient.
+ *
+ * ``audit_id`` is the audit row of this write and the patient email's idempotency key; it is null
+ * only when nothing changed (a reschedule to the time it already has). The patient fields are
+ * full values: these routes are owner and admin only.
+ */
+export type StaffAppointmentChange = {
+    /**
+     * Audit Id
+     */
+    audit_id: string | null;
+    /**
+     * Cancellation Reason
+     */
+    cancellation_reason: string | null;
+    /**
+     * Cancelled At
+     */
+    cancelled_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Ends At
+     */
+    ends_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Patient Email
+     */
+    patient_email: string | null;
+    /**
+     * Patient Id
+     */
+    patient_id: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Previous Starts At
+     */
+    previous_starts_at: string | null;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Status
+     */
+    status: 'booked' | 'cancelled';
+    /**
+     * Timezone
+     */
+    timezone: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * StaffCreateAppointment
+ *
+ * Book for a patient: an existing ``patient_id``, or ``patient`` details (exactly one).
+ */
+export type StaffCreateAppointment = {
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    patient?: PatientCreate | null;
+    /**
+     * Patient Id
+     */
+    patient_id?: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+};
+
+/**
+ * StaffReasonRequest
+ *
+ * Cancel, veto and unlock carry only the reason.
+ */
+export type StaffReasonRequest = {
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * StaffRescheduleRequest
+ */
+export type StaffRescheduleRequest = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+};
+
+/**
+ * TodayBoard
+ */
+export type TodayBoard = {
+    /**
+     * Doctors
+     */
+    doctors: Array<DoctorBoard>;
+    totals: BoardTotals;
+    /**
+     * View
+     */
+    view: 'full' | 'minimised';
 };
 
 /**
@@ -1583,6 +2397,92 @@ export type ListAppointmentsInternalAdminAppointmentsGetResponses = {
 
 export type ListAppointmentsInternalAdminAppointmentsGetResponse = ListAppointmentsInternalAdminAppointmentsGetResponses[keyof ListAppointmentsInternalAdminAppointmentsGetResponses];
 
+export type CreateAppointmentInternalAdminAppointmentsPostData = {
+    body: StaffCreateAppointment;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/appointments';
+};
+
+export type CreateAppointmentInternalAdminAppointmentsPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type CreateAppointmentInternalAdminAppointmentsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: StaffAppointmentChange;
+};
+
+export type CreateAppointmentInternalAdminAppointmentsPostResponse = CreateAppointmentInternalAdminAppointmentsPostResponses[keyof CreateAppointmentInternalAdminAppointmentsPostResponses];
+
+export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData = {
+    /**
+     * Body
+     */
+    body?: AttendanceRequest | null;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/arrived';
+};
+
+export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: StaffAppointmentChange;
+};
+
+export type MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse = MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses[keyof MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses];
+
 export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData = {
     body: CancelRequest;
     path: {
@@ -1622,7 +2522,7 @@ export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchRes
     /**
      * Successful Response
      */
-    200: Appointment;
+    200: StaffAppointmentChange;
 };
 
 export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses[keyof CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses];
@@ -1667,8 +2567,102 @@ export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses 
 
 export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse = GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses[keyof GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses];
 
+export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData = {
+    /**
+     * Body
+     */
+    body?: AttendanceRequest | null;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/no-show';
+};
+
+export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: StaffAppointmentChange;
+};
+
+export type MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse = MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses[keyof MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses];
+
+export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData = {
+    /**
+     * Body
+     */
+    body?: ReminderRequest | null;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/remind';
+};
+
+export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: NotifyResult;
+};
+
+export type RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse = RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses[keyof RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses];
+
 export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData = {
-    body: RescheduleRequest;
+    body: StaffRescheduleRequest;
     path: {
         /**
          * Appointment Id
@@ -1706,10 +2700,363 @@ export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedule
     /**
      * Successful Response
      */
-    200: Appointment;
+    200: StaffAppointmentChange;
 };
 
 export type RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse = RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses[keyof RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses];
+
+export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData = {
+    body: StaffReasonRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/unlock';
+};
+
+export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: StaffAppointmentChange;
+};
+
+export type UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse = UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses[keyof UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses];
+
+export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData = {
+    body: StaffReasonRequest;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/veto';
+};
+
+export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: StaffAppointmentChange;
+};
+
+export type VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse = VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses[keyof VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses];
+
+export type ListAuditInternalAdminAuditGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Appointment Id
+         */
+        appointment_id?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/internal/admin/audit';
+};
+
+export type ListAuditInternalAdminAuditGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type ListAuditInternalAdminAuditGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AuditPage;
+};
+
+export type ListAuditInternalAdminAuditGetResponse = ListAuditInternalAdminAuditGetResponses[keyof ListAuditInternalAdminAuditGetResponses];
+
+export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData = {
+    body?: never;
+    path: {
+        /**
+         * Audit Id
+         */
+        audit_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/audit/{audit_id}/notified';
+};
+
+export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Notified;
+};
+
+export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse = MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses[keyof MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses];
+
+export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData = {
+    body: RunningLateRequest;
+    path: {
+        /**
+         * Doctor Id
+         */
+        doctor_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/doctors/{doctor_id}/running-late';
+};
+
+export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: NotifyResult;
+};
+
+export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse = DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses[keyof DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses];
+
+export type ListInvitesInternalAdminInvitesGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/invites';
+};
+
+export type ListInvitesInternalAdminInvitesGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type ListInvitesInternalAdminInvitesGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: InviteList;
+};
+
+export type ListInvitesInternalAdminInvitesGetResponse = ListInvitesInternalAdminInvitesGetResponses[keyof ListInvitesInternalAdminInvitesGetResponses];
+
+export type CreateInviteInternalAdminInvitesPostData = {
+    body: InviteRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/invites';
+};
+
+export type CreateInviteInternalAdminInvitesPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    409: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    429: unknown;
+};
+
+export type CreateInviteInternalAdminInvitesPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: InviteCreated;
+};
+
+export type CreateInviteInternalAdminInvitesPostResponse = CreateInviteInternalAdminInvitesPostResponses[keyof CreateInviteInternalAdminInvitesPostResponses];
+
+export type AcceptInviteInternalAdminInvitesAcceptPostData = {
+    body: AcceptRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/invites/accept';
+};
+
+export type AcceptInviteInternalAdminInvitesAcceptPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type AcceptInviteInternalAdminInvitesAcceptPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessEntry;
+};
+
+export type AcceptInviteInternalAdminInvitesAcceptPostResponse = AcceptInviteInternalAdminInvitesAcceptPostResponses[keyof AcceptInviteInternalAdminInvitesAcceptPostResponses];
+
+export type RevokeInviteInternalAdminInvitesInviteIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Invite Id
+         */
+        invite_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/invites/{invite_id}';
+};
+
+export type RevokeInviteInternalAdminInvitesInviteIdDeleteErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type RevokeInviteInternalAdminInvitesInviteIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: InviteRevoked;
+};
+
+export type RevokeInviteInternalAdminInvitesInviteIdDeleteResponse = RevokeInviteInternalAdminInvitesInviteIdDeleteResponses[keyof RevokeInviteInternalAdminInvitesInviteIdDeleteResponses];
 
 export type GetMetricsInternalAdminMetricsGetData = {
     body?: never;
@@ -1754,6 +3101,240 @@ export type GetMetricsInternalAdminMetricsGetResponses = {
 };
 
 export type GetMetricsInternalAdminMetricsGetResponse = GetMetricsInternalAdminMetricsGetResponses[keyof GetMetricsInternalAdminMetricsGetResponses];
+
+export type CancellationReasonsInternalAdminOpsCancellationReasonsGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * From
+         */
+        from: string;
+        /**
+         * To
+         */
+        to: string;
+    };
+    url: '/internal/admin/ops/cancellation-reasons';
+};
+
+export type CancellationReasonsInternalAdminOpsCancellationReasonsGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReasonBreakdown;
+};
+
+export type CancellationReasonsInternalAdminOpsCancellationReasonsGetResponse = CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses[keyof CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses];
+
+export type DaySheetInternalAdminOpsDaySheetCsvGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Date
+         */
+        date: string;
+        /**
+         * Doctor Id
+         */
+        doctor_id?: string | null;
+    };
+    url: '/internal/admin/ops/day-sheet.csv';
+};
+
+export type DaySheetInternalAdminOpsDaySheetCsvGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type DaySheetInternalAdminOpsDaySheetCsvGetResponses = {
+    /**
+     * One row per appointment
+     */
+    200: unknown;
+};
+
+export type GapsInternalAdminOpsGapsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Hours
+         */
+        hours?: number;
+    };
+    url: '/internal/admin/ops/gaps';
+};
+
+export type GapsInternalAdminOpsGapsGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type GapsInternalAdminOpsGapsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: GapList;
+};
+
+export type GapsInternalAdminOpsGapsGetResponse = GapsInternalAdminOpsGapsGetResponses[keyof GapsInternalAdminOpsGapsGetResponses];
+
+export type HeatmapInternalAdminOpsHeatmapGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * From
+         */
+        from: string;
+        /**
+         * To
+         */
+        to: string;
+        /**
+         * Doctor Id
+         */
+        doctor_id?: string | null;
+    };
+    url: '/internal/admin/ops/heatmap';
+};
+
+export type HeatmapInternalAdminOpsHeatmapGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type HeatmapInternalAdminOpsHeatmapGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Heatmap;
+};
+
+export type HeatmapInternalAdminOpsHeatmapGetResponse = HeatmapInternalAdminOpsHeatmapGetResponses[keyof HeatmapInternalAdminOpsHeatmapGetResponses];
+
+export type KpisInternalAdminOpsKpisGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * From
+         */
+        from: string;
+        /**
+         * To
+         */
+        to: string;
+    };
+    url: '/internal/admin/ops/kpis';
+};
+
+export type KpisInternalAdminOpsKpisGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type KpisInternalAdminOpsKpisGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Kpis;
+};
+
+export type KpisInternalAdminOpsKpisGetResponse = KpisInternalAdminOpsKpisGetResponses[keyof KpisInternalAdminOpsKpisGetResponses];
+
+export type TodayInternalAdminOpsTodayGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Date
+         */
+        date?: string | null;
+    };
+    url: '/internal/admin/ops/today';
+};
+
+export type TodayInternalAdminOpsTodayGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type TodayInternalAdminOpsTodayGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: TodayBoard;
+};
+
+export type TodayInternalAdminOpsTodayGetResponse = TodayInternalAdminOpsTodayGetResponses[keyof TodayInternalAdminOpsTodayGetResponses];
 
 export type GetSessionInfoInternalAdminSessionGetData = {
     body?: never;

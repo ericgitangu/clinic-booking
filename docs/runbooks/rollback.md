@@ -109,3 +109,22 @@ It only acts on `sil-clinic-booking` in `us-east4` and refuses anything else; a 
 ## Vercel tokens: one per project
 
 The `vercel-prod` context holds two project-scoped tokens: `VERCEL_TOKEN` (`clinic-web`, the booking app) and `VERCEL_ADMIN_TOKEN` (`clinic-admin`). Each app's `ship-` and `rollback-` job picks its own with `scripts/ci/select_vercel_token.sh`, so a booking job never uses the admin token and the reverse. If an admin job stops with "VERCEL_ADMIN_TOKEN is not set", add a `clinic-admin` scoped token to the `vercel-prod` context under that name; nothing was deployed or rolled back. If a Vercel step answers 403, check that the job's token is scoped to the project that job is about.
+
+## Switching staff CRUD off: locked visits
+
+Before switching staff CRUD off (`STAFF_CRUD_ENABLED=false`), unlock any staff-locked visit while the unlock route still works. Once the switch is off that route answers 404, so a visit that is still locked stays locked for the patient (`APPOINTMENT_LOCKED`). If it is already off, clear the lock directly, as the owner role, in a transaction. Count first:
+
+```sql
+SELECT count(*) FROM appointments WHERE staff_locked_at IS NOT NULL;
+```
+
+Then, in the same session:
+
+```sql
+BEGIN;
+UPDATE appointments SET staff_locked_at = NULL WHERE staff_locked_at IS NOT NULL;
+-- the reported row count must equal the number counted above; otherwise ROLLBACK
+COMMIT;
+```
+
+This only clears the lock column. The audit table (`staff_action_audit`) is not touched, so the veto stays on record.

@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AdminTokenInternalRealtimeTokenAdminPostData, AdminTokenInternalRealtimeTokenAdminPostErrors, AdminTokenInternalRealtimeTokenAdminPostResponses, BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostErrors, BookMineInternalMeAppointmentsPostResponses, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchErrors, ChangeAccessRoleInternalAdminAccessEmailPatchResponses, ClaimRemindersInternalRemindersClaimPostData, ClaimRemindersInternalRemindersClaimPostErrors, ClaimRemindersInternalRemindersClaimPostResponses, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostErrors, CreateAppointmentAppointmentsPostResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, EmailsTodayInternalEmailsTodayGetData, EmailsTodayInternalEmailsTodayGetErrors, EmailsTodayInternalEmailsTodayGetResponses, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetErrors, GetAppointmentAppointmentsAppointmentIdGetResponses, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetErrors, GetDoctorDoctorsDoctorIdGetResponses, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetErrors, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetErrors, GetMetricsInternalAdminMetricsGetResponses, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetErrors, GetProblemProblemsSlugGetResponses, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetErrors, GetSessionInfoInternalAdminSessionGetResponses, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostErrors, GrantAccessInternalAdminAccessPostResponses, HealthHealthGetData, HealthHealthGetResponses, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostErrors, LinkAccountInternalAccountsLinkPostResponses, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetErrors, ListAccessInternalAdminAccessGetResponses, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetErrors, ListAppointmentsInternalAdminAppointmentsGetResponses, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponses, ListProblemsProblemsGetData, ListProblemsProblemsGetResponses, MarkReminderSentInternalRemindersAppointmentIdSentPostData, MarkReminderSentInternalRemindersAppointmentIdSentPostErrors, MarkReminderSentInternalRemindersAppointmentIdSentPostResponses, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetErrors, MyAppointmentsInternalMeAppointmentsGetResponses, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetErrors, PatientAppointmentsPatientsPatientIdAppointmentsGetResponses, PatientTokenRealtimeTokenPatientPostData, PatientTokenRealtimeTokenPatientPostErrors, PatientTokenRealtimeTokenPatientPostResponses, PostPatientPatientsPostData, PostPatientPatientsPostErrors, PostPatientPatientsPostResponses, ReadyReadyGetData, ReadyReadyGetErrors, ReadyReadyGetResponses, ReleaseEmailInternalEmailsReleasePostData, ReleaseEmailInternalEmailsReleasePostErrors, ReleaseEmailInternalEmailsReleasePostResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, ReserveEmailInternalEmailsReservePostData, ReserveEmailInternalEmailsReservePostErrors, ReserveEmailInternalEmailsReservePostResponses, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteErrors, RevokeAccessInternalAdminAccessEmailDeleteResponses } from './types.gen';
-import { zAdminTokenInternalRealtimeTokenAdminPostResponse, zBookMineInternalMeAppointmentsPostBody, zBookMineInternalMeAppointmentsPostHeaders, zBookMineInternalMeAppointmentsPostResponse, zCancelAppointmentAppointmentsAppointmentIdCancelPatchBody, zCancelAppointmentAppointmentsAppointmentIdCancelPatchPath, zCancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchBody, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchPath, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchBody, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchPath, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, zChangeAccessRoleInternalAdminAccessEmailPatchBody, zChangeAccessRoleInternalAdminAccessEmailPatchPath, zChangeAccessRoleInternalAdminAccessEmailPatchResponse, zClaimRemindersInternalRemindersClaimPostQuery, zClaimRemindersInternalRemindersClaimPostResponse, zCreateAppointmentAppointmentsPostBody, zCreateAppointmentAppointmentsPostHeaders, zCreateAppointmentAppointmentsPostResponse, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetPath, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetQuery, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, zEmailsTodayInternalEmailsTodayGetResponse, zGetAppointmentAppointmentsAppointmentIdGetPath, zGetAppointmentAppointmentsAppointmentIdGetResponse, zGetDoctorDoctorsDoctorIdGetPath, zGetDoctorDoctorsDoctorIdGetResponse, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, zGetMetricsInternalAdminMetricsGetQuery, zGetMetricsInternalAdminMetricsGetResponse, zGetProblemProblemsSlugGetPath, zGetProblemProblemsSlugGetResponse, zGetSessionInfoInternalAdminSessionGetResponse, zGrantAccessInternalAdminAccessPostBody, zGrantAccessInternalAdminAccessPostResponse, zHealthHealthGetResponse, zLinkAccountInternalAccountsLinkPostBody, zLinkAccountInternalAccountsLinkPostResponse, zListAccessInternalAdminAccessGetResponse, zListAppointmentsInternalAdminAppointmentsGetQuery, zListAppointmentsInternalAdminAppointmentsGetResponse, zListDoctorsDoctorsGetResponse, zListProblemsProblemsGetResponse, zMarkReminderSentInternalRemindersAppointmentIdSentPostBody, zMarkReminderSentInternalRemindersAppointmentIdSentPostPath, zMarkReminderSentInternalRemindersAppointmentIdSentPostResponse, zMyAppointmentInternalMeAppointmentsAppointmentIdGetPath, zMyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, zMyAppointmentsInternalMeAppointmentsGetQuery, zMyAppointmentsInternalMeAppointmentsGetResponse, zPatientAppointmentsPatientsPatientIdAppointmentsGetPath, zPatientAppointmentsPatientsPatientIdAppointmentsGetQuery, zPatientAppointmentsPatientsPatientIdAppointmentsGetResponse, zPatientTokenRealtimeTokenPatientPostBody, zPatientTokenRealtimeTokenPatientPostResponse, zPostPatientPatientsPostBody, zPostPatientPatientsPostResponse, zReadyReadyGetResponse, zReleaseEmailInternalEmailsReleasePostBody, zReleaseEmailInternalEmailsReleasePostResponse, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchBody, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchPath, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchPath, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchBody, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPath, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, zReserveEmailInternalEmailsReservePostResponse, zRevokeAccessInternalAdminAccessEmailDeletePath, zRevokeAccessInternalAdminAccessEmailDeleteResponse } from './zod.gen';
+import type { AcceptInviteInternalAdminInvitesAcceptPostData, AcceptInviteInternalAdminInvitesAcceptPostErrors, AcceptInviteInternalAdminInvitesAcceptPostResponses, AdminTokenInternalRealtimeTokenAdminPostData, AdminTokenInternalRealtimeTokenAdminPostErrors, AdminTokenInternalRealtimeTokenAdminPostResponses, BookMineInternalMeAppointmentsPostData, BookMineInternalMeAppointmentsPostErrors, BookMineInternalMeAppointmentsPostResponses, CancelAppointmentAppointmentsAppointmentIdCancelPatchData, CancelAppointmentAppointmentsAppointmentIdCancelPatchErrors, CancelAppointmentAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancellationReasonsInternalAdminOpsCancellationReasonsGetData, CancellationReasonsInternalAdminOpsCancellationReasonsGetErrors, CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchData, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchErrors, CancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponses, ChangeAccessRoleInternalAdminAccessEmailPatchData, ChangeAccessRoleInternalAdminAccessEmailPatchErrors, ChangeAccessRoleInternalAdminAccessEmailPatchResponses, ClaimRemindersInternalRemindersClaimPostData, ClaimRemindersInternalRemindersClaimPostErrors, ClaimRemindersInternalRemindersClaimPostResponses, CreateAppointmentAppointmentsPostData, CreateAppointmentAppointmentsPostErrors, CreateAppointmentAppointmentsPostResponses, CreateAppointmentInternalAdminAppointmentsPostData, CreateAppointmentInternalAdminAppointmentsPostErrors, CreateAppointmentInternalAdminAppointmentsPostResponses, CreateInviteInternalAdminInvitesPostData, CreateInviteInternalAdminInvitesPostErrors, CreateInviteInternalAdminInvitesPostResponses, DaySheetInternalAdminOpsDaySheetCsvGetData, DaySheetInternalAdminOpsDaySheetCsvGetErrors, DaySheetInternalAdminOpsDaySheetCsvGetResponses, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetData, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetErrors, DoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponses, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostErrors, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses, EmailsTodayInternalEmailsTodayGetData, EmailsTodayInternalEmailsTodayGetErrors, EmailsTodayInternalEmailsTodayGetResponses, GapsInternalAdminOpsGapsGetData, GapsInternalAdminOpsGapsGetErrors, GapsInternalAdminOpsGapsGetResponses, GetAppointmentAppointmentsAppointmentIdGetData, GetAppointmentAppointmentsAppointmentIdGetErrors, GetAppointmentAppointmentsAppointmentIdGetResponses, GetDoctorDoctorsDoctorIdGetData, GetDoctorDoctorsDoctorIdGetErrors, GetDoctorDoctorsDoctorIdGetResponses, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetErrors, GetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponses, GetMetricsInternalAdminMetricsGetData, GetMetricsInternalAdminMetricsGetErrors, GetMetricsInternalAdminMetricsGetResponses, GetProblemProblemsSlugGetData, GetProblemProblemsSlugGetErrors, GetProblemProblemsSlugGetResponses, GetSessionInfoInternalAdminSessionGetData, GetSessionInfoInternalAdminSessionGetErrors, GetSessionInfoInternalAdminSessionGetResponses, GrantAccessInternalAdminAccessPostData, GrantAccessInternalAdminAccessPostErrors, GrantAccessInternalAdminAccessPostResponses, HealthHealthGetData, HealthHealthGetResponses, HeatmapInternalAdminOpsHeatmapGetData, HeatmapInternalAdminOpsHeatmapGetErrors, HeatmapInternalAdminOpsHeatmapGetResponses, KpisInternalAdminOpsKpisGetData, KpisInternalAdminOpsKpisGetErrors, KpisInternalAdminOpsKpisGetResponses, LinkAccountInternalAccountsLinkPostData, LinkAccountInternalAccountsLinkPostErrors, LinkAccountInternalAccountsLinkPostResponses, ListAccessInternalAdminAccessGetData, ListAccessInternalAdminAccessGetErrors, ListAccessInternalAdminAccessGetResponses, ListAppointmentsInternalAdminAppointmentsGetData, ListAppointmentsInternalAdminAppointmentsGetErrors, ListAppointmentsInternalAdminAppointmentsGetResponses, ListAuditInternalAdminAuditGetData, ListAuditInternalAdminAuditGetErrors, ListAuditInternalAdminAuditGetResponses, ListDoctorsDoctorsGetData, ListDoctorsDoctorsGetResponses, ListInvitesInternalAdminInvitesGetData, ListInvitesInternalAdminInvitesGetErrors, ListInvitesInternalAdminInvitesGetResponses, ListProblemsProblemsGetData, ListProblemsProblemsGetResponses, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostErrors, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostErrors, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostErrors, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses, MarkReminderSentInternalRemindersAppointmentIdSentPostData, MarkReminderSentInternalRemindersAppointmentIdSentPostErrors, MarkReminderSentInternalRemindersAppointmentIdSentPostResponses, MyAppointmentInternalMeAppointmentsAppointmentIdGetData, MyAppointmentInternalMeAppointmentsAppointmentIdGetErrors, MyAppointmentInternalMeAppointmentsAppointmentIdGetResponses, MyAppointmentsInternalMeAppointmentsGetData, MyAppointmentsInternalMeAppointmentsGetErrors, MyAppointmentsInternalMeAppointmentsGetResponses, PatientAppointmentsPatientsPatientIdAppointmentsGetData, PatientAppointmentsPatientsPatientIdAppointmentsGetErrors, PatientAppointmentsPatientsPatientIdAppointmentsGetResponses, PatientTokenRealtimeTokenPatientPostData, PatientTokenRealtimeTokenPatientPostErrors, PatientTokenRealtimeTokenPatientPostResponses, PostPatientPatientsPostData, PostPatientPatientsPostErrors, PostPatientPatientsPostResponses, ReadyReadyGetData, ReadyReadyGetErrors, ReadyReadyGetResponses, ReleaseEmailInternalEmailsReleasePostData, ReleaseEmailInternalEmailsReleasePostErrors, ReleaseEmailInternalEmailsReleasePostResponses, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostErrors, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchData, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchErrors, RescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchData, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchErrors, RescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponses, ReserveEmailInternalEmailsReservePostData, ReserveEmailInternalEmailsReservePostErrors, ReserveEmailInternalEmailsReservePostResponses, RevokeAccessInternalAdminAccessEmailDeleteData, RevokeAccessInternalAdminAccessEmailDeleteErrors, RevokeAccessInternalAdminAccessEmailDeleteResponses, RevokeInviteInternalAdminInvitesInviteIdDeleteData, RevokeInviteInternalAdminInvitesInviteIdDeleteErrors, RevokeInviteInternalAdminInvitesInviteIdDeleteResponses, TodayInternalAdminOpsTodayGetData, TodayInternalAdminOpsTodayGetErrors, TodayInternalAdminOpsTodayGetResponses, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostErrors, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostErrors, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses } from './types.gen';
+import { zAcceptInviteInternalAdminInvitesAcceptPostBody, zAcceptInviteInternalAdminInvitesAcceptPostResponse, zAdminTokenInternalRealtimeTokenAdminPostResponse, zBookMineInternalMeAppointmentsPostBody, zBookMineInternalMeAppointmentsPostHeaders, zBookMineInternalMeAppointmentsPostResponse, zCancelAppointmentAppointmentsAppointmentIdCancelPatchBody, zCancelAppointmentAppointmentsAppointmentIdCancelPatchPath, zCancelAppointmentAppointmentsAppointmentIdCancelPatchResponse, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchBody, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchPath, zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse, zCancellationReasonsInternalAdminOpsCancellationReasonsGetQuery, zCancellationReasonsInternalAdminOpsCancellationReasonsGetResponse, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchBody, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchPath, zCancelMineInternalMeAppointmentsAppointmentIdCancelPatchResponse, zChangeAccessRoleInternalAdminAccessEmailPatchBody, zChangeAccessRoleInternalAdminAccessEmailPatchPath, zChangeAccessRoleInternalAdminAccessEmailPatchResponse, zClaimRemindersInternalRemindersClaimPostQuery, zClaimRemindersInternalRemindersClaimPostResponse, zCreateAppointmentAppointmentsPostBody, zCreateAppointmentAppointmentsPostHeaders, zCreateAppointmentAppointmentsPostResponse, zCreateAppointmentInternalAdminAppointmentsPostBody, zCreateAppointmentInternalAdminAppointmentsPostResponse, zCreateInviteInternalAdminInvitesPostBody, zCreateInviteInternalAdminInvitesPostResponse, zDaySheetInternalAdminOpsDaySheetCsvGetQuery, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetPath, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetQuery, zDoctorAvailabilityDoctorsDoctorIdAvailabilityGetResponse, zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostBody, zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostPath, zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse, zEmailsTodayInternalEmailsTodayGetResponse, zGapsInternalAdminOpsGapsGetQuery, zGapsInternalAdminOpsGapsGetResponse, zGetAppointmentAppointmentsAppointmentIdGetPath, zGetAppointmentAppointmentsAppointmentIdGetResponse, zGetDoctorDoctorsDoctorIdGetPath, zGetDoctorDoctorsDoctorIdGetResponse, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath, zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetResponse, zGetMetricsInternalAdminMetricsGetQuery, zGetMetricsInternalAdminMetricsGetResponse, zGetProblemProblemsSlugGetPath, zGetProblemProblemsSlugGetResponse, zGetSessionInfoInternalAdminSessionGetResponse, zGrantAccessInternalAdminAccessPostBody, zGrantAccessInternalAdminAccessPostResponse, zHealthHealthGetResponse, zHeatmapInternalAdminOpsHeatmapGetQuery, zHeatmapInternalAdminOpsHeatmapGetResponse, zKpisInternalAdminOpsKpisGetQuery, zKpisInternalAdminOpsKpisGetResponse, zLinkAccountInternalAccountsLinkPostBody, zLinkAccountInternalAccountsLinkPostResponse, zListAccessInternalAdminAccessGetResponse, zListAppointmentsInternalAdminAppointmentsGetQuery, zListAppointmentsInternalAdminAppointmentsGetResponse, zListAuditInternalAdminAuditGetQuery, zListAuditInternalAdminAuditGetResponse, zListDoctorsDoctorsGetResponse, zListInvitesInternalAdminInvitesGetResponse, zListProblemsProblemsGetResponse, zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostBody, zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostPath, zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse, zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostBody, zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostPath, zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse, zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostPath, zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse, zMarkReminderSentInternalRemindersAppointmentIdSentPostBody, zMarkReminderSentInternalRemindersAppointmentIdSentPostPath, zMarkReminderSentInternalRemindersAppointmentIdSentPostResponse, zMyAppointmentInternalMeAppointmentsAppointmentIdGetPath, zMyAppointmentInternalMeAppointmentsAppointmentIdGetResponse, zMyAppointmentsInternalMeAppointmentsGetQuery, zMyAppointmentsInternalMeAppointmentsGetResponse, zPatientAppointmentsPatientsPatientIdAppointmentsGetPath, zPatientAppointmentsPatientsPatientIdAppointmentsGetQuery, zPatientAppointmentsPatientsPatientIdAppointmentsGetResponse, zPatientTokenRealtimeTokenPatientPostBody, zPatientTokenRealtimeTokenPatientPostResponse, zPostPatientPatientsPostBody, zPostPatientPatientsPostResponse, zReadyReadyGetResponse, zReleaseEmailInternalEmailsReleasePostBody, zReleaseEmailInternalEmailsReleasePostResponse, zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostBody, zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostPath, zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchBody, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchPath, zRescheduleAppointmentAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchBody, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchPath, zRescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponse, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchBody, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchPath, zRescheduleMineInternalMeAppointmentsAppointmentIdReschedulePatchResponse, zReserveEmailInternalEmailsReservePostResponse, zRevokeAccessInternalAdminAccessEmailDeletePath, zRevokeAccessInternalAdminAccessEmailDeleteResponse, zRevokeInviteInternalAdminInvitesInviteIdDeletePath, zRevokeInviteInternalAdminInvitesInviteIdDeleteResponse, zTodayInternalAdminOpsTodayGetQuery, zTodayInternalAdminOpsTodayGetResponse, zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostBody, zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostPath, zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse, zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostBody, zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostPath, zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -257,9 +257,49 @@ export const listAppointmentsInternalAdminAppointmentsGet = <ThrowOnError extend
 });
 
 /**
+ * Create Appointment
+ *
+ * Book for a patient: an existing `patient_id`, or `patient` details (exactly one). Staff are exempt from the lead-time rule; the slot, working-hours and double-booking rules still apply. A reason is required and is recorded in the audit trail.
+ */
+export const createAppointmentInternalAdminAppointmentsPost = <ThrowOnError extends boolean = false>(options: Options<CreateAppointmentInternalAdminAppointmentsPostData, ThrowOnError>): RequestResult<CreateAppointmentInternalAdminAppointmentsPostResponses, CreateAppointmentInternalAdminAppointmentsPostErrors, ThrowOnError> => (options.client ?? client).post<CreateAppointmentInternalAdminAppointmentsPostResponses, CreateAppointmentInternalAdminAppointmentsPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateAppointmentInternalAdminAppointmentsPostBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zCreateAppointmentInternalAdminAppointmentsPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Mark Arrived
+ *
+ * Record that the patient arrived. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.
+ */
+export const markArrivedInternalAdminAppointmentsAppointmentIdArrivedPost = <ThrowOnError extends boolean = false>(options: Options<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostData, ThrowOnError>): RequestResult<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostErrors, ThrowOnError> => (options.client ?? client).post<MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponses, MarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostBody.optional(),
+        path: zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zMarkArrivedInternalAdminAppointmentsAppointmentIdArrivedPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments/{appointment_id}/arrived',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Cancel For Patient
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES).
+ * Refused with 409 CHANGE_TOO_LATE when the appointment begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES). Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.
  */
 export const cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch = <ThrowOnError extends boolean = false>(options: Options<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchData, ThrowOnError>): RequestResult<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError> => (options.client ?? client).patch<CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses, CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -291,9 +331,49 @@ export const getLineageInternalAdminAppointmentsAppointmentIdLineageGet = <Throw
 });
 
 /**
+ * Mark No Show
+ *
+ * Record that the patient did not turn up. Arrival: from 15 minutes before the appointment to 2 hours after it starts. No-show: from the start to 2 hours after (409 ATTENDANCE_WINDOW_CLOSED outside that). Marking what is already marked changes nothing. Changing an earlier mark needs a `reason`. Audited.
+ */
+export const markNoShowInternalAdminAppointmentsAppointmentIdNoShowPost = <ThrowOnError extends boolean = false>(options: Options<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostData, ThrowOnError>): RequestResult<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostErrors, ThrowOnError> => (options.client ?? client).post<MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponses, MarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostBody.optional(),
+        path: zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zMarkNoShowInternalAdminAppointmentsAppointmentIdNoShowPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments/{appointment_id}/no-show',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remind Now
+ *
+ * Remind the patient of this appointment now. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as "demo, not sent" and never has `deliver: true`.
+ */
+export const remindNowInternalAdminAppointmentsAppointmentIdRemindPost = <ThrowOnError extends boolean = false>(options: Options<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostData, ThrowOnError>): RequestResult<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostErrors, ThrowOnError> => (options.client ?? client).post<RemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponses, RemindNowInternalAdminAppointmentsAppointmentIdRemindPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostBody.optional(),
+        path: zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zRemindNowInternalAdminAppointmentsAppointmentIdRemindPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments/{appointment_id}/remind',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Reschedule For Patient
  *
- * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment.
+ * Refused with 409 CHANGE_TOO_LATE when the appointment's current start begins less than 60 minutes from now (BOOKING_MIN_LEAD_MINUTES), and with 422 BOOKING_TOO_SOON when the new start does, exactly as for a fresh booking. Repeating a reschedule that already happened (same new start) returns the appointment. Staff are exempt from the lead-time rule and only from it: this route never returns CHANGE_TOO_LATE or BOOKING_TOO_SOON. Every other check applies (SLOT_IN_PAST, APPOINTMENT_ALREADY_STARTED, APPOINTMENT_ALREADY_CANCELLED, DATE_OUT_OF_RANGE, SLOT_MISALIGNED, OUTSIDE_WORKING_HOURS, SLOT_TAKEN, PATIENT_DOUBLE_BOOKED), and a reason is required.
  */
 export const rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch = <ThrowOnError extends boolean = false>(options: Options<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchData, ThrowOnError>): RequestResult<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError> => (options.client ?? client).patch<RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchResponses, RescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatchErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
@@ -311,6 +391,166 @@ export const rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedul
 });
 
 /**
+ * Unlock Appointment
+ *
+ * Lift the lock so the patient can change the appointment again.
+ */
+export const unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost = <ThrowOnError extends boolean = false>(options: Options<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostData, ThrowOnError>): RequestResult<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostErrors, ThrowOnError> => (options.client ?? client).post<UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponses, UnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostBody,
+        path: zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zUnlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments/{appointment_id}/unlock',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Veto Appointment
+ *
+ * Undo the patient's latest change and lock the appointment against further patient changes. A reschedule is moved back (same appointment). A cancel is undone by booking the same slot again as a NEW appointment (the response carries its id) that starts locked. 409 NOTHING_TO_VETO when the latest change is not the patient's or is already undone.
+ */
+export const vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost = <ThrowOnError extends boolean = false>(options: Options<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostData, ThrowOnError>): RequestResult<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostErrors, ThrowOnError> => (options.client ?? client).post<VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponses, VetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostBody,
+        path: zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zVetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPostResponse.parseAsync(data),
+    url: '/internal/admin/appointments/{appointment_id}/veto',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Audit
+ *
+ * Staff actions, newest first. Owner and admin only.
+ */
+export const listAuditInternalAdminAuditGet = <ThrowOnError extends boolean = false>(options?: Options<ListAuditInternalAdminAuditGetData, ThrowOnError>): RequestResult<ListAuditInternalAdminAuditGetResponses, ListAuditInternalAdminAuditGetErrors, ThrowOnError> => (options?.client ?? client).get<ListAuditInternalAdminAuditGetResponses, ListAuditInternalAdminAuditGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zListAuditInternalAdminAuditGetQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListAuditInternalAdminAuditGetResponse.parseAsync(data),
+    url: '/internal/admin/audit',
+    ...options
+});
+
+/**
+ * Mark Notified
+ *
+ * Record that the patient was emailed about this action. Only the person who made the action can mark it, only for an action that emails the patient, and never for a row recorded as "demo, not sent" or "no email on file". The flag only goes from false to true (marking twice is fine); nothing else in the audit row can change. Anything else is the same 404 as an unknown id.
+ */
+export const markNotifiedInternalAdminAuditAuditIdNotifiedPost = <ThrowOnError extends boolean = false>(options: Options<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostData, ThrowOnError>): RequestResult<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostErrors, ThrowOnError> => (options.client ?? client).post<MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses, MarkNotifiedInternalAdminAuditAuditIdNotifiedPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse.parseAsync(data),
+    url: '/internal/admin/audit/{audit_id}/notified',
+    ...options
+});
+
+/**
+ * Doctor Running Late
+ *
+ * Tell the doctor's remaining patients of today (booked, not yet marked, not synthetic; at most 50) that the doctor is running late. The API writes the audit row(s) and decides who may be emailed; it sends nothing. Send only the items with `deliver: true` (Idempotency-Key = `audit_id`), then POST `/internal/admin/audit/{audit_id}/notified`. A demo recipient (a reserved example domain) is recorded as "demo, not sent" and never has `deliver: true`. One audit row per patient.
+ */
+export const doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost = <ThrowOnError extends boolean = false>(options: Options<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData, ThrowOnError>): RequestResult<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostErrors, ThrowOnError> => (options.client ?? client).post<DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponses, DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostBody,
+        path: zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostResponse.parseAsync(data),
+    url: '/internal/admin/doctors/{doctor_id}/running-late',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Invites
+ */
+export const listInvitesInternalAdminInvitesGet = <ThrowOnError extends boolean = false>(options?: Options<ListInvitesInternalAdminInvitesGetData, ThrowOnError>): RequestResult<ListInvitesInternalAdminInvitesGetResponses, ListInvitesInternalAdminInvitesGetErrors, ThrowOnError> => (options?.client ?? client).get<ListInvitesInternalAdminInvitesGetResponses, ListInvitesInternalAdminInvitesGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zListInvitesInternalAdminInvitesGetResponse.parseAsync(data),
+    url: '/internal/admin/invites',
+    ...options
+});
+
+/**
+ * Create Invite
+ *
+ * Invite an email as admin (owner only) or viewer; valid 72 hours. The raw `token` is in this response only (for the email link): the API keeps its hash. Re-inviting an email supersedes its open invite. At most 10 a day per person (429 RATE_LIMITED). An audit row (`audit_id`) is written; when `deliver` is true the web app emails the link and then marks that row notified.
+ */
+export const createInviteInternalAdminInvitesPost = <ThrowOnError extends boolean = false>(options: Options<CreateInviteInternalAdminInvitesPostData, ThrowOnError>): RequestResult<CreateInviteInternalAdminInvitesPostResponses, CreateInviteInternalAdminInvitesPostErrors, ThrowOnError> => (options.client ?? client).post<CreateInviteInternalAdminInvitesPostResponses, CreateInviteInternalAdminInvitesPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateInviteInternalAdminInvitesPostBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zCreateInviteInternalAdminInvitesPostResponse.parseAsync(data),
+    url: '/internal/admin/invites',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Accept Invite
+ *
+ * Accept an invite. The caller is whoever the web app signed in with Google; the verified email in the signed assertion must equal the invited email. Every failure (unknown, used, expired, revoked, other email, unverified email) is the same 404 INVITE_INVALID with the same body.
+ */
+export const acceptInviteInternalAdminInvitesAcceptPost = <ThrowOnError extends boolean = false>(options: Options<AcceptInviteInternalAdminInvitesAcceptPostData, ThrowOnError>): RequestResult<AcceptInviteInternalAdminInvitesAcceptPostResponses, AcceptInviteInternalAdminInvitesAcceptPostErrors, ThrowOnError> => (options.client ?? client).post<AcceptInviteInternalAdminInvitesAcceptPostResponses, AcceptInviteInternalAdminInvitesAcceptPostErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zAcceptInviteInternalAdminInvitesAcceptPostBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zAcceptInviteInternalAdminInvitesAcceptPostResponse.parseAsync(data),
+    url: '/internal/admin/invites/accept',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revoke Invite
+ */
+export const revokeInviteInternalAdminInvitesInviteIdDelete = <ThrowOnError extends boolean = false>(options: Options<RevokeInviteInternalAdminInvitesInviteIdDeleteData, ThrowOnError>): RequestResult<RevokeInviteInternalAdminInvitesInviteIdDeleteResponses, RevokeInviteInternalAdminInvitesInviteIdDeleteErrors, ThrowOnError> => (options.client ?? client).delete<RevokeInviteInternalAdminInvitesInviteIdDeleteResponses, RevokeInviteInternalAdminInvitesInviteIdDeleteErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zRevokeInviteInternalAdminInvitesInviteIdDeletePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zRevokeInviteInternalAdminInvitesInviteIdDeleteResponse.parseAsync(data),
+    url: '/internal/admin/invites/{invite_id}',
+    ...options
+});
+
+/**
  * Get Metrics
  *
  * Activity series, totals and per-doctor load for the clinic-local days `[from, to)`. Each event or visit is placed by the zone of its own doctor's clinic. `bucket_start` is clinic-local wall-clock time, not an instant, so with clinics in different zones the series merges the same local day (or hour) of every clinic.
@@ -323,6 +563,101 @@ export const getMetricsInternalAdminMetricsGet = <ThrowOnError extends boolean =
     }).parseAsync(data),
     responseValidator: async (data) => await zGetMetricsInternalAdminMetricsGetResponse.parseAsync(data),
     url: '/internal/admin/metrics',
+    ...options
+});
+
+/**
+ * Cancellation Reasons
+ *
+ * Cancellations in [from, to) grouped by the reason text into transport, illness, travel, work, weather, felt_better, insurance and other. Counts only: no reason text.
+ */
+export const cancellationReasonsInternalAdminOpsCancellationReasonsGet = <ThrowOnError extends boolean = false>(options: Options<CancellationReasonsInternalAdminOpsCancellationReasonsGetData, ThrowOnError>): RequestResult<CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses, CancellationReasonsInternalAdminOpsCancellationReasonsGetErrors, ThrowOnError> => (options.client ?? client).get<CancellationReasonsInternalAdminOpsCancellationReasonsGetResponses, CancellationReasonsInternalAdminOpsCancellationReasonsGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zCancellationReasonsInternalAdminOpsCancellationReasonsGetQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zCancellationReasonsInternalAdminOpsCancellationReasonsGetResponse.parseAsync(data),
+    url: '/internal/admin/ops/cancellation-reasons',
+    ...options
+});
+
+/**
+ * Day Sheet
+ *
+ * The day's appointments as CSV (one row each: doctor, time, status, patient, phone, email, cancellation reason), for `date` (clinic-local) and optionally one doctor. Owner and admin get full details; a viewer gets initials and a masked phone and no email or reason. Cells that would run as a spreadsheet formula are neutralised.
+ */
+export const daySheetInternalAdminOpsDaySheetCsvGet = <ThrowOnError extends boolean = false>(options: Options<DaySheetInternalAdminOpsDaySheetCsvGetData, ThrowOnError>): RequestResult<DaySheetInternalAdminOpsDaySheetCsvGetResponses, DaySheetInternalAdminOpsDaySheetCsvGetErrors, ThrowOnError> => (options.client ?? client).get<DaySheetInternalAdminOpsDaySheetCsvGetResponses, DaySheetInternalAdminOpsDaySheetCsvGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zDaySheetInternalAdminOpsDaySheetCsvGetQuery
+    }).parseAsync(data),
+    url: '/internal/admin/ops/day-sheet.csv',
+    ...options
+});
+
+/**
+ * Gaps
+ *
+ * Free 30-minute slots starting within the next `hours` (default 48), soonest first. Staff may book any of them, including inside the lead-time window.
+ */
+export const gapsInternalAdminOpsGapsGet = <ThrowOnError extends boolean = false>(options?: Options<GapsInternalAdminOpsGapsGetData, ThrowOnError>): RequestResult<GapsInternalAdminOpsGapsGetResponses, GapsInternalAdminOpsGapsGetErrors, ThrowOnError> => (options?.client ?? client).get<GapsInternalAdminOpsGapsGetResponses, GapsInternalAdminOpsGapsGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zGapsInternalAdminOpsGapsGetQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zGapsInternalAdminOpsGapsGetResponse.parseAsync(data),
+    url: '/internal/admin/ops/gaps',
+    ...options
+});
+
+/**
+ * Heatmap
+ *
+ * Booked appointments by weekday (1 = Monday) and local start hour over [from, to), for the clinic or one doctor.
+ */
+export const heatmapInternalAdminOpsHeatmapGet = <ThrowOnError extends boolean = false>(options: Options<HeatmapInternalAdminOpsHeatmapGetData, ThrowOnError>): RequestResult<HeatmapInternalAdminOpsHeatmapGetResponses, HeatmapInternalAdminOpsHeatmapGetErrors, ThrowOnError> => (options.client ?? client).get<HeatmapInternalAdminOpsHeatmapGetResponses, HeatmapInternalAdminOpsHeatmapGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zHeatmapInternalAdminOpsHeatmapGetQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zHeatmapInternalAdminOpsHeatmapGetResponse.parseAsync(data),
+    url: '/internal/admin/ops/heatmap',
+    ...options
+});
+
+/**
+ * Kpis
+ *
+ * Utilisation, fill rate, cancellation rate, no-show rate, median booking lead time and reschedules over the clinic-local days [from, to), each with the previous period of the same length and the difference. A rate is null when its denominator is zero.
+ */
+export const kpisInternalAdminOpsKpisGet = <ThrowOnError extends boolean = false>(options: Options<KpisInternalAdminOpsKpisGetData, ThrowOnError>): RequestResult<KpisInternalAdminOpsKpisGetResponses, KpisInternalAdminOpsKpisGetErrors, ThrowOnError> => (options.client ?? client).get<KpisInternalAdminOpsKpisGetResponses, KpisInternalAdminOpsKpisGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zKpisInternalAdminOpsKpisGetQuery
+    }).parseAsync(data),
+    responseValidator: async (data) => await zKpisInternalAdminOpsKpisGetResponse.parseAsync(data),
+    url: '/internal/admin/ops/kpis',
+    ...options
+});
+
+/**
+ * Today
+ *
+ * Each active doctor's day as a timeline with statuses booked, arrived, no_show and cancelled, the next free gap and a running-behind flag. `date` is a clinic-local day; without it, each doctor's clinic's today. Synthetic patients are left out. A viewer gets initials and a masked phone.
+ */
+export const todayInternalAdminOpsTodayGet = <ThrowOnError extends boolean = false>(options?: Options<TodayInternalAdminOpsTodayGetData, ThrowOnError>): RequestResult<TodayInternalAdminOpsTodayGetResponses, TodayInternalAdminOpsTodayGetErrors, ThrowOnError> => (options?.client ?? client).get<TodayInternalAdminOpsTodayGetResponses, TodayInternalAdminOpsTodayGetErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zTodayInternalAdminOpsTodayGetQuery.optional()
+    }).parseAsync(data),
+    responseValidator: async (data) => await zTodayInternalAdminOpsTodayGetResponse.parseAsync(data),
+    url: '/internal/admin/ops/today',
     ...options
 });
 

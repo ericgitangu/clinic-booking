@@ -149,7 +149,7 @@ test.describe("the API refuses on its own, whatever the app shows", () => {
     expect(res.status).toBe(403);
   });
 
-  test("an admin cannot manage access", async () => {
+  test("an admin can read access but cannot grant it directly", async () => {
     const list = await internal("GET", "/internal/admin/access", as("admin"));
     const grant = await internal(
       "POST",
@@ -160,7 +160,7 @@ test.describe("the API refuses on its own, whatever the app shows", () => {
         role: "admin",
       },
     );
-    expect([list.status, grant.status]).toEqual([403, 403]);
+    expect([list.status, grant.status]).toEqual([200, 403]);
   });
 
   test("a viewer can read the dashboard data", async () => {
