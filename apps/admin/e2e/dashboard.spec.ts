@@ -7,7 +7,7 @@ import { formatLead, shareDelta } from "../src/lib/kpi-delta";
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { expect, seeded, tap, test } from "./support/fixtures";
+import { expect, hydrated, seeded, tap, test } from "./support/fixtures";
 
 interface Metrics {
   totals: {
@@ -280,6 +280,9 @@ test.describe("owner dashboard", () => {
     // point is worked out by Playwright in the same step as the click (force skips only its
     // "would another element take this click" wait, which the overlay always trips), so there is no
     // measure-then-click gap for the page to move in.
+    // The row's link is only a handler once React has attached to it: before that a click does
+    // nothing the test could see, so wait for that (a state of the page, not a pause), then click.
+    await hydrated(row.getByRole("link"));
     await row.locator("td").nth(2).click({ force: true });
     await expect(page.getByTestId("sheet-patient")).toBeVisible();
     // The sheet must be for that row's id, whatever else is on the page.
