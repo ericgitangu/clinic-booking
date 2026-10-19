@@ -175,7 +175,7 @@ test.describe("key number cards", () => {
     );
     // A visit of our own in the last hours, so the list is never empty whatever ran before.
     const own = await bookOneStraightThroughTheApi();
-    moveToPastHalfHour(own, 4, false, true);
+    moveToPastHalfHour(own, 4);
     const page = await as("owner");
     await openDashboard(page);
     await tap(card(page, "Fill rate"));
@@ -331,7 +331,7 @@ test.describe("the Today figures and the free slots", () => {
       "a past half hour falls on yesterday in the first hour of the clinic day",
     );
     const own = await bookOneStraightThroughTheApi();
-    moveToPastHalfHour(own, 6, false, true);
+    moveToPastHalfHour(own, 6);
 
     const today = localDate(new Date());
     const board = await internal<{

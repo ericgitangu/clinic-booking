@@ -84,15 +84,13 @@ function execute(sql: string, id: string): void {
  * Moves a booked visit to a half hour that began in the last few hours, on the first free doctor and
  * slot. `back` (0 to 8) is the preferred number of half hours before the latest one; a value of 3 or
  * less keeps the visit inside the desk window (begun within two hours), and the search then stays
- * inside it. `lastDoctor` is kept for callers that name it and no longer changes anything.
+ * inside it.
  */
 export function moveToPastHalfHour(
   id: string,
   back = 0,
   anyStatus = false,
-  lastDoctor = false,
 ): void {
-  void lastDoctor;
   if (!Number.isInteger(back) || back < 0 || back > 8) {
     throw new Error("back must be 0 to 8");
   }

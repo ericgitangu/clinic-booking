@@ -25,8 +25,8 @@ async function openDashboard(page: Page, size = { width: 1280, height: 900 }) {
 /** A visit of our own in the last hours, on the doctor no other spec books, so it is on the board. */
 async function visitOnTheBoard(back: number): Promise<string> {
   const id = await bookOneStraightThroughTheApi();
-  // Each caller its own half hour (all on the last doctor), inside the desk window of two hours.
-  moveToPastHalfHour(id, back, false, true);
+  // Each caller asks for its own half hour; a free one is found, inside the desk window when back is 3 or less.
+  moveToPastHalfHour(id, back);
   return id;
 }
 

@@ -368,7 +368,7 @@ test.describe("live feed", () => {
       "a past half hour falls on yesterday in the first hour of the clinic day",
     );
     const made = await book(`Live Arrival ${Date.now()}`);
-    moveToPastHalfHour(made.id, 1, false, true);
+    moveToPastHalfHour(made.id, 1);
     const ownerPage = await as("owner");
     await ownerPage.goto(`/dashboard/appointments/${made.id}`);
     await expect(ownerPage.getByTestId("appointment-live")).toHaveAttribute(
