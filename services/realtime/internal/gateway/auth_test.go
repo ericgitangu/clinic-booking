@@ -167,22 +167,50 @@ func TestSmokeIdentity(t *testing.T) {
 
 	api := h.env.NewAPI(t)
 	doctor := api.Doctor()
+	// The smoke's stream is a probe: hello, whatever is behind its cursor, then the gateway closes
+	// it itself. It never waits for a live event, so it never holds an instance after the smoke.
 	s := h.openRaw(target, sign(smokeKey, smoke, assertion.SmokeSub))
 	if s.resp.StatusCode != http.StatusOK {
 		t.Fatalf("smoke refused: %d", s.resp.StatusCode)
 	}
-	if f, _ := s.nextEvent(t, 3*time.Second); f.Event != "hello" || !strings.Contains(f.Data, `"role":"smoke"`) {
-		t.Fatalf("hello = %+v", f)
+	hello, _ := s.nextEvent(t, 3*time.Second)
+	if hello.Event != "hello" || !strings.Contains(hello.Data, `"role":"smoke"`) || hello.ID == "" {
+		t.Fatalf("hello = %+v", hello)
 	}
-	// A real patient's booking is invisible to it; the synthetic patient's is the only event.
+	if f, _ := s.nextEvent(t, 3*time.Second); f.Event != "reconnect" || !strings.Contains(f.Data, `"reason":"probe"`) {
+		t.Fatalf("the smoke stream did not end as a probe: %+v", f)
+	}
+	if f, ok := s.next(t, 3*time.Second); ok {
+		t.Fatalf("the smoke stream stayed open after the probe close: %+v", f)
+	}
+	waitFor(t, 3*time.Second, "the probe's slot to free", func() bool { return h.app.Gateway.Active() == 0 })
+
+	// A real patient's booking is invisible to it; the synthetic patient's is the only event, read
+	// by resuming from the hello cursor.
 	api.Book(doctor)
 	patient, name := api.Patient()
 	testenv.MarkSynthetic(t, h.env, patient)
 	synth := api.BookFor(doctor, patient, name)
-	ev, ok := s.nextEvent(t, 5*time.Second)
-	if !ok || ev.Event != "booked" {
-		t.Fatalf("got %+v", ev)
-	}
+	resume := target + "?cursor=" + hello.ID
+	var ev frame
+	waitFor(t, 5*time.Second, "the synthetic booking behind the cursor", func() bool {
+		r := h.openRaw(resume, headerWith(smokeKey, smoke, resume, func(c map[string]any) { c["sub"] = assertion.SmokeSub }))
+		if r.resp.StatusCode != http.StatusOK {
+			t.Fatalf("smoke resume refused: %d", r.resp.StatusCode)
+		}
+		defer r.close()
+		for {
+			f, ok := r.nextEvent(t, 3*time.Second)
+			if !ok || f.Event == "reconnect" {
+				time.Sleep(200 * time.Millisecond) // not behind the horizon yet: try again shortly
+				return false
+			}
+			if f.Event == "booked" {
+				ev = f
+				return true
+			}
+		}
+	})
 	for _, leak := range []string{name, synth.ID, "patient_name", "appointment_id"} {
 		if strings.Contains(ev.Data, leak) {
 			t.Fatalf("the smoke stream leaked %q: %s", leak, ev.Data)

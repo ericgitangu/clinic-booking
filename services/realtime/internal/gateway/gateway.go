@@ -53,6 +53,11 @@ const (
 	ReasonAccess    = "access_changed"
 	ReasonClient    = "client"
 	ReasonUnencoded = "unsupported_event"
+	// ReasonProbe ends the release smoke's stream right after its catch-up: the smoke reads what
+	// is behind its cursor and leaves. Cloud Run does not tell the instance when a client goes
+	// away (no stream in the production logs has ever closed with reason "client"), so a stream
+	// the smoke merely abandons holds an instance until the idle close, 240 s later.
+	ReasonProbe = "probe"
 )
 
 // Gateway is the HTTP handler and its admission state.
@@ -104,6 +109,11 @@ func (g *Gateway) methodNotAllowed(w http.ResponseWriter, r *http.Request, allow
 }
 
 // admit reserves a slot or says why not. The returned func releases it.
+//
+// Both caps are per instance: byPerson lives in this process, so with two instances one person
+// can hold a stream on each, which is the whole service. The admin app opens one stream per
+// browser (docs/adr/0021, amendment of 2026-10-19), so that now takes two browsers, or a stream
+// Cloud Run never reported closed. The global cap is recorded as debt in docs/adr/0021.
 func (g *Gateway) admit(person string) (release func(), status int, code string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -188,6 +198,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	// 2. Admission, then the database: the role must be the one the database says.
 	release, status, code := g.admit(strings.ToLower(principal.Email))
 	if release == nil {
+		g.log.Info("stream refused", slog.String("reason", "no free slot"), slog.Int("active", g.Active()))
 		g.writeProblem(w, r, status, code, "Live feed busy",
 			"The live feed is serving another viewer. The dashboard keeps updating by polling.",
 			map[string]string{"Retry-After": "30"})
@@ -232,6 +243,8 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cache-Control", "no-cache, no-store, no-transform")
 	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
+	g.log.Info("stream opened", slog.String("role", current), slog.Bool("filtered", appointment != ""),
+		slog.Bool("resumed", from != nil))
 
 	begin := time.Now()
 	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
@@ -397,6 +410,9 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	}
 	if reason, done := poll(); done {
 		return reason
+	}
+	if s.smoke {
+		return s.finish(ReasonProbe)
 	}
 
 	for {

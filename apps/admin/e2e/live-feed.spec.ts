@@ -2,6 +2,8 @@
 // Postgres and the real Go gateway (docker compose, profile "realtime"). A booking is made through
 // the public API, exactly as a patient's would be, and the dashboard in a real browser must show it.
 // Only Google's own sign-in is replaced (support/test-auth.ts).
+import type { Page } from "@playwright/test";
+import { holdSlot, opened } from "./support/gateway";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
 import { expect, seeded, test } from "./support/fixtures";
 
@@ -275,8 +277,8 @@ test.describe("live feed", () => {
     await expect(row).toContainText("Doctor asked to keep the original time");
     await expect(row).toContainText(first.name);
 
-    // The appointment page holds its own stream, filtered to that appointment. Opening it lets go
-    // of the dashboard's (one stream per person).
+    // The appointment page reads the browser's one shared stream and keeps its own appointment's
+    // events. A full page load ends the dashboard's stream and starts the page's.
     const second = await book(`Live Veto Page ${Date.now()}`);
     await patientReschedules(second);
     await page.goto(`/dashboard/appointments/${second.id}`);
@@ -295,5 +297,159 @@ test.describe("live feed", () => {
     // The veto moves the visit back: the history gains that move without a reload.
     await expect(moves).toHaveCount(2, { timeout: 2000 });
     await expect(status).not.toHaveAttribute("data-updated-at", "");
+  });
+});
+
+/** Every request a page makes to the admin app's stream route. */
+function streamRequests(page: Page): string[] {
+  const seen: string[] = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname === "/live/stream") seen.push(r.url());
+  });
+  return seen;
+}
+
+async function appointmentLive(page: Page, id: string) {
+  await page.goto(`/dashboard/appointments/${id}`);
+  await expect(page.getByTestId("appointment-live")).toHaveAttribute(
+    "data-status",
+    "live",
+  );
+}
+
+// One browser, one stream: the tabs elect a leader that holds the only stream and passes its
+// events to the others (src/lib/live-share.ts). Counted where it costs, on the gateway: its own
+// "stream opened" log line in the compose stack.
+test.describe("one stream per browser", () => {
+  test("the dashboard and an appointment page in two tabs hold exactly one upstream stream", async ({
+    as,
+  }) => {
+    const made = await book(`Two Tabs ${Date.now()}`);
+    const since = Date.now();
+    const dash = await as("owner");
+    const dashRequests = streamRequests(dash);
+    await live(dash);
+    const appt = await dash.context().newPage();
+    const apptRequests = streamRequests(appt);
+    await appointmentLive(appt, made.id);
+    await dash.waitForTimeout(3000); // time for a second stream to show, if one were opened
+
+    const streams = opened(since).filter((l) => l.role === "owner");
+    expect(streams).toHaveLength(1);
+    expect(dashRequests.length + apptRequests.length).toBe(1);
+    // ...and the stream is the whole clinic's, not filtered to one appointment.
+    expect(streams[0].filtered).toBe(false);
+    expect(apptRequests.concat(dashRequests)[0]).not.toContain("appointment=");
+  });
+
+  test("an event while both are open reaches both tabs within 2 seconds", async ({
+    as,
+  }) => {
+    const made = await book(`Both Tabs ${Date.now()}`);
+    const dash = await as("owner");
+    await live(dash);
+    const appt = await dash.context().newPage();
+    await appointmentLive(appt, made.id);
+    const moves = appt.getByTestId("lineage-rescheduled");
+    await expect(moves).toHaveCount(0);
+
+    // A new booking: the dashboard's feed shows it.
+    const other = await book(`Both Tabs New ${Date.now()}`);
+    await expect(
+      dash.getByTestId("live-event").filter({ hasText: other.name }),
+    ).toBeVisible({ timeout: 2000 });
+
+    // A change to the open appointment: both tabs show it, from the one stream.
+    await patientReschedules(made);
+    await expect(
+      dash
+        .getByTestId("live-event")
+        .filter({ hasText: made.name })
+        .and(dash.locator('[data-kind="rescheduled"]')),
+    ).toBeVisible({ timeout: 2000 });
+    await expect(moves).toHaveCount(1, { timeout: 2000 });
+    await expect(appt.getByTestId("appointment-live")).not.toHaveAttribute(
+      "data-updated-at",
+      "",
+    );
+  });
+
+  test("closing the leader tab hands the stream over without losing or repeating an event", async ({
+    as,
+  }) => {
+    const made = await book(`Handover ${Date.now()}`);
+    const since = Date.now();
+    // The appointment page opens first, so it leads; the dashboard follows.
+    const leader = await as("owner");
+    await appointmentLive(leader, made.id);
+    const follower = await leader.context().newPage();
+    await live(follower);
+    const before = `Handover Before ${Date.now()}`;
+    await book(before);
+    await expect(
+      follower.getByTestId("live-event").filter({ hasText: before }),
+    ).toBeVisible({ timeout: 2000 });
+
+    // Close the leader, and book at once: these happen while no tab holds a stream.
+    await leader.close();
+    const gap = [
+      `Handover Gap A ${Date.now()}`,
+      `Handover Gap B ${Date.now()}`,
+    ];
+    for (const name of gap) await book(name);
+
+    for (const name of [before, ...gap]) {
+      await expect(
+        follower.getByTestId("live-event").filter({ hasText: name }),
+      ).toHaveCount(1, { timeout: 5000 });
+    }
+    await expect(follower.getByTestId("live-status")).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+    const streams = opened(since).filter((l) => l.role === "owner");
+    expect(streams).toHaveLength(2);
+    // The new leader resumed from the last event the old one passed on.
+    expect(streams[1].resumed).toBe(true);
+  });
+
+  test("when the gateway has no free slot both pages say so, and the data still updates within 30 seconds", async ({
+    as,
+  }) => {
+    test.setTimeout(120_000);
+    const made = await book(`Overflow ${Date.now()}`);
+    const release = await holdSlot(EMAIL.admin, "admin");
+    try {
+      const dash = await as("owner");
+      await dash.goto("/dashboard");
+      const status = dash.getByTestId("live-status");
+      await expect(status).toHaveAttribute("data-status", "busy");
+      await expect(status).toHaveText("Live feed busy, refreshing every 30 s");
+      const appt = await dash.context().newPage();
+      await appt.goto(`/dashboard/appointments/${made.id}`);
+      const apptStatus = appt.getByTestId("appointment-live");
+      await expect(apptStatus).toHaveAttribute("data-status", "busy");
+      await expect(apptStatus).toHaveText(
+        "Live updates busy, refreshing every 30 s",
+      );
+
+      // No stream, but the numbers and the history still move: the 30 s refresh.
+      const upcoming = dash.getByTestId("kpi-upcoming-booked");
+      const was = Number(await upcoming.textContent());
+      await book(`Overflow New ${Date.now()}`);
+      await patientReschedules(made);
+      // At least one more than shown (the cached figure may also predate the booking above).
+      await expect
+        .poll(async () => Number(await upcoming.textContent()), {
+          timeout: 35_000,
+        })
+        .toBeGreaterThan(was);
+      await expect(appt.getByTestId("lineage-rescheduled")).toHaveCount(1, {
+        timeout: 35_000,
+      });
+      await expect(status).toHaveAttribute("data-status", "busy");
+    } finally {
+      await release();
+    }
   });
 });

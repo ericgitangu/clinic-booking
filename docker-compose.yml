@@ -42,6 +42,9 @@ services:
     environment:
       DATABASE_URL: postgres://clinic_realtime:clinic_realtime_local@db:5432/clinic
       INTERNAL_SIGNING_KEY: ${INTERNAL_SIGNING_KEY:-}
+      # Empty unless set: lets scripts/ci/realtime_smoke.py run against this stack as it does
+      # against the tagged revision.
+      SMOKE_SIGNING_KEY: ${SMOKE_SIGNING_KEY:-}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       PORT: "8080"
       # The e2e revokes a person and expects the stream to end; production re-checks every 30 s.
