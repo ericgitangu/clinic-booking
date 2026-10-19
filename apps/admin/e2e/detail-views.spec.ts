@@ -220,7 +220,7 @@ test.describe("a click opens the detail", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("a reason row, an activity day and the Reschedules card each open their figures, and say what cannot be listed", async ({
+  test("a reason row, an activity day and the Reschedules card each list as many changes as the figure says", async ({
     as,
   }) => {
     const r = lastDays(new Date(), 14);
@@ -253,23 +253,21 @@ test.describe("a click opens the detail", () => {
       .sort((a, b) => b.count - a.count)[0];
     test.skip(!top, "no cancellations to group");
     await tap(page.getByTestId("reason-row").first());
-    await expect(page.getByTestId("figure-reason")).toContainText(
-      `${top!.count} of ${reasons.body.total} cancelled`,
-    );
-    await expect(page.getByTestId("figure-gap")).toContainText(
-      "cancellation date",
+    await expect(page.getByTestId("changes-count")).toHaveAttribute(
+      "data-count",
+      String(top!.count),
     );
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("figure-gap")).toHaveCount(0);
+    await expect(page.getByTestId("changes-count")).toHaveCount(0);
 
     // The Reschedules card.
     await tap(page.getByRole("button", { name: /^Reschedules\b/ }));
-    await expect(page.getByTestId("figure-reschedules")).toHaveText(
-      `${kpis.body.reschedules.value ?? 0} now, ${kpis.body.reschedules.previous ?? 0} before.`,
+    await expect(page.getByTestId("changes-count")).toHaveAttribute(
+      "data-count",
+      String(kpis.body.reschedules.value ?? 0),
     );
-    await expect(page.getByTestId("figure-gap")).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("figure-gap")).toHaveCount(0);
+    await expect(page.getByTestId("changes-count")).toHaveCount(0);
 
     // An activity day, from the numbers table: today's own row, as the API's series counts it.
     await page.getByText("Show the numbers as a table").click();
@@ -294,65 +292,10 @@ test.describe("a click opens the detail", () => {
         .getByTestId("activity-day")
         .filter({ hasText: formatBucket(`${today}T00:00:00`) }),
     );
-    await expect(page.getByTestId("figure-activity")).toHaveText(
-      `${p?.booked ?? 0} booked, ${p?.rescheduled ?? 0} rescheduled, ${p?.cancelled ?? 0} cancelled.`,
-    );
-    await expect(page.getByTestId("figure-gap")).toBeVisible();
-  });
-});
-
-test.describe("the changes behind a figure, once the API has the read", () => {
-  // The contract is in src/lib/changes.ts. Until the API answers it, the sheets show the figures and
-  // name the gap (asserted above); once it does, every count must equal the figure it was opened
-  // from, and these assert it. They skip, saying why, only while the endpoint does not exist.
-  async function probe(): Promise<boolean> {
-    const r = lastDays(new Date(), 14);
-    const res = await internal(
-      "GET",
-      `/internal/admin/ops/changes?kind=rescheduled&from=${r.from}&to=${r.to}&limit=1`,
-      owner,
-    );
-    return res.status !== 404;
-  }
-
-  test("Reschedules, a reason and an activity day list as many changes as the figure says", async ({
-    as,
-  }) => {
-    test.skip(
-      !(await probe()),
-      "the API does not have /internal/admin/ops/changes yet (contract in src/lib/changes.ts)",
-    );
-    const r = lastDays(new Date(), 14);
-    const kpis = await internal<{ reschedules: { value: number | null } }>(
-      "GET",
-      `/internal/admin/ops/kpis?from=${r.from}&to=${r.to}`,
-      owner,
-    );
-    const page = await as("owner");
-    await openDashboard(page);
-    await tap(page.getByRole("button", { name: /^Reschedules\b/ }));
+    // The first kind offered is Booked.
     await expect(page.getByTestId("changes-count")).toHaveAttribute(
       "data-count",
-      String(kpis.body.reschedules.value ?? 0),
-    );
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("changes-count")).toHaveCount(0);
-
-    const reasons = await internal<{
-      items: { category: string; count: number }[];
-    }>(
-      "GET",
-      `/internal/admin/ops/cancellation-reasons?from=${r.from}&to=${r.to}`,
-      owner,
-    );
-    const top = reasons.body.items
-      .filter((i) => i.count > 0)
-      .sort((a, b) => b.count - a.count)[0];
-    test.skip(!top, "no cancellations to group");
-    await tap(page.getByTestId("reason-row").first());
-    await expect(page.getByTestId("changes-count")).toHaveAttribute(
-      "data-count",
-      String(top!.count),
+      String(p?.booked ?? 0),
     );
   });
 });
@@ -420,8 +363,8 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.getByTestId("drill-count")).toHaveCount(0);
 
       await tap(page.getByRole("button", { name: /^Reschedules\b/ }));
-      await expect(page.getByTestId("figure-gap")).toBeVisible();
-      await audit("figure sheet");
+      await expect(page.getByTestId("changes-count")).toBeVisible();
+      await audit("changes sheet");
       await page.keyboard.press("Escape");
 
       const gap = page.getByTestId("slots-open");

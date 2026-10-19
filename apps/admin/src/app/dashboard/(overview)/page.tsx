@@ -32,7 +32,6 @@ import {
   shareDelta,
 } from "@/lib/kpi-delta";
 import type { DrillConfig } from "@/lib/drill";
-import { RESCHEDULE_GAP } from "@/lib/figure-gaps";
 import { can } from "@/lib/roles";
 import { requireStaff } from "@/lib/session";
 
@@ -306,13 +305,6 @@ export default async function Dashboard({
                   expected: k.reschedules.value ?? 0,
                 },
               ],
-              gap: RESCHEDULE_GAP,
-              figure: (
-                <p className="tabular-nums" data-testid="figure-reschedules">
-                  {k.reschedules.value ?? 0} now, {k.reschedules.previous ?? 0}{" "}
-                  before.
-                </p>
-              ),
             },
             delta: countDelta(
               k.reschedules.value ?? 0,

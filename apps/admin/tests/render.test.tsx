@@ -46,6 +46,7 @@ const board: Board = {
       appointments: [
         {
           id: "a1",
+          patient_changed: true,
           status: "booked",
           locked: false,
           patient_name: "pat one",
@@ -56,6 +57,7 @@ const board: Board = {
         },
         {
           id: "a2",
+          patient_changed: false,
           status: "arrived",
           locked: false,
           patient_name: "pat two",
@@ -66,6 +68,7 @@ const board: Board = {
         },
         {
           id: "a3",
+          patient_changed: false,
           status: "booked",
           locked: true,
           patient_name: "pat three",
@@ -76,6 +79,7 @@ const board: Board = {
         },
         {
           id: "a4",
+          patient_changed: true,
           status: "cancelled",
           locked: false,
           patient_name: "pat four",
@@ -132,9 +136,10 @@ describe("today board", () => {
     expect(html).toContain("Mark no-show");
     expect(html).toContain("Change to no-show"); // the visit already marked arrived
     expect(html).toContain("Cancel appointment");
-    // The board offers Unlock on a locked visit and no Veto: it cannot tell a patient change is waiting.
+    // Unlock on the locked visit; Veto on the booked one the API says a patient changed (a1), and not
+    // on the cancelled one it also flags (a4): that is two controls in all, one of each.
     expect(html).toContain("Unlock");
-    expect(html).not.toContain("Veto and lock");
+    expect(html.match(/Veto and lock/g)).toHaveLength(1);
     expect(html).toContain("day-sheet");
   });
 

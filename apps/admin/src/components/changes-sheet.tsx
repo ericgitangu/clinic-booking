@@ -33,9 +33,8 @@ const SELECT =
 
 // The visits behind a figure the API gives as a count: moves, cancellations by reason, the activity of
 // a day. The list comes from the changes read (contract in lib/changes.ts) and starts as exactly the
-// number on the card. While that read does not exist, the sheet shows the numbers it has and says
-// plainly what is missing, so the gap is named where a person looks for the list. Same sheet pattern
-// as every other detail view; viewers get the API's projection and no actions.
+// number on the card. Same sheet pattern as every other detail view; viewers get the API's
+// projection and no actions.
 export function ChangesSheet({
   title,
   description,
@@ -44,8 +43,6 @@ export function ChangesSheet({
   options,
   range,
   canAct,
-  figure,
-  gap,
 }: {
   title: string;
   description: string;
@@ -54,9 +51,6 @@ export function ChangesSheet({
   options: readonly ChangeOption[];
   range: { from: string; to: string };
   canAct: boolean;
-  /** The numbers the page already has, shown when the list cannot be. */
-  figure: ReactNode;
-  gap: string;
 }) {
   const [open, setOpen] = useState(false);
   const [which, setWhich] = useState(0);
@@ -176,16 +170,6 @@ export function ChangesSheet({
                   ))}
                 </ul>
               )}
-            </>
-          ) : data.notBuilt ? (
-            <>
-              <div data-testid="figure-numbers">{figure}</div>
-              <p
-                className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground"
-                data-testid="figure-gap"
-              >
-                {gap}
-              </p>
             </>
           ) : (
             <p

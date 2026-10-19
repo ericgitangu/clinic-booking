@@ -10,6 +10,8 @@ import {
   changeAccessRoleInternalAdminAccessEmailPatch,
   acceptInviteInternalAdminInvitesAcceptPost,
   cancellationReasonsInternalAdminOpsCancellationReasonsGet,
+  changesInternalAdminOpsChangesGet,
+  getAppointmentInternalAdminAppointmentsAppointmentIdGet,
   createInviteInternalAdminInvitesPost,
   doctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePost,
   listAuditInternalAdminAuditGet,
@@ -28,7 +30,6 @@ import {
   unlockAppointmentInternalAdminAppointmentsAppointmentIdUnlockPost,
   vetoAppointmentInternalAdminAppointmentsAppointmentIdVetoPost,
   listDoctorsDoctorsGet,
-  getAppointmentAppointmentsAppointmentIdGet,
   getLineageInternalAdminAppointmentsAppointmentIdLineageGet,
   getMetricsInternalAdminMetricsGet,
   getSessionInfoInternalAdminSessionGet,
@@ -40,6 +41,9 @@ import {
 } from "@clinic/api/generated";
 
 export type { Caller } from "@clinic/api/call";
+export type ChangeReason = NonNullable<
+  Parameters<typeof changesInternalAdminOpsChangesGet>[0]["query"]["reason"]
+>;
 
 export const sessionInfo = (caller: Caller) =>
   memo(readKey("sessionInfo", caller, []), () =>
@@ -172,16 +176,6 @@ export const rescheduleForPatient = (
         },
       ),
     { caller },
-  );
-
-export const getAppointment = (id: string) =>
-  memo(readKey("getAppointment", null, [id]), () =>
-    callApi("getAppointment", (client) =>
-      getAppointmentAppointmentsAppointmentIdGet({
-        client,
-        path: { appointment_id: id },
-      }),
-    ),
   );
 
 export const availability = (doctorId: string, date: string) =>
@@ -417,19 +411,39 @@ export const auditList = (
     ),
   );
 
-// The read of changes by the day they were made (see lib/changes.ts for the contract). It is not in
-// the generated client because the API does not have it yet, so it goes through the generic client
-// and is typed by hand. DEBT: replace with the generated function when the contract lands.
+// Changes by the day they were made (bookings, moves, cancellations), the visits behind the figures
+// the dashboard shows as counts.
 export const opsChanges = (
   caller: Caller,
-  query: Record<string, string | number | undefined>,
+  query: {
+    kind: "booked" | "rescheduled" | "cancelled";
+    from: string;
+    to: string;
+    reason?: ChangeReason;
+    doctor_id?: string;
+    limit?: number;
+    cursor?: string;
+  },
 ) =>
-  callApi(
-    "opsChanges",
-    (client) =>
-      client.get<unknown, unknown, false>({
-        url: "/internal/admin/ops/changes",
-        query,
-      }),
-    { caller },
+  memo(readKey("opsChanges", caller, [query]), () =>
+    callApi(
+      "opsChanges",
+      (client) => changesInternalAdminOpsChangesGet({ client, query }),
+      { caller },
+    ),
+  );
+
+// One appointment as an item of the admin list (same projection by role; 404 for an unknown or
+// synthetic one). Replaces finding the row in a day's list of up to 100.
+export const adminAppointment = (caller: Caller, id: string) =>
+  memo(readKey("adminAppointment", caller, [id]), () =>
+    callApi(
+      "adminAppointment",
+      (client) =>
+        getAppointmentInternalAdminAppointmentsAppointmentIdGet({
+          client,
+          path: { appointment_id: id },
+        }),
+      { caller },
+    ),
   );

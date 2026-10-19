@@ -12,6 +12,7 @@ import type {
   TodayBoard,
 } from "@clinic/api/generated";
 import {
+  adminAppointment,
   appointmentsPage,
   lineage,
   metrics,
@@ -23,6 +24,7 @@ import {
   type AppointmentQuery,
 } from "@/lib/api";
 import { addDays, lastDays, localDate } from "@/lib/clinic-time";
+import { can } from "@/lib/roles";
 import { assertMayReadMetrics, metricsCachePlan } from "@/lib/metrics-cache";
 import { callerFor, type Authorised } from "@/lib/session";
 
@@ -125,25 +127,25 @@ export async function loadLineage(
 }
 
 /**
- * Who the patient is and which doctor, for one appointment. The public appointment read carries
- * ids only, so this finds the row in that doctor's list for the day (same admin endpoint the
- * dashboard list uses). Null when it is not found, e.g. more than a day's worth of rows.
+ * One appointment as the admin list shows it, through the single-appointment read (the API
+ * minimises it by role like the list). Null when it does not exist (or is synthetic). `view` says
+ * how to show the name: a viewer's is already initials and is shown as sent. That mapping is the
+ * API's own rule (owner and admin full, everyone else minimised); the data itself is the API's
+ * projection, never re-derived here.
  */
 export async function loadAppointmentRow(
   staff: Authorised,
-  appt: { id: string; doctor_id: string; starts_at: string },
+  id: string,
 ): Promise<(AdminAppointment & { view: "full" | "minimised" }) | null> {
-  const day = localDate(new Date(appt.starts_at));
-  const res = await appointmentsPage(callerFor(staff, staff.role), {
-    status: "all",
-    doctor_id: appt.doctor_id,
-    from: day,
-    to: addDays(day, 1),
-    limit: 100,
-  });
-  if (!res.ok) return null;
-  const found = res.data.items.find((a) => a.id === appt.id);
-  return found ? { ...found, view: res.data.view } : null;
+  const res = await adminAppointment(callerFor(staff, staff.role), id);
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new Error(`appointment failed (${res.status} ${res.code})`);
+  }
+  return {
+    ...res.data,
+    view: can(staff.role, "manage-appointments") ? "full" : "minimised",
+  };
 }
 
 export async function loadAppointmentsRaw(

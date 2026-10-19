@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChangesSheet, type ChangeOption } from "@/components/changes-sheet";
 import { DrillSheet } from "@/components/drill-sheet";
@@ -17,14 +16,12 @@ export interface Kpi {
   href?: string;
   /** The appointments behind the number, opened in a sheet. Its count is the number's count. */
   drill?: DrillConfig;
-  /** For a figure the API gives only as a count: the changes behind it (contract in lib/changes.ts). */
+  /** For a figure the API gives only as a count: the changes behind it (read from the API). */
   changes?: {
     title: string;
     description: string;
     options: readonly ChangeOption[];
     range: { from: string; to: string };
-    figure: ReactNode;
-    gap: string;
   };
   /** Change against the period before; omitted for numbers that are a snapshot of now. */
   delta?: Delta | null;
@@ -111,8 +108,6 @@ export function KpiStrip({
                   options={k.changes.options}
                   range={k.changes.range}
                   canAct={canAct}
-                  figure={k.changes.figure}
-                  gap={k.changes.gap}
                   className={cn(
                     base,
                     "w-full text-left motion-safe:transition-[transform,box-shadow,background-color] hover:bg-card hover:shadow-md motion-safe:active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",

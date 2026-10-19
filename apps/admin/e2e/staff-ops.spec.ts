@@ -364,7 +364,7 @@ test.describe("marking attendance from the appointment page", () => {
     const row = page.getByTestId("today-visit").filter({
       has: page.locator(`a[href$="/dashboard/appointments/${id}"]`),
     });
-    // The board does not offer Veto: only the appointment page knows a patient change is waiting.
+    // The patient changed nothing on this visit, so the board has no Veto to offer.
     await expect(
       row.getByRole("button", { name: "Veto and lock" }),
     ).toHaveCount(0);
@@ -372,6 +372,46 @@ test.describe("marking attendance from the appointment page", () => {
     await expect(
       row.getByRole("button", { name: "Change to arrived" }),
     ).toBeVisible();
+  });
+
+  test("the board offers Veto on a visit the patient moved, and not on one they left alone", async ({
+    as,
+  }) => {
+    test.skip(
+      inFirstHourOfClinicDay(),
+      "a past half hour falls on yesterday in the first hour of the clinic day",
+    );
+    const moved = await bookOneStraightThroughTheApi();
+    const untouched = await bookOneStraightThroughTheApi();
+    const original = await publicApi<Appt>("GET", `/appointments/${moved}`);
+    const day = addDays(original.body.starts_at.slice(0, 10), 1);
+    const avail = await publicApi<{ slots: { starts_at: string }[] }>(
+      "GET",
+      `/doctors/${original.body.doctor_id}/availability?date=${day}`,
+    );
+    const target = avail.body.slots[1];
+    test.skip(!target, "no free time the next day to move to");
+    const done = await publicApi("PATCH", `/appointments/${moved}/reschedule`, {
+      starts_at: target!.starts_at,
+    });
+    expect(done.status).toBe(200);
+    moveToPastHalfHour(moved, 2);
+    moveToPastHalfHour(untouched, 3);
+
+    const page = await as("admin");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/dashboard");
+    const rowOf = (id: string) =>
+      page.getByTestId("today-visit").filter({
+        has: page.locator(`a[href$="/dashboard/appointments/${id}"]`),
+      });
+    await expect(
+      rowOf(moved).getByRole("button", { name: "Veto and lock" }),
+    ).toBeVisible();
+    await expect(rowOf(untouched)).toBeVisible();
+    await expect(
+      rowOf(untouched).getByRole("button", { name: "Veto and lock" }),
+    ).toHaveCount(0);
   });
 
   test("a viewer on the same appointment is offered no mark", async ({

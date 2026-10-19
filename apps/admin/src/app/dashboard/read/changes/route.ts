@@ -13,7 +13,7 @@ export async function GET(request: Request): Promise<Response> {
     reason: q.get("reason") ?? undefined,
   });
   return Response.json(res, {
-    status: res.ok ? 200 : res.notBuilt ? 200 : 400,
+    status: res.ok ? 200 : 400,
     headers: { "cache-control": "no-store" },
   });
 }

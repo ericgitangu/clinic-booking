@@ -3,7 +3,6 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { ChangesSheet } from "@/components/changes-sheet";
 import { addDays } from "@/lib/clinic-time";
-import { ACTIVITY_GAP } from "@/lib/figure-gaps";
 import {
   ChartContainer,
   ChartLegend,
@@ -167,7 +166,6 @@ export function ActivityChart({
                             className="min-h-6 rounded-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
                             title={`Activity on ${r.label}`}
                             description="Bookings, moves and cancellations made that day."
-                            gap={ACTIVITY_GAP}
                             range={{ from: r.day, to: addDays(r.day, 1) }}
                             canAct={canAct}
                             options={[
@@ -189,15 +187,6 @@ export function ActivityChart({
                             ]}
                             trigger={
                               <span data-testid="activity-day">{r.label}</span>
-                            }
-                            figure={
-                              <p
-                                className="tabular-nums"
-                                data-testid="figure-activity"
-                              >
-                                {r.booked} booked, {r.rescheduled} rescheduled,{" "}
-                                {r.cancelled} cancelled.
-                              </p>
                             }
                           />
                         </th>

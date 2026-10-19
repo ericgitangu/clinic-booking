@@ -12,7 +12,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatSlot, localDate } from "@/lib/clinic-time";
 import { loadAppointmentRow, loadLineage } from "@/lib/dashboard-data";
 import { liveKey } from "@/lib/live-key";
-import { getAppointment } from "@/lib/api";
 import { shownName } from "@/lib/shown-name";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
 import { canVeto } from "@/lib/veto";
@@ -33,16 +32,13 @@ export default async function AppointmentPage({
   const { id } = await params;
   if (!UUID.test(id)) notFound();
 
-  const [lineage, current] = await Promise.all([
+  const [lineage, row] = await Promise.all([
     loadLineage(staff, id),
-    getAppointment(id),
+    loadAppointmentRow(staff, id),
   ]);
-  if (!lineage.found || (!current.ok && current.status === 404)) notFound();
-  if (!current.ok) throw new Error(`appointment failed (${current.status})`);
-  const appt = current.data;
-  // Names are not in the public read, so they come from the admin list; without them the page
-  // still shows the visit, by time and status.
-  const row = await loadAppointmentRow(staff, appt);
+  if (!lineage.found || !row) notFound();
+  // One read gives the visit and the names, both as the API shows this role.
+  const appt = row;
   const canStaff = can(staff.role, "manage-appointments");
   const nowMs = Date.now();
   // Cancel and move only before the visit starts; the API refuses anything else.
@@ -51,8 +47,7 @@ export default async function AppointmentPage({
     appt.status === "booked" &&
     isStillToCome(appt.starts_at, nowMs);
   // Arrived or no-show, in the desk window, for a visit that has not been cancelled.
-  const mark =
-    row && appt.status === "booked" ? (row.attendance ?? "booked") : null;
+  const mark = appt.status === "booked" ? (row.attendance ?? "booked") : null;
   const canMark =
     canStaff && mark !== null && inAttendanceWindow(appt.starts_at, nowMs);
 
@@ -69,11 +64,11 @@ export default async function AppointmentPage({
           className="font-heading text-3xl font-semibold tracking-tight"
           data-testid="appointment-patient"
         >
-          {row ? shownName(row.patient_name, row.view) : "Appointment"}
+          {shownName(row.patient_name, row.view)}
         </h1>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-lg">
           <span className="tabular-nums">{formatSlot(appt.starts_at)}</span>
-          <StatusBadge status={appt.status} attendance={row?.attendance} />
+          <StatusBadge status={appt.status} attendance={row.attendance} />
         </p>
         {row && (
           <p className="flex items-center gap-2 text-muted-foreground">

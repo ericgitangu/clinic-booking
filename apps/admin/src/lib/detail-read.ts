@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { AuditEntry, LineageEvent } from "@clinic/api/generated";
-import { auditList, getAppointment } from "@/lib/api";
+import { auditList } from "@/lib/api";
 import { loadAppointmentRow, loadLineage } from "@/lib/dashboard-data";
 import { can } from "@/lib/roles";
 import { authorise, callerFor } from "@/lib/session";
@@ -43,38 +43,34 @@ export async function loadDetail(id: string): Promise<DetailResult> {
   if (!UUID.test(id))
     return { ok: false, message: "That appointment could not be found." };
 
-  const [lineage, current] = await Promise.all([
+  const [lineage, row] = await Promise.all([
     loadLineage(staff, id),
-    getAppointment(id),
+    loadAppointmentRow(staff, id),
   ]);
-  if (!lineage.found || !current.ok)
+  if (!lineage.found || !row)
     return { ok: false, message: "That appointment could not be found." };
-  const appt = current.data;
   const mayAudit = can(staff.role, "manage-appointments");
-  const [row, audit] = await Promise.all([
-    loadAppointmentRow(staff, appt),
-    mayAudit
-      ? auditList(callerFor(staff, staff.role), {
-          appointment_id: id,
-          limit: 25,
-        })
-      : Promise.resolve(null),
-  ]);
+  const audit = mayAudit
+    ? await auditList(callerFor(staff, staff.role), {
+        appointment_id: id,
+        limit: 25,
+      })
+    : null;
   return {
     ok: true,
     detail: {
-      id: appt.id,
-      startsAt: appt.starts_at,
-      endsAt: appt.ends_at,
-      status: appt.status,
-      doctorId: appt.doctor_id,
-      doctorName: row?.doctor_name ?? null,
-      patientName: row?.patient_name ?? null,
-      view: row?.view ?? "minimised",
-      attendance: row?.attendance ?? null,
-      locked: row?.staff_locked ?? false,
-      // From the admin row (minimised by role), never the public read, which carries it in full.
-      cancellationReason: row?.cancellation_reason ?? null,
+      id: row.id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      status: row.status,
+      doctorId: row.doctor_id,
+      doctorName: row.doctor_name,
+      patientName: row.patient_name,
+      view: row.view,
+      attendance: row.attendance ?? null,
+      locked: row.staff_locked,
+      // The admin row is minimised by role: a viewer gets no reason text.
+      cancellationReason: row.cancellation_reason ?? null,
       events: lineage.events,
       audit: audit && audit.ok ? audit.data.items : null,
       nowMs: Date.now(),

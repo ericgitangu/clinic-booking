@@ -233,13 +233,19 @@ export function TodayBoard({
                                   today={date}
                                 />
                               )}
-                              {/* Only Unlock here: whether a patient change is waiting to be undone is
-                                  known on the appointment page, not in the board's data. */}
-                              {a.locked && (
+                              {/* Unlock on a locked visit; Veto where the API says a patient change
+                                  is waiting to be undone (a cancelled visit has nothing to put back). */}
+                              {(a.locked ||
+                                (a.patient_changed &&
+                                  a.status !== "cancelled")) && (
                                 <StaffControls
                                   appointmentId={a.id}
-                                  locked
-                                  canVeto={false}
+                                  locked={a.locked}
+                                  canVeto={
+                                    a.patient_changed &&
+                                    !a.locked &&
+                                    a.status !== "cancelled"
+                                  }
                                   compact
                                 />
                               )}

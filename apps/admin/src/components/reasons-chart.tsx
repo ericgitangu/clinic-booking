@@ -6,7 +6,6 @@ import {
   CardTitle,
 } from "@clinic/ui/components/ui/card";
 import { ChangesSheet } from "@/components/changes-sheet";
-import { REASON_GAP } from "@/lib/figure-gaps";
 import type { ReasonBreakdown } from "@clinic/api/generated";
 
 const LABEL: Record<ReasonBreakdown["items"][number]["category"], string> = {
@@ -64,7 +63,6 @@ export function ReasonsChart({
                   className="block w-full rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   title={`${LABEL[r.category]}: ${r.count} of ${data.total}`}
                   description={`Cancellations grouped under this reason, last ${days} days.`}
-                  gap={REASON_GAP}
                   range={range}
                   canAct={canAct}
                   options={[
@@ -93,13 +91,6 @@ export function ReasonsChart({
                         />
                       </div>
                     </span>
-                  }
-                  figure={
-                    <p className="tabular-nums" data-testid="figure-reason">
-                      {r.count} of {data.total} cancelled (
-                      {Math.round(r.share * 100)}%) were put under{" "}
-                      {LABEL[r.category].toLowerCase()}.
-                    </p>
                   }
                 />
               </li>
