@@ -4,7 +4,8 @@
 // the database, because nothing public can book it there.
 import { execFileSync } from "node:child_process";
 import { bookOneStraightThroughTheApi } from "./support/booking";
-import { OWNER, internal } from "./support/stack";
+import { formatTime } from "../src/lib/clinic-time";
+import { OWNER, internal, publicApi } from "./support/stack";
 import { expect, test } from "./support/fixtures";
 
 function moveTo(id: string, minutesAhead: number) {
@@ -30,7 +31,8 @@ function moveTo(id: string, minutesAhead: number) {
       // A rerun on the same database finds an earlier run's visit in that slot: free it first.
       `UPDATE appointments SET status = 'cancelled', cancelled_at = now(),
            cancellation_reason = 'e2e: slot reused'
-         WHERE starts_at = ${slot} AND status = 'booked' AND id <> '${id}';
+         WHERE starts_at = ${slot} AND status = 'booked' AND id <> '${id}'
+           AND doctor_id = (SELECT doctor_id FROM appointments WHERE id = '${id}');
        UPDATE appointments SET starts_at = ${slot}, ends_at = ${slot} + interval '30 minutes'
          WHERE id = '${id}' AND status = 'booked'`,
     ],
@@ -90,4 +92,50 @@ test("a dialog open when the visit comes within the hour closes and a toast says
   await expect(
     page.getByRole("button", { name: "Cancel appointment" }),
   ).toBeDisabled();
+});
+
+test("the times offered for moving a visit are only that visit's doctor's free times", async ({
+  as,
+}) => {
+  const id = await bookOneStraightThroughTheApi();
+  const appt = await publicApi<{ doctor_id: string; starts_at: string }>(
+    "GET",
+    `/appointments/${id}`,
+  );
+  const doctorId = appt.body.doctor_id;
+  // A day with free times for this doctor, a few days after the booking.
+  let day = "";
+  let own: string[] = [];
+  for (let ahead = 5; ahead < 40 && own.length === 0; ahead++) {
+    day = new Date(Date.parse(appt.body.starts_at) + ahead * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const avail = await publicApi<{ slots: { starts_at: string }[] }>(
+      "GET",
+      `/doctors/${doctorId}/availability?date=${day}`,
+    );
+    own = avail.body.slots.map((x) => formatTime(x.starts_at));
+  }
+  expect(own.length).toBeGreaterThan(0);
+  // Another doctor's free times that day, to be sure the list is not just "all times".
+  const doctors = await publicApi<{ items: { id: string }[] }>("GET", "/doctors");
+  const others: string[] = [];
+  for (const d of doctors.body.items.filter((x) => x.id !== doctorId)) {
+    const a = await publicApi<{ slots: { starts_at: string }[] }>(
+      "GET",
+      `/doctors/${d.id}/availability?date=${day}`,
+    );
+    others.push(a.body.slots.map((x) => formatTime(x.starts_at)).join(","));
+  }
+
+  const page = await as("owner");
+  await page.goto(`/dashboard/appointments/${id}`);
+  await page.getByRole("button", { name: "Reschedule" }).click();
+  await page.getByLabel("Day").fill(day);
+  const trigger = page.locator("#move-slot");
+  await expect(trigger).toBeEnabled();
+  await trigger.click();
+  const shown = await page.getByRole("option").allTextContents();
+  expect(shown).toEqual(own);
+  expect(others.some((o) => o !== own.join(","))).toBe(true); // the check can tell doctors apart
 });

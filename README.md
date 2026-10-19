@@ -278,7 +278,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
   - book: `422 BOOKING_TOO_SOON` under 60 minutes ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/create_appointment_appointments_post));
   - cancel: `409 CHANGE_TOO_LATE` when the appointment starts in under 60 minutes ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/cancel_appointment_appointments__appointment_id__cancel_patch));
   - reschedule: `409 CHANGE_TOO_LATE` when the current start is under 60 minutes away, `422 BOOKING_TOO_SOON` when the new start is ([Swagger](https://clinic.ericgitangu.com/docs#/appointments/reschedule_appointment_appointments__appointment_id__reschedule_patch));
-  - staff follow the same rule, with no override.
+  - staff follow the same rule for now, with no override; the exemption decided in [ADR-0033](docs/adr/0033-staff-crud-veto-and-invites.md) lands with the staff-write work.
 - **Cancelling or rescheduling an appointment that has started** is `409 APPOINTMENT_ALREADY_STARTED` ([ADR-0008](docs/adr/0008-appointment-lifecycle-and-reschedule.md)).
 - **Which timezone is "a day".** The clinic's, stored as data ([ADR-0005](docs/adr/0005-time-and-timezone-model.md)).
 - **Who may cancel.** Through the public API, anyone with the id (the brief has no auth). In the web apps, only the signed-in patient who owns it, or staff ([ADR-0012](docs/adr/0012-identity-and-abuse-controls-deferred.md), [ADR-0029](docs/adr/0029-booking-flow.md)).

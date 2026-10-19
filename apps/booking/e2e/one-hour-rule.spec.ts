@@ -4,7 +4,7 @@ import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // A visit that starts in less than an hour cannot be cancelled or moved. The API refuses it (the
-// backend tests cover 59, 60 and 61 minutes); here the screen hides the actions and says why, and
+// backend tests cover 59, 60 and 61 minutes); here the screen disables the actions and says why, and
 // a request that slips through still gets plain words. The appointment is booked through the UI
 // for a far-off time, then moved into the window in the database, as nothing public can book it.
 
@@ -191,5 +191,52 @@ test("a cancel dialog left open when the visit comes within the hour closes and 
     "This visit now starts in less than an hour, so it can no longer be cancelled or moved.",
   );
   await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await context.close();
+});
+
+async function moveById(id: string, minutesAhead: number) {
+  await withDb(async (db) => {
+    const slot = `date_trunc('hour', now() + make_interval(mins => $2))
+        + CASE WHEN extract(minute FROM now() + make_interval(mins => $2)) >= 30
+               THEN interval '30 minutes' ELSE interval '0' END`;
+    // Free the slot if an earlier run left one of this doctor's visits in it.
+    await db.query(
+      `UPDATE appointments
+          SET status = 'cancelled', cancelled_at = now(), cancellation_reason = 'e2e: slot reused'
+        WHERE starts_at = ${slot} AND status = 'booked' AND id <> $1
+          AND doctor_id = (SELECT doctor_id FROM appointments WHERE id = $1)`,
+      [id, minutesAhead],
+    );
+    await db.query(
+      `UPDATE appointments
+          SET starts_at = ${slot}, ends_at = ${slot} + interval '30 minutes'
+        WHERE id = $1 AND status = 'booked'`,
+      [id, minutesAhead],
+    );
+  });
+}
+
+test("a reschedule page left open across the boundary draws itself again and says why", async ({
+  browser,
+}) => {
+  const { context, page, startsAt, doctorId } = await bookedPerson(browser, 0, 3);
+  await moveTo(startsAt, doctorId, 100); // 70 to 100 minutes away when the page is drawn
+  await page.clock.install({ time: new Date() });
+  await page.goto("/appointments");
+  const href = await page
+    .getByRole("link", { name: "Reschedule" })
+    .getAttribute("href");
+  const id = href!.split("/")[2];
+  await page.goto(href!);
+  await expect(page.getByRole("heading", { name: "Reschedule" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move appointment" })).toBeVisible();
+  // The visit is brought forward in the database (the server will now see it inside the hour) and
+  // 45 minutes pass in the browser: the page's own check notices and asks for a fresh render.
+  await moveById(id, 30);
+  await page.clock.fastForward(45 * 60_000);
+  await expect(
+    page.getByText(/less than an hour.*call the clinic/i).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move appointment" })).toHaveCount(0);
   await context.close();
 });

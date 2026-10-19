@@ -55,3 +55,5 @@ Decided by the engineer on 2026-10-18. The brief's bonus is "prevention of booki
 - **Both apps** disable cancel and reschedule inside the window, with a visible explanation tied to the disabled controls (`aria-describedby`).
 
 **Note (2026-10-19): the staff exemption.** Staff are held to the one-hour rule today, with no override, because [ADR-0030](0030-staff-roles-and-access.md) gives staff the public booking rules. [ADR-0033](0033-staff-crud-veto-and-invites.md) decides that staff are exempt from the lead-time rules; that exemption is not built yet and lands with the staff-write work, so until then staff follow the rule.
+
+**Correction (2026-10-19): what happens to a visit inside the hour.** The trade-off above says the slot is "lost for that day" and that the clinic can do nothing through the app. To be exact: the visit stays booked and keeps holding its slot, so nobody else is offered it; the app offers no way to cancel or move it inside the hour, for patients or for staff, until the staff exemption in ADR-0033 lands. Changing such a visit is done by the patient and the clinic outside the app (a phone call), which is what the patient copy says.

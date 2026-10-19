@@ -1,4 +1,5 @@
 import { AUTH_BASE_PATH } from "@/lib/auth-config";
+import { isTestRun } from "@/lib/test-run";
 
 export interface AuthSecrets {
   baseURL: string;
@@ -20,26 +21,12 @@ type Env = Record<string, string | undefined>;
 //
 // Test runs: the browser tests run many workers from ONE address, and every page load asks for the
 // session, so the suite itself could pass 100 reads in 10 seconds and the session menu then got
-// 429. Only when the app was started for tests (E2E=1 or NODE_ENV=test) AND is served from this
-// machine (a localhost base URL) is the ceiling lifted; never when VERCEL_ENV is production or the
-// base URL is anything but local.
-export function isLocalUrl(url: string | undefined): boolean {
-  try {
-    const host = new URL(url ?? "").hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost");
-  } catch {
-    return false;
-  }
-}
-
+// 429. The ceiling is lifted only for a test run (see lib/test-run.ts: not Vercel production,
+// E2E=1 or NODE_ENV=test, and a local base URL).
 export function rateLimitFor(env: Env) {
-  const testRun =
-    env.VERCEL_ENV !== "production" &&
-    (env.NODE_ENV === "test" || env.E2E === "1") &&
-    isLocalUrl(env.BETTER_AUTH_URL);
   return {
     window: 10,
-    max: testRun ? 100_000 : 100,
+    max: isTestRun(env) ? 100_000 : 100,
     storage: "memory" as const,
   };
 }

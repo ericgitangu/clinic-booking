@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isLocalUrl, rateLimitFor } from "@/lib/auth-options";
+import { rateLimitFor } from "@/lib/auth-options";
+import { isLocalUrl } from "@/lib/test-run";
 
 const LOCAL = "http://localhost:3100";
 const PROD = "https://clinic.ericgitangu.com";

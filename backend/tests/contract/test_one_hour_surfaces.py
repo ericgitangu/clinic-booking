@@ -53,7 +53,6 @@ NEW_SLOT = re.compile(
     re.IGNORECASE,
 )
 TOO_SOON = re.compile(r"\b422\b|BOOKING_TOO_SOON")
-SAFE = re.compile(r"same new start|returns the appointment|already happened", re.IGNORECASE)
 BANNED = (
     "422 on book, 409 on change",
     "a reschedule is a change, so its new time",
@@ -101,6 +100,21 @@ _LITERAL = re.compile(
 _COMMENT = re.compile(r"(?m)^\s*(?://|#|\*|/\*)\s?(.*)$")
 
 
+def _trailing_comment(line: str) -> str | None:
+    """The comment after code on the same line (``code, // comment`` or ``code  # comment``),
+    found outside string literals."""
+    quote = ""
+    for i, ch in enumerate(line):
+        if quote:
+            if ch == quote and line[i - 1] != "\\":
+                quote = ""
+        elif ch in "\"'`":
+            quote = ch
+        elif line.startswith("//", i) or ch == "#" or line.startswith("/*", i):
+            return line[i:].lstrip("/#* ").rstrip("*/ ").strip() or None
+    return None
+
+
 def _code_segments(text: str) -> list[str]:
     """For source files, each string literal and each comment line is a segment of its own, so a
     wrong sentence cannot hide next to a correct one in the same block, array or template."""
@@ -112,6 +126,11 @@ def _code_segments(text: str) -> list[str]:
         parts.extend(re.split(r"(?<=[.;])\s+(?=[A-Z`*(])", body))
     for line in _COMMENT.findall(text):
         parts.append(line)
+    for line in text.splitlines():
+        trailing = _trailing_comment(line)
+        if trailing:
+            parts.append(trailing)
+            parts.extend(re.split(r"(?<=[.;])\s+(?=\S)", trailing))
     return parts
 
 
@@ -143,7 +162,6 @@ def _paraphrase(segment: str) -> bool:
         and CONFLICT.search(segment)
         and NEW_SLOT.search(segment)
         and not TOO_SOON.search(segment)
-        and not SAFE.search(segment)
     )
 
 
@@ -267,6 +285,12 @@ def _plant_mid_block(name: str, text: str) -> list[str]:
         shapes = [WRONG]
     else:
         shapes = [WRONG]
+    if name.endswith(CODE_SUFFIXES):
+        marker = "#" if name.endswith(".py") else "//"
+        # The wrong sentence as a trailing comment on a line that itself names BOOKING_TOO_SOON.
+        trailing = list(lines)
+        trailing[at] = f"{trailing[at]} {marker} {WRONG}"
+        variants.append("\n".join(trailing))
     for shape in shapes:
         for offset in (0, 1):
             planted = lines[: at + offset] + [shape] + lines[at + offset :]
@@ -286,3 +310,16 @@ def test_a_wrong_sentence_planted_mid_block_is_caught_in_every_surface() -> None
             continue  # the JSON surfaces are flattened to their strings; covered by the EOF plant
         for variant in _plant_mid_block(name, text):
             assert violations([(name, variant)]), (name, variant[:0])
+
+
+def test_no_waiver_lets_a_wrong_sentence_through() -> None:
+    """A wrong sentence is caught whatever else it says (the old waiver let 'already happened'
+    through), and the scanner has no allow-list at all."""
+    readme = (ROOT / "README.md").read_text()
+    for tail in (
+        f"{WRONG[:-1]}, even if it already happened.",
+        f"{WRONG[:-1]}, and the appointment is returned.",
+        f"{WRONG[:-1]} (same new start).",
+    ):
+        assert violations([("README.md", f"{readme}\n\n{tail}\n")]), tail
+    assert not any(name.upper().startswith(("SAFE", "WAIVER", "ALLOW")) for name in globals())
