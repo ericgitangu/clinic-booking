@@ -1,4 +1,3 @@
-import { StaffBar } from "@/components/staff-bar";
 import { getStaff } from "@/lib/session";
 
 // Shown with a real 403 status whenever a page calls forbidden().
@@ -15,16 +14,6 @@ export default async function Forbidden() {
           : "This account has not been given access to the clinic dashboard."}{" "}
         Ask the clinic owner to add or update your access, then reload.
       </p>
-      {staff && (
-        <div className="mt-6">
-          <StaffBar
-            name={staff.name}
-            email={staff.email}
-            image={staff.image}
-            role={staff.role}
-          />
-        </div>
-      )}
     </section>
   );
 }

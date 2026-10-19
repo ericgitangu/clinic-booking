@@ -5,7 +5,8 @@
 import type { Page } from "@playwright/test";
 import { holdSlot, opened } from "./support/gateway";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { expect, seeded, test } from "./support/fixtures";
+import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import { expect, seeded, signIn, tap, test } from "./support/fixtures";
 
 interface Slot {
   starts_at: string;
@@ -297,6 +298,105 @@ test.describe("live feed", () => {
     // The veto moves the visit back: the history gains that move without a reload.
     await expect(moves).toHaveCount(2, { timeout: 2000 });
     await expect(status).not.toHaveAttribute("data-updated-at", "");
+  });
+
+  test("a row in the live feed opens its appointment", async ({ as }) => {
+    const page = await as("owner");
+    await live(page);
+    const name = `Live Row ${Date.now()}`;
+    const made = await book(name);
+    const row = page.getByTestId("live-event").filter({ hasText: name });
+    await expect(row).toBeVisible({ timeout: 2000 });
+    await row.getByRole("link").click();
+    await expect(page.getByTestId("sheet-patient")).toHaveText(name);
+    await page.getByRole("link", { name: "Open the full page" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard/appointments/${made.id}$`),
+    );
+    await expect(page.getByTestId("appointment-patient")).toHaveText(name);
+  });
+
+  test("a veto made from the appointment page shows on another person's open page within 2 seconds", async ({
+    as,
+    browser,
+  }) => {
+    // Setting up (booking through the API, two browsers, the page loads) is slow on a cold app; the
+    // 2 second assertions below are the ones that measure the feed.
+    test.setTimeout(60_000);
+    const made = await book(`Live Veto UI ${Date.now()}`);
+    await patientReschedules(made);
+    const ownerPage = await as("owner");
+    await ownerPage.goto(`/dashboard/appointments/${made.id}`);
+    await expect(ownerPage.getByTestId("appointment-live")).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+    await expect(ownerPage.getByTestId("lineage-rescheduled")).toHaveCount(1);
+
+    const ctx = await browser.newContext();
+    // The local gateway serves one stream at a time and the owner's page holds it, so the admin's
+    // page (which only does the action) must not open one of its own and compete for the slot.
+    await ctx.route("**/live/stream**", (route) => route.abort());
+    await signIn(ctx, EMAIL.admin);
+    const adminPage = await ctx.newPage();
+    await adminPage.goto(`/dashboard/appointments/${made.id}`);
+    await tap(adminPage.getByRole("button", { name: "Veto and lock" }));
+    const dialog = adminPage.getByRole("dialog", {
+      name: "Undo the patient's last change?",
+    });
+    await dialog.getByLabel("Reason").fill("Doctor needs the original time");
+    await dialog.getByRole("button", { name: "Veto and lock" }).click();
+    await expect(adminPage.getByTestId("locked-note")).toBeVisible();
+
+    // The owner's page, which never reloaded, gains the move back and the lock.
+    await expect(ownerPage.getByTestId("lineage-rescheduled")).toHaveCount(2, {
+      timeout: 2000,
+    });
+    await expect(ownerPage.getByTestId("locked-note")).toBeVisible({
+      timeout: 2000,
+    });
+    await ctx.close();
+  });
+
+  test("an arrival marked on the appointment page shows on another person's open page within 2 seconds", async ({
+    as,
+    browser,
+  }) => {
+    // Setting up (booking through the API, two browsers, the page loads) is slow on a cold app; the
+    // 2 second assertions below are the ones that measure the feed.
+    test.setTimeout(60_000);
+    test.skip(
+      inFirstHourOfClinicDay(),
+      "a past half hour falls on yesterday in the first hour of the clinic day",
+    );
+    const made = await book(`Live Arrival ${Date.now()}`);
+    moveToPastHalfHour(made.id, 1);
+    const ownerPage = await as("owner");
+    await ownerPage.goto(`/dashboard/appointments/${made.id}`);
+    await expect(ownerPage.getByTestId("appointment-live")).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+    const badge = ownerPage.locator('main [data-slot="badge"]');
+    await expect(badge).toHaveText(/Booked/);
+
+    const ctx = await browser.newContext();
+    // The local gateway serves one stream at a time and the owner's page holds it, so the admin's
+    // page (which only does the action) must not open one of its own and compete for the slot.
+    await ctx.route("**/live/stream**", (route) => route.abort());
+    await signIn(ctx, EMAIL.admin);
+    const adminPage = await ctx.newPage();
+    await adminPage.goto(`/dashboard/appointments/${made.id}`);
+    await tap(adminPage.getByRole("button", { name: "Mark arrived" }));
+    {
+      const ask = adminPage.getByRole("dialog", { name: "Mark as arrived?" });
+      await ask.getByLabel("Reason").fill("patient is at the desk");
+      await ask.getByRole("button", { name: "Mark arrived" }).click();
+    }
+    await expect(adminPage.getByText("Marked arrived.")).toBeVisible();
+
+    await expect(badge).toHaveText(/Arrived/, { timeout: 2000 });
+    await ctx.close();
   });
 });
 

@@ -37,3 +37,11 @@ describe("clinic time", () => {
     expect(formatBucket("2026-10-20T00:00:00")).toBe("20 Oct");
   });
 });
+
+describe("humanDate", () => {
+  it("writes a clinic date the way a person says it", async () => {
+    const { humanDate } = await import("@/lib/clinic-time");
+    expect(humanDate("2026-10-20")).toBe("Tuesday 20 October 2026");
+    expect(humanDate("2026-12-31")).toBe("Thursday 31 December 2026");
+  });
+});

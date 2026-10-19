@@ -27,20 +27,41 @@ export default defineConfig({
       name: "independent",
       testIgnore: [
         "**/dashboard.spec.ts",
+        "**/staff-ops.spec.ts",
+        "**/drill-down.spec.ts",
+        "**/detail-views.spec.ts",
         "**/metrics-cache.spec.ts",
         "**/one-hour-rule.spec.ts",
         "**/live-feed.spec.ts",
       ],
     },
+    // Each of these books, cancels, marks or moves visits, or reads the clinic-wide figures they
+    // change, so no two may run side by side: one project each, in a chain. (Two files of one
+    // project do run side by side when there is more than one worker.)
     {
       name: "dashboard",
       testMatch: "**/dashboard.spec.ts",
       dependencies: ["independent"],
     },
     {
+      name: "staff-ops",
+      testMatch: "**/staff-ops.spec.ts",
+      dependencies: ["dashboard"],
+    },
+    {
+      name: "drill-down",
+      testMatch: "**/drill-down.spec.ts",
+      dependencies: ["staff-ops"],
+    },
+    {
+      name: "detail-views",
+      testMatch: "**/detail-views.spec.ts",
+      dependencies: ["drill-down"],
+    },
+    {
       name: "metrics-cache",
       testMatch: "**/metrics-cache.spec.ts",
-      dependencies: ["dashboard"],
+      dependencies: ["detail-views"],
     },
     {
       // Books a visit and leaves it, which changes the clinic-wide numbers. Its own project, after

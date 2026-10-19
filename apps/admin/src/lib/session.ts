@@ -45,7 +45,8 @@ async function identity(): Promise<Identity | null> {
 }
 
 export function callerFor(who: Identity, role: Role | "none"): Caller {
-  // identity() has already refused an unverified email; the API now insists on the claim.
+  // The identity is only built from a session whose email Google verified (see identity()), so the
+  // assertion says so; the invitation and patient routes refuse a caller that is not verified.
   return { sub: who.sub, email: who.email, role, emailVerified: true };
 }
 

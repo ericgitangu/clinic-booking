@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
 import robots from "@/app/robots";
 import { metadata, viewport } from "@/lib/metadata";
+import nextConfig from "../next.config";
 import { SITE, THEME_COLORS } from "@/lib/site";
 
 describe("admin branding and metadata", () => {
@@ -41,5 +42,11 @@ describe("admin branding and metadata", () => {
       short_name: SITE.shortName,
     });
     expect(m.icons?.map((i) => i.sizes)).toEqual(["192x192", "512x512"]);
+  });
+
+  it("names the app's own host for server actions, the same host as SITE.url", () => {
+    expect(nextConfig.experimental?.serverActions?.allowedOrigins).toEqual([
+      new URL(SITE.url).host,
+    ]);
   });
 });

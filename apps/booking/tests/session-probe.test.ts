@@ -13,7 +13,10 @@ describe("hasSession", () => {
     await expect(hasSession()).resolves.toBe(true);
     expect(fetch).toHaveBeenCalledWith(
       "/auth/get-session",
-      expect.objectContaining({ cache: "no-store", credentials: "same-origin" }),
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+      }),
     );
   });
 
