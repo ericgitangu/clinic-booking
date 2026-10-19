@@ -13,7 +13,12 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { acceptPolled, applyEvent, withTaken } from "@/lib/live-availability";
+import {
+  acceptPolled,
+  applyEvent,
+  reapplyTaken,
+  withTaken,
+} from "@/lib/live-availability";
 import {
   IDLE_MS,
   LIVE_POLL_MS,
@@ -77,6 +82,10 @@ export function useLiveAvailability(initial: Availability) {
   const lastMint = useRef(0);
   const idleRef = useRef(false);
   const lastSeq = useRef<string | null>(null);
+  // Times a pushed event took, with the event's sequence: kept off polled responses older than it.
+  const takenByEvent = useRef<{ startsAt: string; seq: string }[]>([]);
+  // Polled responses dropped as older than the one on screen (shown as data-dropped for traces).
+  const [dropped, setDropped] = useState(0);
   const streamRef = useRef<StreamState>("polling");
   // Refreshes that failed in a row; reset by the first success. Read by refetchInterval.
   const failures = useRef(0);
@@ -100,11 +109,17 @@ export function useLiveAvailability(initial: Availability) {
     },
     // RULE 1, and referential stability: an unchanged response keeps the same object, so nothing
     // that reads it renders again.
-    structuralSharing: (old, next) =>
-      replaceEqualDeep(
+    structuralSharing: (old, next) => {
+      const before = old as Availability | undefined;
+      const incoming = next as Availability;
+      const accepted = acceptPolled(before, incoming);
+      if (before && accepted === before && incoming !== before)
+        queueMicrotask(() => setDropped((n) => n + 1));
+      return replaceEqualDeep(
         old,
-        acceptPolled(old as Availability | undefined, next as Availability),
-      ),
+        reapplyTaken(accepted, takenByEvent.current),
+      );
+    },
     initialData: initial,
     staleTime: POLL_MS,
     // A failed poll is not retried inside the fetch (that would double the rate, and a 429 must not
@@ -169,11 +184,18 @@ export function useLiveAvailability(initial: Availability) {
       const r = applyEvent(cur, lastSeq.current, ev);
       lastSeq.current = r.lastSeq;
       if (r.effect === "taken") {
+        takenByEvent.current = [
+          ...takenByEvent.current.filter((t) => t.startsAt !== ev.starts_at),
+          { startsAt: ev.starts_at, seq: ev.seq },
+        ];
         qc.setQueryData<Availability>(key, r.data);
         setJustTaken((j) =>
           j.includes(ev.starts_at) ? j : [...j, ev.starts_at],
         );
       } else if (r.effect === "freed") {
+        takenByEvent.current = takenByEvent.current.filter(
+          (t) => t.startsAt !== ev.starts_at,
+        );
         refetchOnce(); // whether the time can be offered again is the server's call
       }
     },
@@ -231,6 +253,7 @@ export function useLiveAvailability(initial: Availability) {
     idle,
     armed,
     stream,
+    dropped,
     // The last refresh failed: the list on screen may be out of date.
     failing: query.isError,
     resume,

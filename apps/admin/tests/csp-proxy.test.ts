@@ -21,7 +21,7 @@ describe("proxy with sign-in configured", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it.each(["/", "/dashboard", "/access", "/dashboard/appointments/x"])(
+  it.each(["/", "/dashboard", "/access", "/dashboard/appointments/x", "/nope"])(
     "gives %s its own nonce, passed on to the page",
     (path) => {
       const a = proxy(req(path));
@@ -45,7 +45,7 @@ describe("proxy with sign-in configured", () => {
     "/live/stream",
     "/robots.txt",
     "/_next/static/x.js",
-  ])("leaves %s alone: no nonce (the 404 page and non-pages)", (path) => {
+  ])("leaves %s alone: no nonce (it answers no page)", (path) => {
     expect(proxy(req(path)).headers.get("content-security-policy")).toBeNull();
   });
 });

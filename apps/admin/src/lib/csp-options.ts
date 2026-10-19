@@ -1,6 +1,5 @@
 // What the staff app talks to, for the Content-Security-Policy (builder: packages/ui/src/lib/csp.ts).
-// Read by next.config.ts and proxy.ts. Relative import on purpose: next.config.ts is loaded before the
-// workspace aliases exist.
+// Read by proxy.ts. Relative import on purpose: it is also read where the workspace aliases do not exist.
 import type { CspOptions } from "../../../../packages/ui/src/lib/csp";
 
 // The staff app talks only to itself (its live feed arrives through its own /live/stream route). The
@@ -12,14 +11,11 @@ export const CSP_OPTIONS: Omit<CspOptions, "script"> = {
   img: ["https://lh3.googleusercontent.com"],
 };
 
-// The pages rendered per request, which get a nonce in proxy.ts: the sign-in gate and everything under
-// /dashboard and /access (the e2e error fixture, in builds made for e2e). Any other path is the 404
-// page, which is built once and so carries the hashes of its own scripts instead (next.config.ts).
-export const RENDERED_PER_REQUEST = ["dashboard", "access"] as const;
-export const E2E_FIXTURE = process.env.SHELL_E2E === "1" ? ["e2e-shell"] : [];
-export function rendersPerRequest(path: string): boolean {
-  if (path === "/") return true;
-  return [...RENDERED_PER_REQUEST, ...E2E_FIXTURE].some(
-    (p) => path === `/${p}` || path.startsWith(`/${p}/`),
-  );
-}
+// Every page of this app is rendered per request (the root layout reads the session and says so with
+// force-dynamic; that includes the 404 page), so every page can carry a nonce. What is not a page:
+// build assets, the auth routes, the live stream, and anything with a file extension.
+export const isPage = (path: string) =>
+  !path.startsWith("/_next/") &&
+  !path.startsWith("/auth/") &&
+  !path.startsWith("/live/") &&
+  !path.includes(".");

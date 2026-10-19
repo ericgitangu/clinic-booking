@@ -66,3 +66,17 @@ export function eachDay(from: string, to: string): string[] {
   for (let d = from; d < to; d = addDays(d, 1)) out.push(d);
   return out;
 }
+
+const longDay = new Intl.DateTimeFormat("en-GB", {
+  timeZone: CLINIC_TZ,
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+/** "Tuesday 20 October 2026" for a clinic-local date such as 2026-10-20. */
+export function humanDate(day: string): string {
+  // Noon UTC is mid-afternoon in the clinic zone, so the day cannot slip either way.
+  return longDay.format(new Date(`${day}T12:00:00Z`)).replace(",", "");
+}

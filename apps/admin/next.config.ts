@@ -1,23 +1,11 @@
 import type { NextConfig } from "next";
-import {
-  CSP_OPTIONS,
-  E2E_FIXTURE,
-  RENDERED_PER_REQUEST,
-} from "./src/lib/csp-options";
-import { SECURITY_HEADERS, buildCsp } from "../../packages/ui/src/lib/csp";
+import { SECURITY_HEADERS } from "../../packages/ui/src/lib/csp";
 
-// The 404 page is built once, so it has no nonce; it carries the hashes of its own inline scripts,
-// filled in after `next build` by packages/ui/scripts/csp-hashes.mjs (the token below; the build fails
-// if it is not filled). `next dev` has no built HTML, so there it gets 'unsafe-inline'.
-const NOT_FOUND_POLICY = buildCsp({
-  ...CSP_OPTIONS,
-  script: CSP_OPTIONS.dev
-    ? { kind: "inline" }
-    : { kind: "hashes", hashes: ["__INLINE_SCRIPT_HASHES:_not-found__"] },
-});
-const NOT_A_404 = [...RENDERED_PER_REQUEST, ...E2E_FIXTURE, "auth", "live"]
-  .map((p) => `${p}(?:/|$)`)
-  .join("|");
+export const INVITE_HEADERS = [
+  { key: "Referrer-Policy", value: "no-referrer" },
+  { key: "Cache-Control", value: "no-store" },
+  { key: "X-Robots-Tag", value: "noindex" },
+];
 
 // Cost: no image optimization (it bills), no rewrites.
 const nextConfig: NextConfig = {
@@ -38,22 +26,32 @@ const nextConfig: NextConfig = {
     ...(process.env.SHELL_E2E === "1" ? ["e2e.tsx"] : []),
   ],
   transpilePackages: ["@clinic/ui", "@clinic/api"],
-  // The Content-Security-Policy is set per request in proxy.ts (it needs a nonce); these go on everything.
+  // Lets pages answer 403 with forbidden() and render forbidden.tsx.
+  experimental: {
+    authInterrupts: true,
+    // Server actions answer only the app's own host (and the same origin), stated rather than left
+    // to the default. Keep in step with SITE.url in src/lib/site.ts (a test checks it).
+    serverActions: { allowedOrigins: ["clinic-admin.ericgitangu.com"] },
+  },
+  // The Content-Security-Policy is set per request in proxy.ts (every page here is rendered per
+  // request, so each can carry a nonce). These go on pages, not on _next/* or anything with a file
+  // extension (a header on every asset costs bytes). The invite link carries a secret in its path:
+  // it keeps its own Referrer-Policy (none at all), stays out of every cache and out of search.
   async headers() {
-    // Pages only: not on _next/* or anything with a file extension (a header on every asset costs bytes).
     return [
       {
-        source: "/((?!_next(?:/|$)|.*\\.).*)",
+        source: "/((?!_next(?:/|$)|invite(?:/|$)|.*\\.).*)",
         headers: [...SECURITY_HEADERS],
       },
       {
-        source: `/((?!_next(?:/|$)|${NOT_A_404}|.*\\.).+)`,
-        headers: [{ key: "Content-Security-Policy", value: NOT_FOUND_POLICY }],
+        source: "/invite/:token",
+        headers: [
+          ...INVITE_HEADERS,
+          ...SECURITY_HEADERS.filter((h) => h.key !== "Referrer-Policy"),
+        ],
       },
     ];
   },
-  // Lets pages answer 403 with forbidden() and render forbidden.tsx.
-  experimental: { authInterrupts: true },
 };
 
 export default nextConfig;

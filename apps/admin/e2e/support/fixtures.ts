@@ -2,6 +2,7 @@ import {
   expect,
   test as base,
   type BrowserContext,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { EMAIL, type Persona } from "./stack";
@@ -52,6 +53,29 @@ export const test = base.extend<{
     { auto: true },
   ],
   page: async ({ page, context }, use) => {
+    // The pages stream in and hydrate after the load event, and a click before that does nothing.
+    // (Not "networkidle": the live feed keeps a stream open for as long as a page is.) After a
+    // navigation, wait until React has attached to the first buttons and links, best effort.
+    const goto = page.goto.bind(page);
+    page.goto = async (url, options) => {
+      const res = await goto(url, options);
+      await page
+        .waitForFunction(
+          () => {
+            const els = [...document.querySelectorAll("button, a")].slice(0, 6);
+            return (
+              els.length === 0 ||
+              els.some((el) =>
+                Object.keys(el).some((k) => k.startsWith("__reactProps")),
+              )
+            );
+          },
+          undefined,
+          { timeout: 10_000 },
+        )
+        .catch(() => undefined);
+      return res;
+    };
     if (THROTTLE > 1) {
       const cdp = await context.newCDPSession(page);
       await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
@@ -68,3 +92,51 @@ export const test = base.extend<{
 });
 
 export { expect } from "@playwright/test";
+
+/**
+ * Clicks a control once React has attached to it. The pages are server-rendered and stream in, so a
+ * click that lands before hydration does nothing and the test would wait for an outcome that never
+ * comes. React marks every hydrated element with an internal props key; wait for it.
+ */
+export async function tap(locator: Locator): Promise<void> {
+  await expect
+    .poll(() =>
+      locator.evaluate((el) =>
+        Object.keys(el).some((k) => k.startsWith("__reactProps")),
+      ),
+    )
+    .toBe(true);
+  await locator.click();
+}
+
+/**
+ * Waits for the real condition before a colour scan, not for a pause: the page is in the theme the
+ * browser asked for (the class on <html> matches prefers-color-scheme), the fonts are in, nothing
+ * is animating or transitioning, and two frames have passed, so axe reads colours as they rest and
+ * never half way through a change of theme or a fade.
+ */
+export async function settle(page: Page): Promise<void> {
+  // The stylesheet is in: a page whose CSS did not load (a broken build or a half-deleted
+  // environment) has a transparent body, and every colour finding after that would be noise about
+  // the environment. Fail here, saying so, instead.
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    "the page's stylesheet did not load: the build or the environment is broken, not the colours",
+  ).not.toBe("rgba(0, 0, 0, 0)");
+  const dark = await page.evaluate(
+    () => matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  await expect(page.locator("html")).toHaveClass(
+    new RegExp(`\\b${dark ? "dark" : "light"}\\b`),
+  );
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running"),
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}

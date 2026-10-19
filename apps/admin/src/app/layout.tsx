@@ -2,14 +2,27 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import { ThemeProvider } from "@clinic/ui/components/layout/theme-provider";
+import { Shortcuts } from "@/components/shortcuts";
+import { can } from "@/lib/roles";
+import { StaffMenu } from "@/components/staff-menu";
 import { FOOTER_COLUMNS } from "@/lib/footer";
 import { fontVars } from "@/lib/fonts";
 import { metadata, viewport } from "@/lib/metadata";
 import { SHELL_ROUTES, SIGNED_OUT_NAV } from "@/lib/shell-routes";
 import { getStaff } from "@/lib/session";
-import { ACCESS_LINK, FOOTER_NOTICE, NAV_LINKS, SITE } from "@/lib/site";
+import {
+  ACCESS_LINK,
+  AUDIT_LINK,
+  FOOTER_NOTICE,
+  NAV_LINKS,
+  SITE,
+} from "@/lib/site";
 
 export { metadata, viewport };
+
+// The header shows who is signed in, so no page of this app may be prerendered. Without this the
+// not-found page was built once at deploy time and showed everyone a header with no session.
+export const dynamic = "force-dynamic";
 
 export default async function RootLayout({
   children,
@@ -20,8 +33,8 @@ export default async function RootLayout({
   const staff = await getStaff().catch(() => null);
   const navLinks = !staff
     ? [...SIGNED_OUT_NAV]
-    : staff.role === "owner"
-      ? [...NAV_LINKS, ACCESS_LINK]
+    : can(staff.role, "manage-access")
+      ? [...NAV_LINKS, ACCESS_LINK, AUDIT_LINK]
       : [...NAV_LINKS];
   return (
     <html lang="en" suppressHydrationWarning style={fontVars}>
@@ -33,6 +46,19 @@ export default async function RootLayout({
             footerColumns={FOOTER_COLUMNS}
             footerNotice={FOOTER_NOTICE}
             routes={SHELL_ROUTES}
+            headerTrailing={
+              staff ? (
+                <div className="flex items-center">
+                  <Shortcuts canManage={can(staff.role, "manage-access")} />
+                  <StaffMenu
+                    name={staff.name}
+                    email={staff.email}
+                    image={staff.image}
+                    role={staff.role}
+                  />
+                </div>
+              ) : null
+            }
           >
             {children}
           </PageShell>

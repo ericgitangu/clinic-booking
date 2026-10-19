@@ -1,7 +1,12 @@
 import type { Availability } from "@clinic/api/generated";
 import { describe, expect, it } from "vitest";
 import { compareSeq, cursorNotOlder, parseSeq } from "@/lib/cursor";
-import { acceptPolled, applyEvent, withTaken } from "@/lib/live-availability";
+import {
+  acceptPolled,
+  applyEvent,
+  reapplyTaken,
+  withTaken,
+} from "@/lib/live-availability";
 
 const D = "doc";
 const day = "2027-01-04";
@@ -54,7 +59,7 @@ describe("RULE 1: polled responses", () => {
 });
 
 describe("RULE 2: pushed events", () => {
-  it("removes a taken slot at once and moves the cursor to the event", () => {
+  it("removes a taken slot at once and keeps the response's own cursor", () => {
     const r = applyEvent(
       avail("7.5", ["08:00", "08:30"]),
       null,
@@ -63,7 +68,7 @@ describe("RULE 2: pushed events", () => {
     expect(r.effect).toBe("taken");
     expect(r.data.slots.map((s) => s.starts_at)).toEqual([at("08:30")]);
     expect(r.data.taken).toHaveLength(1);
-    expect(r.data.cursor).toBe("7.6");
+    expect(r.data.cursor).toBe("7.5");
     expect(r.lastSeq).toBe("7.6.1");
   });
   it("applies a duplicate delivery once", () => {
@@ -116,5 +121,45 @@ describe("RULE 3: a confirmed 409 or the patient's own booking", () => {
     expect(r.slots).toHaveLength(1);
     expect(r.taken).toEqual([at("08:00")]);
     expect(withTaken(r, at("08:00")).taken).toHaveLength(1);
+  });
+});
+
+describe("a freed time after a taken one, with another writer open", () => {
+  // The server's cursor is "<xmin>.0" (the oldest open transaction), which can sit BEHIND the
+  // (txid, id) of an event already pushed. A refetch after a freed event must still show the time.
+  it("shows the time free when the refetch carries an older xmin cursor", () => {
+    let shown = avail("7.0", ["08:00", "08:30"]);
+    let last: string | null = null;
+
+    const taken = applyEvent(shown, last, ev("9.4.1", "slot_taken", "08:00"));
+    shown = taken.data;
+    last = taken.lastSeq;
+    expect(shown.slots.map((s) => s.starts_at)).toEqual([at("08:30")]);
+
+    // someone else's transaction is still open: the cursor is behind the event
+    shown = acceptPolled(shown, avail("8.0", ["08:30"], ["08:00"]));
+
+    const freed = applyEvent(shown, last, ev("9.6.0", "slot_freed", "08:00"));
+    expect(freed.effect).toBe("freed");
+
+    shown = acceptPolled(shown, avail("8.0", ["08:00", "08:30"]));
+    expect(shown.slots.map((s) => s.starts_at)).toEqual([
+      at("08:00"),
+      at("08:30"),
+    ]);
+  });
+});
+
+describe("a polled response older than a taken event", () => {
+  it("is shown without the time the event took", () => {
+    const stale = avail("8.0", ["08:00", "08:30"]);
+    const out = reapplyTaken(stale, [{ startsAt: at("08:00"), seq: "9.4.1" }]);
+    expect(out.slots.map((s) => s.starts_at)).toEqual([at("08:30")]);
+  });
+  it("is left alone once its cursor has reached the event", () => {
+    const fresh = avail("9.4", ["08:00"]);
+    expect(reapplyTaken(fresh, [{ startsAt: at("08:00"), seq: "9.4.1" }])).toBe(
+      fresh,
+    );
   });
 });

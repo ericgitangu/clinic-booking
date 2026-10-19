@@ -5,14 +5,19 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { notify } from "@clinic/ui/lib/notify";
 import { authClient } from "@/lib/auth-client";
 
-export function SignInButton() {
+export function SignInButton({
+  callbackURL = "/dashboard",
+}: {
+  /** Where to land after Google; an invitation page sends people back to itself. */
+  callbackURL?: string;
+}) {
   const [busy, setBusy] = useState(false);
 
   async function signIn() {
     setBusy(true);
     const res = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL,
     });
     if (res.error) {
       setBusy(false);

@@ -28,7 +28,6 @@ TEXT_FILES = [
     "apps/booking/src/components/booking/appointment-actions.tsx",
     "apps/booking/src/app/appointments/[id]/reschedule/page.tsx",
     "apps/admin/src/lib/actions.ts",
-    "apps/admin/src/lib/change-window.ts",
     "apps/admin/src/components/appointment-actions.tsx",
     "packages/api/src/generated/types.gen.ts",
     "packages/api/src/generated/sdk.gen.ts",
@@ -243,8 +242,8 @@ PARAPHRASES = [
 
 def test_every_surface_catches_a_planted_paraphrase() -> None:
     """Mutation proof: a paraphrase planted in ANY scanned surface (the four that once slipped
-    through, both apps' copy and action components, the reschedule page, the landing evidence, the
-    generated client, the catalogue and the OpenAPI strings) is reported."""
+    through, the patient app's copy and both apps' action components, the reschedule page, the
+    landing evidence, the generated client, the catalogue and the OpenAPI strings) is reported."""
     surfaces = _surfaces()
     assert violations(surfaces) == []
     names = {name for name, _ in surfaces}
@@ -252,7 +251,6 @@ def test_every_surface_catches_a_planted_paraphrase() -> None:
         "README.md",
         "docs/api-errors.md",
         "apps/booking/src/lib/change-window.ts",
-        "apps/admin/src/lib/change-window.ts",
         "apps/booking/src/components/booking/appointment-actions.tsx",
         "apps/admin/src/components/appointment-actions.tsx",
         "apps/booking/src/app/appointments/[id]/reschedule/page.tsx",

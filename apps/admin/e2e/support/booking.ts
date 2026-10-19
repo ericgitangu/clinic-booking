@@ -6,7 +6,9 @@ interface Slot {
   starts_at: string;
 }
 
-export async function bookOneStraightThroughTheApi(): Promise<string> {
+export async function bookOneStraightThroughTheApi(
+  opts: { email?: string; name?: string } = {},
+): Promise<string> {
   const doctors = await publicApi<{ items: { id: string }[] }>(
     "GET",
     "/doctors",
@@ -25,8 +27,9 @@ export async function bookOneStraightThroughTheApi(): Promise<string> {
     const slot = avail.body.slots.at(-1);
     if (!slot) continue;
     const patient = await publicApi<{ id: string }>("POST", "/patients", {
-      full_name: "E2E Cache Patient",
+      full_name: opts.name ?? "E2E Cache Patient",
       phone: `+2547${String(Date.now()).slice(-8)}`,
+      ...(opts.email ? { email: opts.email } : {}),
     });
     const booked = await publicApi<{ id: string }>("POST", "/appointments", {
       doctor_id: doctor.id,

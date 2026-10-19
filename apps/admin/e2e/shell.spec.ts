@@ -358,7 +358,7 @@ test.describe("the Content-Security-Policy", () => {
   }) => {
     await as("owner");
     const nonces = new Set<string>();
-    const paths = ["/", "/dashboard", "/access"];
+    const paths = ["/", "/dashboard", "/access", "/no-such-page"];
     for (const path of paths) {
       const res = await request.get(path);
       const csp = res.headers()["content-security-policy"];
@@ -390,18 +390,6 @@ test.describe("the Content-Security-Policy", () => {
       expect(h["permissions-policy"], path).toContain("camera=()");
     }
     expect(nonces.size, "one nonce per response").toBe(paths.length);
-  });
-
-  test("the 404 page is built once and carries the hashes of its own scripts", async ({
-    request,
-  }) => {
-    const res = await request.get("/no-such-page");
-    expect(res.status()).toBe(404);
-    const csp = res.headers()["content-security-policy"];
-    const script = /script-src ([^;]+)/.exec(csp)![1];
-    expect(script).toMatch(/^'self' ('sha256-[A-Za-z0-9+/=]+' ?)+$/);
-    expect(script).not.toContain("unsafe-inline");
-    expect(script).not.toContain("nonce");
   });
 
   test("an injected inline script is blocked on the signed-in dashboard", async ({

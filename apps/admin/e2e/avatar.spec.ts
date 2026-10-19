@@ -34,7 +34,7 @@ async function open(
 const trigger = (page: import("@playwright/test").Page, name: string) =>
   page.getByRole("button", { name: `Account menu for ${name}` });
 
-test("the staff bar shows the profile picture, 32px, and keeps the email and role", async ({
+test("the header shows the profile picture, 32px, keeps the role and puts the email in the menu", async ({
   browser,
 }) => {
   const { context, page, name, email } = await open(
@@ -49,8 +49,9 @@ test("the staff bar shows the profile picture, 32px, and keeps the email and rol
   await expect(img).toHaveAttribute("src", PICTURE);
   const box = await img.boundingBox();
   expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([32, 32]);
-  await expect(page.getByTestId("staff-email")).toHaveText(email);
   await expect(page.getByTestId("staff-role")).toBeVisible();
+  await trigger(page, name).click();
+  await expect(page.getByRole("menu")).toContainText(email);
   await context.close();
 });
 

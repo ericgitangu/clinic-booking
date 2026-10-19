@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   BellRingIcon,
@@ -25,6 +24,7 @@ import {
   CardTitle,
 } from "@clinic/ui/components/ui/card";
 import { Button } from "@clinic/ui/components/ui/button";
+import { AppointmentLink } from "@/components/appointment-sheet";
 import { refreshMetrics } from "@/lib/actions";
 import {
   addEvent,
@@ -86,6 +86,7 @@ export function LiveFeed({
   const [status, setStatus] = useState<LiveStatus>("connecting");
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [, start] = useTransition();
+  const canAct = role === "owner" || role === "admin";
   const refreshAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const names = new Map(doctors.map((d) => [d.id, d.name]));
 
@@ -187,12 +188,13 @@ export function LiveFeed({
                 >
                   <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
                   {ev.appointmentId ? (
-                    <Link
+                    <AppointmentLink
+                      id={ev.appointmentId}
+                      canAct={canAct}
                       className="underline-offset-4 hover:underline"
-                      href={`/dashboard/appointments/${ev.appointmentId}`}
                     >
                       {text}
-                    </Link>
+                    </AppointmentLink>
                   ) : (
                     <span>{text}</span>
                   )}

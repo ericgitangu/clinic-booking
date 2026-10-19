@@ -785,6 +785,12 @@ jobs:
             SHELL_E2E=1 pnpm -C apps/booking build
             pnpm -C apps/booking exec playwright install --with-deps chromium
             E2E_API_URL=http://127.0.0.1:8080 PW_BUNDLED=1 pnpm -C apps/booking test:e2e
+      # Stored right after the scenarios and whatever their result: a failed step skips every later
+      # step that is not `when: always`, and the reCAPTCHA run below clears this folder when it starts. Traces are kept for failed scenarios only (playwright.config.ts).
+      - store_artifacts:
+          path: apps/booking/test-results
+          destination: playwright-booking
+          when: always
       - run:
           name: Lighthouse budgets on / /book /about /data (production build, docs/adr/0026)
           command: |

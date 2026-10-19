@@ -6,7 +6,7 @@ import {
 } from "@clinic/api/auth-env";
 import { withNonce } from "@clinic/ui/lib/csp-proxy";
 import { canonicalRedirect } from "@/lib/canonical-host";
-import { CSP_OPTIONS, rendersPerRequest } from "@/lib/csp-options";
+import { CSP_OPTIONS, isPage } from "@/lib/csp-options";
 import { SITE } from "@/lib/site";
 
 // Three jobs, in this order (the third is described at the end of proxy()):
@@ -28,11 +28,10 @@ export function proxy(request: NextRequest) {
     logNotConfiguredOnce("admin", env.missing);
     return notConfiguredResponse(SITE.name);
   }
-  // The pages rendered per request (they read the session) get a fresh nonce and the nonce
-  // Content-Security-Policy (packages/ui/src/lib/csp.ts). The 404 page is built once, so it is left
-  // alone here and next.config.ts gives it a policy with the hashes of its own scripts. Assets, the
-  // sign-in routes and the live stream answer no page and are passed through.
-  return rendersPerRequest(request.nextUrl.pathname)
+  // Every page is rendered per request (the root layout is force-dynamic), so each gets a fresh nonce
+  // and the nonce Content-Security-Policy (packages/ui/src/lib/csp.ts). Assets, the sign-in routes and
+  // the live stream answer no page and are passed through.
+  return isPage(request.nextUrl.pathname)
     ? withNonce(request, CSP_OPTIONS)
     : NextResponse.next();
 }
