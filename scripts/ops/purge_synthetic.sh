@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# One-off removal of the release smoke's old test rows (patients named 'verify-claims %' and
-# 'Release Gate Check%', their appointments and events) from the database. See purge_synthetic.sql
-# for exactly what is selected and deleted.
+# A TOOL, not a pending step: it can remove the release smoke's old test rows (patients named
+# 'verify-claims %' and 'Release Gate Check%', their appointments and events) from the database.
+# Those rows are already EXCLUDED from every admin view (patients.synthetic, migration 0012) and are
+# kept, so no release or review step needs this script. It stays for an operator who one day wants
+# the rows gone. See purge_synthetic.sql for exactly what is selected and deleted.
 #
 #   PURGE_DATABASE_URL=... purge_synthetic.sh            dry run: counts only, in a READ ONLY, rolled-back transaction
 #   PURGE_DATABASE_URL=... purge_synthetic.sh --apply    delete in ONE transaction as the owner role,
@@ -16,7 +18,7 @@
 #   PURGE_DATABASE_URL="$(gcloud secrets versions access latest --secret clinic-database-url-migrate \
 #       --project sil-clinic-booking --account "$GCLOUD_ACCOUNT")" bash scripts/ops/purge_synthetic.sh
 #
-# Always dry-run first, read the counts, then re-run with --apply.
+# If you ever use it: dry-run first, read the counts, then re-run with --apply.
 # Exit codes: 0 done, 1 psql failed (nothing was committed), 2 refused (bad usage).
 set -euo pipefail
 
