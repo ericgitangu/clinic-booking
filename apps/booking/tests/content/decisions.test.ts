@@ -34,8 +34,10 @@ describe("decisions content", () => {
   it("says why Go is there in the entry the landing line links to", () => {
     const go = DECISIONS.find((d) => d.id === "go");
     expect(go?.title).toBe("A small Go service for the staff live feed");
-    expect(go?.gaveUp).toContain("900 vCPU-seconds");
-    expect(go?.gaveUp).toContain("to be measured after the first deploy");
+    expect(go?.decision).toContain("deployed and serving the live feed");
+    expect(go?.gaveUp).toContain("two staff can watch live at once");
+    expect(go?.gaveUp).toContain("shares one stream across all its tabs");
+    expect(go?.why).toContain("inside our Google Cloud boundary");
   });
 
   it("uses no em or en dashes anywhere in the copy", () => {
