@@ -37,7 +37,7 @@ def test_a_linear_chain_passes(tmp_path: pathlib.Path) -> None:
 
 
 def test_two_branches_off_the_same_parent_fail(tmp_path: pathlib.Path) -> None:
-    """The collision this guards against: two lanes each add the next migration."""
+    """The collision this guards against: two branches each add the next migration."""
     write(tmp_path, "0001_a", "0001", None)
     write(tmp_path, "0002_b", "0002", "0001")
     write(tmp_path, "0002_c", "0003", "0001")

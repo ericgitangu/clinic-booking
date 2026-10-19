@@ -76,6 +76,8 @@ Option 1.
 - Bad: admins can now bring in viewers without the owner. That is a wider grant than [ADR-0030](0030-staff-roles-and-access.md) allowed, bounded by the rules in the matrix.
 - Bad: patient email is best-effort and a bounced or capped email is only visible as `notified = false`.
 
+**Rollback note (2026-10-19, additive).** With `STAFF_CRUD_ENABLED=false` the unlock route is off too, so visits that staff already locked stay locked for patients. Unlock them before switching off, or clear the column as the owner role in a transaction after counting the rows (`SELECT count(*) FROM appointments WHERE staff_locked_at IS NOT NULL;`, then `UPDATE appointments SET staff_locked_at = NULL WHERE staff_locked_at IS NOT NULL;` and compare the row count). The audit table is not touched. The exact steps are in [the rollback runbook](../runbooks/rollback.md).
+
 ### Declared debt
 
 - **Patient email has no retry.** It is sent best-effort after the response, with no outbox. If the process dies after the commit, or the provider fails, the patient is not told and `notified` stays false. Risk: a patient learns of a staff change when they next look. The real fix is the outbox pattern the realtime relay already uses (`0006_realtime_outbox`, [ADR-0031](0031-realtime-push-via-ably-sse.md)): write the email intent in the same transaction and send from a relay. Not built in this ADR to keep the first version small.
