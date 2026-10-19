@@ -18,6 +18,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SPEC = JSON.parse(readFileSync(join(ROOT, "contracts/openapi.json"), "utf8"));
 const OUT = join(ROOT, "docs/api");
 
+// The lead time this deployment enforces (BOOKING_MIN_LEAD_MINUTES), as the contract states it. The
+// API fills it into the availability description when it builds the document, so a different value
+// rebuilds the collection with that value.
+const LEAD = Number(/within (\d+) minutes/.exec(SPEC.paths["/doctors/{doctor_id}/availability"]?.get?.description ?? "")?.[1]);
+if (!Number.isInteger(LEAD) || LEAD < 2) throw new Error("no lead time in the availability description of contracts/openapi.json");
+const SOON = Math.floor(LEAD / 2); // minutes ahead for a start that is too soon
+
 // Public operations the journey leaves out on purpose.
 const NOT_IN_JOURNEY = {
   "POST /realtime/token/patient":
@@ -68,14 +75,17 @@ function responseSchema(op, status) {
 const js = (strings, ...vals) => String.raw(strings, ...vals);
 
 // Every request's pre-request script starts with this guard. It skips the request when a variable
-// it needs is still empty (an earlier step was skipped or failed, or soonAppointmentId was not
-// seeded), and skips every non-GET unless allowWrites is "true". `needs` is worked out when the
-// collection is built: the variables the request uses, less those its own script sets.
+// it needs is still empty: an earlier step was skipped or failed, soonAppointmentId was not seeded,
+// or, for every request other than GET, writeBaseUrl is not set. `needs` is worked out when the
+// collection is built: the variables the request and its scripts read, less those its pre-request sets.
+//
+// The guard is a convenience, not the safety. Requests other than GET are addressed to
+// {{writeBaseUrl}}, which the production environment does not define, so a client that ignores
+// these scripts sends them to no host at all rather than to production.
 const guard = (needs, own) => js`const needs = ${JSON.stringify(needs)};
 const missing = needs.filter((name) => !pm.variables.get(name));
-const writesAllowed = String(pm.variables.get("allowWrites")).toLowerCase() === "true";
-if (pm.request.method !== "GET" && !writesAllowed) {
-  console.log("skipped (writes are off; set allowWrites=true to run it): " + pm.info.requestName);
+if (missing.includes("writeBaseUrl")) {
+  console.log("skipped (writes are off; set writeBaseUrl to the API base to run it): " + pm.info.requestName);
   pm.execution.skipRequest();
 } else if (missing.length) {
   console.log("skipped (" + missing.join(", ") + " not set): " + pm.info.requestName);
@@ -159,36 +169,47 @@ pm.collectionVariables.set("doctorId", items[0].id);`,
   {
     name: "03 Slots",
     description:
-      "Free 30-minute slots for the doctor on a clinic-local day. The pre-request script starts at tomorrow and the test moves a day ahead (up to 14 times) until the day has at least two free slots, so the run never depends on a fixed date.",
+      "Free slots for the doctor on a clinic-local day. The pre-request script looks from tomorrow, a day at a time (up to 14), for a day with at least two free slots, so the run never depends on a fixed date. It works when the request is sent on its own too.",
     requests: [
       {
         name: "Free slots for a day",
         op: ["GET", "/doctors/{doctor_id}/availability"],
         path: "/doctors/{{doctorId}}/availability",
         query: [["date", "{{slotDay}}"]],
-        prerequest: js`// The UTC date offset days from now (kept between attempts in slotDayOffset). The sandbox has no
-// time-zone data, and with an offset of at least one day the UTC date is never earlier than the
-// clinic's local today, so the day asked for is always today or later where the clinic is.
-const offset = Number(pm.collectionVariables.get("slotDayOffset") || 1);
-pm.collectionVariables.set("slotDay", new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10));`,
+        prerequest: js`// Asks for one day after another, from tomorrow, until a day has two free slots, then sends this
+// request for that day. Dates are UTC dates: the sandbox has no time-zone data, and from tomorrow
+// on the UTC date is never earlier than the clinic's local today. pm.sendRequest works for a request
+// sent by hand as well as in a collection run.
+const base = pm.variables.replaceIn("{{baseUrl}}/doctors/{{doctorId}}/availability?date=");
+const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+pm.collectionVariables.set("slotDay", day(1));
+pm.collectionVariables.set("slotSearch", "none");
+const probe = (n) => {
+  if (n > 14) return; // none found: slotSearch stays "none" and the tests below fail and say so
+  pm.sendRequest(base + day(n), (err, res) => {
+    if (!err && res.code === 200 && res.json().slots.length >= 2) {
+      pm.collectionVariables.set("slotDay", day(n));
+      pm.collectionVariables.set("slotSearch", "found");
+    } else probe(n + 1);
+  });
+};
+probe(1);`,
         expect: [200],
         tests: js`const body = pm.response.json();
-const offset = Number(pm.collectionVariables.get("slotDayOffset") || 1);
 pm.test("it is the day asked for", () => pm.expect(body.date).to.eql(pm.collectionVariables.get("slotDay")));
-pm.test("no slot starts within the hour", () => {
-  const earliest = Date.now() + 60 * 60000;
+pm.test("no slot starts within ${LEAD} minutes", () => {
+  // Against the server's clock (the Date header, whole seconds), not this machine's.
+  const now = Date.parse(pm.response.headers.get("Date") || "") || Date.now() - 120000;
+  const earliest = now + ${LEAD} * 60000 - 2000;
   body.slots.forEach((s) => pm.expect(new Date(s.starts_at).getTime(), s.starts_at).to.be.at.least(earliest));
 });
-if (body.slots.length < 2 && offset < 14) {
-  // A weekend or a full day: try the next one.
-  pm.collectionVariables.set("slotDayOffset", String(offset + 1));
-  pm.execution.setNextRequest(pm.info.requestName);
-} else {
-  pm.test("the day has two free slots", () => pm.expect(body.slots.length).to.be.at.least(2));
-  pm.collectionVariables.set("slotDayOffset", "1");
-  pm.collectionVariables.set("slotStart", body.slots[0].starts_at);
-  pm.collectionVariables.set("slotStartNew", body.slots[1].starts_at);
-}`,
+const found = pm.collectionVariables.get("slotSearch") === "found" && body.slots.length >= 2;
+pm.test("a day in the next 14 has two free slots (if not, the steps that book are skipped; send this again later)", () => {
+  pm.expect(found, "no day from tomorrow to 14 days out has two free slots").to.be.true;
+});
+pm.collectionVariables.set("slotMinutes", String(body.slot_minutes));
+pm.collectionVariables.set("slotStart", found ? body.slots[0].starts_at : "");
+pm.collectionVariables.set("slotStartNew", found ? body.slots[1].starts_at : "");`,
       },
     ],
   },
@@ -216,7 +237,7 @@ pm.collectionVariables.set("idempotencyKey", "review-" + pm.variables.replaceIn(
 pm.test("booked at the slot asked for", () => {
   pm.expect(appt.status).to.eql("booked");
   pm.expect(new Date(appt.starts_at).getTime()).to.eql(new Date(pm.collectionVariables.get("slotStart")).getTime());
-  pm.expect(new Date(appt.ends_at) - new Date(appt.starts_at)).to.eql(30 * 60000);
+  pm.expect(new Date(appt.ends_at) - new Date(appt.starts_at)).to.eql(Number(pm.collectionVariables.get("slotMinutes")) * 60000);
 });
 pm.test("Location points at the appointment", () => pm.expect(pm.response.headers.get("Location")).to.eql("/appointments/" + appt.id));
 pm.test("not marked as a replay", () => pm.expect(pm.response.headers.has("Idempotent-Replayed")).to.be.false);
@@ -280,19 +301,19 @@ pm.test("the replay made no second booking", () => pm.expect(ids).to.eql([pm.col
   {
     name: "06 Too soon",
     description:
-      "The one-hour rule on a new time: a start under 60 minutes away is 422 BOOKING_TOO_SOON, for a booking and for a reschedule's new time. The time is computed from now, 30 minutes ahead.",
+      `The lead-time rule on a new time: a start under ${LEAD} minutes away is 422 BOOKING_TOO_SOON, for a booking and for a reschedule's new time. The time is computed from now, ${SOON} minutes ahead. ${LEAD} comes from the contract.`,
     requests: [
       {
-        name: "Book 30 minutes from now",
+        name: `Book ${SOON} minutes from now`,
         op: ["POST", "/appointments"],
         body: { doctor_id: "{{doctorId}}", patient_id: "{{otherPatientId}}", starts_at: "{{soonStart}}" },
-        prerequest: js`const t = new Date(Date.now() + 30 * 60000);
+        prerequest: js`const t = new Date(Date.now() + ${SOON} * 60000);
 t.setUTCSeconds(0, 0);
 pm.collectionVariables.set("soonStart", t.toISOString());`,
         expect: [422, "BOOKING_TOO_SOON"],
       },
       {
-        name: "Reschedule to 30 minutes from now",
+        name: `Reschedule to ${SOON} minutes from now`,
         op: ["PATCH", "/appointments/{appointment_id}/reschedule"],
         path: "/appointments/{{appointmentId}}/reschedule",
         body: { starts_at: "{{soonStart}}" },
@@ -360,19 +381,19 @@ pm.test("cancelled with the reason given", () => {
     ],
   },
   {
-    name: "08 Change within the hour",
+    name: `08 Change within ${LEAD} minutes`,
     description:
-      "Cancelling or rescheduling a visit that starts in under 60 minutes is 409 CHANGE_TOO_LATE. The API never books a slot that close, so this needs an appointment made another way: `make api-check` writes one straight into the local database and passes its id as `soonAppointmentId`. In Postman or Insomnia, paste the id that `make api-check` prints into the environment. Without it these requests are skipped.",
+      `Cancelling or rescheduling a visit that starts in under ${LEAD} minutes is 409 CHANGE_TOO_LATE. The API never books a slot that close, so this needs an appointment made another way: \`make api-check\` writes one straight into the database of its own stack and passes its id as \`soonAppointmentId\`. To send these by hand, run \`KEEP_STACK=1 make api-check\` and paste the \`baseUrl\`, \`writeBaseUrl\` and \`soonAppointmentId\` it prints into the local environment. The seeded visit starts 5 to 35 minutes after the run, so use it straight away. Without it these requests are skipped.`,
     requests: [
       {
-        name: "Cancel within the hour",
+        name: `Cancel within ${LEAD} minutes`,
         op: ["PATCH", "/appointments/{appointment_id}/cancel"],
         path: "/appointments/{{soonAppointmentId}}/cancel",
         body: { reason: "Reviewer run of the API collection" },
         expect: [409, "CHANGE_TOO_LATE"],
       },
       {
-        name: "Reschedule within the hour",
+        name: `Reschedule within ${LEAD} minutes`,
         op: ["PATCH", "/appointments/{appointment_id}/reschedule"],
         path: "/appointments/{{soonAppointmentId}}/reschedule",
         body: { starts_at: "{{slotStartNew}}" },
@@ -516,9 +537,14 @@ function buildRequest(r) {
   if (r.tests) test.push(r.tests);
 
   const event = [];
-  const used = [...JSON.stringify([path, query, headers, r.body ?? null]).matchAll(/{{\s*([A-Za-z0-9_]+)\s*}}/g)].map((m) => m[1]);
-  const setsOwn = [...(r.prerequest ?? "").matchAll(/collectionVariables\.set\("([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
-  const needs = [...new Set(used)].filter((v) => v !== "baseUrl" && !setsOwn.includes(v));
+  // Reads go to baseUrl; anything else goes to writeBaseUrl, which production does not define.
+  const host = method === "GET" ? "baseUrl" : "writeBaseUrl";
+  const used = [...JSON.stringify([host, path, query, headers, r.body ?? null]).matchAll(/{{\s*([A-Za-z0-9_]+)\s*}}/g)].map((m) => m[1]);
+  const pre = r.prerequest ?? "";
+  // Variables the request's scripts read: the pre-request's inputs, and what its tests compare with.
+  const reads = [...(pre + (r.tests ?? "")).matchAll(/collectionVariables\.get\("([A-Za-z0-9_]+)"\)/g)].map((m) => m[1]);
+  const sets = [...pre.matchAll(/collectionVariables\.set\("([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
+  const needs = [...new Set([...(host === "writeBaseUrl" ? [host] : []), ...used, ...reads])].filter((v) => v !== "baseUrl" && !sets.includes(v));
   event.push({ listen: "prerequest", script: { type: "text/javascript", exec: guard(needs, r.prerequest).split("\n") } });
   event.push({ listen: "test", script: { type: "text/javascript", exec: test.join("\n").split("\n") } });
 
@@ -527,8 +553,8 @@ function buildRequest(r) {
     method,
     header: headers.map(([key, value]) => ({ key, value })),
     url: {
-      raw: `{{baseUrl}}${path}${qs}`,
-      host: ["{{baseUrl}}"],
+      raw: `{{${host}}}${path}${qs}`,
+      host: [`{{${host}}}`],
       path: path.split("/").filter(Boolean),
       ...(query.length ? { query: query.map(([key, value]) => ({ key, value })) } : {}),
     },
@@ -557,7 +583,7 @@ function build() {
         "",
         "Pick the `local` or `production` environment and run the folders in order. IDs and times flow from one request to the next through collection variables, and every time is computed from now, so the run never goes stale.",
         "",
-        "Requests other than GET run only when the environment sets `allowWrites` to `true` (local does, production does not).",
+        "Requests other than GET go to `writeBaseUrl`. The local environment sets it; the production environment does not, so those requests are skipped there, and a client that ignores the scripts has no host to send them to.",
         "",
         "Public operations not in the journey:",
         ...left,
@@ -565,17 +591,17 @@ function build() {
       schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     },
     variable: [
-      "doctorId", "slotDay", "slotDayOffset", "slotStart", "slotStartNew", "patientId", "otherPatientId",
+      "doctorId", "slotDay", "slotSearch", "slotMinutes", "slotStart", "slotStartNew", "patientId", "otherPatientId",
       "idempotencyKey", "appointmentId", "soonStart", "farDay", "naiveStart", "pastStart", "offGridStart", "nightStart",
     ].map((key) => ({ key, value: "" })),
     item: FOLDERS.map((f) => ({ name: f.name, description: f.description, item: f.requests.map(buildRequest) })),
   };
 
-  const env = (name, baseUrl, allowWrites) => ({
+  const env = (name, baseUrl, writeBaseUrl) => ({
     name: `Clinic booking API, ${name}`,
     values: [
       { key: "baseUrl", value: baseUrl, type: "default", enabled: true },
-      { key: "allowWrites", value: allowWrites, type: "default", enabled: true },
+      ...(writeBaseUrl ? [{ key: "writeBaseUrl", value: writeBaseUrl, type: "default", enabled: true }] : []),
       { key: "soonAppointmentId", value: "", type: "default", enabled: true },
     ],
     _postman_variable_scope: "environment",
@@ -583,9 +609,11 @@ function build() {
 
   return {
     "clinic-booking.postman_collection.json": collection,
-    "local.postman_environment.json": env("local (docker compose)", "http://localhost:8080", "true"),
-    // The public path is the booking site's /api proxy: Cloud Run itself is IAM-only.
-    "production.postman_environment.json": env("production (read-only)", "https://clinic.ericgitangu.com/api", "false"),
+    // The `make up` stack (compose publishes the API on API_HOST_PORT, 8080 by default).
+    "local.postman_environment.json": env("local (docker compose)", "http://localhost:8080", "http://localhost:8080"),
+    // The public path is the booking site's /api proxy: Cloud Run itself is IAM-only. No
+    // writeBaseUrl on purpose: writes need it passed in (API_WRITES=1 make api-check-prod).
+    "production.postman_environment.json": env("production (read-only)", "https://clinic.ericgitangu.com/api", null),
   };
 }
 

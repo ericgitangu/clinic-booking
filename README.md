@@ -100,9 +100,14 @@ One command, Docker only (its own compose stack, removed afterwards):
 make api-check
 ```
 
-Observed on 2026-10-19: 39 requests, 212 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production (12 requests, 62 assertions, 0 failed on 2026-10-19); the booking writes need `API_WRITES=1`.
+Observed on 2026-10-19: 40 requests (the 39 in the collection and one slot lookup), 212 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production: 13 requests, 62 assertions, 0 failed on 2026-10-19. `API_WRITES=1 make api-check-prod` also runs the writes, and those leave two "Reviewer …" patients and a cancelled appointment in the production database.
 
-To click through it instead: in Postman, Import the three files in `docs/api/` and pick the `local` or `production` environment; in Insomnia, Import the collection file (it reads the Postman format) and set `baseUrl`, though Insomnia runs only part of Postman's test scripts. No request needs a key.
+To click through it instead, start the API with `make up` (or use production), then:
+
+- **Postman**: Import the three files in `docs/api/` and pick the `local` or `production` environment.
+- **Insomnia**: Import the collection file (it reads the Postman format) and create an environment with `baseUrl` and, for local, `writeBaseUrl` (`http://localhost:8080` for both). Without `writeBaseUrl`, every request other than GET has no host. I have not verified the Insomnia import; `inso` 13.3.1 refuses the file, and Insomnia runs only part of Postman's test scripts.
+
+Folder 08 (`CHANGE_TOO_LATE`) needs a visit inside the lead time, which only `make api-check` can seed; [`docs/api/README.md`](docs/api/README.md#the-journey) explains how to send it by hand. No request needs a key.
 
 ## 3. System design
 
