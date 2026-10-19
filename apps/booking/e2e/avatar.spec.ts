@@ -131,40 +131,38 @@ test("the menu opens from the keyboard, shows who and where, and the focus ring 
   await context.close();
 });
 
-test("axe finds nothing serious with the avatar (picture or initials), menu closed and open, light and dark", async ({
-  browser,
-}) => {
-  for (const [scheme, image] of [
-    ["light", PICTURE],
-    ["dark", PICTURE],
-    ["light", undefined],
-    ["dark", undefined],
-  ] as const) {
-    const { context, page, person } = await signedIn(
-      browser,
-      PICTURE,
-      "picture",
-    );
-    await page.emulateMedia({ colorScheme: scheme });
-    const audit = async () =>
-      (await new AxeBuilder({ page }).analyze()).violations.filter(
-        (v) => v.impact === "serious" || v.impact === "critical",
-      );
-    await expect(trigger(page, person.name)).toBeVisible();
-    expect(
-      await audit(),
-      `${scheme}, ${image ? "picture" : "initials"}, closed`,
-    ).toEqual([]);
-    await trigger(page, person.name).click();
-    await expect(page.getByRole("menu")).toBeVisible();
-    // The menu fades in; axe must read its final colours, not a frame of the fade.
-    await page
-      .getByRole("menu")
-      .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    expect(
-      await audit(),
-      `${scheme}, ${image ? "picture" : "initials"}, open`,
-    ).toEqual([]);
-    await context.close();
+// One test per combination (avatar x menu state x colour scheme): each axe scan gets its own timeout
+// budget and its own title, so a failure names the exact combination.
+for (const avatar of ["picture", "initials"] as const) {
+  for (const menu of ["closed", "open"] as const) {
+    for (const scheme of ["light", "dark"] as const) {
+      test(`axe finds nothing serious with the avatar (${avatar}), menu ${menu}, ${scheme}`, async ({
+        browser,
+      }) => {
+        const { context, page, person } = await signedIn(
+          browser,
+          avatar === "picture" ? PICTURE : undefined,
+          "picture",
+        );
+        await page.emulateMedia({ colorScheme: scheme });
+        const audit = async () =>
+          (await new AxeBuilder({ page }).analyze()).violations.filter(
+            (v) => v.impact === "serious" || v.impact === "critical",
+          );
+        await expect(trigger(page, person.name)).toBeVisible();
+        if (menu === "open") {
+          await trigger(page, person.name).click();
+          await expect(page.getByRole("menu")).toBeVisible();
+          // The menu fades in; axe must read its final colours, not a frame of the fade.
+          await page
+            .getByRole("menu")
+            .evaluate((el) =>
+              Promise.all(el.getAnimations().map((a) => a.finished)),
+            );
+        }
+        expect(await audit(), `${scheme}, ${avatar}, ${menu}`).toEqual([]);
+        await context.close();
+      });
+    }
   }
-});
+}
