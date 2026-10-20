@@ -20,7 +20,12 @@ overrides:
 # through puppeteer-core's browser downloader, which Lighthouse CI never calls here: it is given a
 # local Chrome through CHROME_PATH and downloads nothing. Risk: low while that stays true. Real fix:
 # a Lighthouse CI release without puppeteer-core 22, then delete these two ignores.
+# TECH DEBT, dated 2026-10-20: sprintf-js (<=1.1.3, no patched release, GHSA-hp3w-g68c-fv3c, a DoS
+# through unbounded precision specifiers) arrives as @lhci/utils > js-yaml 3 > argparse 1 > sprintf-js
+# and only ever formats our own lighthouserc, so no untrusted format string reaches it. Review
+# trigger: an @lhci/cli release after 0.15.1 (0.15.1 is the latest on 2026-10-20), then delete the ignore.
 auditConfig:
   ignoreGhsas:
     - GHSA-jmr9-qjv8-65gv
     - GHSA-7pqw-9j4j-h8q3
+    - GHSA-hp3w-g68c-fv3c
