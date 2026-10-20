@@ -19,8 +19,8 @@ describe("the time marking an arrival can take", () => {
     ).toBeLessThanOrEqual(maxDuration() - MARGIN_MS);
   });
 
-  it("is the real worst case: 80 s with today's timeouts, so 120 s leaves 40 s", () => {
-    expect(worstCaseMs()).toBe(80_000);
+  it("is the real worst case: 85 s with today's timeouts (two token exchanges counted), so 120 s leaves 35 s", () => {
+    expect(worstCaseMs()).toBe(85_000);
     expect(maxDuration()).toBe(120_000);
     expect(MARGIN_MS).toBeGreaterThanOrEqual(10_000);
   });

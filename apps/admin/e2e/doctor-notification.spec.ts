@@ -249,6 +249,12 @@ test.describe("the arrival email to the doctor", () => {
       "Change to arrived",
       "came back to the desk",
     );
+    // The card's "Updated" tag is raised only for a live (not replayed) event, so seeing it is
+    // evidence that the second arrival came back on this tab's stream as a live event. It lasts 2 s
+    // and the earlier no-show's has long gone (the toasts were awaited), so it is this event's.
+    await expect(page.getByTestId("today-updated").first()).toBeVisible({
+      timeout: 15_000,
+    });
     // Wait for the second arrival to come back on this tab's own stream (the feed now lists
     // three events for the visit: arrived, no-show, arrived), which takes the relay and a poll of
     // the gateway; only then is "no second toast" a statement about a toast that could have come.

@@ -246,11 +246,12 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	// the commit, so a row written before this moment and committed after it is counted as
 	// backlog (its event is not toasted; it still shows in the feed). That is a named limit, and it
 	// fails in the quiet direction. A transaction can straddle the moment only where it writes
-	// SEVERAL audit rows that are streamed in their own right with a clock_timestamp() each, which
-	// is "running late" (one row per patient told): the rows inserted before the moment are
-	// backlog and the ones after are not. An appointment event and the audit row beside it do not
-	// straddle: the audit row of an attendance, veto or booking is not a frame of its own, it only
-	// names who did it on the event.
+	// SEVERAL audit rows that are streamed in their own right, each stamped by its own
+	// clock_timestamp(): "running late" (one row per patient told) and creating an invitation (a
+	// revoke row for each invitation it supersedes, then the create row). Rows inserted before the
+	// moment are backlog and the ones after are not. An appointment event and the audit row beside
+	// it do not straddle: the audit row of an attendance, veto or booking is not a frame of its own,
+	// it only names who did it on the event.
 	var opened time.Time
 	if from != nil {
 		if opened, err = lease.Now(r.Context()); err != nil {
