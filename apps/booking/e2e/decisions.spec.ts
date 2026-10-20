@@ -137,3 +137,16 @@ for (const scheme of ["light", "dark"] as const) {
     ).toEqual([]);
   });
 }
+
+test("the trail reads Home, then Decisions, not Page not found", async ({
+  page,
+}) => {
+  await page.goto("/decisions");
+  const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(trail.getByRole("link", { name: "Home" })).toHaveAttribute(
+    "href",
+    "/",
+  );
+  await expect(trail.locator('[aria-current="page"]')).toHaveText("Decisions");
+  await expect(trail.getByText("Page not found")).toHaveCount(0);
+});

@@ -10,7 +10,13 @@ import { SECURITY_HEADERS, buildCsp } from "../../packages/ui/src/lib/csp";
 // The e2e error fixture is rendered per request too but, as a test page, takes the catch-all policy.
 // `next dev` has no built HTML, so there the pages get 'unsafe-inline'. The two docs pages send their
 // own stricter policy, and the route handlers (/api, /auth, /cron) send HTML to nobody.
-const HASHED_PAGES = ["about", "data", "privacy", "terms"] as const;
+const HASHED_PAGES = [
+  "about",
+  "data",
+  "decisions",
+  "privacy",
+  "terms",
+] as const;
 const NOT_FOUND_PAGE = "_not-found";
 const hashToken = (name: string) => `__INLINE_SCRIPT_HASHES:${name}__`;
 const policyFor = (name: string) =>
