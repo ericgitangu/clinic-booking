@@ -406,7 +406,7 @@ API_WRITES=1 make api-check-prod   # also runs the writes`,
         },
         {
           t: "p",
-          text: "Folder 08 needs a second API because the normal API never books a visit inside its own lead time, so no request to it can produce one that is too close to change. `make api-check` starts that second API on the same database, with only `BOOKING_MIN_LEAD_MINUTES=144000` different. To send folder 08 by hand, run `KEEP_STACK=1 make api-check` and paste the base URLs it prints into the local environment. Against `make up` or production, folder 08's two refusals are skipped.",
+          text: "Folder 08 needs a second API because the normal API never books a visit inside its own lead time, so no request to it can produce one that is too close to change. `make api-check` starts that second API on the same database, with only the minimum lead time different (100 days, set in the compose file that only api-check uses). To send folder 08 by hand, run `KEEP_STACK=1 make api-check` and paste the base URLs it prints into the local environment. Against `make up` or production, folder 08's two refusals are skipped.",
         },
         {
           t: "code",
