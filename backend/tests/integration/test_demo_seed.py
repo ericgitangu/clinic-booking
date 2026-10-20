@@ -204,6 +204,7 @@ async def test_demo_rows_show_in_admin_and_synthetic_rows_do_not(
         assert resp.status_code == 200
         page = resp.json()
         names |= {i["patient_name"] for i in page["items"]}
+        assert all(i["avatar_url"] is None for i in page["items"])  # demo patients: initials
         if not page["next_cursor"]:
             break
         cursor = f"&cursor={page['next_cursor']}"

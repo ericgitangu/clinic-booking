@@ -119,10 +119,12 @@ async def list_appointments(
     cursor: str | None = None,
     who: Principal = Depends(ANY_STAFF),
     session: AsyncSession = Depends(get_session),
+    principal: Principal = Depends(ANY_STAFF),
 ) -> AdminAppointmentPage:
     response.headers.update(_NO_STORE)
     return await service.appointments(
         session,
+        show_avatars=service.may_see_avatars(principal.role),
         status=status,
         doctor_id=doctor_id,
         start=from_,
@@ -162,9 +164,12 @@ async def get_lineage(
     response: Response,
     appointment_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
+    principal: Principal = Depends(ANY_STAFF),
 ) -> Lineage:
     response.headers.update(_NO_STORE)
-    return await service.lineage(session, appointment_id)
+    return await service.lineage(
+        session, appointment_id, show_avatars=service.may_see_avatars(principal.role)
+    )
 
 
 @identity_router.get("/session", response_model=SessionInfo)
