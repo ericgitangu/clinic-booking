@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { zProblemCode } from "@clinic/api/generated/zod.gen";
 import { DECISIONS } from "@/content/decisions";
+import { ADRS } from "@/content/architecture";
 import {
   BONUS,
   REQUIRED,
@@ -84,6 +85,18 @@ describe("the evidence cards match the contract", () => {
 });
 
 describe("the verification steps and the architecture tiles", () => {
+  it("sends the front-door tile to the front-door decision, and states one cost figure", () => {
+    const door = TILES.find(
+      (t) => "extra" in t && t.extra.label === "Read the front-door decision",
+    );
+    expect(door && "extra" in door && door.extra.href).toBe(
+      "/decisions#adr-0023",
+    );
+    expect(ADRS.find((a) => a.id === "adr-0023")?.title).toMatch(/front door/);
+    const cost = TILES.find((t) => t.title.startsWith("$0"));
+    expect(cost?.body).toContain("about $0.35 a month against a $0.50 ceiling");
+  });
+
   it("has three steps that target the live API", () => {
     expect(STEPS).toHaveLength(3);
     expect(STEPS[0].code).toContain("https://clinic.ericgitangu.com/api");

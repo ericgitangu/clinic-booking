@@ -128,6 +128,10 @@ describe("landing page", () => {
     expect(html).toContain("API=http://localhost:8080");
   });
 
+  it("links the run-locally section next to the local-stack note", () => {
+    expect(html).toContain("#12-run-locally");
+  });
+
   it("links the README sections it cites", () => {
     expect(html).toContain("#2-verify-the-claims-in-10-minutes");
     expect(html).toContain("#11-ai-reflection");

@@ -11,7 +11,7 @@
 # the values to paste into Postman.
 #
 # Production: GET requests only. API_WRITES=1 also runs the booking writes against the live
-# database, which keeps what they make: two patients and one cancelled appointment. Nothing else
+# database, which keeps what they make: two patients and two cancelled appointments. Nothing else
 # turns them on.
 #
 # Only Docker is needed: newman runs from its published image, pinned by digest.
@@ -102,7 +102,7 @@ EOF
     node_check
     args=(-e production.postman_environment.json)
     if [ "${API_WRITES:-0}" = 1 ]; then
-      echo "API_WRITES=1: the booking writes run against production and leave two patients and a cancelled appointment there"
+      echo "API_WRITES=1: the booking writes run against production and leave two patients and two cancelled appointments there"
       args+=(--env-var "writeBaseUrl=$(jq -r '.values[] | select(.key == "baseUrl") | .value' collections/production.postman_environment.json)")
     fi
     newman bridge "${args[@]}"

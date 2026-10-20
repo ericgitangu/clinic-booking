@@ -154,8 +154,10 @@ export const TILES = [
   {
     title: "Cloud Run is IAM-only, behind a Vercel proxy",
     body: "Nothing public reaches the API directly. Only named service identities may call it (the web apps and a smoke-test account), and /api forwards requests with a short-lived token.",
-    decision: "hosting-and-cost",
-    label: "Read the front-door decision",
+    extra: {
+      href: "/decisions#adr-0023",
+      label: "Read the front-door decision",
+    },
   },
   {
     title: "Tested on every pull request, deployed on merge",
@@ -167,7 +169,7 @@ export const TILES = [
   },
   {
     title: "$0, with one stated exception",
-    body: "Everything runs inside free tiers. The project shares a billing account whose other projects already used up two free tiers, so it bills about $0.28 a month. The README says so.",
+    body: "Everything runs inside free tiers. The project shares a billing account whose other projects already used up two free tiers, so it bills about $0.35 a month against a $0.50 ceiling. The README says so.",
     decision: "hosting-and-cost",
     label: "Read the hosting and cost decision",
     extra: {
