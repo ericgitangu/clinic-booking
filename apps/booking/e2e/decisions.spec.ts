@@ -64,7 +64,7 @@ test("shows no draft banner once the copy is published", async ({ page }) => {
   await expect(page.getByTestId("draft-banner")).toHaveCount(0);
 });
 
-test("the header reaches /decisions", async ({ page }) => {
+test("the header and the footer both reach /decisions", async ({ page }) => {
   await page.goto("/about");
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -72,6 +72,12 @@ test("the header reaches /decisions", async ({ page }) => {
     .click();
   await expect(page).toHaveURL(/\/decisions$/);
 
+  await page.goto("/about");
+  await page
+    .getByRole("contentinfo")
+    .getByRole("link", { name: "Architecture decisions" })
+    .click();
+  await expect(page).toHaveURL(/\/decisions$/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Architecture decisions" }),
   ).toBeVisible();

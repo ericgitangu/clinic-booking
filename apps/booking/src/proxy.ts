@@ -15,7 +15,7 @@ import { SITE } from "@/lib/site";
 //    instead of throwing on every request. Checked per request, so a fixed environment takes
 //    effect on the next deploy without code changes.
 // 3. Every page that is rendered per request gets a fresh nonce and the nonce Content-Security-Policy
-//    (packages/ui/src/lib/csp.ts). The pages built once (/about, /architecture, /data, /privacy, /terms, the 404)
+//    (packages/ui/src/lib/csp.ts). The pages built once (/about, /data, /decisions, /privacy, /terms, the 404)
 //    are not matched here; next.config.ts gives them the "inline" policy.
 // The redirect runs before the settings check, so an alias redirects even when sign-in is not
 // configured, and a public page on the branded host never needs the sign-in settings.

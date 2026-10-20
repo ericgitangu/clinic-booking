@@ -12,8 +12,8 @@ import { SECURITY_HEADERS, buildCsp } from "../../packages/ui/src/lib/csp";
 // own stricter policy, and the route handlers (/api, /auth, /cron) send HTML to nobody.
 const HASHED_PAGES = [
   "about",
-  "architecture",
   "data",
+  "decisions",
   "privacy",
   "terms",
 ] as const;

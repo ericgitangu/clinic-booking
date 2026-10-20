@@ -85,8 +85,8 @@ describe("decision record cards", () => {
 });
 
 describe("page anchors", () => {
-  it("are unique, lower-case and dashed", () => {
-    const all = allAnchors();
+  it("are unique, lower-case and dashed, and none reuses a decision's anchor", () => {
+    const all = [...allAnchors(), ...DECISIONS.map((d) => d.id)];
     expect(new Set(all).size).toBe(all.length);
     for (const id of all) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
   });
@@ -99,14 +99,16 @@ describe("page anchors", () => {
       "base-image-cve",
       "rollback",
       "go-gateway",
+      "api-collection",
     ])
       expect(anchors.has(id), id).toBe(true);
   });
 
-  it("names the six tabs in order", () => {
+  it("names the seven tabs in order", () => {
     expect(TABS.map((t) => t.label)).toEqual([
-      "Overview",
-      "Decisions record",
+      "Decisions",
+      "Decision record",
+      "Architecture",
       "Operations",
       "Evidence",
       "API and collections",

@@ -2,7 +2,7 @@
 // out. Strings that say "text" below may use three inline marks and nothing else:
 //   `code`            monospace
 //   **bold**          bold
-//   [label](target)   a link. target is "#anchor" (a card on this page), "/decisions#id" (the
+//   [label](target)   a link. target is "#anchor" (a card on this page), "/decisions#<entry>" (the
 //                     decisions page), another site path like "/docs", or an https:// address.
 // No raw HTML. A unit test checks every link target resolves.
 

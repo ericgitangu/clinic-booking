@@ -30,6 +30,12 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
         external: false,
         icon: "code",
       },
+      {
+        label: "API collection (Newman)",
+        href: "/decisions#api-collection",
+        external: false,
+        icon: "terminal",
+      },
     ],
   },
   {
@@ -43,8 +49,8 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
         icon: "docs",
       },
       {
-        label: "Architecture",
-        href: "/architecture",
+        label: "Architecture decisions",
+        href: "/decisions",
         external: false,
         icon: "list",
       },

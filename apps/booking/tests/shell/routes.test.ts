@@ -26,7 +26,6 @@ describe("booking route list", () => {
     ["/privacy", "/", "Home"],
     ["/terms", "/", "Home"],
     ["/data", "/", "Home"],
-    ["/architecture", "/", "Home"],
     ["/docs", "/", "Home"],
     ["/redoc", "/", "Home"],
     ["/no/such/page", "/", "Home"],

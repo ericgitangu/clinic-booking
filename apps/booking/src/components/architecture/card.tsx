@@ -1,10 +1,26 @@
-import { ChevronDown } from "lucide-react";
 import type { AdrCard, Card } from "@/content/architecture/types";
 import { Blocks } from "./blocks";
 import { Inline } from "./inline";
 
 const SUMMARY =
   "flex min-h-14 cursor-pointer list-none items-start gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 rounded-xl";
+// A plain SVG, not an icon component: the fragments are rendered outside a React client tree.
+function ChevronDown({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
 const CHEVRON =
   "mt-1.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none";
 const LABEL = "font-heading text-sm font-semibold text-foreground";
@@ -28,7 +44,7 @@ export function InfoCard({ card, open }: { card: Card; open?: boolean }) {
             </span>
           ) : null}
         </span>
-        <ChevronDown aria-hidden="true" className={CHEVRON} />
+        <ChevronDown className={CHEVRON} />
       </summary>
       <div className="border-t border-border px-4 py-5 sm:px-5">
         <Blocks blocks={card.blocks} />
@@ -60,7 +76,7 @@ export function RecordCard({ adr }: { adr: AdrCard }) {
             {adr.status}
           </span>
         </span>
-        <ChevronDown aria-hidden="true" className={CHEVRON} />
+        <ChevronDown className={CHEVRON} />
       </summary>
       <dl className="grid border-t border-border md:grid-cols-2">
         <div className="border-l-4 border-primary px-4 py-4 sm:px-5 md:col-span-2">

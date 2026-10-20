@@ -303,8 +303,8 @@ export const API: TabContent = {
       ],
     },
     {
-      id: "postman-collection",
-      title: "Postman collection and environments",
+      id: "api-collection",
+      title: "API collection: newman and Postman",
       summary:
         "A reviewer journey through the API, runnable in Postman or with newman.",
       blocks: [
@@ -363,6 +363,56 @@ API_WRITES=1 make api-check-prod   # also runs the writes`,
           code: `newman run collections/clinic-booking.postman_collection.json \\
   -e collections/local.postman_environment.json`,
           caption: "newman by hand, against the `make up` stack.",
+        },
+        {
+          t: "table",
+          caption: "The nine folders of the journey, in the order they run.",
+          head: ["Folder", "What it shows"],
+          rows: [
+            ["01 Health", "`/health`, `/ready` and the error catalogue."],
+            [
+              "02 Doctors",
+              "The seeded doctors. The first is used from here on.",
+            ],
+            [
+              "03 Slots",
+              "Free slots on the first day from tomorrow that has at least two, found a day at a time, up to 14 days.",
+            ],
+            [
+              "04 Book with an Idempotency-Key",
+              "A booking, its replay (same id, `Idempotent-Replayed: true`), the same key with another time (`422 IDEMPOTENCY_KEY_REUSED`), and the patient's list.",
+            ],
+            [
+              "05 Double booking",
+              "A second patient on the same slot gets `409 SLOT_TAKEN`.",
+            ],
+            [
+              "06 Too soon",
+              "A booking and a reschedule inside the lead time get `422 BOOKING_TOO_SOON`.",
+            ],
+            [
+              "07 Reschedule and cancel",
+              "Move, repeat the move, cancel, cancel again (`409 APPOINTMENT_ALREADY_CANCELLED`), reuse the key (`409 IDEMPOTENCY_KEY_CONSUMED`).",
+            ],
+            [
+              "08 Change inside the lead time",
+              "Cancel and reschedule a visit through a second API with a 100 day lead time and get `409 CHANGE_TOO_LATE`.",
+            ],
+            [
+              "09 Validation errors",
+              "Bad ids, missing fields, a time without an offset, off the grid, outside working hours, unknown doctor, and 404s.",
+            ],
+          ],
+        },
+        {
+          t: "p",
+          text: "Folder 08 needs a second API because the normal API never books a visit inside its own lead time, so no request to it can produce one that is too close to change. `make api-check` starts that second API on the same database, with only `BOOKING_MIN_LEAD_MINUTES=144000` different. To send folder 08 by hand, run `KEEP_STACK=1 make api-check` and paste the base URLs it prints into the local environment. Against `make up` or production, folder 08's two refusals are skipped.",
+        },
+        {
+          t: "code",
+          lang: "bash",
+          code: `KEEP_STACK=1 make api-check`,
+          caption: "Keep the stack up so folder 08 can be sent by hand.",
         },
         {
           t: "p",

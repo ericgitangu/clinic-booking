@@ -11,7 +11,7 @@ import type { AdrCard, Card, TabContent } from "./types";
 export { ADR_INTRO, ADR_STATUS_NOTE };
 
 export const PAGE_INTRO =
-  "Everything a reviewer needs beyond the README: how the system fits together, why each choice was made, how it is run, what I observed on the live stack and how to call the API.";
+  "The other tabs hold the rest of the working: the full decision record, how the system fits together, how it is run, what I observed on the live stack, and how to call the API.";
 
 export const ADRS: readonly AdrCard[] = [...ADRS_1, ...ADRS_2, ...ADRS_3];
 
@@ -29,19 +29,29 @@ export const SCREENSHOTS_TAB: TabContent = {
   })),
 };
 
-/** The records tab has its own card type, so it carries no `cards`. */
-export const RECORD_TAB = {
-  id: "decisions-record",
-  label: "Decisions record",
-} as const;
+/** The first tab is the decisions page's own ten entries, rendered by the page itself. */
+export const DECISIONS_TAB = { id: "decisions", label: "Decisions" } as const;
 
-export const TABS: readonly { id: string; label: string }[] = [
-  { id: OVERVIEW.id, label: OVERVIEW.label },
+/** The records tab has its own card type, so it carries no `cards`. */
+export const RECORD_TAB = { id: "record", label: "Decision record" } as const;
+
+export type TabId =
+  | "decisions"
+  | "record"
+  | "architecture"
+  | "operations"
+  | "evidence"
+  | "api"
+  | "screenshots";
+
+export const TABS: readonly { id: TabId; label: string }[] = [
+  DECISIONS_TAB,
   RECORD_TAB,
-  { id: OPERATIONS.id, label: OPERATIONS.label },
-  { id: EVIDENCE.id, label: EVIDENCE.label },
-  { id: API.id, label: API.label },
-  { id: SCREENSHOTS_TAB.id, label: SCREENSHOTS_TAB.label },
+  { id: OVERVIEW.id as TabId, label: OVERVIEW.label },
+  { id: OPERATIONS.id as TabId, label: OPERATIONS.label },
+  { id: EVIDENCE.id as TabId, label: EVIDENCE.label },
+  { id: API.id as TabId, label: API.label },
+  { id: SCREENSHOTS_TAB.id as TabId, label: SCREENSHOTS_TAB.label },
 ];
 
 export const CARD_TABS: readonly TabContent[] = [
@@ -52,7 +62,15 @@ export const CARD_TABS: readonly TabContent[] = [
   SCREENSHOTS_TAB,
 ];
 
-/** Every anchor id the page defines: tabs, cards and records. */
+/** Card id to the tab that holds it, for every card that is loaded on demand. */
+export function cardTabs(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const t of CARD_TABS) for (const c of t.cards) map[c.id] = t.id;
+  for (const a of ADRS) map[a.id] = RECORD_TAB.id;
+  return map;
+}
+
+/** Every anchor id the page defines on top of the ten decisions: tabs, cards and records. */
 export function allAnchors(): string[] {
   return [
     ...TABS.map((t) => t.id),

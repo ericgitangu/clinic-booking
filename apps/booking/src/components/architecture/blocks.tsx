@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { DIAGRAMS } from "@/content/architecture/diagrams";
 import { SCREENSHOTS } from "@/content/architecture/screenshots";
 import type { Block } from "@/content/architecture/types";
@@ -98,22 +97,24 @@ function Diagram({ id }: { id: keyof typeof DIAGRAMS }) {
       >
         {/* Natural size up to 1200px, so the text stays readable; a narrower screen scrolls inside the box. */}
         <div style={{ minWidth: Math.min(d.width, 1200) }}>
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element -- static files with explicit size; the fragments render outside the client tree, where next/image cannot */}
+          <img
             src={d.light}
             alt=""
             width={d.width}
             height={d.height}
-            unoptimized
             loading="lazy"
+            decoding="async"
             className="h-auto w-full dark:hidden"
           />
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element -- static files with explicit size; the fragments render outside the client tree, where next/image cannot */}
+          <img
             src={d.dark}
             alt=""
             width={d.width}
             height={d.height}
-            unoptimized
             loading="lazy"
+            decoding="async"
             className="hidden h-auto w-full dark:block"
           />
         </div>
@@ -134,22 +135,24 @@ function Shot({ id }: { id: string }) {
   if (!s) return null;
   return (
     <figure className="min-w-0">
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element -- static files with explicit size; the fragments render outside the client tree, where next/image cannot */}
+      <img
         src={s.light}
         alt={s.alt}
         width={s.width}
         height={s.height}
-        unoptimized
         loading="lazy"
+        decoding="async"
         className="h-auto w-full rounded-md border border-border dark:hidden"
       />
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element -- static files with explicit size; the fragments render outside the client tree, where next/image cannot */}
+      <img
         src={s.dark}
         alt={s.alt}
         width={s.width}
         height={s.height}
-        unoptimized
         loading="lazy"
+        decoding="async"
         className="hidden h-auto w-full rounded-md border border-border dark:block"
       />
       <figcaption className="mt-2 text-sm text-muted-foreground">

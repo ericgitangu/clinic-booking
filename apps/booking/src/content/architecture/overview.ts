@@ -1,8 +1,8 @@
 import type { TabContent } from "./types";
 
 export const OVERVIEW: TabContent = {
-  id: "overview",
-  label: "Overview",
+  id: "architecture",
+  label: "Architecture",
   intro:
     "The system as built, checked against the code on main. Names in the diagrams are the real ones: jobs in the CircleCI config, services in the infra folder, modules under the backend.",
   cards: [
