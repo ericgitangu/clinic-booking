@@ -514,6 +514,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_id": {
             "format": "uuid",
             "title": "Patient Id",
@@ -552,6 +556,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at"
         ],
@@ -633,6 +638,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_id": {
             "format": "uuid",
             "title": "Patient Id",
@@ -671,6 +680,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at",
           "doctor"
@@ -3362,6 +3372,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_email": {
             "anyOf": [
               {
@@ -3427,6 +3441,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at",
           "audit_id",

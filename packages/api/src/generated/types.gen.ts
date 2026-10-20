@@ -278,6 +278,10 @@ export type Appointment = {
      */
     id: string;
     /**
+     * Locked
+     */
+    locked: boolean;
+    /**
      * Patient Id
      */
     patient_id: string;
@@ -346,6 +350,10 @@ export type AppointmentWithDoctor = {
      * Id
      */
     id: string;
+    /**
+     * Locked
+     */
+    locked: boolean;
     /**
      * Patient Id
      */
@@ -1965,6 +1973,10 @@ export type StaffAppointmentChange = {
      * Id
      */
     id: string;
+    /**
+     * Locked
+     */
+    locked: boolean;
     /**
      * Patient Email
      */
