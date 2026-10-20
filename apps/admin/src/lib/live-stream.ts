@@ -14,7 +14,6 @@
 // One browser holds one of these at a time: live-share.ts elects a leader tab that owns it and
 // passes its events to the other tabs.
 import { createSseParser } from "@clinic/api/realtime";
-import { after } from "@/lib/live-events";
 
 export type LiveStatus =
   | "connecting"
@@ -33,9 +32,8 @@ export const BUSY_RETRY_MAX_MS = 4 * 60_000;
 export interface LiveStreamOptions {
   /**
    * Called with each event frame's SSE id, event name and data. `replay` is true for a frame that
-   * is part of the catch-up after a resume: it was already committed when this connection was made
-   * (its id is below the `horizon` the hello frame carries), so it happened while this client was
-   * away, not just now. A gateway that sends no horizon marks nothing as replay.
+   * is part of the backlog the gateway sent after a resume: the gateway tags those frames itself
+   * (`replay: true`) and this trusts that tag alone. Frames it does not tag are live.
    */
   onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
@@ -243,13 +241,10 @@ export class LiveStream {
     this.set("live");
 
     let closeReason: string | null = null;
-    // The gateway's horizon at connect: every row below it was committed before this connection.
-    let horizon: string | null = null;
     const parser = createSseParser((f) => {
       if (f.kind !== "event") return;
       if (f.id) this.lastId = f.id;
       if (f.event === "hello") {
-        horizon = horizonOf(f.data);
         this.o.onHello?.(f.id ?? "", f.data);
         return;
       }
@@ -257,11 +252,7 @@ export class LiveStream {
         closeReason = f.event === "idle" ? "idle" : this.reason(f.data);
         return;
       }
-      const replay =
-        horizon !== null &&
-        SEQ.test(f.id ?? "") &&
-        after(horizon, f.id as string);
-      this.o.onEvent(f.id ?? "", f.event, f.data, replay);
+      this.o.onEvent(f.id ?? "", f.event, f.data, f.replay);
     });
     const reader = res.body.getReader();
     try {
@@ -308,17 +299,5 @@ export class LiveStream {
     this.startRefreshing();
     const { baseMs, maxMs } = this.o.backoff ?? { baseMs: 2000, maxMs: 30_000 };
     this.later(Math.min(baseMs * 2 ** this.failures++, maxMs));
-  }
-}
-
-const SEQ = /^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/;
-
-/** The horizon in a hello frame's data, if it has a well-formed one. */
-function horizonOf(data: string): string | null {
-  try {
-    const h = (JSON.parse(data) as { horizon?: unknown }).horizon;
-    return typeof h === "string" && SEQ.test(h) ? h : null;
-  } catch {
-    return null;
   }
 }

@@ -7,8 +7,10 @@
 //   1. claim the notification (POST /internal/admin/doctor-notifications/{id}/claim). The API
 //      hands out the send once, with a lease, and counts the attempt; nothing to send means
 //      already sent, skipped, out of attempts or held by another sender. A claim call that fails
-//      is logged with its code and nothing is recorded: the row stays pending, the sheet offers a
-//      resend once nothing has claimed it for a couple of minutes, and the claim is the same.
+//      is logged with its code and nothing is recorded: the row stays pending and, if the claim
+//      never committed, the sheet offers a resend after 2 minutes (UNCLAIMED_GRACE in the API). If
+//      the claim DID commit and its answer was lost, the row is held for the 15 minute lease
+//      (REMINDER_LEASE_MINUTES) before the sheet offers one, because the claim may be a live send.
 //      Every result below names the attempt the claim returned, so a sender whose lease ran out
 //      cannot overwrite a newer claim.
 //   2. no RESEND_API_KEY here: record it as skipped (not_configured) and stop.
@@ -21,9 +23,15 @@
 //      it is reused with a different payload, so a repeat to the SAME address (a timeout whose
 //      email did go out) returns the first result and sends nothing new, while a resend after the
 //      address was corrected is a new key and is not refused.
-//   5. only after the provider accepted it: record it as sent, with the provider's id (tried up to
-//      three times, since the email has gone and the row must say so). A refusal, timeout or throw
-//      gives the reserved unit back and records the attempt as failed.
+//   5. only after the provider accepted it: record it as sent, with the provider's id (tried twice,
+//      since the email has gone and the row must say so). A refusal, timeout or throw gives the
+//      reserved unit back and records the attempt as failed, so a resend is offered at once and
+//      not after the 15 minute lease. If every try at recording a SENT result is lost, the row
+//      reads as not sent after the lease and a resend would reserve a second unit of allowance
+//      (Resend dedupes the email itself for 24 hours); that is a named limit.
+//
+// Time: five calls at most (claim, reserve, send, two results), each cut off after 5 s, so about
+// 25 s, off the request path. The dashboard sets maxDuration = 60 for it (app/dashboard/layout.tsx).
 //
 // It never throws. Logs carry ids and outcomes only: no address, no name.
 import "server-only";
@@ -83,6 +91,26 @@ export async function sendDoctorArrival(
   const { caller, id } = input;
   let taken: { day: string; month: string } | undefined;
   let spent = false;
+  let claimedJob: DoctorNoticeToSend | undefined;
+  /** A result for the claim this call holds; `tries` > 1 is for the one that must not be lost. */
+  const finish = async (
+    body: Omit<DoctorNoticeFinish, "attempt">,
+    tries = 1,
+  ) => {
+    if (!claimedJob) return;
+    for (let n = 1; n <= tries; n++) {
+      const r = await ports.finish(caller, id, {
+        ...body,
+        attempt: claimedJob.attempt,
+      });
+      if (r.ok) return;
+      logError("doctor email: the result was not recorded", {
+        notice: id,
+        code: r.code,
+        try: n,
+      });
+    }
+  };
   try {
     const claimed = await ports.claim(caller, id);
     if (!claimed.ok) {
@@ -94,25 +122,7 @@ export async function sendDoctorArrival(
     }
     if (claimed.data === null) return "nothing-to-send";
     const job = claimed.data;
-    // A result names the attempt this claim returned. `tries` > 1 is for the one result that must
-    // not be lost: the email went out.
-    const finish = async (
-      body: Omit<DoctorNoticeFinish, "attempt">,
-      tries = 1,
-    ) => {
-      for (let n = 1; n <= tries; n++) {
-        const r = await ports.finish(caller, id, {
-          ...body,
-          attempt: job.attempt,
-        });
-        if (r.ok) return;
-        logError("doctor email: the result was not recorded", {
-          notice: id,
-          code: r.code,
-          try: n,
-        });
-      }
-    };
+    claimedJob = job;
 
     if (!emailConfigured()) {
       await finish({ outcome: "skipped", reason: "not_configured" });
@@ -172,7 +182,7 @@ export async function sendDoctorArrival(
       return "send-failed";
     }
     spent = true;
-    await finish({ outcome: "sent", provider_id: sent.id }, 3);
+    await finish({ outcome: "sent", provider_id: sent.id }, 2);
     return "sent";
   } catch (err) {
     logError("doctor email failed", {
@@ -180,7 +190,15 @@ export async function sendDoctorArrival(
       // The name of the error only: its message could carry an address.
       detail: err instanceof Error ? err.name : "unknown",
     });
-    // Whatever was claimed is left: its lease runs out and the sheet then offers a resend.
+    // After a claim, say it failed (for that attempt) so a resend is offered at once and not after
+    // the lease; nothing to say when it was sent or never claimed.
+    if (!spent) {
+      try {
+        await finish({ outcome: "failed", error: "Unexpected error." });
+      } catch {
+        // already in the log; the lease runs out and the row can be claimed again
+      }
+    }
     return spent ? "sent" : "error";
   } finally {
     if (taken && !spent) {

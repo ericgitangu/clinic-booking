@@ -4188,13 +4188,13 @@ export type ReleaseEmailInternalEmailsReleasePostResponse = ReleaseEmailInternal
 export type ReserveEmailInternalEmailsReservePostData = {
     body?: never;
     path?: never;
-    query?: {
+    query: {
         /**
          * Purpose
          *
-         * `ack`: a booking acknowledgement, which may use the whole allowance (the default, so the patient app is unchanged). `other`: any other email (staff emails, the doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the room kept for acknowledgements cannot be used up by them.
+         * Required, so every sender says which it is. `ack`: a booking acknowledgement, which may use the whole day. `other`: any other email (reminders, staff emails, the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by them. The month has no reserve.
          */
-        purpose?: 'ack' | 'other';
+        purpose: 'ack' | 'other';
     };
     url: '/internal/emails/reserve';
 };

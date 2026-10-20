@@ -17,3 +17,8 @@ export function isOwn(appointmentId: string, now = Date.now()): boolean {
   }
   return true;
 }
+
+/** The change did not go through: other people's events about it must not be held back. */
+export function forgetOwn(appointmentId: string): void {
+  mine.delete(appointmentId);
+}

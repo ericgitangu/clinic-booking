@@ -25,8 +25,10 @@ export type Reservation = EmailReservation;
 export const STAFF_FROM = `Idyllic Clinic <${FROM_ADDRESS}>`;
 
 // Every outbound call in the path is bounded the same way: reserve, release, notified and the Resend
-// send each give up after this long, so the whole path is at most four of them (about 20 s), and it
-// runs after the response so it never delays the staff member.
+// send each give up after this long, so a staff email is at most four of them (about 20 s), and it
+// runs after the response so it never delays the staff member. The doctor's arrival email also
+// claims the notification and records the result (twice at most): five calls, about 25 s (see
+// emails/doctor-arrival.ts), under the dashboard's maxDuration.
 export const CALL_TIMEOUT_MS = 5_000;
 
 export type Failure = { ok: false; code: string };

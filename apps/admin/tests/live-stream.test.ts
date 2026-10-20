@@ -363,23 +363,26 @@ describe("LiveStream: replay after a resume", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  const hello = (id: string, horizon: string) =>
-    `id: ${id}\nevent: hello\ndata: ${JSON.stringify({ cursor: id, horizon })}\n\n`;
+  const hello = (id: string) =>
+    `id: ${id}\nevent: hello\ndata: ${JSON.stringify({ cursor: id })}\n\n`;
+  const backlog = (id: string, event: string) =>
+    `id: ${id}\nevent: ${event}\nreplay: true\ndata: {"x":1}\n\n`;
+  const live = (id: string, event: string) =>
+    `id: ${id}\nevent: ${event}\ndata: {"x":1}\n\n`;
 
-  it("marks the rows below the horizon as replay and the ones at or above it as live, whatever the timing", async () => {
+  it("passes on the gateway's replay tag and nothing else, whatever the timing", async () => {
     const a = sse();
     const t = setup([a.response], { cursor: "5.0" });
     t.streams.push(a);
     t.live.start();
     await tick();
-    a.push(hello("5.0", "9.0"));
-    a.push('id: 5.1\nevent: booked\ndata: {"x":1}\n\n');
-    a.push('id: 8.7\nevent: arrived\ndata: {"x":2}\n\n');
-    // A real event right after the replay, with no gap at all: live, because its txid is not
-    // below the horizon.
-    a.push('id: 9.1\nevent: arrived\ndata: {"x":3}\n\n');
+    a.push(hello("5.0"));
+    a.push(backlog("5.1", "booked"));
+    a.push(backlog("8.7", "arrived"));
+    // A real event straight after the backlog, with no gap at all: not tagged, so live.
+    a.push(live("9.1", "arrived"));
     await tick();
-    a.push('id: 12.1\nevent: booked\ndata: {"x":4}\n\n');
+    a.push(live("12.1", "booked"));
     await tick(3000);
     expect(t.events).toEqual([
       "5.1:booked:replay",
@@ -389,38 +392,38 @@ describe("LiveStream: replay after a resume", () => {
     ]);
   });
 
-  it("a fresh connection starts at the horizon, so nothing it sends is replay", async () => {
+  it("does not guess from ids or cursors: an untagged frame is live even on a resumed stream", async () => {
+    const a = sse();
+    const t = setup([a.response], { cursor: "5.0" });
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push(hello("5.0"));
+    a.push(live("5.1", "booked")); // an old id, but the gateway did not call it replay
+    await tick();
+    expect(t.events).toEqual(["5.1:booked"]);
+  });
+
+  it("a fresh stream's frames are live", async () => {
     const a = sse();
     const t = setup([a.response]);
     t.streams.push(a);
     t.live.start();
     await tick();
-    a.push(hello("9.0", "9.0"));
-    a.push('id: 9.1\nevent: booked\ndata: {"x":1}\n\n');
+    a.push(hello("9.0"));
+    a.push(live("9.1", "booked"));
     await tick();
     expect(t.events).toEqual(["9.1:booked"]);
   });
 
-  it("marks nothing as replay when the gateway sent no horizon", async () => {
+  it("ignores a replay field with any other value", async () => {
     const a = sse();
     const t = setup([a.response], { cursor: "5.0" });
     t.streams.push(a);
     t.live.start();
     await tick();
-    a.push("id: 5.0\nevent: hello\ndata: {}\n\n");
-    a.push('id: 5.1\nevent: booked\ndata: {"x":1}\n\n');
-    await tick();
-    expect(t.events).toEqual(["5.1:booked"]);
-  });
-
-  it("ignores a malformed horizon", async () => {
-    const a = sse();
-    const t = setup([a.response], { cursor: "5.0" });
-    t.streams.push(a);
-    t.live.start();
-    await tick();
-    a.push(hello("5.0", "not-a-seq"));
-    a.push('id: 5.1\nevent: booked\ndata: {"x":1}\n\n');
+    a.push(hello("5.0"));
+    a.push('id: 5.1\nevent: booked\nreplay: yes\ndata: {"x":1}\n\n');
     await tick();
     expect(t.events).toEqual(["5.1:booked"]);
   });

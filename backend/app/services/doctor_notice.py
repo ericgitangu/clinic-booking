@@ -40,6 +40,8 @@ from app.schemas.doctor_notice import (
 MAX_ATTEMPTS = 3
 # A pending row nobody has claimed this long after it was written is not going to be sent by the
 # after() that was meant to (it was cut off, or its claim call failed): the sheet offers a resend.
+# A row that WAS claimed is held for the lease (REMINDER_LEASE_MINUTES, 15) before the same is
+# true of it: the claim may be a live send, and a resend must not race it.
 UNCLAIMED_GRACE = timedelta(minutes=2)
 
 
@@ -55,10 +57,15 @@ def _state(
     retryable = False
     if now is not None and lease is not None:
         leased_at = row.get("leased_at")
+        held = leased_at is not None and leased_at >= now - lease
         if status == "failed":
-            retryable = attempts < MAX_ATTEMPTS
+            if held:
+                # A resend is being sent right now (the claim sets the lease, the result clears it):
+                # it is in flight, so not for another resend, and it reads as on its way.
+                status = "pending"
+            else:
+                retryable = attempts < MAX_ATTEMPTS
         elif status == "pending":
-            held = leased_at is not None and leased_at >= now - lease
             unclaimed = leased_at is None and row["updated_at"] < now - UNCLAIMED_GRACE
             gone = leased_at is not None and not held
             if unclaimed or gone:

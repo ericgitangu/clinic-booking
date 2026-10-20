@@ -152,19 +152,14 @@ test.describe("the arrival email to the doctor", () => {
     const back = tabA.getByRole("dialog", { name: "Change to arrived?" });
     await back.getByLabel("Reason").fill("came back to the desk");
     await back.getByRole("button", { name: "Change to arrived" }).click();
-    await expect(tabA.getByText(/^Marked arrived\./)).toBeVisible();
+    // The person who marked it sees one toast, and it already says "doctor emailed": the server
+    // action found the row sent, so it scheduled no send. Nothing waits on a clock here.
+    await expect(
+      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+    ).toBeVisible();
     await expect
-      .poll(
-        async () => (await mailTo(DOCTOR_EMAIL)).sent.slice(before).length,
-        {
-          timeout: 4000,
-          intervals: [500],
-        },
-      )
+      .poll(async () => (await mailTo(DOCTOR_EMAIL)).sent.slice(before).length)
       .toBe(1);
-    // ...and stays one while anything that was going to run has had time to.
-    await tabA.waitForTimeout(3000);
-    expect((await mailTo(DOCTOR_EMAIL)).sent.slice(before)).toHaveLength(1);
     expect(await notice(visit.id)).toMatchObject({ status: "sent", attempts });
     await allowMailTo(DOCTOR_EMAIL);
     await setDoctorEmail(visit.doctorId, null);
@@ -252,21 +247,37 @@ test.describe("the arrival email to the doctor", () => {
         asked.push(r.url());
     });
     await onDashboard(page);
+    // Every text a toast on this page shows from now on is kept, so the whole life of the toast
+    // is looked at, not one moment of it.
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      (window as unknown as { __toastTexts: string[] }).__toastTexts = seen;
+      new MutationObserver(() => {
+        for (const t of document.querySelectorAll("[data-sonner-toast]"))
+          seen.push((t as HTMLElement).innerText);
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+      });
+    });
     await arrive(visit.id);
     const toast = page
       .locator("[data-sonner-toast]")
       .filter({ hasText: "Marked arrived" });
     await expect(toast.first()).toBeVisible({ timeout: 2000 });
-    // Past the first look an owner's toast makes (2.5 s) and still on screen (toasts last 6 s).
-    await page.waitForTimeout(4000);
-    const text = (
-      await toast.first().innerText({ timeout: 1500 })
-    ).toLowerCase();
-    expect(text).not.toContain(visit.name.toLowerCase());
-    expect(text).not.toContain("email");
-    expect(text).not.toContain("doctor.e2e");
-    // Then past the last look (15 s): the page never asked about the email.
-    await page.waitForTimeout(13_000);
+    await expect(toast.first()).toHaveText(/^Marked arrived: [^·]*$/);
+    // The toast runs its course (it closes by itself); nothing is added to it on the way.
+    await expect(toast).toHaveCount(0, { timeout: 30_000 });
+    const texts = await page.evaluate(
+      () => (window as unknown as { __toastTexts: string[] }).__toastTexts,
+    );
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts.map((t) => t.toLowerCase())) {
+      expect(text).not.toContain(visit.name.toLowerCase());
+      expect(text).not.toContain("email");
+      expect(text).not.toContain("doctor.e2e");
+    }
     // A viewer's page never asks about the email, and never carried the address.
     expect(asked).toEqual([]);
     expect(await page.content()).not.toContain(DOCTOR_EMAIL);

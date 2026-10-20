@@ -5,7 +5,10 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { notify } from "@clinic/ui/lib/notify";
 import { retryDoctorEmail } from "@/lib/actions";
 import type { DoctorNoticeView } from "@/lib/detail-read";
-import { watchDoctorNotice } from "@/lib/doctor-notice-read";
+import {
+  SHEET_RECHECK_AFTER_MS,
+  watchDoctorNotice,
+} from "@/lib/doctor-notice-read";
 import { sheetLead, sheetLine } from "@/lib/doctor-notice-words";
 
 /**
@@ -34,7 +37,13 @@ export function DoctorNoticeLine({
   useEffect(() => {
     if (first.status !== "pending" || first.retryable) return;
     let alive = true;
-    void watchDoctorNotice(appointmentId, setNotice, () => alive);
+    // Looks until the row is final or can be sent again (2 minutes on, for an arrival nobody
+    // claimed), and only while this tab is in front.
+    void watchDoctorNotice(appointmentId, setNotice, {
+      alive: () => alive,
+      delays: SHEET_RECHECK_AFTER_MS,
+      done: (n) => n.status !== "pending" || n.retryable,
+    });
     return () => {
       alive = false;
     };
@@ -49,7 +58,11 @@ export function DoctorNoticeLine({
       aria-live="polite"
     >
       <p className="text-sm">
-        <span className="font-medium">{sheetLead(notice)}</span>{" "}
+        {sheetLead(notice) && (
+          <>
+            <span className="font-medium">{sheetLead(notice)}</span>{" "}
+          </>
+        )}
         {sheetLine(notice)}
       </p>
       {mayRetry && (

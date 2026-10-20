@@ -1728,7 +1728,7 @@ export const zReleaseEmailInternalEmailsReleasePostBody = zEmailRelease;
 export const zReleaseEmailInternalEmailsReleasePostResponse = zEmailBudget;
 
 export const zReserveEmailInternalEmailsReservePostQuery = z.object({
-    purpose: z.enum(['ack', 'other']).optional().default('ack')
+    purpose: z.enum(['ack', 'other'])
 });
 
 /**

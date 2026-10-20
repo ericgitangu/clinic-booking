@@ -243,35 +243,55 @@ func TestSSEHeadersAreProxySafeAndFirstFrameIsPrompt(t *testing.T) {
 	}
 	var hello struct {
 		Role     string `json:"role"`
-		Horizon  string `json:"horizon"`
-		Cursor   string `json:"cursor"`
 		Lifetime int    `json:"lifetime_seconds"`
 		Idle     int    `json:"idle_seconds"`
 	}
 	if err := json.Unmarshal([]byte(f.Data), &hello); err != nil || hello.Role != "owner" || hello.Lifetime != 30 || hello.Idle != 30 {
 		t.Fatalf("hello = %+v (%v)", hello, err)
 	}
-	// A fresh connection starts at the horizon, and says so.
-	if hello.Horizon == "" || hello.Horizon != hello.Cursor {
-		t.Fatalf("hello horizon %q, cursor %q: a fresh stream starts at the horizon", hello.Horizon, hello.Cursor)
-	}
+
 }
 
-// A resumed stream starts at the cursor it was given and reports where the horizon is, so the client
-// can tell the backlog it is sent (below the horizon) from what happens after it connected.
-func TestResumeHelloCarriesTheCursorAndTheHorizon(t *testing.T) {
-	h := start(t, nil)
-	s := h.open(asOwner, q("cursor", "1.1"))
-	f, ok := s.nextEvent(t, 3*time.Second)
-	if !ok || f.Event != "hello" || f.ID != "1.1" {
-		t.Fatalf("hello %+v: a resume starts at the cursor it was given", f)
+// A resumed stream tags the backlog it sends with "replay: true" and nothing it sends after that;
+// a fresh stream tags nothing. The tag is the only thing the client trusts.
+func TestResumedStreamTagsTheBacklogAsReplayAndNothingAfter(t *testing.T) {
+	h := start(t, func(c *config.Config) { c.MaxStreamsPerInstance = 3; c.MaxStreamsPerPerson = 3 })
+	api := h.env.NewAPI(t)
+	doctor := api.Doctor()
+
+	first := h.hello(asOwner, q())
+	api.Book(doctor)
+	api.Book(doctor)
+	api.Book(doctor)
+	var ids []string
+	for range 3 {
+		f, ok := first.nextEvent(t, 5*time.Second)
+		if !ok || f.Event != "booked" {
+			t.Fatalf("got %+v", f)
+		}
+		if f.Replay {
+			t.Fatalf("a fresh stream tagged %+v as replay", f)
+		}
+		ids = append(ids, f.ID)
 	}
-	var hello struct {
-		Cursor  string `json:"cursor"`
-		Horizon string `json:"horizon"`
+	first.close()
+
+	second := h.open(asOwner, q("cursor", ids[0]))
+	hello, _ := second.nextEvent(t, 5*time.Second)
+	if hello.Event != "hello" || hello.Replay {
+		t.Fatalf("hello %+v: the hello frame is never replay", hello)
 	}
-	if err := json.Unmarshal([]byte(f.Data), &hello); err != nil || hello.Cursor != "1.1" || hello.Horizon == "" || hello.Horizon == "1.1" {
-		t.Fatalf("hello = %+v (%v)", hello, err)
+	for i := 1; i < 3; i++ {
+		f, _ := second.nextEvent(t, 5*time.Second)
+		if f.ID != ids[i] || !f.Replay {
+			t.Fatalf("backlog item %d = %+v, want id %s tagged replay", i, f, ids[i])
+		}
+	}
+	// Something that happens after the stream has drained its backlog is not tagged.
+	api.Book(doctor)
+	live, _ := second.nextEvent(t, 5*time.Second)
+	if live.Event != "booked" || live.Replay {
+		t.Fatalf("an event after the catch-up = %+v, want it untagged", live)
 	}
 }
 

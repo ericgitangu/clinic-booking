@@ -267,7 +267,11 @@ async def test_the_run_limit_applies(
 
 async def reserve(api: httpx.AsyncClient, clock: Clock, **kw: str) -> httpx.Response:
     return await internal(
-        api, clock, "POST", "/internal/emails/reserve", **{"role": "patient", "sub": "sub-x", **kw}
+        api,
+        clock,
+        "POST",
+        "/internal/emails/reserve?purpose=ack",
+        **{"role": "patient", "sub": "sub-x", **kw},
     )
 
 

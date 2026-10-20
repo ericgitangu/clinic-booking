@@ -16,7 +16,9 @@ import {
 import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { notify } from "@clinic/ui/lib/notify";
-import { rememberOwn } from "@/lib/own-actions";
+import { followArrivalToast, WAITING_MS } from "@/lib/arrival-toast";
+import { nextSerial } from "@/lib/live-notices";
+import { forgetOwn, rememberOwn } from "@/lib/own-actions";
 import type { ActionResult } from "@/lib/failure-copy";
 
 export const MIN_REASON = 3;
@@ -77,14 +79,36 @@ export function ConfirmAction({
     start(async () => {
       // Before the call: the live event can arrive before the answer does.
       if (ownsAppointment) rememberOwn(ownsAppointment);
-      const res = await run(text);
+      let res: ActionResult;
+      try {
+        res = await run(text);
+      } catch (err) {
+        // The call itself failed: nothing was changed that other people's events should wait on.
+        if (ownsAppointment) forgetOwn(ownsAppointment);
+        throw err;
+      }
       if (res.ok) {
-        notify.success(res.message);
+        // The change also touched other appointments (a veto of a cancel books a new one).
+        for (const other of res.alsoOwns ?? []) rememberOwn(other);
+        if (res.watch) {
+          // One toast for the whole story: updated in place as the email to the doctor is sent.
+          const id = `confirm-${nextSerial()}`;
+          notify.success(res.message, { id, duration: WAITING_MS });
+          void followArrivalToast(
+            res.watch.appointmentId,
+            id,
+            (tid, message, kind, ms) =>
+              notify[kind](message, { id: tid, duration: ms }),
+          );
+        } else {
+          notify.success(res.message);
+        }
         setOpen(false);
         setReason("");
         onDone?.();
         router.refresh();
       } else {
+        if (ownsAppointment) forgetOwn(ownsAppointment);
         notify.error(res.message);
       }
     });

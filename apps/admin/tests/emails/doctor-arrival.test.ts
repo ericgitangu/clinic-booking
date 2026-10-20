@@ -223,7 +223,11 @@ describe("sendDoctorArrival", () => {
     });
     expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe("error");
     expect(t.p.release).toHaveBeenCalledTimes(1);
-    expect(t.finished).toEqual([]); // the claim is left to run out; the sheet offers a resend
+    // Said at once, for the attempt that was claimed, so a resend is offered now and not after the
+    // 15 minute claim.
+    expect(t.finished).toEqual([
+      { attempt: 1, outcome: "failed", error: "Unexpected error." },
+    ]);
   });
 
   it("a claim call that fails sends nothing, records nothing and says so", async () => {
@@ -243,14 +247,14 @@ describe("sendDoctorArrival", () => {
     const t = ports({
       finish: async (_c, _id, body) => {
         calls += 1;
-        if (calls < 3) return { ok: false, code: "UPSTREAM_UNREACHABLE" };
+        if (calls < 2) return { ok: false, code: "UPSTREAM_UNREACHABLE" };
         t.finished.push(body);
         return { ok: true, data: true };
       },
     });
     const reserve = vi.spyOn(t.p, "reserve");
     expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe("sent");
-    expect(calls).toBe(3);
+    expect(calls).toBe(2); // two tries at most: the path stays inside its 25 s
     expect(t.sends).toHaveLength(1);
     expect(reserve).toHaveBeenCalledTimes(1);
     expect(t.finished).toEqual([

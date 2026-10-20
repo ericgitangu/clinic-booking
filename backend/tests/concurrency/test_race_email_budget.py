@@ -25,7 +25,7 @@ async def fresh_counters(owner_conn: asyncpg.Connection) -> AsyncIterator[None]:
 
 async def _reserve(api: httpx.AsyncClient, clock: MovableClock) -> bool:
     resp = await internal(
-        api, clock, "POST", "/internal/emails/reserve", role="patient", sub="racer"
+        api, clock, "POST", "/internal/emails/reserve?purpose=ack", role="patient", sub="racer"
     )
     assert resp.status_code == 200, resp.text
     return bool(resp.json()["granted"])
@@ -42,7 +42,11 @@ async def test_forty_concurrent_reservations_never_exceed_the_cap(
     winners: int,
 ) -> None:
     clock = MovableClock(FIXED_NOW)
-    opts = {"EMAIL_DAILY_LIMIT": day_cap, "EMAIL_MONTHLY_LIMIT": month_cap}
+    opts = {
+        "EMAIL_DAILY_LIMIT": day_cap,
+        "EMAIL_MONTHLY_LIMIT": month_cap,
+        "EMAIL_ACK_RESERVE": 0,  # these are acknowledgements racing for the whole cap
+    }
     # three API instances, each with its own connection pool, all asking at once
     async with _app(clock, **opts) as a, _app(clock, **opts) as b, _app(clock, **opts) as c:
         granted = await asyncio.gather(*(_reserve(x, clock) for x in [a, b, c] * 14))

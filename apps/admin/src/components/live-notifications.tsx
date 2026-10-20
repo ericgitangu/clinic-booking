@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { notify } from "@clinic/ui/lib/notify";
+import { WAITING_MS } from "@/lib/arrival-toast";
 import { doctorEmailSuffix } from "@/lib/doctor-notice-read";
 import { parseLiveEvent } from "@/lib/live-events";
 import {
@@ -19,8 +20,6 @@ import type { Role } from "@/lib/roles";
 
 const SUMMARY_MS = 6000;
 const TOAST_MS = 6000;
-// A toast still waiting to hear what became of the doctor's email stays up until the next look.
-const WAITING_MS = 12_000;
 
 /** Toasts through the shared notify setup: quiet (no buzz, no sound) and loaded on the first one.
  *  Ids come from one counter for the page, so a toast of an earlier mount is never overwritten. */

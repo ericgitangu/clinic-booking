@@ -1,7 +1,7 @@
 // What to say about the email to the doctor, in plain words. Pure, so the wording is tested. The
 // same status reads differently in a toast (short, after a " · ") and on the appointment sheet
 // (a sentence with the time it went).
-import { formatSlot } from "@/lib/clinic-time";
+import { formatTime } from "@/lib/clinic-time";
 
 export interface NoticeFacts {
   status: "pending" | "sent" | "failed" | "skipped";
@@ -14,6 +14,8 @@ export interface NoticeFacts {
     | null;
   attempts: number;
   sentAt: string | null;
+  /** Whether sending again can help now (see the API's `retryable`). */
+  retryable?: boolean;
 }
 
 const WHY_SHORT: Record<NonNullable<NoticeFacts["reason"]>, string> = {
@@ -38,7 +40,9 @@ export function toastSuffix(n: NoticeFacts): string {
     case "sent":
       return "doctor emailed";
     case "pending":
-      return "doctor email on its way";
+      return n.retryable
+        ? "doctor email did not go out"
+        : "doctor email on its way";
     case "failed":
       return "doctor email failed";
     case "skipped":
@@ -46,10 +50,10 @@ export function toastSuffix(n: NoticeFacts): string {
   }
 }
 
-/** The bold lead of the sheet's line. It says "notified" only when the doctor was. */
+/** The bold lead of the sheet's line. Empty for a sent email, whose line says it all. */
 export function sheetLead(n: NoticeFacts): string {
-  if (n.status === "sent") return "Doctor notified.";
-  return n.status === "pending"
+  if (n.status === "sent") return "";
+  return n.status === "pending" && !n.retryable
     ? "Doctor not notified yet."
     : "Doctor not notified.";
 }
@@ -58,11 +62,15 @@ export function sheetLead(n: NoticeFacts): string {
 export function sheetLine(n: NoticeFacts): string {
   switch (n.status) {
     case "sent":
-      return `Doctor notified by email${n.sentAt ? ` at ${formatSlot(n.sentAt)}` : ""}.`;
+      return n.sentAt
+        ? `Doctor emailed at ${formatTime(n.sentAt)} EAT.`
+        : "Doctor emailed.";
     case "pending":
-      return "The email to the doctor is on its way.";
+      return n.retryable
+        ? "The email didn't go out. Send it again."
+        : "The email to the doctor is on its way.";
     case "failed":
-      return `The email to the doctor could not be sent (${n.attempts} ${n.attempts === 1 ? "try" : "tries"}).`;
+      return `The email to the doctor could not be sent (${n.attempts} ${n.attempts === 1 ? "try" : "tries"}).${n.retryable ? " Send it again." : ""}`;
     case "skipped":
       return `The doctor was not emailed: ${n.reason ? WHY_LONG[n.reason] : "it was skipped"}.`;
   }
@@ -71,7 +79,8 @@ export function sheetLine(n: NoticeFacts): string {
 /** The confirmation for the person who marked the arrival: "Marked arrived. Doctor email on its
  *  way." The first words are always "Marked arrived." */
 export function arrivalMessage(
-  notice: Pick<NoticeFacts, "status" | "reason"> | null | undefined,
+  notice:
+    Pick<NoticeFacts, "status" | "reason" | "retryable"> | null | undefined,
 ): string {
   if (!notice) return "Marked arrived.";
   const note = toastSuffix({ ...notice, attempts: 0, sentAt: null });

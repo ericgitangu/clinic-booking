@@ -45,6 +45,8 @@ _NO_STORE = {"Cache-Control": "no-store"}
 _log = logging.getLogger(APP_LOGGER)
 # Which cap was reported as used up (and for which day or month): each is logged once per process.
 _spent_logged: set[tuple[str, date]] = set()
+# Days on which a non-acknowledgement send was held back at the reserve (logged once each).
+_held_logged: set[date] = set()
 
 
 @router.post(
@@ -225,13 +227,14 @@ async def reserve_email(
         Literal["ack", "other"],
         Query(
             description=(
-                "`ack`: a booking acknowledgement, which may use the whole allowance (the default, "
-                "so the patient app is unchanged). `other`: any other email (staff emails, the "
-                "doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the "
-                "room kept for acknowledgements cannot be used up by them."
+                "Required, so every sender says which it is. `ack`: a booking acknowledgement, "
+                "which may use the whole day. `other`: any other email (reminders, staff emails, "
+                "the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of "
+                "EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by "
+                "them. The month has no reserve."
             )
         ),
-    ] = "ack",
+    ],
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
@@ -250,10 +253,20 @@ async def reserve_email(
             day=day,
             month=month,
             day_cap=settings.EMAIL_DAILY_LIMIT - held_back,
-            month_cap=settings.EMAIL_MONTHLY_LIMIT - held_back,
+            month_cap=settings.EMAIL_MONTHLY_LIMIT,
         ),
     )
-    if reason is not None and (reason, month if reason == "month" else day) not in _spent_logged:
+    budget = await _current(session, now, settings)
+    await session.rollback()
+    if reason == "day" and purpose == "other" and budget.sent < settings.EMAIL_DAILY_LIMIT:
+        # Not used up: the last EMAIL_ACK_RESERVE of the day are held back for acknowledgements.
+        if day not in _held_logged:
+            _held_logged.add(day)
+            _log.info(
+                "email held back for acknowledgements: the rest of the day is kept for them",
+                extra={"sent_today": budget.sent, "reserve": settings.EMAIL_ACK_RESERVE},
+            )
+    elif reason is not None and (reason, month if reason == "month" else day) not in _spent_logged:
         _spent_logged.add((reason, month if reason == "month" else day))
         _log.warning(
             "email allowance used up for the %s: no more email until it resets",
@@ -263,8 +276,6 @@ async def reserve_email(
                 "monthly_limit": settings.EMAIL_MONTHLY_LIMIT,
             },
         )
-    budget = await _current(session, now, settings)
-    await session.rollback()
     return EmailReservation(
         granted=reason is None,
         reason="day" if reason == "day" else "month" if reason == "month" else None,

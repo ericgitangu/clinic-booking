@@ -229,19 +229,13 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// The horizon at connect: every row with a txid below it is already committed, so a row the
-	// stream sends below it was there before this client connected (a catch-up after a resume) and
-	// one at or above it happened after. A fresh connection starts there; a resume starts at its
-	// cursor and says where the horizon is, so the client can tell the two apart without a clock.
-	horizon, err := lease.Horizon(r.Context())
-	if err != nil {
+	var pos cursor.Cursor
+	if from != nil {
+		pos = *from
+	} else if pos, err = lease.Horizon(r.Context()); err != nil {
 		g.log.Error("horizon failed", slog.String("error", err.Error()))
 		g.dbUnavailable(w, r)
 		return
-	}
-	pos := horizon
-	if from != nil {
-		pos = *from
 	}
 
 	h := w.Header()
@@ -253,7 +247,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		slog.Bool("resumed", from != nil))
 
 	begin := time.Now()
-	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, horizon: horizon, role: current,
+	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, replaying: from != nil, role: current,
 		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke,
 		appointment: appointment, lifeEnd: begin.Add(g.cfg.MaxConnection)}
 	reason := s.run(r.Context(), lease)
@@ -292,26 +286,38 @@ type session struct {
 	w   http.ResponseWriter
 	rc  *http.ResponseController
 	pos cursor.Cursor
-	// horizon is the commit-safe position at connect (see the hello frame).
-	horizon cursor.Cursor
-	role    string
-	staff   bool
-	email   string
-	smoke   bool
-	sent    int
+	// replaying is true while the stream is catching up from a cursor the client resumed with: every
+	// event frame sent in that time carries the "replay" field. It turns false after the first
+	// poll that comes back short of a full batch (the backlog is drained). A fresh stream starts
+	// at the horizon and has no backlog.
+	replaying bool
+	role      string
+	staff     bool
+	email     string
+	smoke     bool
+	sent      int
 	// appointment, when not "", limits the stream to one appointment.
 	appointment string
 	lifeEnd     time.Time
 }
 
 // frame writes one SSE frame and flushes. A failed write means the client is gone.
-func (s *session) frame(id, event, data string) error {
+func (s *session) frame(id, event, data string) error { return s.frameTagged(id, event, data, false) }
+
+// frameTagged is frame with, when replay is true, a "replay: true" field line between the event
+// name and the data. SSE clients ignore field names they do not know, so a client that does not
+// read it sees the same frame as before; the admin app's parser reads it and trusts it alone to
+// tell the backlog a resumed stream is sent from what happens after.
+func (s *session) frameTagged(id, event, data string, replay bool) error {
 	var b strings.Builder
 	if id != "" {
 		b.WriteString("id: " + id + "\n")
 	}
 	if event != "" {
 		b.WriteString("event: " + event + "\n")
+	}
+	if replay {
+		b.WriteString("replay: true\n")
 	}
 	if data != "" {
 		b.WriteString("data: " + data + "\n")
@@ -346,8 +352,8 @@ func closeEvent(reason string) string {
 // run is the stream loop. It returns the close reason.
 func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	g := s.g
-	hello := fmt.Sprintf(`{"cursor":%q,"horizon":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
-		s.pos, s.horizon, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
+	hello := fmt.Sprintf(`{"cursor":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
+		s.pos, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
 	if err := s.frame(s.pos.String(), "hello", hello); err != nil {
 		return ReasonClient
 	}
@@ -388,6 +394,12 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 				g.log.Error("poll failed", slog.String("error", err.Error()))
 				return s.finish(ReasonDatabase), true
 			}
+			// Rows of this batch are backlog if the stream is still catching up when it is read; a
+			// batch short of full drains the backlog, and is itself the last of it.
+			replay := s.replaying
+			if len(rows) < pollBatch {
+				s.replaying = false
+			}
 			delivered := false
 			for _, row := range rows {
 				s.pos = row.Cursor() // advance first: a skipped row must not be re-read
@@ -401,7 +413,7 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 					g.log.Error("event not encodable, skipped", slog.String("error", err.Error()))
 					continue
 				}
-				if err := s.frame(row.Cursor().String(), name, string(data)); err != nil {
+				if err := s.frameTagged(row.Cursor().String(), name, string(data), replay); err != nil {
 					return ReasonClient, true
 				}
 				s.sent++

@@ -1,6 +1,14 @@
 // A small Server-Sent Events parser: bytes in, frames out. Comment lines (": ...") are heartbeats.
+// Beyond the standard fields, a frame may carry `replay: true`, which the live-feed gateway puts on
+// the backlog it sends a resumed stream (see services/realtime); `replay` is true only then.
 export type SseFrame =
-  | { kind: "event"; event: string; data: string; id: string | null }
+  | {
+      kind: "event";
+      event: string;
+      data: string;
+      id: string | null;
+      replay: boolean;
+    }
   | { kind: "comment"; text: string };
 
 export function createSseParser(onFrame: (f: SseFrame) => void) {
@@ -9,14 +17,16 @@ export function createSseParser(onFrame: (f: SseFrame) => void) {
   let event = "message";
   let data: string[] = [];
   let id: string | null = null;
+  let replay = false;
 
   const line = (l: string) => {
     if (l === "") {
       if (data.length > 0)
-        onFrame({ kind: "event", event, data: data.join("\n"), id });
+        onFrame({ kind: "event", event, data: data.join("\n"), id, replay });
       event = "message";
       data = [];
       id = null;
+      replay = false;
     } else if (l.startsWith(":")) {
       onFrame({ kind: "comment", text: l.slice(1).trim() });
     } else {
@@ -27,6 +37,7 @@ export function createSseParser(onFrame: (f: SseFrame) => void) {
       if (field === "event") event = value;
       else if (field === "data") data.push(value);
       else if (field === "id") id = value;
+      else if (field === "replay") replay = value === "true";
     }
   };
 

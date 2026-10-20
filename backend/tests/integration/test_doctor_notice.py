@@ -507,7 +507,9 @@ async def test_the_room_held_for_acknowledgements_is_not_open_to_other_emails(
     await _spend(env, owner_conn, limit - reserve)
     other = await env.req("POST", "/internal/emails/reserve?purpose=other", role="admin")
     assert other.json()["granted"] is False and other.json()["reason"] == "day"
-    ack = await env.req("POST", "/internal/emails/reserve", role="admin")  # an acknowledgement
+    ack = await env.req(
+        "POST", "/internal/emails/reserve?purpose=ack", role="admin"
+    )  # an acknowledgement
     assert ack.json()["granted"] is True
     await _spend(env, owner_conn, 0)
 
@@ -543,3 +545,91 @@ async def test_a_spent_allowance_is_skipped_through_the_real_counter(
         assert (state["status"], state["reason"]) == ("skipped", "allowance_day")
     finally:
         await _spend(env, owner_conn, 0)
+
+
+# --- the reserve: explicit purpose, day only, honest logging ---------------------------------
+
+
+async def test_every_reserve_must_say_what_it_is_for(env: Env) -> None:
+    missing = await env.req("POST", "/internal/emails/reserve", role="admin")
+    assert missing.status_code == 422
+    wrong = await env.req("POST", "/internal/emails/reserve?purpose=reminder", role="admin")
+    assert wrong.status_code == 422
+
+
+async def test_the_reserve_is_taken_off_the_day_and_not_off_the_month(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    from tests.conftest import make_settings
+
+    s = make_settings()
+    await _spend(env, owner_conn, 0)
+    day = env.clock.now().date()
+    # The month is at its limit minus the reserve: other emails are still granted.
+    await owner_conn.execute(
+        "UPDATE email_month_counter SET sent = $1 WHERE month = $2",
+        s.EMAIL_MONTHLY_LIMIT - s.EMAIL_ACK_RESERVE,
+        day.replace(day=1),
+    )
+    try:
+        got = await env.req("POST", "/internal/emails/reserve?purpose=other", role="admin")
+        assert got.json()["granted"] is True
+    finally:
+        await _spend(env, owner_conn, 0)
+
+
+async def test_a_refusal_at_the_reserve_says_held_back_and_not_used_up(
+    env: Env, owner_conn: asyncpg.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    from app.api.routers import reminders as router
+    from tests.conftest import make_settings
+
+    s = make_settings()
+    router._spent_logged.clear()
+    router._held_logged.clear()
+    await _spend(env, owner_conn, s.EMAIL_DAILY_LIMIT - s.EMAIL_ACK_RESERVE)
+    try:
+        with caplog.at_level(logging.INFO, logger="clinic"):
+            refused = await env.req("POST", "/internal/emails/reserve?purpose=other", role="admin")
+        assert refused.json()["granted"] is False
+        text = " ".join(r.getMessage() for r in caplog.records)
+        assert "held back for acknowledgements" in text
+        assert "used up" not in text
+        assert router._spent_logged == set()  # the real exhaustion warning is still to come
+        # Really used up: the warning is given, once.
+        await _spend(env, owner_conn, s.EMAIL_DAILY_LIMIT)
+        with caplog.at_level(logging.INFO, logger="clinic"):
+            await env.req("POST", "/internal/emails/reserve?purpose=ack", role="admin")
+        assert any("used up" in r.getMessage() for r in caplog.records)
+    finally:
+        await _spend(env, owner_conn, 0)
+        router._spent_logged.clear()
+        router._held_logged.clear()
+
+
+async def test_a_failed_row_with_a_resend_in_flight_is_not_for_another_resend(env: Env) -> None:
+    await set_address(env, REAL_LOOKING)
+    appt, body = await arrive(env)
+    notice = body["doctor_notice"]["id"]
+
+    async def state() -> dict[str, Any]:
+        got: dict[str, Any] = (await env.req("GET", appt_path(appt, "doctor-notification"))).json()
+        return got
+
+    await env.req("POST", notice_path(notice, "claim"))
+    await env.req("POST", notice_path(notice, "finish"), body={"attempt": 1, "outcome": "failed"})
+    failed = await state()
+    assert (failed["status"], failed["retryable"]) == ("failed", True)
+
+    # The resend is claimed: in flight, so not failed, not retryable, and a second claim is refused.
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 2
+    flying = await state()
+    assert (flying["status"], flying["retryable"]) == ("pending", False)
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"] is None
+
+    # That sender died: once its claim ran out the row is failed and can be resent again.
+    env.clock.set(START.replace(hour=START.hour + 1))
+    gone = await state()
+    assert (gone["status"], gone["retryable"]) == ("failed", True)

@@ -159,6 +159,10 @@ export async function markAttendance(
     ok: true,
     // The one toast the person who marked it sees, so it also says what became of the email.
     message: kind === "arrived" ? arrivalMessage(notice) : "Marked no-show.",
+    // While the email is on its way the confirmation goes on to say how it ended.
+    ...(kind === "arrived" && notice?.status === "pending"
+      ? { watch: { appointmentId: id } }
+      : {}),
   };
 }
 
@@ -248,7 +252,13 @@ export async function vetoAppointment(
   after(() => noticeToPatient("vetoed", caller, res.data, text));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
-  return { ok: true, message: "Change undone and the appointment locked." };
+  return {
+    ok: true,
+    message: "Change undone and the appointment locked.",
+    // Undoing a cancel books the slot again as a NEW appointment, and the live events are about
+    // that one: they are this person's own too.
+    alsoOwns: res.data.id === id ? [] : [res.data.id],
+  };
 }
 
 export async function unlockAppointment(

@@ -36,7 +36,7 @@ describe("what the toast and the sheet say about the doctor's email", () => {
   it("gives the sheet the time it went, or the reason it did not", () => {
     expect(
       sheetLine({ ...base, status: "sent", sentAt: "2026-10-27T07:00:01Z" }),
-    ).toMatch(/^Doctor notified by email at .*10:00/);
+    ).toBe("Doctor emailed at 10:00 EAT.");
     expect(sheetLine({ ...base, status: "skipped", reason: "no_email" })).toBe(
       "The doctor was not emailed: the doctor has no email address on file.",
     );
@@ -44,16 +44,28 @@ describe("what the toast and the sheet say about the doctor's email", () => {
       "2 tries",
     );
     expect(sheetLine(base)).toBe("The email to the doctor is on its way.");
+    // Pending but nothing is sending it any more: it did not go out, so say that, not "on its way".
+    expect(sheetLine({ ...base, retryable: true })).toBe(
+      "The email didn't go out. Send it again.",
+    );
+    expect(sheetLine({ ...base, retryable: true })).not.toContain("on its way");
+    expect(toastSuffix({ ...base, retryable: true })).toBe(
+      "doctor email did not go out",
+    );
   });
 });
 
 describe("the lead and the arrival message follow the status", () => {
   it("says 'notified' only when the doctor was", () => {
-    expect(sheetLead({ ...base, status: "sent" })).toBe("Doctor notified.");
+    // A sent email has no lead: its line, "Doctor emailed at 10:00 EAT.", says it all.
+    expect(sheetLead({ ...base, status: "sent" })).toBe("");
     for (const status of ["pending", "failed", "skipped"] as const)
-      expect(sheetLead({ ...base, status })).not.toMatch(/^Doctor notified/);
+      expect(sheetLead({ ...base, status })).toMatch(/^Doctor not notified/);
     expect(sheetLead({ ...base, status: "pending" })).toBe(
       "Doctor not notified yet.",
+    );
+    expect(sheetLead({ ...base, retryable: true })).toBe(
+      "Doctor not notified.",
     );
   });
 

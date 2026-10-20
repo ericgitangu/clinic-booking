@@ -143,10 +143,15 @@ export const SYSTEM_CALLER: Caller = {
 
 // Takes one email from the day's and the month's allowance before it is sent, atomically in the
 // database. `granted: false` (with the cap that refused) is a normal answer: do not send.
-export const reserveEmail = (caller: Caller) =>
+//
+// `purpose` is always said: "ack" is a booking acknowledgement, which may use the whole day; "other"
+// (reminders, staff emails) stops EMAIL_ACK_RESERVE short of the day's limit, so the room kept for
+// acknowledgements is theirs alone.
+export const reserveEmail = (caller: Caller, purpose: "ack" | "other") =>
   callApi(
     "reserveEmail",
-    (client) => reserveEmailInternalEmailsReservePost({ client }),
+    (client) =>
+      reserveEmailInternalEmailsReservePost({ client, query: { purpose } }),
     { caller },
   );
 

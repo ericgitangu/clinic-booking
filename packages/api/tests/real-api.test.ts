@@ -736,7 +736,11 @@ describe.skipIf(!REAL)("against the real API", () => {
     );
     const taken = await callApi(
       "reserveEmail",
-      (client) => sdk.reserveEmailInternalEmailsReservePost({ client }),
+      (client) =>
+        sdk.reserveEmailInternalEmailsReservePost({
+          client,
+          query: { purpose: "ack" },
+        }),
       { caller: patient },
     );
     expect(before.ok && taken.ok).toBe(true);
