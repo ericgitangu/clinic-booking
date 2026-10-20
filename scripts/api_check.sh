@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Runs the reviewer collection (docs/api/) with newman.
+# Runs the reviewer collection (collections/) with newman.
 #
 #   bash scripts/api_check.sh local        its own compose stack, the whole journey, then down -v
 #   bash scripts/api_check.sh production   the read-only requests against the public /api proxy
@@ -42,7 +42,7 @@ node_check() { # the committed collection must match a fresh build from the cont
 
 newman() { # newman <docker network> <newman args...>
   local net="$1"; shift
-  docker run --rm --network "$net" -v "$ROOT/docs/api:/etc/newman:ro" -v "$REPORT_DIR:/reports" "$NEWMAN_IMAGE" \
+  docker run --rm --network "$net" -v "$ROOT/collections:/etc/newman:ro" -v "$REPORT_DIR:/reports" "$NEWMAN_IMAGE" \
     run clinic-booking.postman_collection.json --color auto --reporters cli,junit \
     --reporter-junit-export "/reports/newman-$RUN_NAME.xml" "$@"
 }
@@ -103,7 +103,7 @@ EOF
     args=(-e production.postman_environment.json)
     if [ "${API_WRITES:-0}" = 1 ]; then
       echo "API_WRITES=1: the booking writes run against production and leave two patients and a cancelled appointment there"
-      args+=(--env-var "writeBaseUrl=$(jq -r '.values[] | select(.key == "baseUrl") | .value' docs/api/production.postman_environment.json)")
+      args+=(--env-var "writeBaseUrl=$(jq -r '.values[] | select(.key == "baseUrl") | .value' collections/production.postman_environment.json)")
     fi
     newman bridge "${args[@]}"
     ;;

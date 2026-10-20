@@ -175,7 +175,7 @@ Observed: the first returns `200`. The second returns `409` as `application/prob
 
 ### Try the API
 
-A Postman collection in [`docs/api/`](docs/api/README.md), run with newman, walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot inside the configured lead time, 60 minutes by default (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change inside the lead time (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
+A Postman collection in [`collections/`](collections/README.md), run with newman, walks the reviewer path in order: health, doctors, a day's free slots, a booking with an `Idempotency-Key` and its replay, a double booking (`409 SLOT_TAKEN`), a slot inside the configured lead time, 60 minutes by default (`422 BOOKING_TOO_SOON`), reschedule and cancel, a change inside the lead time (`409 CHANGE_TOO_LATE`) and the validation errors. Every request checks the status, the content type (`application/problem+json` on errors), the key fields and the body against the contract's schema. Times are computed from now, so it does not go stale.
 
 One command, Docker only (its own compose stack, removed afterwards):
 
@@ -185,7 +185,7 @@ make api-check
 
 Observed on 2026-10-19: 42 requests (the 41 in the collection and one slot lookup), 219 assertions, 0 failed. `make api-check-prod` runs only the GET requests against production: 13 requests, 62 assertions, 0 failed on 2026-10-19. `API_WRITES=1 make api-check-prod` also runs the writes, and those leave two "Reviewer …" patients and two cancelled appointments in the production database.
 
-To click through it instead, start the API with `make up` (or use production), then in Postman Import the three files in `docs/api/` and pick the `local` or `production` environment. newman and Postman are the supported tools; [`docs/api/README.md`](docs/api/README.md#postman-and-newman) says why Insomnia is not. Folder 08 needs the second API that only `make api-check` starts ([how to send it by hand](docs/api/README.md#the-journey)). No request needs a key.
+To click through it instead, start the API with `make up` (or use production), then in Postman Import the three files in `collections/` and pick the `local` or `production` environment. newman and Postman are the supported tools; [`collections/README.md`](collections/README.md#postman-and-newman) says why Insomnia is not. Folder 08 needs the second API that only `make api-check` starts ([how to send it by hand](collections/README.md#the-journey)). No request needs a key.
 
 ## 3. System design
 

@@ -1149,9 +1149,9 @@ newman_pin="$(sed -n 's/^NEWMAN_IMAGE="\(.*\)"$/\1/p' "$HERE/../api_check.sh")"
 expect "api check: newman is pinned to a tag and a sha256 digest" \
   "$(printf '%s' "$newman_pin" | grep -cE '^postman/newman:[0-9.]+-alpine@sha256:[0-9a-f]{64}$')" 1
 expect "api check: no other tracked file names a newman image" \
-  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' | tr '\n' ' ')" "scripts/api_check.sh "
-expect "api check: docs/api is mounted read-only into the newman container" \
-  "$(grep -c 'docs/api:/etc/newman:ro' "$HERE/../api_check.sh")" 1
+  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' ':!collections/README.md' | tr '\n' ' ')" "scripts/api_check.sh "
+expect "api check: collections is mounted read-only into the newman container" \
+  "$(grep -c 'collections:/etc/newman:ro' "$HERE/../api_check.sh")" 1
 
 # =========================================================================================
 # realtime_live_check.sh: a gateway full of real streams is not a failed release; a broken one is.
