@@ -34,6 +34,7 @@ import {
   type LiveEvent,
   type LiveKind,
 } from "@/lib/live-events";
+import { nextUnread, unreadText } from "@/lib/live-notices";
 import { sharedStream } from "@/lib/live-share";
 import type { LiveStatus } from "@/lib/live-stream";
 import type { Role } from "@/lib/roles";
@@ -99,6 +100,10 @@ export function LiveFeed({
   const [, start] = useTransition();
   const canAct = role === "owner" || role === "admin";
   const refreshAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const panel = useRef<HTMLDivElement | null>(null);
+  const [unread, setUnread] = useState(0);
+  // Whether the panel is on screen in a visible tab; events that arrive while it is not are unread.
+  const seen = useRef(false);
   const names = new Map(doctors.map((d) => [d.id, d.name]));
 
   const refresh = useCallback(() => {
@@ -108,14 +113,52 @@ export function LiveFeed({
   }, []);
 
   useEffect(() => {
+    const el = panel.current;
+    if (!el) return;
+    const settle = (inView: boolean) => {
+      seen.current = inView && !document.hidden;
+      if (seen.current) setUnread(0);
+    };
+    if (typeof IntersectionObserver === "undefined") {
+      // No observer: the panel counts as seen once the person points at it, tabs to it or scrolls
+      // it, and the count keeps growing until then.
+      const see = () => settle(true);
+      el.addEventListener("pointerenter", see);
+      el.addEventListener("focusin", see);
+      return () => {
+        el.removeEventListener("pointerenter", see);
+        el.removeEventListener("focusin", see);
+      };
+    }
+    let inView = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        inView = entries[entries.length - 1]?.isIntersecting ?? false;
+        settle(inView);
+      },
+      { threshold: 0.5 },
+    );
+    io.observe(el);
+    const visible = () => settle(inView);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, []);
+
+  useEffect(() => {
     const off = sharedStream(person).subscribe({
       role,
       onStatus: setStatus,
       onRefresh: refresh,
-      onEvent: (_id, _event, data) => {
+      onEvent: (_id, _event, data, replay) => {
         const ev = parseLiveEvent(data, role);
         if (!ev) return;
         setEvents((list) => addEvent(list, ev));
+        setUnread((n) =>
+          nextUnread(n, { replay: replay === true }, seen.current),
+        );
         if (refreshAt.current === null) {
           refreshAt.current = setTimeout(() => {
             refreshAt.current = null;
@@ -132,10 +175,23 @@ export function LiveFeed({
   }, [person, role, refresh]);
 
   return (
-    <Card data-testid="live-feed">
+    <Card data-testid="live-feed" ref={panel}>
       <CardHeader>
         <div className={FEED_HEADER_CLASS}>
-          <CardTitle className="font-heading text-lg">Live feed</CardTitle>
+          <div className="flex min-w-0 items-center gap-2">
+            <CardTitle className="font-heading text-lg">Live feed</CardTitle>
+            {/* Always in the row, with a fixed box, so a count appearing or changing moves nothing.
+                Words, not just a colour; polite, and no sound. */}
+            <span
+              data-testid="live-unread"
+              data-count={unread}
+              role="status"
+              aria-live="polite"
+              className="inline-flex h-6 min-w-14 items-center justify-center rounded-full text-xs font-medium tabular-nums data-[count=0]:invisible border border-border"
+            >
+              {unreadText(unread)}
+            </span>
+          </div>
           <div className="flex min-w-0 items-center gap-2">
             <span
               data-testid="live-status"

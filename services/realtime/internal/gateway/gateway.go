@@ -238,6 +238,29 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A resumed stream is sent a backlog. Which rows are backlog is decided per row, against the
+	// database's own clock read now: a row whose occurred_at is before this moment was written
+	// before the stream opened. occurred_at is not the commit time, and the two tables set it
+	// differently: appointment_events uses now(), the START of its transaction;
+	// staff_action_audit uses clock_timestamp(), the moment of each INSERT. Both are at or before
+	// the commit, so a row written before this moment and committed after it is counted as
+	// backlog (its event is not toasted; it still shows in the feed). That is a named limit, and it
+	// fails in the quiet direction. A transaction can straddle the moment only where it writes
+	// SEVERAL audit rows that are streamed in their own right, each stamped by its own
+	// clock_timestamp(): "running late" (one row per patient told) and creating an invitation (a
+	// revoke row for each invitation it supersedes, then the create row). Rows inserted before the
+	// moment are backlog and the ones after are not. An appointment event and the audit row beside
+	// it do not straddle: the audit row of an attendance, veto or booking is not a frame of its own,
+	// it only names who did it on the event.
+	var opened time.Time
+	if from != nil {
+		if opened, err = lease.Now(r.Context()); err != nil {
+			g.log.Error("now failed", slog.String("error", err.Error()))
+			g.dbUnavailable(w, r)
+			return
+		}
+	}
+
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache, no-store, no-transform")
@@ -247,7 +270,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		slog.Bool("resumed", from != nil))
 
 	begin := time.Now()
-	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
+	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, resumed: from != nil, opened: opened, role: current,
 		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke,
 		appointment: appointment, lifeEnd: begin.Add(g.cfg.MaxConnection)}
 	reason := s.run(r.Context(), lease)
@@ -282,28 +305,44 @@ func (g *Gateway) dbUnavailable(w http.ResponseWriter, r *http.Request) {
 }
 
 type session struct {
-	g     *Gateway
-	w     http.ResponseWriter
-	rc    *http.ResponseController
-	pos   cursor.Cursor
-	role  string
-	staff bool
-	email string
-	smoke bool
-	sent  int
+	g   *Gateway
+	w   http.ResponseWriter
+	rc  *http.ResponseController
+	pos cursor.Cursor
+	// resumed is true for a stream that started from a cursor the client brought; opened is the
+	// database's time when it did. Every event frame of a resumed stream whose row was written
+	// before opened carries the "replay" field. A fresh stream starts at the horizon and has no
+	// backlog.
+	resumed bool
+	opened  time.Time
+	role    string
+	staff   bool
+	email   string
+	smoke   bool
+	sent    int
 	// appointment, when not "", limits the stream to one appointment.
 	appointment string
 	lifeEnd     time.Time
 }
 
 // frame writes one SSE frame and flushes. A failed write means the client is gone.
-func (s *session) frame(id, event, data string) error {
+func (s *session) frame(id, event, data string) error { return s.frameTagged(id, event, data, false) }
+
+// frameTagged is frame with, when replay is true, a "replay: true" field line between the event
+// name and the data. SSE clients ignore field names they do not know, so a client that does not
+// read it sees the same frame as before; the admin app's parser reads it and trusts it alone to
+// tell the backlog a resumed stream is sent (rows written before the stream opened, by the
+// database's clock) from what happens after.
+func (s *session) frameTagged(id, event, data string, replay bool) error {
 	var b strings.Builder
 	if id != "" {
 		b.WriteString("id: " + id + "\n")
 	}
 	if event != "" {
 		b.WriteString("event: " + event + "\n")
+	}
+	if replay {
+		b.WriteString("replay: true\n")
 	}
 	if data != "" {
 		b.WriteString("data: " + data + "\n")
@@ -338,7 +377,10 @@ func closeEvent(reason string) string {
 // run is the stream loop. It returns the close reason.
 func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	g := s.g
-	hello := fmt.Sprintf(`{"cursor":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
+	// "replay_tag": this gateway tags the backlog of a resumed stream (see frameTagged); a client
+	// that finds the flag missing is talking to an older gateway and must not trust the absence of
+	// a tag as "live".
+	hello := fmt.Sprintf(`{"cursor":%q,"replay_tag":true,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
 		s.pos, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
 	if err := s.frame(s.pos.String(), "hello", hello); err != nil {
 		return ReasonClient
@@ -393,7 +435,7 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 					g.log.Error("event not encodable, skipped", slog.String("error", err.Error()))
 					continue
 				}
-				if err := s.frame(row.Cursor().String(), name, string(data)); err != nil {
+				if err := s.frameTagged(row.Cursor().String(), name, string(data), s.resumed && row.OccurredAt.Before(s.opened)); err != nil {
 					return ReasonClient, true
 				}
 				s.sent++

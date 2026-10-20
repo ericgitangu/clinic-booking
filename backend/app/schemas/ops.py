@@ -53,6 +53,9 @@ class DoctorBoard(BaseModel):
     doctor_id: uuid.UUID
     name: str
     specialty: str
+    # The address staff set for arrival emails. Owner and admin only: null for a viewer, and null
+    # for a doctor with none.
+    email: str | None = None
     timezone: str
     date: _dt.date
     appointments: list[BoardAppointment]

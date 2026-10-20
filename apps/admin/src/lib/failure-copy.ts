@@ -1,7 +1,13 @@
 import type { ApiFailure } from "@clinic/api/call";
 
 export type ActionResult =
-  { ok: true; message: string } | { ok: false; message: string };
+  | {
+      ok: true;
+      message: string;
+      /** Keep the confirmation toast up to date with what becomes of the email to the doctor. */
+      watch?: { appointmentId: string };
+    }
+  | { ok: false; message: string };
 
 const COPY: Record<string, string> = {
   ACCESS_EXISTS: "That email already has access. Change its role instead.",

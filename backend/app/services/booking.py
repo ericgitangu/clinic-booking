@@ -48,6 +48,7 @@ from app.repositories import patients as patient_repo
 from app.repositories import staff as staff_repo
 from app.repositories.errors import IdempotencyKeyRaced, map_integrity_error
 from app.schemas.patient import PatientCreate
+from app.services import doctor_notice
 
 
 @dataclass(frozen=True)
@@ -549,6 +550,12 @@ async def mark_attendance(
             after={"attendance": kind},
         )
         await _annotate(session, appt, kind, staff)
+        if kind == "arrived":
+            # Same transaction as the mark: the arrival and the record of telling the doctor exist
+            # together or not at all, and a second mark finds the row and writes nothing.
+            staff.doctor_notice = await doctor_notice.record_arrival(
+                session, clock, appointment_id=appt.id, doctor_id=appt.doctor_id
+            )
         return appt
 
     return await _run_txn(session, _do)

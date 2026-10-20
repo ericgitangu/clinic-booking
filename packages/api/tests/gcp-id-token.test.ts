@@ -173,3 +173,65 @@ describe("concurrent cold requests share one mint", () => {
     ).resolves.toBe(token);
   });
 });
+
+describe("a hung mint", () => {
+  const hungFetch = ((_url: string, init?: RequestInit) =>
+    new Promise<Response>((_ok, fail) => {
+      // never answers; like a real fetch it stops when its signal aborts
+      init?.signal?.addEventListener("abort", () => fail(new Error("aborted")));
+    })) as unknown as typeof fetch;
+
+  it("is cut off, taken out of the in-flight map, and the next call mints afresh and succeeds", async () => {
+    const now = 1_000_000;
+    const token = jwtWithExp(now / 1000 + 3600);
+    const oidc = vi.fn(async () => "VERCEL_OIDC");
+    const hung: MintDeps = {
+      oidcToken: oidc,
+      fetchImpl: hungFetch,
+      now: () => now,
+      timeoutMs: 40,
+    };
+    await expect(mintIdToken("clinic-api", hung)).rejects.toThrow(/timed out/);
+    expect(oidc).toHaveBeenCalledTimes(1);
+
+    // Straight afterwards, with a working exchange: a FRESH mint, not the hung promise.
+    const good = { ...deps(token, oidc, () => now), timeoutMs: 40 };
+    const began = Date.now();
+    await expect(mintIdToken("clinic-api", good)).resolves.toBe(token);
+    expect(Date.now() - began).toBeLessThan(30); // it did not wait on the hung one
+    expect(oidc).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts the requests it made, both the exchange and the token", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const seen = ((url: string, init?: RequestInit) => {
+      signals.push(init?.signal ?? undefined);
+      if (url.includes("sts.googleapis.com"))
+        return Promise.resolve(
+          new Response(JSON.stringify({ access_token: "STS" }), {
+            status: 200,
+          }),
+        );
+      return hungFetch(url, init); // generateIdToken hangs
+    }) as unknown as typeof fetch;
+    const d: MintDeps = {
+      oidcToken: async () => "VERCEL_OIDC",
+      fetchImpl: seen,
+      now: () => 1_000_000,
+      timeoutMs: 40,
+    };
+    await expect(mintIdToken("clinic-api", d)).rejects.toThrow();
+    expect(signals).toHaveLength(2);
+    expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
+  });
+
+  it("bounds a Vercel OIDC token that never arrives", async () => {
+    const d: MintDeps = {
+      oidcToken: () => new Promise<string>(() => undefined),
+      fetchImpl: hungFetch,
+      now: () => 1_000_000,
+      timeoutMs: 40,
+    };
+    await expect(mintIdToken("clinic-api", d)).rejects.toThrow();
+  });
+});

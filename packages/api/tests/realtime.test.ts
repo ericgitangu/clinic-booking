@@ -90,8 +90,22 @@ describe("createSseParser", () => {
     p.push(enc.encode("ta: a\ndata: b\n\n"));
     expect(frames).toEqual([
       { kind: "comment", text: "hb" },
-      { kind: "event", event: "ping", data: "a\nb", id: null },
+      { kind: "event", event: "ping", data: "a\nb", id: null, replay: false },
     ]);
+  });
+
+  it("reads the gateway's replay tag, for the frame it is on only", () => {
+    const frames: { replay?: boolean }[] = [];
+    const p = createSseParser((f) => {
+      if (f.kind === "event") frames.push(f);
+    });
+    const enc = new TextEncoder();
+    p.push(
+      enc.encode(
+        "id: 1.1\nevent: booked\nreplay: true\ndata: {}\n\nid: 1.2\nevent: booked\ndata: {}\n\nevent: x\nreplay: maybe\ndata: {}\n\n",
+      ),
+    );
+    expect(frames.map((f) => f.replay)).toEqual([true, false, false]);
   });
 });
 

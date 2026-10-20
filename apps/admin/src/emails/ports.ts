@@ -25,8 +25,11 @@ export type Reservation = EmailReservation;
 export const STAFF_FROM = `Idyllic Clinic <${FROM_ADDRESS}>`;
 
 // Every outbound call in the path is bounded the same way: reserve, release, notified and the Resend
-// send each give up after this long, so the whole path is at most four of them (about 20 s), and it
-// runs after the response so it never delays the staff member.
+// send each give up after this long, so a staff email is at most four of them (about 20 s), and it
+// runs after the response so it never delays the staff member. The doctor's arrival email also
+// claims the notification and records the result (twice at most): five calls, about 25 s (see
+// emails/doctor-arrival.ts); with the work before the response it must fit the dashboard's
+// maxDuration, which lib/arrival-budget.ts adds up and a test checks.
 export const CALL_TIMEOUT_MS = 5_000;
 
 export type Failure = { ok: false; code: string };
@@ -55,7 +58,13 @@ export function makePorts(
     async reserve(caller) {
       const r = await callApi(
         "reserveEmail",
-        (client) => reserveEmailInternalEmailsReservePost({ client }),
+        (client) =>
+          // "other": the room EMAIL_ACK_RESERVE keeps for booking acknowledgements is not open to the
+          // admin app's emails.
+          reserveEmailInternalEmailsReservePost({
+            client,
+            query: { purpose: "other" },
+          }),
         { caller, timeoutMs },
       );
       return r.ok ? { ok: true, data: r.data } : failure(r);

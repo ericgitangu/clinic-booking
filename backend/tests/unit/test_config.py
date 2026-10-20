@@ -42,3 +42,20 @@ def test_a_rejected_url_never_echoes_the_password() -> None:
     with pytest.raises(ValidationError) as exc:
         Settings(DATABASE_URL="postgresql://user:s3cr3t-pw@host/clinic?sslmode=require")
     assert "s3cr3t-pw" not in str(exc.value)
+
+
+def test_the_email_limits_must_cover_the_reserve() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from tests.conftest import make_settings
+
+    make_settings(EMAIL_DAILY_LIMIT=20, EMAIL_ACK_RESERVE=20)  # exactly the reserve is allowed
+    # The reserve is a day reserve: a small month limit is not refused because of it.
+    make_settings(EMAIL_MONTHLY_LIMIT=10, EMAIL_ACK_RESERVE=20)
+    for bad in (
+        {"EMAIL_DAILY_LIMIT": 19, "EMAIL_ACK_RESERVE": 20},
+        {"EMAIL_ACK_RESERVE": -1},
+    ):
+        with pytest.raises(ValidationError):
+            make_settings(**bad)

@@ -1403,6 +1403,55 @@ CCSTEP="$(awk '/^      - cost-check:/{f=1} f&&/^      - zap-prod:/{exit} f' "$HE
 expect "cost-check: waits for ship-api" "$(grep -c -- '- ship-api$' <<<"$CCSTEP")" 1
 expect "cost-check: waits for ship-realtime, so its prune has run before C6 counts" "$(grep -c -- '- ship-realtime$' <<<"$CCSTEP")" 1
 
+# The admin ship must not wait for the gateway ship, and verification must not depend on it either,
+# directly or through anything else: the admin client works against a gateway without the replay
+# tag, so either order is safe, while a failed ship-realtime that held ship-admin back would also
+# skip verify-release, smoke-public, zap-prod and every rollback with ship-api and ship-booking
+# already live. Parses the release workflow and follows `requires` transitively.
+release_graph() { # release_graph <config.yml>: prints "admin-direct:<n> verify-reaches:<n>"
+  python3 - "$1" <<'PY'
+import sys, re
+text = open(sys.argv[1]).read()
+# the release workflow: from "  release:" to the end of the file (it is the last workflow)
+wf = text.split("\n  release:\n", 1)[1]
+jobs = []
+cur = None
+for line in wf.splitlines():
+    m = re.match(r"^      - ([\w-]+):\s*$", line) or re.match(r"^      - ([\w-]+)\s*$", line)
+    if m:
+        cur = {"alias": m.group(1), "requires": []}; jobs.append(cur); in_req = False; continue
+    if cur is None:
+        continue
+    m = re.match(r"^          name: ([\w-]+)\s*$", line)
+    if m:
+        cur["alias"] = m.group(1); continue
+    if re.match(r"^          requires:\s*$", line):
+        in_req = True; continue
+    m = re.match(r"^            - ([\w-]+)\s*$", line)
+    if in_req and m:
+        cur["requires"].append(m.group(1)); continue
+    if re.match(r"^          [\w-]+:", line):
+        in_req = False
+by_alias = {j["alias"]: j for j in jobs}
+def ancestors(name, seen=None):
+    seen = seen if seen is not None else set()
+    for r in by_alias[name]["requires"]:
+        if r not in seen:
+            seen.add(r); ancestors(r, seen)
+    return seen
+direct = "ship-realtime" in by_alias["ship-admin"]["requires"]
+reaches = "ship-realtime" in ancestors("verify-release")
+print(f"admin-direct:{int(direct)} verify-reaches:{int(reaches)}")
+PY
+}
+CIG="$HERE/../../.circleci/config.yml"
+expect "ci graph: ship-admin does not require ship-realtime, and verify-release does not reach it" \
+  "$(release_graph "$CIG")" "admin-direct:0 verify-reaches:0"
+# the guard fails if the dependency is put back (on a copy of the config)
+sed '/^          name: ship-admin$/,/^      - verify-release:$/ s/^            - build-admin$/            - ship-realtime\n            - build-admin/' "$CIG" > "$WORK/graph-readded.yml"
+expect "ci graph: the guard sees ship-realtime if it is re-added to ship-admin's requires" \
+  "$(release_graph "$WORK/graph-readded.yml")" "admin-direct:1 verify-reaches:1"
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

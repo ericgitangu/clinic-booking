@@ -16,6 +16,8 @@ import {
 import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { notify } from "@clinic/ui/lib/notify";
+import { followArrivalToast, WHILE_PENDING_MS } from "@/lib/arrival-toast";
+import { nextSerial } from "@/lib/live-notices";
 import type { ActionResult } from "@/lib/failure-copy";
 
 export const MIN_REASON = 3;
@@ -70,9 +72,44 @@ export function ConfirmAction({
 
   function go() {
     start(async () => {
-      const res = await run(text);
+      let res: ActionResult;
+      try {
+        res = await run(text);
+      } catch {
+        // The call itself failed (the network, a server error): say so, do not leave it spinning.
+        notify.error("That did not go through. Try again.");
+        return;
+      }
       if (res.ok) {
-        notify.success(res.message);
+        if (res.watch) {
+          // One toast for the whole story: updated in place as the email to the doctor is sent.
+          const id = `confirm-${nextSerial()}`;
+          // The person closing the toast ends the story: no more updates, nothing recreated.
+          let closedByPerson = false;
+          const closed = {
+            onDismiss: () => {
+              closedByPerson = true;
+            },
+          };
+          notify.success(res.message, {
+            id,
+            duration: WHILE_PENDING_MS,
+            ...closed,
+          });
+          void followArrivalToast(
+            res.watch.appointmentId,
+            id,
+            (tid, message, kind, ms) =>
+              notify.update(kind, message, {
+                id: tid,
+                duration: ms,
+                ...closed,
+              }),
+            { initial: res.message, alive: () => !closedByPerson },
+          );
+        } else {
+          notify.success(res.message);
+        }
         setOpen(false);
         setReason("");
         onDone?.();

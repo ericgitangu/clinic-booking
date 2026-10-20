@@ -71,6 +71,7 @@ async def _change(
         patient_email=patient.email,
         doctor_name=doctor.full_name,
         previous_starts_at=ctx.previous_starts_at,
+        doctor_notice=ctx.doctor_notice,
     )
     await session.rollback()  # end the read transaction the lookups began (values are copied)
     return change

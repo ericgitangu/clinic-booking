@@ -95,3 +95,25 @@ body::before {
     color: #000;
   }
 }
+
+/* A doctor's card on the today board, for two seconds after one of its visits changes. The outline
+   is outside the box, so nothing moves. With reduced motion it stays as a still outline. */
+@keyframes live-changed {
+  0%,
+  100% {
+    outline-offset: 2px;
+  }
+  50% {
+    outline-offset: 5px;
+  }
+}
+
+.live-changed {
+  animation: live-changed 1s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-changed {
+    animation: none;
+  }
+}

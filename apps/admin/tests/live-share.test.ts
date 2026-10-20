@@ -170,7 +170,8 @@ function listener(role = "owner") {
     refresh,
     l: {
       role,
-      onEvent: (id: string, event: string) => events.push(`${id}:${event}`),
+      onEvent: (id: string, event: string, _data: string, replay?: boolean) =>
+        events.push(`${id}:${event}${replay ? ":replay" : ""}`),
       onStatus: (s: LiveStatus) => statuses.push(s),
       onRefresh: refresh,
     },
@@ -440,5 +441,29 @@ describe("SharedStream: one stream per browser", () => {
     t.setHidden(false);
     await flush();
     expect(t.open!.o.cursor).toBe("10.1");
+  });
+});
+
+describe("SharedStream: replayed events keep their flag", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("a replay is marked for the leader and for a follower tab, and a live event after it is not", async () => {
+    const b = new Browser();
+    const lead = tab(b, 1);
+    const follow = tab(b, 2);
+    const l = listener();
+    const f = listener();
+    lead.share.subscribe(l.l);
+    await flush();
+    follow.share.subscribe(f.l);
+    await flush();
+    serve(lead.open!);
+    await flush();
+    lead.open!.o.onEvent("10.1", "booked", "{}", true);
+    lead.open!.o.onEvent("10.2", "booked", "{}", false);
+    await flush();
+    expect(l.events).toEqual(["10.1:booked:replay", "10.2:booked"]);
+    expect(f.events).toEqual(["10.1:booked:replay", "10.2:booked"]);
   });
 });

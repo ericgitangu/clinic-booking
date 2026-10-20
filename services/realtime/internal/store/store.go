@@ -41,12 +41,12 @@ import (
 const viewerSQL = `
 WITH h AS (SELECT pg_snapshot_xmin(pg_current_snapshot()) AS xmin)
 SELECT u.src, u.id, u.txid::text, u.kind, u.doctor_id, u.from_starts_at, u.to_starts_at,
-       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic
+       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic, u.occurred_at
 FROM (
   SELECT 'event' AS src, e.id, e.txid, e.event_type AS kind, e.doctor_id::text AS doctor_id,
          e.from_starts_at, e.to_starts_at, e.local_date, e.from_local_date,
          NULL::timestamptz AS starts_at, NULL::int AS delay_minutes,
-         COALESCE(p.synthetic, false) AS synthetic
+         COALESCE(p.synthetic, false) AS synthetic, e.occurred_at
   FROM appointment_events e
   CROSS JOIN h
   LEFT JOIN appointments a ON a.id = e.appointment_id
@@ -59,7 +59,7 @@ FROM (
          NULL, NULL, NULL, NULL, a.starts_at,
          CASE WHEN s.after ->> 'delay_minutes' ~ '^[0-9]{1,4}$'
               THEN (s.after ->> 'delay_minutes')::int END,
-         COALESCE(p.synthetic, false)
+         COALESCE(p.synthetic, false), s.occurred_at
   FROM staff_action_audit s
   CROSS JOIN h
   LEFT JOIN appointments a ON a.id = s.appointment_id
@@ -77,14 +77,14 @@ LIMIT $3`
 const staffSQL = `
 WITH h AS (SELECT pg_snapshot_xmin(pg_current_snapshot()) AS xmin)
 SELECT u.src, u.id, u.txid::text, u.kind, u.doctor_id, u.from_starts_at, u.to_starts_at,
-       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic,
+       u.local_date, u.from_local_date, u.starts_at, u.delay_minutes, u.synthetic, u.occurred_at,
        u.appointment_id, u.patient_name, u.cancellation_reason, u.actor_email, u.actor_role,
        u.reason, u.invite_email, u.invite_role
 FROM (
   SELECT 'event' AS src, e.id, e.txid, e.event_type AS kind, e.doctor_id::text AS doctor_id,
          e.from_starts_at, e.to_starts_at, e.local_date, e.from_local_date,
          NULL::timestamptz AS starts_at, NULL::int AS delay_minutes,
-         COALESCE(p.synthetic, false) AS synthetic,
+         COALESCE(p.synthetic, false) AS synthetic, e.occurred_at,
          COALESCE(e.appointment_id::text, '') AS appointment_id,
          COALESCE(p.full_name, '') AS patient_name, a.cancellation_reason,
          sa.actor_email, sa.actor_role, sa.reason,
@@ -109,7 +109,7 @@ FROM (
          NULL, NULL, NULL, NULL, a.starts_at,
          CASE WHEN s.after ->> 'delay_minutes' ~ '^[0-9]{1,4}$'
               THEN (s.after ->> 'delay_minutes')::int END,
-         COALESCE(p.synthetic, false),
+         COALESCE(p.synthetic, false), s.occurred_at,
          COALESCE(s.appointment_id::text, ''), COALESCE(p.full_name, ''), NULL,
          s.actor_email, s.actor_role::text, s.reason, i.email::text, i.role::text
   FROM staff_action_audit s
@@ -126,6 +126,8 @@ FROM (
 ) u
 ORDER BY u.txid, u.id
 LIMIT $3`
+
+const nowSQL = `SELECT clock_timestamp()`
 
 const horizonSQL = `SELECT pg_snapshot_xmin(pg_current_snapshot())::text`
 
@@ -222,6 +224,17 @@ func (l *Lease) Horizon(ctx context.Context) (cursor.Cursor, error) {
 	return cursor.Cursor{Txid: txid}, nil
 }
 
+// Now is the database's own clock, the one a row's occurred_at is written with. A resumed stream
+// reads it when it opens, so that "was this row there before the stream opened" compares two
+// times from the same clock.
+func (l *Lease) Now(ctx context.Context) (time.Time, error) {
+	var t time.Time
+	if err := l.pool.QueryRow(ctx, nowSQL).Scan(&t); err != nil {
+		return time.Time{}, fmt.Errorf("now: %w", err)
+	}
+	return t, nil
+}
+
 // Poll returns up to limit rows after the cursor, in (txid, id) order, that are safe to deliver.
 // staff selects the query that also reads the personal columns. appointment, when not "", limits
 // the rows to that appointment (and a successor a veto booked for it); the caller validates it.
@@ -249,7 +262,7 @@ func (l *Lease) Poll(ctx context.Context, after cursor.Cursor, limit int, staff 
 			localDate *time.Time
 		)
 		dest := []any{&r.Source, &r.ID, &txid, &r.EventType, &doctor, &r.FromStartsAt, &r.ToStartsAt,
-			&localDate, &r.FromLocalDate, &r.StartsAt, &r.DelayMinutes, &r.Synthetic}
+			&localDate, &r.FromLocalDate, &r.StartsAt, &r.DelayMinutes, &r.Synthetic, &r.OccurredAt}
 		if staff {
 			dest = append(dest, &r.AppointmentID, &r.PatientName, &r.CancellationReason, &r.ActorEmail,
 				&r.ActorRole, &r.Reason, &r.InviteEmail, &r.InviteRole)

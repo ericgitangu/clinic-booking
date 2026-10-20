@@ -112,7 +112,7 @@ export async function runReminders(
     }
     // One email from the day's and the month's allowance, before sending (and kept across the
     // retries below: they carry the same idempotency key, so Resend sends it once).
-    const reserved = await reserveEmail(SYSTEM_CALLER);
+    const reserved = await reserveEmail(SYSTEM_CALLER, "other");
     if (!reserved.ok || !reserved.data.granted) {
       stop = "allowance";
       deferred++;

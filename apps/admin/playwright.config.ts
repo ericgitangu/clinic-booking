@@ -11,6 +11,9 @@ import { defineConfig } from "@playwright/test";
 // The port the production build is served on; override it when 3101 is taken.
 const PORT = Number(process.env.ADMIN_E2E_PORT ?? 3101);
 const ORIGIN = `http://localhost:${PORT}`;
+// The stand-in for Resend's HTTP API (the booking suite's, on a port of its own).
+const RESEND_PORT = Number(process.env.ADMIN_E2E_RESEND_PORT ?? 3298);
+const RESEND_KEY = ["re", "e2e", "standin", "key"].join("_"); // ggignore
 
 export default defineConfig({
   testDir: "e2e",
@@ -33,6 +36,8 @@ export default defineConfig({
         "**/metrics-cache.spec.ts",
         "**/one-hour-rule.spec.ts",
         "**/live-feed.spec.ts",
+        "**/live-notifications.spec.ts",
+        "**/doctor-notification.spec.ts",
       ],
     },
     // Each of these books, cancels, marks or moves visits, or reads the clinic-wide figures they
@@ -78,6 +83,18 @@ export default defineConfig({
       testMatch: "**/live-feed.spec.ts",
       dependencies: ["one-hour-rule"],
     },
+    // Both mark visits arrived and book while a dashboard is open, so they run after the live feed
+    // and one after the other.
+    {
+      name: "live-notifications",
+      testMatch: "**/live-notifications.spec.ts",
+      dependencies: ["live-feed"],
+    },
+    {
+      name: "doctor-notification",
+      testMatch: "**/doctor-notification.spec.ts",
+      dependencies: ["live-notifications"],
+    },
   ],
   use: {
     baseURL: ORIGIN,
@@ -90,27 +107,43 @@ export default defineConfig({
         ? {}
         : { channel: "chrome" }),
   },
-  webServer: {
-    // The dashboard metrics are cached on disk for sixty seconds. A server started within
-    // a minute of the last run would otherwise serve that run's numbers for this run's database, so
-    // each run starts with an empty data cache.
-    command: `rm -rf .next/cache/fetch-cache && pnpm exec next start -p ${PORT}`,
-    url: `${ORIGIN}/robots.txt`,
-    reuseExistingServer: false,
-    timeout: 60_000,
-    env: {
-      API_URL: process.env.E2E_API_URL ?? "",
-      // The live-feed gateway from docker compose (profile "realtime").
-      REALTIME_URL: process.env.E2E_REALTIME_URL ?? "",
-      INTERNAL_SIGNING_KEY: process.env.INTERNAL_SIGNING_KEY ?? "",
-      ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
-      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
-      BETTER_AUTH_URL: ORIGIN,
-      // The e2e error fixture (page.e2e.tsx) only gets a nonce at runtime when this is set.
-      SHELL_E2E: "1",
-      // Present only so the auth instance can be built; no test ever reaches Google.
-      GOOGLE_CLIENT_ID: randomUUID(),
-      GOOGLE_CLIENT_SECRET: randomUUID(),
+  webServer: [
+    {
+      // STAND-IN for Resend's HTTP API only; the app, the API and the database are real.
+      command: "node ../booking/e2e/support/resend-standin.mjs",
+      url: `http://127.0.0.1:${RESEND_PORT}/_health`,
+      reuseExistingServer: false,
+      timeout: 15_000,
+      env: {
+        RESEND_STANDIN_PORT: String(RESEND_PORT),
+        RESEND_API_KEY: RESEND_KEY,
+      },
     },
-  },
+    {
+      // The dashboard metrics are cached on disk for sixty seconds. A server started within
+      // a minute of the last run would otherwise serve that run's numbers for this run's database, so
+      // each run starts with an empty data cache.
+      command: `rm -rf .next/cache/fetch-cache && pnpm exec next start -p ${PORT}`,
+      url: `${ORIGIN}/robots.txt`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        API_URL: process.env.E2E_API_URL ?? "",
+        // The live-feed gateway from docker compose (profile "realtime").
+        REALTIME_URL: process.env.E2E_REALTIME_URL ?? "",
+        INTERNAL_SIGNING_KEY: process.env.INTERNAL_SIGNING_KEY ?? "",
+        ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
+        BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
+        BETTER_AUTH_URL: ORIGIN,
+        // The e2e error fixture (page.e2e.tsx) only gets a nonce at runtime when this is set.
+        SHELL_E2E: "1",
+        // Present only so the auth instance can be built; no test ever reaches Google.
+        GOOGLE_CLIENT_ID: randomUUID(),
+        GOOGLE_CLIENT_SECRET: randomUUID(),
+        // Email goes to the stand-in, with the key it expects.
+        RESEND_API_KEY: RESEND_KEY,
+        RESEND_BASE_URL: `http://127.0.0.1:${RESEND_PORT}`,
+      },
+    },
+  ],
 });

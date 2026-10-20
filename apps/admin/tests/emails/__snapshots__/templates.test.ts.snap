@@ -1,5 +1,45 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`staff email templates > doctorArrived: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A patient has arrived</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">Amina K. is here for the Tuesday 20 October, 09:00 visit</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">A patient has arrived</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">Hello Dr. Achieng Otieno, Amina K. has arrived and is waiting for you.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Amina K.</p><p style="margin:4px 0 0;font-size:15px;">Tuesday 20 October, 09:00</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">East Africa Time (GMT+03:00), 30 minutes.</p></div>
+
+
+<div style="padding:24px 0 4px;"><a href="https://clinic-admin.ericgitangu.com/dashboard/appointments/0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">Open the appointment</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because the clinic&#39;s reception marked a patient of yours as arrived on the Idyllic Clinic admin dashboard, and your address is set as the doctor&#39;s contact there. Idyllic Clinic is a demonstration made for an assessment and not a real clinic. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > doctorArrived: subject, html and text > subject 1`] = `"Amina K. has arrived for Tuesday 20 October, 09:00"`;
+
+exports[`staff email templates > doctorArrived: subject, html and text > text 1`] = `
+"A PATIENT HAS ARRIVED
+
+Hello Dr. Achieng Otieno, Amina K. has arrived and is waiting for you.
+
+Amina K.
+Tuesday 20 October, 09:00
+East Africa Time (GMT+03:00), 30 minutes.
+
+Open the appointment: https://clinic-admin.ericgitangu.com/dashboard/appointments/0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8
+
+--
+You are getting this because the clinic's reception marked a patient of yours as arrived on the Idyllic Clinic admin dashboard, and your address is set as the doctor's contact there. Idyllic Clinic is a demonstration made for an assessment and not a real clinic. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
 exports[`staff email templates > staffBooked: subject, html and text > html 1`] = `
 "<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You have been booked</title></head>

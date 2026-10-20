@@ -10,8 +10,10 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { AppointmentLink } from "@/components/appointment-sheet";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { AttendanceActions } from "@/components/attendance-actions";
+import { DoctorEmail } from "@/components/doctor-email";
 import { DrillSheet } from "@/components/drill-sheet";
 import { StaffControls } from "@/components/staff-controls";
+import { TodayCard } from "@/components/today-card";
 import { StatusBadge } from "@/components/status-badge";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
 import { CLINIC_TZ, addDays, formatSlot, formatTime } from "@/lib/clinic-time";
@@ -113,8 +115,11 @@ export function TodayBoard({
               (a) => a.status === "booked",
             ).length;
             return (
-              <li
+              <TodayCard
                 key={d.doctor_id}
+                doctorId={d.doctor_id}
+                doctorName={d.name}
+                date={date}
                 data-testid={`today-${d.doctor_id}`}
                 className="min-w-0 rounded-xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm"
               >
@@ -144,6 +149,13 @@ export function TodayBoard({
                     </span>
                   </p>
                 </div>
+                {canAct && (
+                  <DoctorEmail
+                    doctorId={d.doctor_id}
+                    doctorName={d.name}
+                    email={d.email ?? null}
+                  />
+                )}
                 {d.appointments.length > 0 && (
                   <div className="mt-2 flex justify-end">
                     <DrillSheet
@@ -256,7 +268,7 @@ export function TodayBoard({
                     })}
                   </ol>
                 )}
-              </li>
+              </TodayCard>
             );
           })}
         </ul>

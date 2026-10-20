@@ -77,7 +77,14 @@ export interface CallOptions {
   caller?: Caller;
 }
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+export const DEFAULT_TIMEOUT_MS = 15_000;
+
+/** The longest a call waits for the Cloud Run identity token (see proxy/gcp-id-token.ts): the
+ *  exchange runs before the request is sent, outside the request's own timeout, and is bounded
+ *  there. The token is cached for about an hour and shared by concurrent calls, so a slow exchange
+ *  is usually paid by one call; a token that enters its 5 minute refresh window part-way through
+ *  one action can make that action pay it a second time. */
+export { MINT_TIMEOUT_MS } from "./proxy/gcp-id-token";
 
 // What a generated SDK function resolves to, whichever branch it took.
 type SdkOutcome<D> = {

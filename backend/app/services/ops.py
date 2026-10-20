@@ -162,6 +162,7 @@ async def today_board(
                 doctor_id=did,
                 name=d["full_name"],
                 specialty=d["specialty"],
+                email=d["email"] if full else None,
                 timezone=d["timezone"],
                 date=day,
                 appointments=items,

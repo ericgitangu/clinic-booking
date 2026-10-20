@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  doctorArrived,
   escapeHtml,
   staffBooked,
   staffCancelled,
@@ -48,6 +49,14 @@ const all = {
     if (!r.ok) throw new Error("expected a valid mail");
     return r.mail;
   },
+  doctorArrived: () =>
+    doctorArrived({
+      patientName: "Amina Wanjiku Kariuki",
+      doctor: "Dr. Achieng Otieno",
+      startsAt: "2026-10-20T09:00:00+03:00",
+      timezone: "Africa/Nairobi",
+      appointmentId: "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+    }),
   staffInvite: () =>
     staffInvite({
       role: "viewer",
@@ -179,30 +188,44 @@ describe("staff email templates", () => {
 describe("escaping", () => {
   const nasty = `<script>alert("x")</script> & 'quotes' "double"`;
 
-  it.each(Object.keys(all).filter((n) => n !== "staffInvite"))(
-    "%s escapes a reason full of markup",
-    (n) => {
-      const make = {
-        staffBooked: staffBooked,
-        staffRescheduled: staffRescheduled,
-        staffCancelled: staffCancelled,
-        staffVetoed: staffVetoed,
-        staffRemind: staffRemind,
-        staffRunningLate: (f: Parameters<typeof staffBooked>[0]) => {
-          const r = staffRunningLate({ ...f, minutes: 10 });
-          if (!r.ok) throw new Error("expected a valid mail");
-          return r.mail;
-        },
-      }[n as string]!;
-      const m = make({ ...appt, reason: nasty });
-      expect(m.html).not.toContain("<script");
-      expect(m.html).toContain(
-        "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;quotes&#39; &quot;double&quot;",
-      );
-      // the plain-text version is not HTML: the reason stays as it was written
-      expect(m.text).toContain(nasty);
-    },
-  );
+  it("doctorArrived escapes a patient name full of markup", () => {
+    const m = doctorArrived({
+      patientName: `<b>Eve</b> <script>alert(1)</script>`,
+      doctor: nasty,
+      startsAt: "2026-10-20T09:00:00+03:00",
+      appointmentId: "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8",
+    });
+    expect(m.html).not.toContain("<script>");
+    expect(m.html).not.toContain("<b>Eve");
+    expect(m.html).not.toContain("alert(1)");
+    expect(m.html).toContain("bEveb");
+  });
+
+  it.each(
+    Object.keys(all).filter(
+      (n) => n !== "staffInvite" && n !== "doctorArrived",
+    ),
+  )("%s escapes a reason full of markup", (n) => {
+    const make = {
+      staffBooked: staffBooked,
+      staffRescheduled: staffRescheduled,
+      staffCancelled: staffCancelled,
+      staffVetoed: staffVetoed,
+      staffRemind: staffRemind,
+      staffRunningLate: (f: Parameters<typeof staffBooked>[0]) => {
+        const r = staffRunningLate({ ...f, minutes: 10 });
+        if (!r.ok) throw new Error("expected a valid mail");
+        return r.mail;
+      },
+    }[n as string]!;
+    const m = make({ ...appt, reason: nasty });
+    expect(m.html).not.toContain("<script");
+    expect(m.html).toContain(
+      "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;quotes&#39; &quot;double&quot;",
+    );
+    // the plain-text version is not HTML: the reason stays as it was written
+    expect(m.text).toContain(nasty);
+  });
 
   it("escapes names and the doctor too", () => {
     const m = staffBooked({

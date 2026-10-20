@@ -1,5 +1,7 @@
 // Staff emails. The API and the rules are documented at the top of ./send.ts.
 export {
+  doctorArrived,
+  firstNameAndInitial,
   staffBooked,
   staffCancelled,
   staffInvite,

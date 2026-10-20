@@ -39,7 +39,7 @@ export async function acknowledge(
     if (!emailConfigured()) return;
     // Fails closed: if the allowance cannot be reserved we do not send, so a broken counter can
     // never turn into unlimited email.
-    const reserved = await reserveEmail(ctx.caller);
+    const reserved = await reserveEmail(ctx.caller, "ack");
     if (!reserved.ok) {
       logError("email dropped: the allowance could not be reserved", {
         kind,
