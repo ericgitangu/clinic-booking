@@ -22,6 +22,7 @@ import {
 import { Skeleton } from "@clinic/ui/components/ui/skeleton";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { AttendanceActions } from "@/components/attendance-actions";
+import { DoctorNoticeLine } from "@/components/doctor-notice-line";
 import { LineageTimeline } from "@/components/lineage-timeline";
 import { StaffControls } from "@/components/staff-controls";
 import { StatusBadge } from "@/components/status-badge";
@@ -237,6 +238,15 @@ function Body({
             <LockIcon className="size-4" aria-hidden /> Locked by staff. The
             patient cannot change this appointment.
           </p>
+        )}
+
+        {d.doctorNotice && (
+          <DoctorNoticeLine
+            appointmentId={d.id}
+            notice={d.doctorNotice}
+            canAct={canAct}
+            reload={reload}
+          />
         )}
 
         <section

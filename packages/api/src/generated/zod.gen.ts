@@ -351,6 +351,25 @@ export const zChangeList = z.object({
 });
 
 /**
+ * DoctorEmail
+ */
+export const zDoctorEmail = z.object({
+    audit_id: z.uuid().nullable(),
+    doctor_id: z.uuid(),
+    email: z.string().nullable()
+});
+
+/**
+ * DoctorEmailRequest
+ *
+ * Set the doctor's address, or clear it with ``email: null`` (or a blank).
+ */
+export const zDoctorEmailRequest = z.object({
+    email: z.string().max(254).nullable(),
+    reason: z.string().min(3).max(500)
+});
+
+/**
  * DoctorLoad
  */
 export const zDoctorLoad = z.object({
@@ -360,6 +379,92 @@ export const zDoctorLoad = z.object({
     doctor_id: z.uuid(),
     name: z.string(),
     utilization: z.number().nullable()
+});
+
+/**
+ * DoctorNoticeFinish
+ */
+export const zDoctorNoticeFinish = z.object({
+    attempt: z.int().gte(1),
+    error: z.string().max(300).nullish(),
+    outcome: z.enum([
+        'sent',
+        'failed',
+        'skipped'
+    ]),
+    provider_id: z.string().max(200).nullish(),
+    reason: z.enum([
+        'no_email',
+        'allowance_day',
+        'allowance_month',
+        'demo_address',
+        'not_configured'
+    ]).nullish()
+});
+
+/**
+ * DoctorNoticeFinished
+ */
+export const zDoctorNoticeFinished = z.object({
+    id: z.uuid(),
+    status: z.enum([
+        'pending',
+        'sent',
+        'failed',
+        'skipped'
+    ]),
+    updated: z.boolean()
+});
+
+/**
+ * DoctorNoticeState
+ *
+ * Where telling the doctor stands. ``reason`` says why a row was skipped.
+ */
+export const zDoctorNoticeState = z.object({
+    attempts: z.int(),
+    id: z.uuid(),
+    reason: z.enum([
+        'no_email',
+        'allowance_day',
+        'allowance_month',
+        'demo_address',
+        'not_configured'
+    ]).nullable(),
+    retryable: z.boolean(),
+    sent_at: z.iso.datetime({ offset: true }).nullable(),
+    status: z.enum([
+        'pending',
+        'sent',
+        'failed',
+        'skipped'
+    ])
+});
+
+/**
+ * DoctorNoticeToSend
+ *
+ * What the web app needs to write and send the arrival email, once it holds the claim.
+ */
+export const zDoctorNoticeToSend = z.object({
+    appointment_id: z.uuid(),
+    attempt: z.int(),
+    doctor_email: z.string(),
+    doctor_name: z.string(),
+    id: z.uuid(),
+    patient_name: z.string(),
+    starts_at: z.iso.datetime({ offset: true }),
+    timezone: z.string()
+});
+
+/**
+ * DoctorNoticeClaim
+ *
+ * ``send`` is set when the caller now holds the claim and should send; otherwise the row is
+ * sent, skipped, out of attempts or held by another sender, and there is nothing to do.
+ */
+export const zDoctorNoticeClaim = z.object({
+    send: zDoctorNoticeToSend.nullable()
 });
 
 /**
@@ -901,6 +1006,7 @@ export const zDoctorBoard = z.object({
     appointments: z.array(zBoardAppointment),
     date: z.iso.date(),
     doctor_id: z.uuid(),
+    email: z.string().nullish(),
     free_slots: z.int(),
     name: z.string(),
     next_gap: zBoardGap.nullable(),
@@ -1020,6 +1126,7 @@ export const zStaffAppointmentChange = z.object({
     created_at: z.iso.datetime({ offset: true }),
     doctor_id: z.uuid(),
     doctor_name: z.string(),
+    doctor_notice: zDoctorNoticeState.nullish(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
     locked: z.boolean(),
@@ -1346,6 +1453,15 @@ export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchP
  */
 export const zCancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = zStaffAppointmentChange;
 
+export const zGetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetPath = z.object({
+    appointment_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetResponse = zDoctorNoticeState;
+
 export const zGetLineageInternalAdminAppointmentsAppointmentIdLineageGetPath = z.object({
     appointment_id: z.uuid()
 });
@@ -1435,6 +1551,37 @@ export const zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostPath = z.object({
  * Successful Response
  */
 export const zMarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse = zNotified;
+
+export const zClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostPath = z.object({
+    notification_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostResponse = zDoctorNoticeClaim;
+
+export const zFinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostBody = zDoctorNoticeFinish;
+
+export const zFinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostPath = z.object({
+    notification_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zFinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostResponse = zDoctorNoticeFinished;
+
+export const zSetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchBody = zDoctorEmailRequest;
+
+export const zSetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchPath = z.object({
+    doctor_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zSetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchResponse = zDoctorEmail;
 
 export const zDoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostBody = zRunningLateRequest;
 
@@ -1579,6 +1726,10 @@ export const zReleaseEmailInternalEmailsReleasePostBody = zEmailRelease;
  * Successful Response
  */
 export const zReleaseEmailInternalEmailsReleasePostResponse = zEmailBudget;
+
+export const zReserveEmailInternalEmailsReservePostQuery = z.object({
+    purpose: z.enum(['ack', 'other']).optional().default('other')
+});
 
 /**
  * Successful Response

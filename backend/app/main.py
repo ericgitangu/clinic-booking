@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from app.api.routers import (
     admin,
     appointments,
+    doctor_notice,
     doctors,
     health,
     me,
@@ -83,6 +84,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(staff.doctors_router)
     app.include_router(staff.invites_router)
     app.include_router(staff.audit_router)
+    app.include_router(doctor_notice.router)
     app.include_router(me.router)
     app.include_router(realtime.router)
     app.include_router(realtime.admin_router)

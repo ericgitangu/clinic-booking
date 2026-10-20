@@ -29,10 +29,25 @@ export const HIDDEN_CLOSE_MS = 5 * 60_000;
 export const BUSY_REFRESH_MS = 30_000;
 export const BUSY_RETRY_BASE_MS = 30_000;
 export const BUSY_RETRY_MAX_MS = 4 * 60_000;
+/**
+ * An older gateway sends no `replay_tag: true` in its hello frame and never tags its backlog, so
+ * the absence of a tag would read as "live" and a resumed stream would toast the whole backlog.
+ * Against such a gateway only (the admin app can ship before the gateway does), a resumed stream
+ * treats frames as backlog until one arrives more than this long after the one before it (the
+ * gateway polls every second). It is a heuristic, kept for that case alone; a gateway that says it
+ * tags is trusted and this is never used.
+ */
+export const LEGACY_CATCHUP_QUIET_MS = 1500;
 
 export interface LiveStreamOptions {
-  /** Called with each event frame's SSE id, event name and data. */
-  onEvent(id: string, event: string, data: string): void;
+  /**
+   * Called with each event frame's SSE id, event name and data. `replay` is true for a frame that
+   * is part of the backlog the gateway sent after a resume: the gateway tags those frames itself
+   * (`replay: true`) and this trusts that tag alone. Frames it does not tag are live. The one
+   * exception is a gateway whose hello does not say it tags (`replay_tag`): against that, a
+   * resumed stream reports frames as replay until it goes quiet (LEGACY_CATCHUP_QUIET_MS).
+   */
+  onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
   /** Refresh the page's numbers by other means (the fallback while the stream is unavailable). */
   onRefresh(): void;
@@ -42,6 +57,8 @@ export interface LiveStreamOptions {
   url?: string;
   /** Resume from here on the first connection (a new leader tab continues where the last left). */
   cursor?: string | null;
+  /** Milliseconds, for the legacy catch-up rule; Date.now by default. */
+  now?: () => number;
   /** 0..1, for the busy retry's jitter; Math.random by default. */
   random?: () => number;
   fetchImpl?: typeof fetch;
@@ -238,10 +255,19 @@ export class LiveStream {
     this.set("live");
 
     let closeReason: string | null = null;
+    // Against a gateway that does not say it tags its backlog (see LEGACY_CATCHUP_QUIET_MS).
+    const resuming = this.lastId !== null;
+    const now = this.o.now ?? Date.now;
+    let legacyCatchUp = false;
+    let lastFrameAt = now();
     const parser = createSseParser((f) => {
       if (f.kind !== "event") return;
       if (f.id) this.lastId = f.id;
+      const at = now();
+      const quiet = at - lastFrameAt > LEGACY_CATCHUP_QUIET_MS;
+      lastFrameAt = at;
       if (f.event === "hello") {
+        legacyCatchUp = resuming && !tagsItsBacklog(f.data);
         this.o.onHello?.(f.id ?? "", f.data);
         return;
       }
@@ -249,7 +275,8 @@ export class LiveStream {
         closeReason = f.event === "idle" ? "idle" : this.reason(f.data);
         return;
       }
-      this.o.onEvent(f.id ?? "", f.event, f.data);
+      if (legacyCatchUp && quiet) legacyCatchUp = false;
+      this.o.onEvent(f.id ?? "", f.event, f.data, f.replay || legacyCatchUp);
     });
     const reader = res.body.getReader();
     try {
@@ -296,5 +323,14 @@ export class LiveStream {
     this.startRefreshing();
     const { baseMs, maxMs } = this.o.backoff ?? { baseMs: 2000, maxMs: 30_000 };
     this.later(Math.min(baseMs * 2 ** this.failures++, maxMs));
+  }
+}
+
+/** Whether the hello frame says this gateway tags the backlog of a resumed stream. */
+function tagsItsBacklog(data: string): boolean {
+  try {
+    return (JSON.parse(data) as { replay_tag?: unknown }).replay_tag === true;
+  } catch {
+    return false;
   }
 }

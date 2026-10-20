@@ -98,7 +98,7 @@ beforeEach(async () => {
       res.writeHead(status, { "content-type": "application/json" });
       res.end(JSON.stringify(body));
     };
-    if (hit.url === "/internal/emails/reserve")
+    if (hit.url === "/internal/emails/reserve?purpose=other")
       return json(200, {
         granted: cap === "none",
         reason: cap === "none" ? null : cap,
@@ -173,7 +173,7 @@ describe("sendStaffEmail: the sending path", () => {
     expect(body.html).toBe(mail().html);
     expect(body.reply_to).toBe("developer.ericgitangu@gmail.com");
     expect(apiHits.map((h) => `${h.method} ${h.url}`)).toEqual([
-      "POST /internal/emails/reserve",
+      "POST /internal/emails/reserve?purpose=other",
       `POST /internal/admin/audit/${AUDIT}/notified`,
     ]);
     // the API calls are signed as the staff member
@@ -198,7 +198,7 @@ describe("sendStaffEmail: the sending path", () => {
       notified: false,
     });
     expect(apiHits.map((h) => h.url)).toEqual([
-      "/internal/emails/reserve",
+      "/internal/emails/reserve?purpose=other",
       "/internal/emails/release",
     ]);
   });
@@ -338,7 +338,9 @@ describe("sendStaffEmail: the allowance", () => {
         notified: false,
       });
       expect(resendHits).toHaveLength(0);
-      expect(apiHits.map((h) => h.url)).toEqual(["/internal/emails/reserve"]);
+      expect(apiHits.map((h) => h.url)).toEqual([
+        "/internal/emails/reserve?purpose=other",
+      ]);
       expect(spy).toHaveBeenCalled();
     },
   );
@@ -526,7 +528,7 @@ describe("sendInviteEmail", () => {
     expect(key).toBe(`invite/${INVITE}`);
     expect(String(key)).not.toContain(TOKEN_LIKE);
     expect(apiHits.map((h) => h.url)).toEqual([
-      "/internal/emails/reserve",
+      "/internal/emails/reserve?purpose=other",
       `/internal/admin/audit/${AUDIT}/notified`,
     ]);
     const body = JSON.parse(resendHits[0]!.body);
@@ -568,7 +570,7 @@ describe("sendInviteEmail", () => {
     resendStatus = 400;
     expect((await sendInviteEmail(invite())).outcome).toBe("send-failed");
     expect(apiHits.map((h) => h.url)).toEqual([
-      "/internal/emails/reserve",
+      "/internal/emails/reserve?purpose=other",
       "/internal/emails/release",
     ]);
   });

@@ -8,6 +8,11 @@ import { redact } from "./log";
 
 const REFRESH_SKEW_MS = 5 * 60 * 1000;
 
+/** The longest one mint (the OIDC token, the STS exchange and generateIdToken together) may take. It
+ *  runs before a request is sent, outside that request's own timeout, so a slow or hung exchange
+ *  would otherwise hold every call. Each stage's request is also aborted at this long. */
+export const MINT_TIMEOUT_MS = 5_000;
+
 export type MintStage =
   "config" | "oidc" | "sts" | "generateIdToken" | "generateAccessToken";
 
@@ -49,6 +54,25 @@ export interface MintDeps {
   oidcToken: () => Promise<string>;
   fetchImpl: typeof fetch;
   now: () => number;
+  /** Overrides MINT_TIMEOUT_MS (tests). */
+  timeoutMs?: number;
+}
+
+/** Rejects with `Error(what)` if `p` has not settled in `ms`; the timer never outlives `p`. */
+function bounded<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(what)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }
 
 export const defaultDeps: MintDeps = {
@@ -88,7 +112,11 @@ export async function federate(
 
   let subject: string;
   try {
-    subject = await deps.oidcToken();
+    subject = await bounded(
+      deps.oidcToken(),
+      deps.timeoutMs ?? MINT_TIMEOUT_MS,
+      "the Vercel OIDC token did not arrive in time",
+    );
   } catch (err) {
     throw new TokenMintError(
       "oidc",
@@ -98,6 +126,7 @@ export async function federate(
   }
 
   const stsResp = await deps.fetchImpl("https://sts.googleapis.com/v1/token", {
+    signal: AbortSignal.timeout(deps.timeoutMs ?? MINT_TIMEOUT_MS),
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -126,6 +155,7 @@ async function mint(audience: string, deps: MintDeps): Promise<string> {
   const idResp = await deps.fetchImpl(
     `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccount}:generateIdToken`,
     {
+      signal: AbortSignal.timeout(deps.timeoutMs ?? MINT_TIMEOUT_MS),
       method: "POST",
       headers: {
         authorization: `Bearer ${accessToken}`,
@@ -152,7 +182,15 @@ export async function mintIdToken(
   const pending = inflight.get(audience);
   if (pending) return pending;
 
-  const promise = mint(audience, deps).finally(() => inflight.delete(audience));
+  // The whole mint is bounded, and a mint that is cut off is taken out of `inflight`, so the next
+  // call starts a fresh one instead of waiting on (and failing with) the hung promise.
+  const promise = bounded(
+    mint(audience, deps),
+    deps.timeoutMs ?? MINT_TIMEOUT_MS,
+    "the identity token exchange timed out",
+  ).finally(() => {
+    if (inflight.get(audience) === promise) inflight.delete(audience);
+  });
   inflight.set(audience, promise);
   return promise;
 }

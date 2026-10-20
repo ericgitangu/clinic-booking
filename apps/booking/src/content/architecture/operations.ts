@@ -677,6 +677,38 @@ FROM staff_access_audit ORDER BY occurred_at DESC LIMIT 20;`,
     },
 
     {
+      id: "notifications",
+      title: "Doctor notifications",
+      summary:
+        "How staff and doctors are told that a patient arrived or a booking changed, and what is not built.",
+      blocks: [
+        {
+          t: "p",
+          text: "Arrivals, no-shows, bookings, changes and vetoes already reach the admin dashboard through the one live stream. The feed panel is easy to miss, so the same events now raise a toast, add to an unread count on the feed heading, and outline the doctor's card on the today board for two seconds. When a patient is marked arrived, the doctor is also emailed, if staff have set the doctor's address.",
+        },
+        {
+          t: "ul",
+          items: [
+            "**Only what happens after the page opens.** The gateway replays what a resumed connection missed, and tags each event it sends with a `replay: true` field when the row was written before the stream opened, by the database clock. The client trusts that tag and nothing else: no guessing from ids or timing. The replay gets no toast, no highlight and no unread count; whatever happens after the stream opened is announced, even while a long backlog is still being sent. The gateway says in its first frame that it tags (`replay_tag`); against an older gateway that does not, a resumed stream falls back to treating frames as backlog until it goes quiet for 1.5 s, so either order of the two deploys is safe: the admin app shipped first cannot toast a whole backlog, and the gateway shipped first is simply ignored by an older client. Named limits, both in the quiet direction: a row has an `occurred_at` that is not its commit time (`appointment_events` stamps the start of the transaction, the audit table the moment of the insert), so a row written before the stream opened and committed after it counts as backlog and is not toasted (it still shows in the feed); and a long transaction can straddle the moment only where it writes several streamed audit rows, each stamped at its own insert (telling a doctor's patients that the doctor is running late, one row per patient; creating an invitation, which revokes the ones it replaces and then adds its own), so some of those are counted as backlog and the rest are announced. An appointment event and the audit row beside it do not straddle, since that audit row only names who did it.",
+            "**One stream.** The toasts listen to the stream the browser already shares between tabs. They open no connection of their own, so the gateway's two-stream capacity is untouched.",
+            '**Bursts.** Up to three events in two seconds are three toasts; a fourth replaces them with one "4 updates" toast that keeps counting. Nothing is held back to decide.',
+            "**Viewers.** A viewer's events carry no patient or staff name, and a viewer's message that does carry one is refused whole. The toast text is built from that minimised shape, and a viewer is told nothing about the doctor's email.",
+            "**One toast for your own change.** The tab where you make a change shows its own confirmation (for an arrival, with what became of the doctor's email) and skips the live toast for it; another tab of yours, and everyone else, get the live toast. Only the tab that is in front asks about the email.",
+            '**No sound, no colour-only cue.** The unread count is words in a polite live region with a fixed box, so the table does not move. The doctor card gets an outline and the word "Updated"; with reduced motion the outline stays still for the same two seconds.',
+          ],
+        },
+        {
+          t: "p",
+          text: '**The email to the doctor.** Marking a patient arrived writes a `doctor_notification` row in the same transaction, one per appointment (a second mark or a double click cannot make another). The admin app then claims the row with a lease, takes one email from the daily and monthly allowance that acknowledgements, reminders and staff emails also use, sends it through the same sender, and records it as sent only after the provider accepted it. A spent allowance, a doctor with no address or a provider failure never changes the arrival: the row says skipped (with the reason) or failed, the toast says "doctor emailed", "doctor email on its way" or "email not sent (no doctor email)" (the confirmation to the person who marked it stays up while the email is pending and looks again at 2.5, 6, 15, 30 and 40 seconds, then says it is still sending and that the appointment shows the result; the toast of a colleague looks at 2.5, 6 and 15 seconds), and the appointment sheet shows when it went or why it did not. Nothing runs in the background, so a send that was cut off leaves the row pending: after two minutes if nothing ever claimed it, or after the 15 minute claim if a sender claimed it and died, the sheet says so and offers "Send the email again", as it does for a failed one, up to three tries; a pending row with every try used shows as failed. A result names the attempt it belongs to, so a slow sender cannot overwrite a newer one. The allowance is reserved with the room kept for booking acknowledgements (EMAIL_ACK_RESERVE, 20 of the 100 a day) left out, for reminders, staff emails and this one alike, so they cannot use it up; the month has no reserve. The email names the patient by first name and last initial and gives the time (East Africa Time), the doctor and a link to the appointment: no phone, email or notes.',
+        },
+        {
+          t: "note",
+          text: "Seeded doctors have no email address until staff set one on the doctor's card, so nothing is emailed from seed data. The address is set by an owner or an admin with a reason, audited with the value before and after, and never in a public response. Honest limits: a row whose sender claimed it and died keeps saying it is on its way for the 15 minutes of the claim before the sheet offers a resend, and an open sheet stops looking after about 2 minutes, so it needs reopening to see that; the email shows the patient as the first name and the first letter of the last, read as Surname, First when there is a comma; a name written surname-first without a comma, or a Chinese, Japanese or Korean name, still shows its family name, because a patient has one free-text name field (the fix is a given-name field on patients); one address per doctor and no per-doctor preferences, no morning digest yet, no bounce handling, and the email shares the 100 a day and 3,000 a month allowance with every other email, so a busy day can use it up.",
+        },
+      ],
+    },
+
+    {
       id: "demo-seed",
       title: "Demo seed",
       summary:

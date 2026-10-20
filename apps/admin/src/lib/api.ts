@@ -3,8 +3,9 @@
 // against the contract (see packages/api/src/call.ts). The /internal calls carry the signed
 // assertion for `caller`; the two public reads (one appointment, free times) carry none.
 import "server-only";
-import { callApi, type Caller } from "@clinic/api/call";
+import { callApi, DEFAULT_TIMEOUT_MS, type Caller } from "@clinic/api/call";
 import { memo, readKey } from "@/lib/render-cache";
+import { CALL_TIMEOUT_MS } from "@/emails/ports";
 import {
   cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch,
   changeAccessRoleInternalAdminAccessEmailPatch,
@@ -38,6 +39,11 @@ import {
   listAppointmentsInternalAdminAppointmentsGet,
   rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch,
   revokeAccessInternalAdminAccessEmailDelete,
+  claimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPost,
+  finishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPost,
+  getDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGet,
+  setDoctorEmailInternalAdminDoctorsDoctorIdEmailPatch,
+  type DoctorNoticeFinish,
 } from "@clinic/api/generated";
 
 export type { Caller } from "@clinic/api/call";
@@ -50,7 +56,10 @@ export const sessionInfo = (caller: Caller) =>
     callApi(
       "sessionInfo",
       (client) => getSessionInfoInternalAdminSessionGet({ client }),
-      { caller },
+      // The default timeout, on purpose and said out loud: this is the role lookup of every page
+      // and action, and a cold API can take longer than the short one used on the arrival path.
+      // lib/arrival-budget.ts counts exactly this value.
+      { caller, timeoutMs: DEFAULT_TIMEOUT_MS },
     ),
   );
 
@@ -283,7 +292,7 @@ export const markAttendance = (
             path: { appointment_id: id },
             body: reason ? { reason } : null,
           }),
-    { caller },
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
   );
 
 export const staffBook = (
@@ -446,4 +455,57 @@ export const adminAppointment = (caller: Caller, id: string) =>
         }),
       { caller },
     ),
+  );
+
+// The doctor's address for arrival emails (owner and admin; the API audits it with the reason), and
+// the record of telling the doctor that a patient arrived.
+export const setDoctorEmail = (
+  caller: Caller,
+  doctorId: string,
+  email: string | null,
+  reason: string,
+) =>
+  callApi(
+    "setDoctorEmail",
+    (client) =>
+      setDoctorEmailInternalAdminDoctorsDoctorIdEmailPatch({
+        client,
+        path: { doctor_id: doctorId },
+        body: { email, reason },
+      }),
+    { caller },
+  );
+
+export const doctorNotice = (caller: Caller, appointmentId: string) =>
+  callApi(
+    "doctorNotice",
+    (client) =>
+      getDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGet(
+        { client, path: { appointment_id: appointmentId } },
+      ),
+    { caller },
+  );
+
+export const claimDoctorNotice = (caller: Caller, id: string) =>
+  callApi(
+    "claimDoctorNotice",
+    (client) =>
+      claimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPost(
+        { client, path: { notification_id: id } },
+      ),
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
+  );
+
+export const finishDoctorNotice = (
+  caller: Caller,
+  id: string,
+  body: DoctorNoticeFinish,
+) =>
+  callApi(
+    "finishDoctorNotice",
+    (client) =>
+      finishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPost(
+        { client, path: { notification_id: id }, body },
+      ),
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
   );

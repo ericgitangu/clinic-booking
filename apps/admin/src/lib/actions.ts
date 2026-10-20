@@ -11,12 +11,15 @@ import {
   inviteCreate,
   inviteRevoke,
   markAttendance as mark,
+  setDoctorEmail as setEmail,
   unlockAppointment as unlock,
   vetoAppointment as veto,
   rescheduleForPatient,
   staffBook,
   revokeAccess as revoke,
 } from "@/lib/api";
+import { doctorPorts, sendDoctorArrival } from "@/emails/doctor-arrival";
+import { arrivalMessage } from "@/lib/doctor-notice-words";
 import { SITE } from "@/lib/site";
 import { noticeOfInvite, noticeToPatient } from "@/lib/staff-mail";
 import { describeFailure as describe } from "@/lib/failure-copy";
@@ -128,6 +131,10 @@ export async function rescheduleAppointment(
   return { ok: true, message: "Appointment rescheduled." };
 }
 
+// The time this action may take, step by step against the dashboard's maxDuration, is in
+// lib/arrival-budget.ts (about 85 s in the worst case, inside 120 s; a test keeps it so). The mark
+// itself passes the short CALL_TIMEOUT_MS (lib/api.ts); the role lookup keeps the default, since
+// every page and action goes through it and a cold API can need longer than the short one.
 // Arrived or no-show, from 15 minutes before the visit to 2 hours after it starts. Marking what is
 // already marked changes nothing; changing an earlier mark needs a reason (the API says so).
 export async function markAttendance(
@@ -141,13 +148,25 @@ export async function markAttendance(
   const text = validReason(reason);
   if (!text)
     return { ok: false, message: "Give a reason of at least 3 characters." };
-  const res = await mark(callerFor(staff, staff.role), id, kind, text);
+  const caller = callerFor(staff, staff.role);
+  const res = await mark(caller, id, kind, text);
   if (!res.ok) return describe(res, "Give a reason of at least 3 characters.");
+  // The arrival is recorded and the response is on its way; telling the doctor happens after it,
+  // and never changes it. A row that is not pending (no address on file, already sent) sends nothing.
+  const notice = res.data.doctor_notice;
+  if (kind === "arrived" && notice && notice.status === "pending") {
+    after(() => sendDoctorArrival({ caller, id: notice.id }, doctorPorts()));
+  }
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
   return {
     ok: true,
-    message: kind === "arrived" ? "Marked arrived." : "Marked no-show.",
+    // The one toast the person who marked it sees, so it also says what became of the email.
+    message: kind === "arrived" ? arrivalMessage(notice) : "Marked no-show.",
+    // While the email is on its way the confirmation goes on to say how it ended.
+    ...(kind === "arrived" && notice?.status === "pending"
+      ? { watch: { appointmentId: id } }
+      : {}),
   };
 }
 
@@ -316,4 +335,55 @@ export async function acceptInvite(token: string): Promise<ActionResult> {
   }
   revalidatePath("/", "layout");
   return { ok: true, message: `You now have access as ${res.data.role}.` };
+}
+
+// Send the arrival email again after it failed. Anyone who may mark attendance may ask; the API only
+// hands out a send for a row that is pending or failed with attempts left, so asking twice sends
+// once.
+export async function retryDoctorEmail(
+  notificationId: string,
+): Promise<ActionResult> {
+  const staff = await authorise("manage-appointments");
+  if (!staff) return DENIED;
+  const caller = callerFor(staff, staff.role);
+  after(() => sendDoctorArrival({ caller, id: notificationId }, doctorPorts()));
+  return { ok: true, message: "Sending the email to the doctor again." };
+}
+
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+// Set the address arrival emails go to, or clear it with an empty string. The API normalises it,
+// refuses a malformed one and records who changed it, from what, and why.
+export async function setDoctorEmail(
+  doctorId: string,
+  email: string,
+  reason: string,
+): Promise<ActionResult> {
+  const staff = await authorise("manage-appointments");
+  if (!staff) return DENIED;
+  const text = validReason(reason);
+  if (!text)
+    return { ok: false, message: "Give a reason of at least 3 characters." };
+  const address = normalise(email);
+  if (address !== "" && !EMAIL_SHAPE.test(address))
+    return {
+      ok: false,
+      message: "Enter an email address like name@clinic.org.",
+    };
+  const res = await setEmail(
+    callerFor(staff, staff.role),
+    doctorId,
+    address === "" ? null : address,
+    text,
+  );
+  if (!res.ok)
+    return describe(res, "Enter an email address like name@clinic.org.");
+  revalidatePath("/dashboard", "layout");
+  return {
+    ok: true,
+    message:
+      address === ""
+        ? "The doctor's email was removed."
+        : "The doctor's email was saved.",
+  };
 }

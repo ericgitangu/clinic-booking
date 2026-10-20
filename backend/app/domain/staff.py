@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 StaffActionName = Literal[
     "book",
@@ -25,6 +25,7 @@ StaffActionName = Literal[
     "invite_create",
     "invite_revoke",
     "invite_accept",
+    "doctor_email",
 ]
 
 
@@ -43,6 +44,8 @@ class StaffAction:
     # changed nothing, so wrote nothing) and the start the appointment had before a move or cancel.
     audit_id: uuid.UUID | None = None
     previous_starts_at: datetime | None = None
+    # An arrival writes the record of telling the doctor in the same transaction (None otherwise).
+    doctor_notice: Any = None
 
 
 def is_vetoable(event_type: str | None, actor: str | None, has_successor: bool) -> bool:

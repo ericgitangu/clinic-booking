@@ -337,3 +337,75 @@ export function staffInvite(f: {
     why: "You are getting this because a member of staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, invited you.",
   });
 }
+
+/** A name token without punctuation other than the hyphen and apostrophe inside a name. */
+const word = (t: string) =>
+  t.replace(/[^\p{L}\p{M}'’-]/gu, "").replace(/^['’-]+|['’-]+$/gu, "");
+
+/**
+ * The patient as the doctor's inbox may see them: the first name and the first letter of the last
+ * one, "Amina W.". The name is free text, so it is read with care: "Kamau, Amina" (surname first,
+ * with a comma) is read as Amina K., and a name of one word, which is not known to be a first name
+ * or a surname, gives only its initial ("Patient A.").
+ *
+ * Named limit: a name written surname-first WITHOUT a comma ("Kamau Amina"), and a name in a
+ * script where the family name comes first (Chinese, Japanese, Korean), cannot be told apart from
+ * first-name-first, so the family name shows in the place of the first name. The record has one
+ * free-text name field; the fix is a given-name field on patients.
+ */
+export function firstNameAndInitial(fullName: string): string {
+  const comma = fullName.indexOf(",");
+  const tokens = (text: string) => text.split(/\s+/).map(word).filter(Boolean);
+  let first: string | undefined;
+  let last: string | undefined;
+  if (comma >= 0) {
+    const before = tokens(fullName.slice(0, comma));
+    const after = tokens(fullName.slice(comma + 1));
+    first = after[0] ?? before[0];
+    last = after[0] ? before[before.length - 1] : undefined;
+  } else {
+    const all = tokens(fullName);
+    first = all[0];
+    last = all.length > 1 ? all[all.length - 1] : undefined;
+  }
+  if (!first) return "A patient";
+  if (!last) return `Patient ${[...first][0].toUpperCase()}.`;
+  return `${first} ${[...last][0].toUpperCase()}.`;
+}
+
+const DOCTOR_WHY =
+  "You are getting this because the clinic's reception marked a patient of yours as arrived on the Idyllic Clinic admin dashboard, and your address is set as the doctor's contact there. Idyllic Clinic is a demonstration made for an assessment and not a real clinic.";
+
+/**
+ * "Patient arrived", to the doctor. The patient is the first name and the last initial, the time is
+ * the visit's in the clinic's zone, and the link opens the appointment in the admin (which asks the
+ * doctor's staff login for the rest). No phone, email, notes or reason: the inbox is not a place
+ * for them.
+ */
+export function doctorArrived(f: {
+  /** The patient's full name as the API returned it; only the first name and last initial are used. */
+  patientName: string;
+  /** `doctor_name`. */
+  doctor: string;
+  startsAt: string;
+  timezone?: string;
+  appointmentId: string;
+}): Composed {
+  const who = firstNameAndInitial(f.patientName);
+  const w = when(f);
+  return compose(`${who} has arrived for ${w.when}`, {
+    preview: `${who} is here for the ${w.when} visit`,
+    heading: "A patient has arrived",
+    lead: `Hello ${f.doctor}, ${who} has arrived and is waiting for you.`,
+    box: [
+      { text: who, strong: true },
+      { text: w.when },
+      { text: `${w.zone}, ${APPOINTMENT_MINUTES} minutes.`, muted: true },
+    ],
+    button: {
+      label: "Open the appointment",
+      href: `${SITE.url}/dashboard/appointments/${encodeURIComponent(f.appointmentId)}`,
+    },
+    why: DOCTOR_WHY,
+  });
+}

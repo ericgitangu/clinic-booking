@@ -6,6 +6,7 @@ the environment; ``.env.example`` documents every one. There are no secrets in t
 
 from __future__ import annotations
 
+from typing import Self
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -55,10 +56,12 @@ class Settings(BaseSettings):
     # reminder run claims at most REMINDER_RUN_LIMIT, and never more than what is left of the day.
     EMAIL_DAILY_LIMIT: int = 100
     # ... and 3,000 a month (https://resend.com/docs/knowledge-base/account-quotas-and-limits),
-    # counted by calendar month (UTC) in ``email_month_counter``; the same reserve is kept.
+    # counted by calendar month (UTC) in ``email_month_counter``. The reserve below is a day
+    # reserve: the month has none.
     EMAIL_MONTHLY_LIMIT: int = 3000
     REMINDER_RUN_LIMIT: int = 50
-    # Kept free of reminders so acknowledgements sent later in the day always have room.
+    # Kept free of every other email, so acknowledgements sent later in the day always have room:
+    # reminders, staff emails and the doctor's arrival email stop this far short of the day's limit.
     EMAIL_ACK_RESERVE: int = 20
     REMINDER_LEASE_MINUTES: int = 15
     WEB_ORIGIN: str = "http://localhost:3000"
@@ -130,6 +133,14 @@ class Settings(BaseSettings):
                 f"{info.field_name} must be at least {_MIN_SIGNING_KEY_CHARS} characters."
             )
         return value
+
+    @model_validator(mode="after")
+    def _email_limits_cover_the_reserve(self) -> Self:
+        # The reserve is taken off the day's limit for every email but an acknowledgement; a limit
+        # below it would refuse all of them, always.
+        if self.EMAIL_ACK_RESERVE < 0 or self.EMAIL_DAILY_LIMIT < self.EMAIL_ACK_RESERVE:
+            raise ValueError("EMAIL_DAILY_LIMIT must be at least EMAIL_ACK_RESERVE (and both >= 0)")
+        return self
 
     @model_validator(mode="after")
     def _keys_differ(self) -> Settings:

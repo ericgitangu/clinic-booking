@@ -21,6 +21,9 @@ class Doctor(Base):
     )
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     specialty: Mapped[str] = mapped_column(String, nullable=False)
+    # The doctor's official address, set by staff; null until then. Staff-only: no public schema
+    # carries it (see tests/integration/test_doctor_notice.py).
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

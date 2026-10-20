@@ -132,6 +132,7 @@ func headerWith(key []byte, w who, target string, mutate func(map[string]any)) h
 // frame is one parsed SSE frame.
 type frame struct {
 	ID, Event, Data, Comment string
+	Replay                   bool
 	At                       time.Time
 }
 
@@ -201,6 +202,8 @@ func (s *sse) read() {
 			f.ID = line[4:]
 		case strings.HasPrefix(line, "event: "):
 			f.Event = line[7:]
+		case line == "replay: true":
+			f.Replay = true
 		case strings.HasPrefix(line, "data: "):
 			f.Data = line[6:]
 		}

@@ -41,9 +41,7 @@ describe("every page the staff app serves has a breadcrumb label", () => {
     .map((l) => hrefPath(l.href));
   const pagePaths = pagePatterns().map((p) => p.replace(/:[^/]+/g, "x"));
 
-  const all = [
-    ...new Set([...navPaths, ...footerPaths, ...pagePaths]),
-  ].sort();
+  const all = [...new Set([...navPaths, ...footerPaths, ...pagePaths])].sort();
 
   it("finds the routes it is meant to check", () => {
     expect(pagePaths).toEqual(

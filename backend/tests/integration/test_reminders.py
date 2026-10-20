@@ -267,7 +267,11 @@ async def test_the_run_limit_applies(
 
 async def reserve(api: httpx.AsyncClient, clock: Clock, **kw: str) -> httpx.Response:
     return await internal(
-        api, clock, "POST", "/internal/emails/reserve", **{"role": "patient", "sub": "sub-x", **kw}
+        api,
+        clock,
+        "POST",
+        "/internal/emails/reserve?purpose=ack",
+        **{"role": "patient", "sub": "sub-x", **kw},
     )
 
 
@@ -532,3 +536,25 @@ async def test_each_claimed_reminder_carries_its_own_clinics_zone(
     # The claim time is in the clinic zone too (CEST that day); "sent" quotes it as handed out.
     marked = await mark_sent(api, clock, berlin.json()["id"], by_id[berlin.json()["id"]])
     assert marked.json()["sent"] is True
+
+
+async def test_a_reminder_run_is_held_back_from_the_day_reserve_and_not_the_month(
+    clean: None, clock: MovableClock, owner_conn: asyncpg.Connection
+) -> None:
+    """The reserve is a day reserve: with 10 left of the month and a reserve of 20, a run may still
+    claim up to the 10; the day reserve alone limits it."""
+    async with _app(
+        clock, EMAIL_DAILY_LIMIT=100, EMAIL_MONTHLY_LIMIT=10, EMAIL_ACK_RESERVE=20
+    ) as api:
+        pid = await make_patient(owner_conn, "pat@example.test")
+        for t in ["09:00", "09:30", "10:00"]:
+            await book(api, pid, slot(TOMORROW, t))
+        batch = await claim(api, clock)
+        assert len(batch.json()["items"]) == 3
+    async with _app(
+        clock, EMAIL_DAILY_LIMIT=22, EMAIL_MONTHLY_LIMIT=1000, EMAIL_ACK_RESERVE=20
+    ) as api:
+        # a day of 22 with a reserve of 20 leaves 2 for reminders, whatever the month says
+        await owner_conn.execute("UPDATE appointments SET reminder_claimed_at = NULL")
+        batch = await claim(api, clock)
+        assert len(batch.json()["items"]) == 2

@@ -36,6 +36,24 @@ export const notify = {
     haptic("error");
     show((t) => t.error(message, data));
   },
+  // A toast the person did not cause (something that happened elsewhere): no buzz, no sound. Give
+  // it an `id` to replace it later or take it away with `dismiss`.
+  quiet: (message: string, data?: ExternalToast) => {
+    show((t) => t(message, data));
+  },
+  // A later version of a toast already on screen (same `id`): no buzz, because the person was told
+  // when it first appeared. If it has been closed since, this brings it back. `kind` is the look
+  // (success, info, warning) the new words should have.
+  update: (
+    kind: "success" | "info" | "warning",
+    message: string,
+    data?: ExternalToast,
+  ) => {
+    show((t) => t[kind](message, data));
+  },
+  dismiss: (id: string) => {
+    show((t) => t.dismiss(id));
+  },
   critical: (message: string, data?: ExternalToast) => {
     haptic("critical");
     show((t) => t.error(message, { duration: Infinity, ...data }));

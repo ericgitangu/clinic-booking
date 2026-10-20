@@ -41,3 +41,20 @@ describe("live feed panel height", () => {
     expect(html).toContain("flex-nowrap");
   });
 });
+
+describe("live feed unread count", () => {
+  it("has its place in the header from the first paint, empty and polite", () => {
+    expect(html).toMatch(/data-testid="live-unread"[^>]*aria-live="polite"/);
+    expect(html).toMatch(/data-testid="live-unread"[^>]*data-count="0"/);
+    const cls = classOf("live-unread");
+    // a fixed box that is hidden, not removed, at zero: the row does not change height or width
+    expect(cls).toContain("h-6");
+    expect(cls).toContain("min-w-14");
+    expect(cls).toContain("invisible");
+    expect(html).not.toMatch(/data-testid="live-unread"[^>]*>[^<]+</);
+  });
+
+  it("makes no sound", () => {
+    expect(html).not.toMatch(/<audio|autoplay/i);
+  });
+});

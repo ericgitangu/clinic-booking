@@ -124,7 +124,7 @@ async def test_the_api_survives_concurrent_reserves_and_releases_across_instance
 
     async def reserve(api: httpx.AsyncClient) -> int:
         r = await internal(
-            api, clock, "POST", "/internal/emails/reserve", role="patient", sub="racer"
+            api, clock, "POST", "/internal/emails/reserve?purpose=ack", role="patient", sub="racer"
         )
         return r.status_code
 
