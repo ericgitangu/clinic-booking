@@ -243,6 +243,11 @@ test.describe("the arrival email to the doctor", () => {
       page.getByText("Marked no-show.", { exact: true }),
     ).toBeVisible();
     await expect(toasts).toHaveCount(0, { timeout: 15_000 });
+    // The no-show's own event must have come back on this stream (arrived, no-show) before the
+    // second mark, so the "Updated" tag seen below can only be the next event's.
+    await expect(
+      page.getByTestId("live-event").filter({ hasText: visit.name }),
+    ).toHaveCount(2, { timeout: 15_000 });
     await tap(card().getByRole("button", { name: "Change to arrived" }));
     await confirm(
       "Change to arrived?",
@@ -251,8 +256,9 @@ test.describe("the arrival email to the doctor", () => {
     );
     // The card's "Updated" tag is raised only for a live (not replayed) event, so seeing it is
     // evidence that the second arrival came back on this tab's stream as a live event. It lasts 2 s
-    // and the earlier no-show's has long gone (the toasts were awaited), so it is this event's.
-    await expect(page.getByTestId("today-updated").first()).toBeVisible({
+    // and the earlier no-show's event was awaited above, so it is this event's. It is read on this
+    // visit's card, not anywhere on the board.
+    await expect(card().getByTestId("today-updated")).toBeVisible({
       timeout: 15_000,
     });
     // Wait for the second arrival to come back on this tab's own stream (the feed now lists
