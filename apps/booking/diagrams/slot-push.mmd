@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  participant A as clinic-api
+  participant D as Postgres
+  participant L as Ably
+  actor B as Browser (another patient)
+  A->>D: write appointment and appointment_events in one transaction
+  A->>D: relay_once: lock the cursor row FOR UPDATE SKIP LOCKED
+  A->>D: read events below the snapshot xmin, at most 100, debit the monthly budget
+  A->>L: publish slot_taken on channel slots:{doctor_id}:{local_date}, id txid.id.part
+  A->>D: advance the cursor only after Ably accepted the batch
+  B->>A: POST /realtime/token/patient (doctor, date)
+  A-->>B: 5 minute subscribe-only JWT for one channel
+  B->>L: subscribe (SSE)
+  L-->>B: slot_taken
+  B->>B: apply if seq is newer than the last and after the availability cursor
+  loop every 15 s while the tab is visible, and after every reconnect
+    B->>A: GET availability
+    A-->>B: slots and cursor
+  end

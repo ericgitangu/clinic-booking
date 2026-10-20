@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  actor B as Browser
+  participant W as Booking app (server action)
+  participant G as reCAPTCHA Enterprise
+  participant A as clinic-api
+  participant D as Postgres
+  B->>W: submit (doctor, time, attempt key from crypto.randomUUID)
+  W->>G: create assessment for action "book"
+  G-->>W: score and action match
+  W->>A: POST /internal/me/appointments, Idempotency-Key, signed assertion
+  A->>D: BEGIN, then look up the key for this patient
+  alt key seen before with the same doctor and time
+    D-->>A: stored appointment
+    A-->>W: 201 with Idempotent-Replayed (the booking made earlier)
+  else key seen with a different body
+    A-->>W: 422 IDEMPOTENCY_KEY_REUSED
+  else new key
+    A->>D: INSERT appointment (doctor_id, starts_at, key, fingerprint)
+    alt another booking holds the slot
+      D-->>A: unique violation 23505 on uq_appt_doctor_slot_booked
+      A->>D: re-check the key (the winner may be this same request)
+      A-->>W: 409 SLOT_TAKEN, or the replay if the winner was this request
+    else slot free
+      A->>D: INSERT appointment_events, COMMIT
+      A-->>W: 201
+    end
+  end
+  W-->>B: confirmation, or the typed error
