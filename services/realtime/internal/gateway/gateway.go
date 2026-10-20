@@ -238,6 +238,20 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A resumed stream is sent a backlog. Which rows are backlog is decided per row, against the
+	// database's own clock read now: a row whose occurred_at is before this moment was there
+	// before the stream opened. (occurred_at is the transaction's start, so a long transaction that
+	// started before this moment and commits after it is counted as backlog too: its event is
+	// not toasted, but it still appears in the feed. Failing that way is deliberate.)
+	var opened time.Time
+	if from != nil {
+		if opened, err = lease.Now(r.Context()); err != nil {
+			g.log.Error("now failed", slog.String("error", err.Error()))
+			g.dbUnavailable(w, r)
+			return
+		}
+	}
+
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache, no-store, no-transform")
@@ -247,7 +261,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		slog.Bool("resumed", from != nil))
 
 	begin := time.Now()
-	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, replaying: from != nil, role: current,
+	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, resumed: from != nil, opened: opened, role: current,
 		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke,
 		appointment: appointment, lifeEnd: begin.Add(g.cfg.MaxConnection)}
 	reason := s.run(r.Context(), lease)
@@ -286,16 +300,17 @@ type session struct {
 	w   http.ResponseWriter
 	rc  *http.ResponseController
 	pos cursor.Cursor
-	// replaying is true while the stream is catching up from a cursor the client resumed with: every
-	// event frame sent in that time carries the "replay" field. It turns false after the first
-	// poll that comes back short of a full batch (the backlog is drained). A fresh stream starts
-	// at the horizon and has no backlog.
-	replaying bool
-	role      string
-	staff     bool
-	email     string
-	smoke     bool
-	sent      int
+	// resumed is true for a stream that started from a cursor the client brought; opened is the
+	// database's time when it did. Every event frame of a resumed stream whose row was written
+	// before opened carries the "replay" field. A fresh stream starts at the horizon and has no
+	// backlog.
+	resumed bool
+	opened  time.Time
+	role    string
+	staff   bool
+	email   string
+	smoke   bool
+	sent    int
 	// appointment, when not "", limits the stream to one appointment.
 	appointment string
 	lifeEnd     time.Time
@@ -307,7 +322,8 @@ func (s *session) frame(id, event, data string) error { return s.frameTagged(id,
 // frameTagged is frame with, when replay is true, a "replay: true" field line between the event
 // name and the data. SSE clients ignore field names they do not know, so a client that does not
 // read it sees the same frame as before; the admin app's parser reads it and trusts it alone to
-// tell the backlog a resumed stream is sent from what happens after.
+// tell the backlog a resumed stream is sent (rows written before the stream opened, by the
+// database's clock) from what happens after.
 func (s *session) frameTagged(id, event, data string, replay bool) error {
 	var b strings.Builder
 	if id != "" {
@@ -394,12 +410,6 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 				g.log.Error("poll failed", slog.String("error", err.Error()))
 				return s.finish(ReasonDatabase), true
 			}
-			// Rows of this batch are backlog if the stream is still catching up when it is read; a
-			// batch short of full drains the backlog, and is itself the last of it.
-			replay := s.replaying
-			if len(rows) < pollBatch {
-				s.replaying = false
-			}
 			delivered := false
 			for _, row := range rows {
 				s.pos = row.Cursor() // advance first: a skipped row must not be re-read
@@ -413,7 +423,7 @@ func (s *session) run(ctx context.Context, lease *store.Lease) string {
 					g.log.Error("event not encodable, skipped", slog.String("error", err.Error()))
 					continue
 				}
-				if err := s.frameTagged(row.Cursor().String(), name, string(data), replay); err != nil {
+				if err := s.frameTagged(row.Cursor().String(), name, string(data), s.resumed && row.OccurredAt.Before(s.opened)); err != nil {
 					return ReasonClient, true
 				}
 				s.sent++

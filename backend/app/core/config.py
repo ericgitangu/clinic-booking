@@ -56,7 +56,8 @@ class Settings(BaseSettings):
     # reminder run claims at most REMINDER_RUN_LIMIT, and never more than what is left of the day.
     EMAIL_DAILY_LIMIT: int = 100
     # ... and 3,000 a month (https://resend.com/docs/knowledge-base/account-quotas-and-limits),
-    # counted by calendar month (UTC) in ``email_month_counter``; the same reserve is kept.
+    # counted by calendar month (UTC) in ``email_month_counter``. The reserve below is a day
+    # reserve: the month has none.
     EMAIL_MONTHLY_LIMIT: int = 3000
     REMINDER_RUN_LIMIT: int = 50
     # Kept free of every other email, so acknowledgements sent later in the day always have room:
@@ -139,8 +140,6 @@ class Settings(BaseSettings):
         # below it would refuse all of them, always.
         if self.EMAIL_ACK_RESERVE < 0 or self.EMAIL_DAILY_LIMIT < self.EMAIL_ACK_RESERVE:
             raise ValueError("EMAIL_DAILY_LIMIT must be at least EMAIL_ACK_RESERVE (and both >= 0)")
-        if self.EMAIL_MONTHLY_LIMIT < self.EMAIL_ACK_RESERVE:
-            raise ValueError("EMAIL_MONTHLY_LIMIT must be at least EMAIL_ACK_RESERVE")
         return self
 
     @model_validator(mode="after")

@@ -147,6 +147,7 @@ export default async function Dashboard({
 
       <LiveNotifications
         role={staff.role}
+        self={staff.email}
         person={liveKey(staff.sub)}
         doctors={dash.range.per_doctor.map((d) => ({
           id: d.doctor_id,

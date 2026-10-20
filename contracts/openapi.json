@@ -7390,12 +7390,13 @@
         "operationId": "reserve_email_internal_emails_reserve_post",
         "parameters": [
           {
-            "description": "Required, so every sender says which it is. `ack`: a booking acknowledgement, which may use the whole day. `other`: any other email (reminders, staff emails, the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by them. The month has no reserve.",
+            "description": "`ack`: a booking acknowledgement, which may use the whole day. `other` (the default): any other email (reminders, staff emails, the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by them. The month has no reserve. It is optional, and defaults to `other`, so a caller that does not say (the patient app during a rollout, before it sends `ack`) is held back from the reserve rather than allowed to spend it: the safe direction.",
             "in": "query",
             "name": "purpose",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "Required, so every sender says which it is. `ack`: a booking acknowledgement, which may use the whole day. `other`: any other email (reminders, staff emails, the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by them. The month has no reserve.",
+              "default": "other",
+              "description": "`ack`: a booking acknowledgement, which may use the whole day. `other` (the default): any other email (reminders, staff emails, the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by them. The month has no reserve. It is optional, and defaults to `other`, so a caller that does not say (the patient app during a rollout, before it sends `ack`) is held back from the reserve rather than allowed to spend it: the safe direction.",
               "enum": [
                 "ack",
                 "other"

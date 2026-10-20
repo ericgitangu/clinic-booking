@@ -12,11 +12,15 @@ import {
 import { sheetLead, sheetLine } from "@/lib/doctor-notice-words";
 
 /**
- * What became of the email to the doctor, on the appointment sheet: the time it went, or why it
- * did not, in plain words, with a lead that says "notified" only when the doctor was. While it is
- * still on its way the line looks again (2.5 s, 6 s, 15 s) and changes by itself. A failed email,
- * and a pending one nothing is sending any more (the send was cut off), can be sent again by owner
- * and admin; asking twice sends once, because the API hands out the send once.
+ * What became of the email to the doctor, on the appointment sheet: the time it went, or why it did
+ * not, in plain words, with a lead that says "not notified" unless the doctor was. While it is on
+ * its way the line looks again (2.5 s up to 140 s) and changes by itself, and only while this tab
+ * is in front. A failed email, and a pending one nothing is sending, can be sent again by owner
+ * and admin; asking twice sends once, because the API hands out the send once. Pending and
+ * nothing sending means: never claimed and 2 minutes old (the send was cut off before it began), or
+ * claimed and the 15 minute claim has run out (the sender died). Until the 15 minutes pass a
+ * claimed row reads "on its way", and the looks stop at about 2 minutes, so a sheet left open
+ * needs reopening to see that case: a named limit (README, the decisions page).
  */
 export function DoctorNoticeLine({
   appointmentId,
@@ -63,7 +67,7 @@ export function DoctorNoticeLine({
             <span className="font-medium">{sheetLead(notice)}</span>{" "}
           </>
         )}
-        {sheetLine(notice)}
+        {sheetLine(notice, mayRetry)}
       </p>
       {mayRetry && (
         <Button

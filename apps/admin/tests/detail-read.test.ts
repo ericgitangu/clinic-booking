@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const gate = vi.hoisted(() => {
   const state = {
     audit: undefined as ((v: unknown) => void) | undefined,
+    retryable: true,
     notice: undefined as ((v: unknown) => void) | undefined,
     started: [] as string[],
   };
@@ -51,6 +52,29 @@ beforeEach(() => {
 });
 
 describe("loadDetail", () => {
+  it.each([true, false])(
+    "passes the API's retryable (%s) on to the sheet as it is",
+    async (retryable) => {
+      gate.retryable = retryable;
+      const done = loadDetail(ID);
+      await new Promise((r) => setTimeout(r, 20));
+      gate.audit?.({ ok: true, data: { items: [] } });
+      gate.notice?.({
+        ok: true,
+        data: {
+          id: "n",
+          status: "pending",
+          reason: null,
+          attempts: 1,
+          sent_at: null,
+          retryable,
+        },
+      });
+      const res = await done;
+      expect(res.ok && res.detail.doctorNotice?.retryable).toBe(retryable);
+    },
+  );
+
   it("starts the audit read and the doctor-notice read together, not one after the other", async () => {
     const done = loadDetail(ID);
     await new Promise((r) => setTimeout(r, 20));

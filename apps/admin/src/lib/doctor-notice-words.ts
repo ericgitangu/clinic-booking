@@ -58,8 +58,12 @@ export function sheetLead(n: NoticeFacts): string {
     : "Doctor not notified.";
 }
 
-/** The line on the appointment sheet. */
-export function sheetLine(n: NoticeFacts): string {
+/**
+ * The line on the appointment sheet. "Send it again." is said only when the person is being
+ * offered the button for it (`canResend`: the row can be resent AND they may), so the words never
+ * point at a control that is not there.
+ */
+export function sheetLine(n: NoticeFacts, canResend: boolean): string {
   switch (n.status) {
     case "sent":
       return n.sentAt
@@ -67,10 +71,10 @@ export function sheetLine(n: NoticeFacts): string {
         : "Doctor emailed.";
     case "pending":
       return n.retryable
-        ? "The email didn't go out. Send it again."
+        ? `The email didn't go out.${canResend ? " Send it again." : ""}`
         : "The email to the doctor is on its way.";
     case "failed":
-      return `The email to the doctor could not be sent (${n.attempts} ${n.attempts === 1 ? "try" : "tries"}).${n.retryable ? " Send it again." : ""}`;
+      return `The email to the doctor could not be sent (${n.attempts} ${n.attempts === 1 ? "try" : "tries"}).${n.retryable && canResend ? " Send it again." : ""}`;
     case "skipped":
       return `The doctor was not emailed: ${n.reason ? WHY_LONG[n.reason] : "it was skipped"}.`;
   }

@@ -16,9 +16,8 @@ import {
 import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { notify } from "@clinic/ui/lib/notify";
-import { followArrivalToast, WAITING_MS } from "@/lib/arrival-toast";
+import { followArrivalToast, WHILE_PENDING_MS } from "@/lib/arrival-toast";
 import { nextSerial } from "@/lib/live-notices";
-import { forgetOwn, rememberOwn } from "@/lib/own-actions";
 import type { ActionResult } from "@/lib/failure-copy";
 
 export const MIN_REASON = 3;
@@ -44,7 +43,6 @@ export function ConfirmAction({
   reasonLabel = "Reason",
   reasonHint,
   onDone,
-  ownsAppointment,
 }: {
   /** The button that opens the dialog (a real button element, rendered as the trigger). */
   trigger: ReactNode;
@@ -64,9 +62,6 @@ export function ConfirmAction({
   reasonLabel?: string;
   reasonHint?: string;
   onDone?: () => void;
-  /** The appointment this changes: the live toast for the change is then left to this
-   *  confirmation in this tab (other tabs, and other people, still get it). */
-  ownsAppointment?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -77,28 +72,25 @@ export function ConfirmAction({
 
   function go() {
     start(async () => {
-      // Before the call: the live event can arrive before the answer does.
-      if (ownsAppointment) rememberOwn(ownsAppointment);
       let res: ActionResult;
       try {
         res = await run(text);
-      } catch (err) {
-        // The call itself failed: nothing was changed that other people's events should wait on.
-        if (ownsAppointment) forgetOwn(ownsAppointment);
-        throw err;
+      } catch {
+        // The call itself failed (the network, a server error): say so, do not leave it spinning.
+        notify.error("That did not go through. Try again.");
+        return;
       }
       if (res.ok) {
-        // The change also touched other appointments (a veto of a cancel books a new one).
-        for (const other of res.alsoOwns ?? []) rememberOwn(other);
         if (res.watch) {
           // One toast for the whole story: updated in place as the email to the doctor is sent.
           const id = `confirm-${nextSerial()}`;
-          notify.success(res.message, { id, duration: WAITING_MS });
+          notify.success(res.message, { id, duration: WHILE_PENDING_MS });
           void followArrivalToast(
             res.watch.appointmentId,
             id,
             (tid, message, kind, ms) =>
-              notify[kind](message, { id: tid, duration: ms }),
+              notify.update(kind, message, { id: tid, duration: ms }),
+            { initial: res.message },
           );
         } else {
           notify.success(res.message);
@@ -108,7 +100,6 @@ export function ConfirmAction({
         onDone?.();
         router.refresh();
       } else {
-        if (ownsAppointment) forgetOwn(ownsAppointment);
         notify.error(res.message);
       }
     });

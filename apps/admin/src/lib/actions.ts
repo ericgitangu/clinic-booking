@@ -131,6 +131,15 @@ export async function rescheduleAppointment(
   return { ok: true, message: "Appointment rescheduled." };
 }
 
+// The time this action may take, against the dashboard's maxDuration of 60 s (app/dashboard/
+// layout.tsx), which covers the response AND the after() work that follows it:
+//   before the response  sessionInfo 5 s (when the role is not the owner's) + markAttendance 5 s
+//                        + the page's re-render for revalidatePath, whose reads run together and
+//                        each stop at 15 s  =  at most about 25 s
+//   after the response   the doctor email: claim, reserve, send and two results, 5 s each = 25 s
+//   total                about 50 s, 10 s inside the 60. Both calls above pass CALL_TIMEOUT_MS
+//                        (lib/api.ts) so the first line cannot grow; tests/api-timeouts.test.ts.
+//
 // Arrived or no-show, from 15 minutes before the visit to 2 hours after it starts. Marking what is
 // already marked changes nothing; changing an earlier mark needs a reason (the API says so).
 export async function markAttendance(
@@ -252,13 +261,7 @@ export async function vetoAppointment(
   after(() => noticeToPatient("vetoed", caller, res.data, text));
   updateTag(METRICS_TAG);
   revalidatePath("/dashboard", "layout");
-  return {
-    ok: true,
-    message: "Change undone and the appointment locked.",
-    // Undoing a cancel books the slot again as a NEW appointment, and the live events are about
-    // that one: they are this person's own too.
-    alsoOwns: res.data.id === id ? [] : [res.data.id],
-  };
+  return { ok: true, message: "Change undone and the appointment locked." };
 }
 
 export async function unlockAppointment(

@@ -806,11 +806,11 @@ export const releaseEmailInternalEmailsReleasePost = <ThrowOnError extends boole
  * any number of concurrent senders the caps are never exceeded. A refusal is a normal answer
  * (``granted`` false and the cap that said no), not an error: the caller just does not send.
  */
-export const reserveEmailInternalEmailsReservePost = <ThrowOnError extends boolean = false>(options: Options<ReserveEmailInternalEmailsReservePostData, ThrowOnError>): RequestResult<ReserveEmailInternalEmailsReservePostResponses, ReserveEmailInternalEmailsReservePostErrors, ThrowOnError> => (options.client ?? client).post<ReserveEmailInternalEmailsReservePostResponses, ReserveEmailInternalEmailsReservePostErrors, ThrowOnError>({
+export const reserveEmailInternalEmailsReservePost = <ThrowOnError extends boolean = false>(options?: Options<ReserveEmailInternalEmailsReservePostData, ThrowOnError>): RequestResult<ReserveEmailInternalEmailsReservePostResponses, ReserveEmailInternalEmailsReservePostErrors, ThrowOnError> => (options?.client ?? client).post<ReserveEmailInternalEmailsReservePostResponses, ReserveEmailInternalEmailsReservePostErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
         path: z.never().optional(),
-        query: zReserveEmailInternalEmailsReservePostQuery
+        query: zReserveEmailInternalEmailsReservePostQuery.optional()
     }).parseAsync(data),
     responseValidator: async (data) => await zReserveEmailInternalEmailsReservePostResponse.parseAsync(data),
     url: '/internal/emails/reserve',

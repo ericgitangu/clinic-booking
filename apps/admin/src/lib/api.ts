@@ -56,7 +56,9 @@ export const sessionInfo = (caller: Caller) =>
     callApi(
       "sessionInfo",
       (client) => getSessionInfoInternalAdminSessionGet({ client }),
-      { caller },
+      // Short, like every call on the way to an action that sends email: see the budget in
+      // actions.ts (markAttendance).
+      { caller, timeoutMs: CALL_TIMEOUT_MS },
     ),
   );
 
@@ -289,7 +291,7 @@ export const markAttendance = (
             path: { appointment_id: id },
             body: reason ? { reason } : null,
           }),
-    { caller },
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
   );
 
 export const staffBook = (

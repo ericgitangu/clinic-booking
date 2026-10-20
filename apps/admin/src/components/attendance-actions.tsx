@@ -64,7 +64,6 @@ function Mark({
   const Icon = to === "arrived" ? UserCheckIcon : UserXIcon;
   return (
     <ConfirmAction
-      ownsAppointment={appointmentId}
       trigger={
         change ? (
           <Button size="sm" variant="ghost" className="min-h-11">

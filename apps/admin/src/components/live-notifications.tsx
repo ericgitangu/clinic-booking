@@ -2,9 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { notify } from "@clinic/ui/lib/notify";
-import { WAITING_MS } from "@/lib/arrival-toast";
 import { doctorEmailSuffix } from "@/lib/doctor-notice-read";
-import { parseLiveEvent } from "@/lib/live-events";
+import { isOwnChange, parseLiveEvent } from "@/lib/live-events";
 import {
   ToastBatcher,
   cardsTouched,
@@ -14,12 +13,13 @@ import {
   wantsEmailStatus,
   type ToastSink,
 } from "@/lib/live-notices";
-import { isOwn } from "@/lib/own-actions";
 import { sharedStream } from "@/lib/live-share";
 import type { Role } from "@/lib/roles";
 
 const SUMMARY_MS = 6000;
 const TOAST_MS = 6000;
+// A colleague's arrival toast, still waiting for the email, stays up past its last look (15 s).
+const WAITING_MS = 17_000;
 
 /** Toasts through the shared notify setup: quiet (no buzz, no sound) and loaded on the first one.
  *  Ids come from one counter for the page, so a toast of an earlier mount is never overwritten. */
@@ -56,9 +56,12 @@ const sink = (): ToastSink => ({
 export function LiveNotifications({
   role,
   person,
+  self,
   doctors,
 }: {
   role: Role;
+  /** The signed-in person's own address, as the gateway writes an actor's: lower case. */
+  self: string;
   /** The per-person key the tabs share their stream under (liveKey). */
   person: string;
   doctors: { id: string; name: string }[];
@@ -82,9 +85,12 @@ export function LiveNotifications({
         for (const key of cardsTouched(ev)) highlights.mark(key);
         const doctor = latest.current.find((d) => d.id === ev.doctorId)?.name;
         if (!isToastKind(ev.kind)) return;
-        // The tab that made the change already says so (its own confirmation); a second toast for
-        // the same action would also count towards a burst and fold colleagues' updates away.
-        if (ev.appointmentId && isOwn(ev.appointmentId)) return;
+        // A change the signed-in person made is theirs: they have its confirmation, and a second
+        // toast would also count towards a burst and fold colleagues' updates away. It is known
+        // by who did it, which the event itself carries (owner and admin only: a viewer's events
+        // name nobody, and a viewer changes nothing), so it holds whichever tab made the change,
+        // whenever the event arrives, and for a veto's new appointment as well as the same one.
+        if (isOwnChange(ev, self)) return;
         // Owner and admin hear what became of the email to the doctor; a viewer's stream carries
         // no names, and nothing about the doctor's address either.
         const follow =
@@ -99,7 +105,7 @@ export function LiveNotifications({
       off();
       batch.dispose();
     };
-  }, [person, role]);
+  }, [person, role, self]);
   return null;
 }
 

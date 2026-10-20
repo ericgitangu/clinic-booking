@@ -54,6 +54,20 @@ describe("the doctor line on the appointment sheet", () => {
     );
   });
 
+  it("points at the button only when it is there", () => {
+    const stale = notice({ status: "pending", retryable: true });
+    const asAdmin = html(stale, true);
+    expect(asAdmin).toContain("Send it again.");
+    expect(asAdmin).toContain("Send the email again");
+    const asViewer = html(stale, false).replaceAll("&#x27;", "'");
+    expect(asViewer).toContain("The email didn't go out.");
+    expect(asViewer).not.toContain("Send it again.");
+    expect(asViewer).not.toContain("Send the email again");
+    const failed = notice({ status: "failed", attempts: 1, retryable: true });
+    expect(html(failed, true)).toContain("Send it again.");
+    expect(html(failed, false)).not.toContain("Send it again");
+  });
+
   it("is a polite live region, so a change of state is announced", () => {
     expect(html(notice({}))).toContain('aria-live="polite"');
   });

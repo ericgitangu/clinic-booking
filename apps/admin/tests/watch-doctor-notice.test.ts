@@ -3,7 +3,11 @@ import {
   SHEET_RECHECK_AFTER_MS,
   watchDoctorNotice,
 } from "@/lib/doctor-notice-read";
-import { followArrivalToast } from "@/lib/arrival-toast";
+import {
+  ARRIVAL_RECHECK_AFTER_MS,
+  STILL_SENDING,
+  followArrivalToast,
+} from "@/lib/arrival-toast";
 import type { DoctorNoticeView } from "@/lib/detail-read";
 
 const view = (over: Partial<DoctorNoticeView> = {}): DoctorNoticeView => ({
@@ -119,7 +123,7 @@ describe("followArrivalToast", () => {
     ]);
     expect(shown.at(-1)?.[2]).toBe("success");
     expect(shown.at(-1)?.[3]).toBe(6000);
-    expect(shown[0][3]).toBe(17_000); // long enough to outlast the last look at 15 s
+    expect(shown[0][3]).toBe(Infinity); // no timeout while the email is pending
   });
 
   it.each([
@@ -144,4 +148,48 @@ describe("followArrivalToast", () => {
       expect(shown.at(-1)).toEqual([message, kind]);
     },
   );
+
+  it("looks at 2.5, 6, 15, 30 and 40 s: past the ~25 s the send can take", async () => {
+    const waits: number[] = [];
+    await followArrivalToast("a", "t1", () => undefined, {
+      read: async () => view(),
+      wait: async (ms) => void waits.push(ms),
+    });
+    expect(ARRIVAL_RECHECK_AFTER_MS).toEqual([2500, 6000, 15000, 30000, 40000]);
+    expect(waits.reduce((a, b) => a + b, 0)).toBe(40_000);
+  });
+
+  it("never closes silently on 'on its way': still pending at the last look says it is still sending", async () => {
+    const shown: [string, string, number][] = [];
+    await followArrivalToast(
+      "a",
+      "t1",
+      (_id, m, k, ms) => shown.push([m, k, ms]),
+      { read: async () => view(), wait: now },
+    );
+    expect(shown.at(-1)).toEqual([STILL_SENDING, "info", 6000]);
+    expect(STILL_SENDING).toContain(
+      "The doctor email is still sending; the appointment shows the result.",
+    );
+  });
+
+  it("says the same when none of the looks could read the state", async () => {
+    const shown: string[] = [];
+    await followArrivalToast("a", "t1", (_id, m) => shown.push(m), {
+      read: async () => null,
+      wait: now,
+    });
+    expect(shown).toEqual([STILL_SENDING]);
+  });
+
+  it("a send that finishes at the last look is shown as final, not as still sending", async () => {
+    const shown: string[] = [];
+    const answers = [view(), view(), view(), view(), view(), sent];
+    await followArrivalToast("a", "t1", (_id, m) => shown.push(m), {
+      read: async () => answers.shift() ?? null,
+      wait: now,
+    });
+    expect(shown.at(-1)).toBe("Marked arrived. Doctor emailed.");
+    expect(shown).not.toContain(STILL_SENDING);
+  });
 });

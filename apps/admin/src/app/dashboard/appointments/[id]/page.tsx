@@ -95,6 +95,7 @@ export default async function AppointmentPage({
         {staff.role && (
           <LiveNotifications
             role={staff.role}
+            self={staff.email}
             person={liveKey(staff.sub)}
             doctors={[{ id: appt.doctor_id, name: row.doctor_name }]}
           />

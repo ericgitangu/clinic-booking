@@ -40,7 +40,6 @@ export function StaffControls({
           title="Unlock this appointment?"
           description="The patient will be able to change it again."
           confirmLabel="Unlock appointment"
-          ownsAppointment={appointmentId}
           run={(reason) => unlockAppointment(appointmentId, reason)}
           onDone={onDone}
         />
@@ -54,7 +53,6 @@ export function StaffControls({
           title="Undo the patient's last change?"
           description="Their most recent move is reversed and the appointment is locked, so they cannot change it again until you unlock it."
           confirmLabel="Veto and lock"
-          ownsAppointment={appointmentId}
           run={(reason) => vetoAppointment(appointmentId, reason)}
           onDone={onDone}
         />

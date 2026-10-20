@@ -550,11 +550,28 @@ async def test_a_spent_allowance_is_skipped_through_the_real_counter(
 # --- the reserve: explicit purpose, day only, honest logging ---------------------------------
 
 
-async def test_every_reserve_must_say_what_it_is_for(env: Env) -> None:
-    missing = await env.req("POST", "/internal/emails/reserve", role="admin")
-    assert missing.status_code == 422
+async def test_a_reserve_that_does_not_say_what_it_is_for_is_held_back_like_any_other_email(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    """`purpose` is optional and defaults to `other`, never to `ack`: during a rollout the old
+    patient app asks without it, and must be held back from the reserve, not allowed to spend it."""
+    from tests.conftest import make_settings
+
+    s = make_settings()
+    await _spend(env, owner_conn, s.EMAIL_DAILY_LIMIT - s.EMAIL_ACK_RESERVE)
+    try:
+        bare = await env.req("POST", "/internal/emails/reserve", role="admin")
+        assert bare.status_code == 200
+        assert bare.json()["granted"] is False and bare.json()["reason"] == "day"
+        ack = await env.req("POST", "/internal/emails/reserve?purpose=ack", role="admin")
+        assert ack.json()["granted"] is True
+    finally:
+        await _spend(env, owner_conn, 0)
+    ok = await env.req("POST", "/internal/emails/reserve", role="admin")
+    assert ok.status_code == 200 and ok.json()["granted"] is True
     wrong = await env.req("POST", "/internal/emails/reserve?purpose=reminder", role="admin")
     assert wrong.status_code == 422
+    await _spend(env, owner_conn, 0)
 
 
 async def test_the_reserve_is_taken_off_the_day_and_not_off_the_month(

@@ -41,6 +41,16 @@ export const notify = {
   quiet: (message: string, data?: ExternalToast) => {
     show((t) => t(message, data));
   },
+  // A later version of a toast already on screen (same `id`): no buzz, because the person was told
+  // when it first appeared. If it has been closed since, this brings it back. `kind` is the look
+  // (success, info, warning) the new words should have.
+  update: (
+    kind: "success" | "info" | "warning",
+    message: string,
+    data?: ExternalToast,
+  ) => {
+    show((t) => t[kind](message, data));
+  },
   dismiss: (id: string) => {
     show((t) => t.dismiss(id));
   },

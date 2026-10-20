@@ -22,6 +22,9 @@ vi.mock("@clinic/ui/lib/notify", () => {
       warning: rec("warning"),
       error: rec("error"),
       quiet: rec("quiet"),
+      // A later version of a toast: no buzz; recorded with its look.
+      update: (kind: string, message: string, data?: { id?: string }) =>
+        void toasts.calls.push({ fn: `update:${kind}`, message, id: data?.id }),
       dismiss: () => undefined,
     },
   };
@@ -60,10 +63,17 @@ import type { ActionResult } from "@/lib/failure-copy";
 const APPT = "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8";
 const SUCCESSOR = "1a1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f9";
 const DOCTOR = "e52e9da0-f7f3-5a6a-93d3-d7f658947afa";
+const ME = "admin@clinic.example";
+const COLLEAGUE = "owner@clinic.example";
 
-const arrivedEvent = (appointmentId: string, seq: string) =>
+const eventJson = (
+  kind: string,
+  appointmentId: string,
+  seq: string,
+  actor: string | null,
+) =>
   JSON.stringify({
-    event_type: "arrived",
+    event_type: kind,
     doctor_id: DOCTOR,
     local_date: "2026-10-27",
     from_local_date: null,
@@ -73,33 +83,39 @@ const arrivedEvent = (appointmentId: string, seq: string) =>
     appointment_id: appointmentId,
     patient_name: "Wanjiru Kamau",
     cancellation_reason: null,
-    actor_email: null,
-    actor_role: null,
+    actor_email: actor,
+    actor_role: actor ? "admin" : null,
     staff_reason: null,
   });
 
-const live = (appointmentId: string, seq: string) =>
+const live = (
+  kind: string,
+  appointmentId: string,
+  seq: string,
+  actor: string | null = ME,
+) =>
   act(async () => {
     stream.listener?.onEvent(
       seq,
-      "arrived",
-      arrivedEvent(appointmentId, seq),
+      kind,
+      eventJson(kind, appointmentId, seq, actor),
       false,
     );
   });
 
 function Page({
   run,
-  owns = APPT,
+  who = ME,
 }: {
   run: () => Promise<ActionResult>;
-  owns?: string;
+  who?: string;
 }) {
   return (
     <>
       <LiveNotifications
-        role="owner"
+        role="admin"
         person="p"
+        self={who}
         doctors={[{ id: DOCTOR, name: "Dr. Otieno" }]}
       />
       <ConfirmAction
@@ -107,7 +123,6 @@ function Page({
         title="Mark as arrived?"
         description="d"
         confirmLabel="Confirm"
-        ownsAppointment={owns}
         run={run}
       />
     </>
@@ -136,6 +151,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The action's answer, held back until the test lets it go, so an event can arrive before it.
+function later<T>() {
+  let release: (v: T) => void = () => undefined;
+  const promise = new Promise<T>((ok) => (release = ok));
+  return { promise, release };
+}
+
+const quiet = () => toasts.calls.filter((c) => c.fn === "quiet");
+
 describe("the toast of the person who marks an arrival", () => {
   it("is exactly one toast, with one id, and it ends on what became of the email", async () => {
     const states = [
@@ -157,58 +181,98 @@ describe("the toast of the person who marks an arrival", () => {
       }),
     }));
     vi.stubGlobal("fetch", fetchMock);
-    render(
-      <Page
-        run={async () => ({
-          ok: true,
-          message: "Marked arrived. Doctor email on its way.",
-          watch: { appointmentId: APPT },
-        })}
-      />,
-    );
+    const answer = later<ActionResult>();
+    render(<Page run={() => answer.promise} />);
     await mark();
-    // The gateway sends this person's own arrival back to them: no second toast for it.
-    await live(APPT, "10.1");
+    // The gateway sends this person's own arrival back before the action has answered.
+    await live("arrived", APPT, "10.1");
+    await act(async () => {
+      answer.release({
+        ok: true,
+        message: "Marked arrived. Doctor email on its way.",
+        watch: { appointmentId: APPT },
+      });
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
+    expect(quiet()).toHaveLength(0); // no second toast for their own change
     const mine = toasts.calls;
-    expect(mine.some((c) => c.fn === "quiet")).toBe(false); // the live toast stayed away
     expect(new Set(mine.map((c) => c.id)).size).toBe(1); // one toast, updated in place
     expect(mine[0].message).toBe("Marked arrived. Doctor email on its way.");
     expect(mine.at(-1)).toMatchObject({
-      fn: "success",
+      fn: "update:success",
       message: "Marked arrived. Doctor emailed.",
     });
+    // The first look says what the answer said, so nothing is repeated.
+    expect(mine.map((c) => c.message)).toEqual([
+      "Marked arrived. Doctor email on its way.",
+      "Marked arrived. Doctor emailed.",
+    ]);
   });
 
-  it("does not hide a colleague's change to the same appointment when this one failed", async () => {
-    render(<Page run={async () => ({ ok: false, message: "Not allowed." })} />);
+  it("does not toast a veto of a cancel, whose events are about a NEW appointment, when they arrive before the answer", async () => {
+    const answer = later<ActionResult>();
+    render(<Page run={() => answer.promise} />);
     await mark();
-    expect(toasts.calls.map((c) => c.fn)).toEqual(["error"]);
-    await live(APPT, "10.2");
-    expect(toasts.calls.filter((c) => c.fn === "quiet")).toHaveLength(1);
+    await live("booked", SUCCESSOR, "11.1");
+    await live("vetoed", SUCCESSOR, "11.2");
+    await act(async () => {
+      answer.release({
+        ok: true,
+        message: "Change undone and the appointment locked.",
+      });
+    });
+    expect(quiet()).toHaveLength(0);
   });
 
-  it("does not toast again for an appointment a veto booked as the successor", async () => {
+  it("does not toast a veto of a reschedule, whose events are about the SAME appointment, when they arrive before the answer", async () => {
+    const answer = later<ActionResult>();
+    render(<Page run={() => answer.promise} />);
+    await mark();
+    await live("rescheduled", APPT, "12.1");
+    await live("vetoed", APPT, "12.2");
+    await act(async () => {
+      answer.release({
+        ok: true,
+        message: "Change undone and the appointment locked.",
+      });
+    });
+    expect(quiet()).toHaveLength(0);
+  });
+
+  it("holds in another tab of the same person too: nothing here made the change, the actor is the same", async () => {
+    render(<Page run={async () => ({ ok: true, message: "x" })} />);
+    await live("arrived", APPT, "13.1");
+    expect(quiet()).toHaveLength(0);
+  });
+
+  it("still toasts a colleague's change to the very same appointment", async () => {
+    const answer = later<ActionResult>();
+    render(<Page run={() => answer.promise} />);
+    await mark();
+    await live("rescheduled", APPT, "14.1", COLLEAGUE);
+    expect(quiet()).toHaveLength(1);
+    expect(quiet()[0].message).toContain("Rescheduled");
+  });
+
+  it("toasts an event that names no actor (nothing to say it is theirs)", async () => {
+    render(<Page run={async () => ({ ok: true, message: "x" })} />);
+    await live("booked", APPT, "15.1", null);
+    expect(quiet()).toHaveLength(1);
+  });
+
+  it("says so when the call itself throws, and keeps working", async () => {
     render(
       <Page
-        run={async () => ({
-          ok: true,
-          message: "Change undone and the appointment locked.",
-          alsoOwns: [SUCCESSOR],
-        })}
+        run={async () => {
+          throw new Error("network");
+        }}
       />,
     );
     await mark();
-    await live(SUCCESSOR, "10.3");
-    expect(toasts.calls.filter((c) => c.fn === "quiet")).toHaveLength(0);
-  });
-
-  it("still toasts for someone else's change to a different appointment", async () => {
-    render(<Page run={async () => ({ ok: true, message: "Done." })} />);
-    await mark();
-    await live("9f9d2c3b-4a5e-6f70-8192-a3b4c5d6e7aa", "10.4");
-    expect(toasts.calls.filter((c) => c.fn === "quiet")).toHaveLength(1);
+    expect(toasts.calls.map((c) => c.fn)).toEqual(["error"]);
+    expect(toasts.calls[0].message).toBe("That did not go through. Try again.");
+    expect(screen.queryByRole("dialog")).not.toBeNull();
   });
 });

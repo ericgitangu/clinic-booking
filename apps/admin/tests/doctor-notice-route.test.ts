@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-const read = vi.hoisted(() => ({ role: "admin" as string | null }));
+const read = vi.hoisted(() => ({
+  role: "admin" as string | null,
+  retryable: true,
+}));
 vi.mock("@/lib/session", () => ({
   authorise: async () =>
     read.role ? { role: read.role, sub: "s", email: "a@clinic.test" } : null,
@@ -15,7 +18,7 @@ vi.mock("@/lib/api", () => ({
       reason: null,
       attempts: 0,
       sent_at: null,
-      retryable: true,
+      retryable: read.retryable,
     },
   }),
 }));
@@ -43,6 +46,19 @@ describe("the doctor-notice read route", () => {
       },
     });
   });
+
+  it.each([true, false])(
+    "passes retryable %s on as it is",
+    async (retryable) => {
+      read.role = "admin";
+      read.retryable = retryable;
+      const body = (await (await call()).json()) as {
+        notice: { retryable: boolean };
+      };
+      expect(body.notice.retryable).toBe(retryable);
+      read.retryable = true;
+    },
+  );
 
   it("tells a viewer nothing", async () => {
     read.role = null;

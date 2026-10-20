@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -252,46 +253,144 @@ func TestSSEHeadersAreProxySafeAndFirstFrameIsPrompt(t *testing.T) {
 
 }
 
-// A resumed stream tags the backlog it sends with "replay: true" and nothing it sends after that;
-// a fresh stream tags nothing. The tag is the only thing the client trusts.
-func TestResumedStreamTagsTheBacklogAsReplayAndNothingAfter(t *testing.T) {
-	h := start(t, func(c *config.Config) { c.MaxStreamsPerInstance = 3; c.MaxStreamsPerPerson = 3 })
+// The tag is per ROW, against the database's clock: a row of a resumed stream is replay iff it was
+// written before the stream opened, however many batches the backlog takes and however the polls
+// fall. A fresh stream tags nothing.
+func resumedBacklogThenLive(t *testing.T, backlog int) {
+	t.Helper()
+	h := start(t, func(c *config.Config) {
+		c.MaxStreamsPerInstance = 3
+		c.MaxStreamsPerPerson = 3
+		c.PollInterval = 100 * time.Millisecond
+	})
 	api := h.env.NewAPI(t)
 	doctor := api.Doctor()
+	booking := api.Book(doctor)
 
-	first := h.hello(asOwner, q())
-	api.Book(doctor)
-	api.Book(doctor)
-	api.Book(doctor)
-	var ids []string
-	for range 3 {
-		f, ok := first.nextEvent(t, 5*time.Second)
-		if !ok || f.Event != "booked" {
-			t.Fatalf("got %+v", f)
-		}
-		if f.Replay {
-			t.Fatalf("a fresh stream tagged %+v as replay", f)
-		}
-		ids = append(ids, f.ID)
-	}
-	first.close()
-
-	second := h.open(asOwner, q("cursor", ids[0]))
-	hello, _ := second.nextEvent(t, 5*time.Second)
+	// Where "now" is: a fresh stream starts there.
+	h.grant(asOwner)
+	fresh := h.open(asOwner, q())
+	hello, _ := fresh.nextEvent(t, 5*time.Second)
 	if hello.Event != "hello" || hello.Replay {
 		t.Fatalf("hello %+v: the hello frame is never replay", hello)
 	}
-	for i := 1; i < 3; i++ {
-		f, _ := second.nextEvent(t, 5*time.Second)
-		if f.ID != ids[i] || !f.Replay {
-			t.Fatalf("backlog item %d = %+v, want id %s tagged replay", i, f, ids[i])
+	fresh.close()
+
+	ctx := context.Background()
+	owner := testenv.Connect(t, h.env.OwnerDSN)
+	if _, err := owner.Exec(ctx, `INSERT INTO appointment_events
+	  (appointment_id, doctor_id, event_type, to_starts_at, local_date)
+	  SELECT $1::uuid, $2::uuid, 'booked', now() + interval '2 days', current_date + 2
+	  FROM generate_series(1, $3::int)`, booking.ID, booking.DoctorID, backlog); err != nil {
+		t.Fatal(err)
+	}
+
+	second := h.open(asOwner, q("cursor", hello.ID))
+	if f, _ := second.nextEvent(t, 5*time.Second); f.Event != "hello" || f.Replay {
+		t.Fatalf("resumed hello = %+v", f)
+	}
+	// A real booking while the backlog is still being sent: written after the stream opened.
+	live := api.Book(doctor)
+
+	tagged := 0
+	for {
+		f, ok := second.nextEvent(t, 15*time.Second)
+		if !ok {
+			t.Fatalf("the stream ended after %d backlog frames, before the live booking", tagged)
+		}
+		if f.Event != "booked" {
+			continue
+		}
+		if strings.Contains(f.Data, live.ID) {
+			if f.Replay {
+				t.Fatalf("the live booking arrived tagged as replay after %d backlog frames", tagged)
+			}
+			break
+		}
+		if !f.Replay {
+			t.Fatalf("backlog frame %d (%s) was not tagged", tagged+1, f.ID)
+		}
+		tagged++
+	}
+	if tagged < backlog {
+		t.Fatalf("saw %d tagged backlog frames, want at least the %d inserted", tagged, backlog)
+	}
+}
+
+func TestBacklogOfSeveralBatchesIsTaggedAndALiveRowDuringCatchUpIsNot(t *testing.T) {
+	resumedBacklogThenLive(t, 1300) // 7 batches of 200, across more than one tick
+}
+
+func TestBacklogThatIsAnExactMultipleOfTheBatchIsTaggedToo(t *testing.T) {
+	resumedBacklogThenLive(t, 400)
+}
+
+// A row written (and committed) before the stream opened but withheld at first, because another
+// transaction that started earlier was still open and held the horizon back, arrives on a later
+// poll. It is backlog, so it is tagged, though the stream was no longer "catching up".
+func TestARowWithheldByAnOpenTransactionIsStillTaggedWhenItArrivesLate(t *testing.T) {
+	h := start(t, func(c *config.Config) {
+		c.MaxStreamsPerInstance = 3
+		c.MaxStreamsPerPerson = 3
+		c.PollInterval = 100 * time.Millisecond
+	})
+	api := h.env.NewAPI(t)
+	doctor := api.Doctor()
+	api.Book(doctor)
+
+	h.grant(asOwner)
+	fresh := h.open(asOwner, q())
+	hello, _ := fresh.nextEvent(t, 5*time.Second)
+	fresh.close()
+
+	ctx := context.Background()
+	holder := testenv.Connect(t, h.env.OwnerDSN)
+	tx, err := holder.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_current_xact_id()`); err != nil { // takes a txid and holds the horizon
+		t.Fatal(err)
+	}
+	held := api.Book(doctor) // commits now, with a txid after the holder's
+
+	second := h.open(asOwner, q("cursor", hello.ID))
+	if f, _ := second.nextEvent(t, 5*time.Second); f.Event != "hello" {
+		t.Fatalf("hello = %+v", f)
+	}
+	select {
+	case f := <-second.frames:
+		if f.Event == "booked" {
+			t.Fatalf("the row came through while an earlier transaction was open: %+v", f)
+		}
+	case <-time.After(500 * time.Millisecond):
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		f, ok := second.nextEvent(t, 5*time.Second)
+		if !ok {
+			t.Fatal("the stream ended before the withheld row arrived")
+		}
+		if f.Event == "booked" && strings.Contains(f.Data, held.ID) {
+			if !f.Replay {
+				t.Fatalf("the late row %+v was not tagged: it was committed before the stream opened", f)
+			}
+			return
 		}
 	}
-	// Something that happens after the stream has drained its backlog is not tagged.
-	api.Book(doctor)
-	live, _ := second.nextEvent(t, 5*time.Second)
-	if live.Event != "booked" || live.Replay {
-		t.Fatalf("an event after the catch-up = %+v, want it untagged", live)
+}
+
+// A fresh stream starts at the horizon and tags nothing it sends.
+func TestAFreshStreamTagsNothing(t *testing.T) {
+	h := start(t, func(c *config.Config) { c.PollInterval = 100 * time.Millisecond })
+	api := h.env.NewAPI(t)
+	s := h.hello(asOwner, q())
+	api.Book(api.Doctor())
+	f, _ := s.nextEvent(t, 5*time.Second)
+	if f.Event != "booked" || f.Replay {
+		t.Fatalf("a fresh stream's event = %+v, want it untagged", f)
 	}
 }
 

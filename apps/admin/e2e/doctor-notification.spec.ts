@@ -8,7 +8,7 @@ import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { book } from "./support/live-book";
 import { allowMailTo, mailTo, refuseMailTo } from "./support/mail";
 import { EMAIL, internal, OWNER } from "./support/stack";
-import { expect, settle, tap, test } from "./support/fixtures";
+import { expect, settle, signIn, tap, test } from "./support/fixtures";
 
 const OWNER_WHO = { email: OWNER, role: "owner" };
 const ADMIN_WHO = { email: EMAIL.admin, role: "admin" };
@@ -90,25 +90,36 @@ test.describe("the arrival email to the doctor", () => {
     "a past half hour falls on yesterday in the first hour of the clinic day",
   );
 
-  test("an arrival emails the doctor once, the row says sent, and the toast says so", async ({
+  test("an arrival emails the doctor once, the row says sent, and both toasts say so", async ({
     as,
+    browser,
   }) => {
     test.setTimeout(90_000);
     const visit = await visitAtTheDesk("Doctor Email Sent");
     await setDoctorEmail(visit.doctorId, DOCTOR_EMAIL);
     const before = (await mailTo(DOCTOR_EMAIL)).sent.length;
 
-    // Tab B shows the dashboard; the person marks the visit in tab A, the same browser.
-    const tabB = await as("admin");
+    // The owner watches the dashboard; the admin marks the visit in a browser of their own (the
+    // local gateway serves one stream, which the owner's page holds).
+    const tabB = await as("owner");
     await onDashboard(tabB);
-    const tabA = await tabB.context().newPage();
+    const adminContext = await browser.newContext();
+    await adminContext.route("**/live/stream**", (route) => route.abort());
+    await signIn(adminContext, EMAIL.admin);
+    const tabA = await adminContext.newPage();
     await tabA.goto(`/dashboard/appointments/${visit.id}`);
     await tap(tabA.getByRole("button", { name: "Mark arrived" }));
     const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
     await ask.getByLabel("Reason").fill("patient is at the desk");
     await ask.getByRole("button", { name: "Mark arrived" }).click();
 
-    // The toast is up within 2 seconds, and goes on to say what became of the email.
+    // The admin's own toast is the one confirmation they get, updated in place to the end.
+    await expect(
+      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(tabA.locator("[data-sonner-toast]")).toHaveCount(1);
+
+    // The owner's toast is up within 2 seconds, and goes on to say what became of the email.
     const toast = tabB
       .locator("[data-sonner-toast]")
       .filter({ hasText: `Marked arrived: ${visit.name}` });
@@ -153,13 +164,31 @@ test.describe("the arrival email to the doctor", () => {
     await back.getByLabel("Reason").fill("came back to the desk");
     await back.getByRole("button", { name: "Change to arrived" }).click();
     // The person who marked it sees one toast, and it already says "doctor emailed": the server
-    // action found the row sent, so it scheduled no send. Nothing waits on a clock here.
+    // action found the row sent, so it scheduled no send.
     await expect(
-      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+      tabA
+        .getByText("Marked arrived. Doctor emailed.", { exact: true })
+        .first(),
     ).toBeVisible();
+    // Then the row stays terminal with the same attempts, and the stand-in's count stays at one,
+    // over a bounded window of samples (six, half a second apart): a sample that passes at the
+    // first look does not count, because a stray second send would show up later than that.
+    let steady = 0;
     await expect
-      .poll(async () => (await mailTo(DOCTOR_EMAIL)).sent.slice(before).length)
-      .toBe(1);
+      .poll(
+        async () => {
+          const n = await notice(visit.id);
+          const sentMails = (await mailTo(DOCTOR_EMAIL)).sent.slice(
+            before,
+          ).length;
+          const same =
+            n?.status === "sent" && n.attempts === attempts && sentMails === 1;
+          steady = same ? steady + 1 : 0;
+          return steady;
+        },
+        { intervals: [500], timeout: 15_000 },
+      )
+      .toBeGreaterThanOrEqual(6);
     expect(await notice(visit.id)).toMatchObject({ status: "sent", attempts });
     await allowMailTo(DOCTOR_EMAIL);
     await setDoctorEmail(visit.doctorId, null);
@@ -172,7 +201,8 @@ test.describe("the arrival email to the doctor", () => {
     const visit = await visitAtTheDesk("Doctor Email None");
     await setDoctorEmail(visit.doctorId, null);
 
-    const page = await as("admin");
+    // The owner watches; the admin (through the API here) marks it: someone else's change.
+    const page = await as("owner");
     await onDashboard(page);
     const body = await arrive(visit.id);
     expect(body.doctor_notice?.status).toBe("skipped");

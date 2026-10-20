@@ -82,12 +82,12 @@ async def claim_reminders(
     sent = await reminder_repo.sent_today(session, day)
     month_sent = await reminder_repo.sent_month(session, month)
     await session.rollback()
-    # What is left of the day and of the month, minus the room kept for acknowledgements sent later.
     budget = max(
         0,
         min(
+            # The reserve is a DAY reserve (acknowledgements sent later today); the month has none.
             settings.EMAIL_DAILY_LIMIT - sent - settings.EMAIL_ACK_RESERVE,
-            settings.EMAIL_MONTHLY_LIMIT - month_sent - settings.EMAIL_ACK_RESERVE,
+            settings.EMAIL_MONTHLY_LIMIT - month_sent,
         ),
     )
     n = min(limit, settings.REMINDER_RUN_LIMIT, budget)
@@ -227,14 +227,16 @@ async def reserve_email(
         Literal["ack", "other"],
         Query(
             description=(
-                "Required, so every sender says which it is. `ack`: a booking acknowledgement, "
-                "which may use the whole day. `other`: any other email (reminders, staff emails, "
-                "the doctor's arrival email); its day stops EMAIL_ACK_RESERVE short of "
-                "EMAIL_DAILY_LIMIT, so the room kept for acknowledgements cannot be used up by "
-                "them. The month has no reserve."
+                "`ack`: a booking acknowledgement, which may use the whole day. `other` (the "
+                "default): any other email (reminders, staff emails, the doctor's arrival email); "
+                "its day stops EMAIL_ACK_RESERVE short of EMAIL_DAILY_LIMIT, so the room kept "
+                "for acknowledgements cannot be used up by them. The month has no reserve. It is "
+                "optional, and defaults to `other`, so a caller that does not say (the patient "
+                "app during a rollout, before it sends `ack`) is held back from the reserve "
+                "rather than allowed to spend it: the safe direction."
             )
         ),
-    ],
+    ] = "other",
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),

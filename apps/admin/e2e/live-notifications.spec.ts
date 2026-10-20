@@ -5,13 +5,15 @@
 import AxeBuilder from "@axe-core/playwright";
 import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { book, patientReschedules } from "./support/live-book";
-import { expect, settle, tap, test } from "./support/fixtures";
+import { EMAIL } from "./support/stack";
+import { expect, settle, signIn, tap, test } from "./support/fixtures";
 
 const SCHEMES = ["light", "dark"] as const;
 
 test.describe("live notifications", () => {
-  test("an arrival marked in one tab shows as a toast and an unread count in another within 2 seconds", async ({
+  test("an arrival marked by someone else shows as a toast and an unread count within 2 seconds", async ({
     as,
+    browser,
   }) => {
     test.setTimeout(60_000);
     test.skip(
@@ -31,13 +33,14 @@ test.describe("live notifications", () => {
     );
     await expect(tabB.getByTestId("live-unread")).toHaveText("");
 
-    // Tab A: the appointment page, in the same browser context, where the person marks it.
-    const tabA = await tabB.context().newPage();
+    // The admin marks it on the appointment page, in a browser of their own. (The local gateway
+    // serves one stream, which the owner's page holds, so the admin's page opens none.) The
+    // toast is for what someone ELSE did: a change the signed-in person makes is theirs.
+    const adminContext = await browser.newContext();
+    await adminContext.route("**/live/stream**", (route) => route.abort());
+    await signIn(adminContext, EMAIL.admin);
+    const tabA = await adminContext.newPage();
     await tabA.goto(`/dashboard/appointments/${made.id}`);
-    await expect(tabA.getByTestId("appointment-live")).toHaveAttribute(
-      "data-status",
-      "live",
-    );
     await tap(tabA.getByRole("button", { name: "Mark arrived" }));
     const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
     await ask.getByLabel("Reason").fill("patient is at the desk");

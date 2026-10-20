@@ -4,9 +4,6 @@ export type ActionResult =
   | {
       ok: true;
       message: string;
-      /** The change made another appointment too (a veto of a cancel books a new one): its live
-       *  events are this person's own as well. */
-      alsoOwns?: string[];
       /** Keep the confirmation toast up to date with what becomes of the email to the doctor. */
       watch?: { appointmentId: string };
     }

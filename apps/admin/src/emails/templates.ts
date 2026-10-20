@@ -344,9 +344,14 @@ const word = (t: string) =>
 
 /**
  * The patient as the doctor's inbox may see them: the first name and the first letter of the last
- * one, "Amina W.". The name is free text, so it is read with care. "Kamau, Amina" (surname first)
- * is read as Amina K. A name of one word is not known to be a first name or a surname, so only its
- * initial is given ("Patient A."). Nothing past the first name and one letter is ever returned.
+ * one, "Amina W.". The name is free text, so it is read with care: "Kamau, Amina" (surname first,
+ * with a comma) is read as Amina K., and a name of one word, which is not known to be a first name
+ * or a surname, gives only its initial ("Patient A.").
+ *
+ * Named limit: a name written surname-first WITHOUT a comma ("Kamau Amina"), and a name in a
+ * script where the family name comes first (Chinese, Japanese, Korean), cannot be told apart from
+ * first-name-first, so the family name shows in the place of the first name. The record has one
+ * free-text name field; the fix is a given-name field on patients.
  */
 export function firstNameAndInitial(fullName: string): string {
   const comma = fullName.indexOf(",");

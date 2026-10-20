@@ -35,23 +35,52 @@ describe("what the toast and the sheet say about the doctor's email", () => {
 
   it("gives the sheet the time it went, or the reason it did not", () => {
     expect(
-      sheetLine({ ...base, status: "sent", sentAt: "2026-10-27T07:00:01Z" }),
+      sheetLine(
+        { ...base, status: "sent", sentAt: "2026-10-27T07:00:01Z" },
+        true,
+      ),
     ).toBe("Doctor emailed at 10:00 EAT.");
-    expect(sheetLine({ ...base, status: "skipped", reason: "no_email" })).toBe(
+    expect(
+      sheetLine({ ...base, status: "skipped", reason: "no_email" }, true),
+    ).toBe(
       "The doctor was not emailed: the doctor has no email address on file.",
     );
-    expect(sheetLine({ ...base, status: "failed", attempts: 2 })).toContain(
-      "2 tries",
+    expect(
+      sheetLine({ ...base, status: "failed", attempts: 2 }, true),
+    ).toContain("2 tries");
+    expect(sheetLine(base, true)).toBe(
+      "The email to the doctor is on its way.",
     );
-    expect(sheetLine(base)).toBe("The email to the doctor is on its way.");
     // Pending but nothing is sending it any more: it did not go out, so say that, not "on its way".
-    expect(sheetLine({ ...base, retryable: true })).toBe(
+    expect(sheetLine({ ...base, retryable: true }, true)).toBe(
       "The email didn't go out. Send it again.",
     );
-    expect(sheetLine({ ...base, retryable: true })).not.toContain("on its way");
+    expect(sheetLine({ ...base, retryable: true }, true)).not.toContain(
+      "on its way",
+    );
     expect(toastSuffix({ ...base, retryable: true })).toBe(
       "doctor email did not go out",
     );
+  });
+});
+
+describe("'Send it again.' is said only when the button is there", () => {
+  const stale = { ...base, retryable: true };
+  const failed = {
+    ...base,
+    status: "failed" as const,
+    attempts: 1,
+    retryable: true,
+  };
+
+  it("says it when the person can resend, and not when they cannot", () => {
+    expect(sheetLine(stale, true)).toBe(
+      "The email didn't go out. Send it again.",
+    );
+    expect(sheetLine(stale, false)).toBe("The email didn't go out.");
+    expect(sheetLine(failed, true)).toContain("Send it again.");
+    expect(sheetLine(failed, false)).not.toContain("Send it again");
+    expect(sheetLine(failed, false)).toContain("could not be sent (1 try)");
   });
 });
 

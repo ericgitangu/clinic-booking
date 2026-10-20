@@ -9,7 +9,10 @@ import { toastSuffix } from "@/lib/doctor-notice-words";
 export const RECHECK_AFTER_MS = [2500, 6000, 15000] as const;
 
 /** For the sheet, which stays open longer: it keeps looking until the row is final or can be
- *  resent, which is 2 minutes after an arrival nobody claimed (UNCLAIMED_GRACE in the API). */
+ *  resent. That is 2 minutes after an arrival nobody claimed (UNCLAIMED_GRACE in the API), which
+ *  these looks reach (the last is at 140 s). A row that WAS claimed and whose sender died is held
+ *  for the 15 minute claim before it can be resent, and these looks stop long before: that case
+ *  needs the sheet reopened. */
 export const SHEET_RECHECK_AFTER_MS = [
   2500, 6000, 15000, 30000, 60000, 120000, 140000,
 ] as const;

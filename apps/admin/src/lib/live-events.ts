@@ -70,6 +70,19 @@ const PERSONAL = [
   "invite_role",
 ];
 
+/**
+ * Whether the signed-in person made this change themselves. The actor comes from the event: owner
+ * and admin events name who did it (the same field the feed shows them), a viewer's names nobody.
+ * Compared in lower case, the form the gateway writes it in.
+ */
+export function isOwnChange(ev: LiveEvent, self: string): boolean {
+  return (
+    ev.actorEmail !== null &&
+    self !== "" &&
+    ev.actorEmail.trim().toLowerCase() === self.trim().toLowerCase()
+  );
+}
+
 export function canSeePeople(role: Role): boolean {
   return role === "owner" || role === "admin";
 }
