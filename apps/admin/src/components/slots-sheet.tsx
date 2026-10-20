@@ -12,6 +12,7 @@ import {
   SheetTrigger,
 } from "@clinic/ui/components/ui/sheet";
 import { BookOnBehalf } from "@/components/book-on-behalf";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { formatSlot } from "@/lib/clinic-time";
 
 export interface SlotRow {
@@ -81,6 +82,7 @@ export function SlotsSheet({
             {children ? " in this gap" : ` in the next ${hours} hours`}, soonest
             first.
           </SheetDescription>
+          <ZoneNote />
         </SheetHeader>
         <div className="space-y-1 px-4">
           <Label htmlFor="slots-doctor">Doctor</Label>

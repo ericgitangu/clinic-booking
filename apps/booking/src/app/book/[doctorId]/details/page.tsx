@@ -5,6 +5,7 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
 import { BookingForm } from "@/components/booking/booking-form";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import * as api from "@/lib/api";
 import { clinicDay, formatWhen } from "@/lib/clinic-time";
 import { heldMessage } from "@/lib/held";
@@ -83,9 +84,7 @@ export default async function Details({
               {doctor.data.full_name}, {doctor.data.specialty}
             </p>
           ) : null}
-          <p className="mt-1 text-sm text-muted-foreground">
-            Nairobi time, 30 minutes.
-          </p>
+          <ZoneNote className="mt-1">30 minutes.</ZoneNote>
         </div>
       </div>
       <div className="mt-8">

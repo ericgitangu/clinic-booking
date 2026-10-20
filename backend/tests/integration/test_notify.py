@@ -251,6 +251,8 @@ async def test_the_day_sheet_has_personal_data_only_for_owner_and_admin(
         ("09:30", "cancelled", "Demo Patient"),
     ]
     assert rows[0]["phone"] == REAL_PHONE and rows[0]["email"] == REAL_EMAIL
+    assert full.text.splitlines()[0].split(",")[-1] == "timezone"
+    assert {r["timezone"] for r in rows} == {"Africa/Nairobi"}
     assert rows[1]["cancellation_reason"] == "my private reason"
     assert "Release Smoke" not in full.text
     mini = await world.req("GET", path, role="viewer")

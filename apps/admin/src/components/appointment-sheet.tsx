@@ -28,6 +28,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { inAttendanceWindow, isStillToCome } from "@/lib/attendance-window";
 import { formatSlot, localDate } from "@/lib/clinic-time";
 import type { AppointmentDetail, DetailResult } from "@/lib/detail-read";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { shownName } from "@/lib/shown-name";
 import { canVeto } from "@/lib/veto";
 
@@ -224,6 +225,7 @@ function Body({
             </span>
           )}
         </SheetDescription>
+        <ZoneNote />
       </SheetHeader>
 
       <div className="space-y-5 px-4 pb-5">
