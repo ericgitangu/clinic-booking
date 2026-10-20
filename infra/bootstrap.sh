@@ -32,7 +32,7 @@
 # developer.ericgitangu@gmail.com; nothing in this script needs that account.
 #
 # Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3, no
-# allUsers, custom audience clinic-api. See docs/ for the decision records.
+# allUsers, custom audience clinic-api. See https://clinic.ericgitangu.com/decisions.
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT}"
