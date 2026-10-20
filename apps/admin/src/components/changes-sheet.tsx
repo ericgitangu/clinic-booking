@@ -16,6 +16,7 @@ import { Skeleton } from "@clinic/ui/components/ui/skeleton";
 import { AppointmentLink } from "@/components/appointment-sheet";
 import { StatusBadge } from "@/components/status-badge";
 import type { ChangeKind, ChangeRow, ChangesResult } from "@/lib/changes";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { formatSlot } from "@/lib/clinic-time";
 import { shownName } from "@/lib/shown-name";
 
@@ -110,6 +111,7 @@ export function ChangesSheet({
         <SheetHeader className="px-4 pt-4 pr-12">
           <SheetTitle className="font-heading text-lg">{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
+          <ZoneNote />
         </SheetHeader>
         {options.length > 1 && (
           <div className="space-y-1 px-4">

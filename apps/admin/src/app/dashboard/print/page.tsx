@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { PrintButton } from "@/components/print-button";
 import { formatTime, humanDate, localDate } from "@/lib/clinic-time";
 import { loadDayRows } from "@/lib/dashboard-data";
@@ -32,6 +33,7 @@ export default async function PrintPage() {
       <h1 className="font-heading text-3xl font-semibold tracking-tight">
         Schedule for {humanDate(date)}
       </h1>
+      <ZoneNote className="-mt-4" />
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground">
           Nothing is booked today.

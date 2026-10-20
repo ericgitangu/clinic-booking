@@ -8,6 +8,7 @@ import { RememberBooking } from "@/components/booking/remember-booking";
 import { ToastOnMount } from "@/components/booking/toast-on-mount";
 import { isForbidden, needsSignIn } from "@/lib/auth-failure";
 import { NoAccess } from "@/components/account/no-access";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import * as api from "@/lib/api";
 import { formatWhen } from "@/lib/clinic-time";
 import { SignInPrompt } from "@/components/account/sign-in-prompt";
@@ -93,9 +94,7 @@ export default async function Confirmed({
               {doctor.data.full_name}, {doctor.data.specialty}
             </p>
           ) : null}
-          <p className="mt-1 text-sm text-muted-foreground">
-            Nairobi time, 30 minutes.
-          </p>
+          <ZoneNote className="mt-1">30 minutes.</ZoneNote>
         </div>
       </div>
       <div className="mt-8 flex flex-wrap gap-3">

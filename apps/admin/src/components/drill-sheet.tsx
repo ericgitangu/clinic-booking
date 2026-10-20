@@ -32,6 +32,7 @@ import {
   type StatusChoice,
 } from "@/lib/drill";
 import type { DrillResult } from "@/lib/drill-read";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { formatLead } from "@/lib/kpi-delta";
 import { shownName } from "@/lib/shown-name";
 
@@ -154,6 +155,7 @@ export function DrillSheet({
             {config.title}
           </SheetTitle>
           <SheetDescription>{config.description}</SheetDescription>
+          <ZoneNote />
         </SheetHeader>
 
         <div className="grid gap-3 px-4 sm:grid-cols-4">
