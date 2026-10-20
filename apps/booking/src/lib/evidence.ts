@@ -158,7 +158,7 @@ export const TILES = [
   },
   {
     title: "Tested on every pull request, deployed on merge",
-    body: "CircleCI runs the tests, scans and both end-to-end suites on every PR, deploys main to Cloud Run and Vercel, checks the live site, and rolls back if that check fails.",
+    body: "CircleCI runs the tests, scans and both end-to-end suites on every PR, deploys main to Cloud Run and Vercel, checks the live site, and is set up to roll back if that check fails.",
     adr: "0016-cicd-circleci-keyless-deploy.md",
     label: "Read the CI/CD decision",
   },
