@@ -143,3 +143,32 @@ for (const [i, scheme] of (["light", "dark"] as const).entries()) {
     await context.close();
   });
 }
+
+// The staff section and its button are on the landing page, which has no data of its own, so these
+// two stay short: one per scheme, with the screenshot loaded (it is lazy) before axe reads the page.
+for (const scheme of ["light", "dark"] as const) {
+  test(`axe is clean on the landing page staff section (${scheme})`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      colorScheme: scheme,
+      reducedMotion: "reduce",
+      extraHTTPHeaders: { "x-forwarded-for": ip() },
+    });
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(
+      page.getByRole("link", { name: "Open the staff dashboard" }),
+    ).toHaveAttribute("href", "https://clinic-admin.ericgitangu.com");
+    const shot = page.getByRole("img", {
+      name: new RegExp(`in the ${scheme} theme`),
+    });
+    await shot.scrollIntoViewIfNeeded();
+    await expect(shot).toBeVisible();
+    await expect
+      .poll(() => shot.evaluate((el: HTMLImageElement) => el.complete))
+      .toBe(true);
+    await clean(page, `landing with the staff section (${scheme})`);
+    await context.close();
+  });
+}
