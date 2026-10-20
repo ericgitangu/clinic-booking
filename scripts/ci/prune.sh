@@ -17,9 +17,12 @@
 #   exit 1 and no change; the cost-check gate still runs and still counts.
 # - The keep set is resolved from the revisions' own image digests, never from "newest two by
 #   update time" and never from age.
-# - An image tagged sha-<commit> for a commit that is a descendant of this one (or one this
-#   checkout cannot resolve) belongs to a release that is still in flight: it was pushed but not
-#   deployed yet, so it is never deleted here.
+# - Git history decides nothing: a sha-<commit> tag that does not resolve (after a history rewrite)
+#   is not a keep reason. Kept: the keep set, any serving digest, and any image created after the
+#   serving image (a newer pipeline's image that is pushed but not deployed yet). An image with no
+#   createTime is kept too, and no serving createTime stops the script with no change.
+# - Once the lookups have succeeded, a failed tag removal or image deletion is a WARNING and the
+#   script still exits 0, so the release stays green.
 # - Every gcloud call names --project; the region defaults to us-east4.
 set -euo pipefail
 
@@ -125,29 +128,40 @@ remove_tags="$(jq -r --argjson keep "$keep_revs_json" \
 
 images_json="$(g artifacts docker images list "$REPO" --include-tags --format=json)" || die "cannot list images in $REPO"
 
+# Candidates: every image whose digest is not in the keep set AND that is not newer than the image
+# now serving. Git history decides nothing (after a history rewrite old sha tags resolve to no
+# commit); the digest a revision runs is the identity. An image created after the serving image
+# was pushed by a newer pipeline (build-scan-push is outside the deploy-prod serial group, so it
+# can push while this ship job prunes) and has not been deployed yet: it is never older junk.
+serving_json="$(printf '%s\n' "${serving_digests[@]:-}" | grep . | jq -R . | jq -sc .)"
+serving_created="$(jq -r --argjson s "$serving_json" \
+  '[.[] | select(.version as $v | $s | index($v)) | .createTime // empty | tostring | .[0:19]] | max // empty' <<<"$images_json")"
+[ -n "$serving_created" ] || die "cannot read the creation time of the serving image; leaving all images in place"
+
 candidates=()
-while IFS=$'\t' read -r version tags; do
+while IFS= read -r version; do
   [ -z "$version" ] && continue
-  protected=""
-  for t in ${tags//,/ }; do
-    case "$t" in sha-*) ;; *) continue ;; esac
-    full="$(git rev-parse --verify --quiet "${t#sha-}^{commit}" 2>/dev/null)" || full=""
-    if [ -z "$full" ]; then protected="tag $t is a commit this checkout cannot resolve"; break; fi
-    if [ "$full" != "${CIRCLE_SHA1:-}" ] && git merge-base --is-ancestor "${CIRCLE_SHA1:-HEAD}" "$full" 2>/dev/null; then
-      protected="tag $t is a newer release that is still in flight"; break
-    fi
-  done
-  if [ -n "$protected" ]; then echo "prune: keeping $version ($protected)"; continue; fi
   candidates+=("${REPO}@${version}")
-done < <(jq -r --argjson keep "$keep_digests_json" \
+done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" \
   '.[] | select((.version as $v | $keep | index($v)) == null)
-       | [.version, ((.tags // "") | if type == "array" then join(",") else . end)] | @tsv' <<<"$images_json")
+       | select((.createTime // "" | tostring | .[0:19]) as $c | $c != "" and $c <= $since)
+       | .version' <<<"$images_json")
+while IFS=$'\t' read -r version; do
+  [ -z "$version" ] && continue
+  echo "prune: keeping $version: newer than the serving image (a release not yet deployed)"
+done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" \
+  '.[] | select((.version as $v | $keep | index($v)) == null)
+       | select(((.createTime // "" | tostring | .[0:19]) as $c | $c == "" or $c > $since))
+       | .version' <<<"$images_json")
 
 # ---- every lookup succeeded: now change things ----------------------------------------------
 if [ -n "$remove_tags" ]; then
-  change run services update-traffic "$SERVICE" --region "$REGION" --remove-tags "$remove_tags"
+  change run services update-traffic "$SERVICE" --region "$REGION" --remove-tags "$remove_tags" \
+    || echo "prune: WARNING could not remove tags $remove_tags; continuing" >&2
 fi
 for ref in "${candidates[@]:-}"; do
   [ -z "$ref" ] && continue
-  change artifacts docker images delete "$ref" --delete-tags --quiet
+  # A failed deletion is a warning, not a failed release: the next cost-check reports the leftover.
+  change artifacts docker images delete "$ref" --delete-tags --quiet \
+    || echo "prune: WARNING could not delete $ref; continuing" >&2
 done
