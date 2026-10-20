@@ -243,18 +243,53 @@ test.describe("the arrival email to the doctor", () => {
       page.getByText("Marked no-show.", { exact: true }),
     ).toBeVisible();
     await expect(toasts).toHaveCount(0, { timeout: 15_000 });
+    // The no-show's own event must have come back on this stream (arrived, no-show) before the
+    // second mark, so the "Updated" tag seen below can only be the next event's.
+    await expect(
+      page.getByTestId("live-event").filter({ hasText: visit.name }),
+    ).toHaveCount(2, { timeout: 15_000 });
+    // The "Updated" tag is on the doctor's card (not on the visit row) and is shown for only 2 s, so
+    // a poll could miss it. Record every time it appears on this doctor's card, from before the
+    // second mark; the tag is raised only for a live (not replayed) event.
+    const doctorCard = page.getByTestId(`today-${visit.doctorId}`);
+    await expect(doctorCard.getByTestId("today-updated")).toHaveCount(0, {
+      timeout: 5000,
+    });
+    await page.evaluate((doctorTestId) => {
+      const w = window as unknown as { __updatedTagSeen: number };
+      w.__updatedTagSeen = 0;
+      new MutationObserver(() => {
+        if (
+          document.querySelector(
+            `[data-testid="${doctorTestId}"] [data-testid="today-updated"]`,
+          )
+        )
+          w.__updatedTagSeen += 1;
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+      });
+    }, `today-${visit.doctorId}`);
     await tap(card().getByRole("button", { name: "Change to arrived" }));
     await confirm(
       "Change to arrived?",
       "Change to arrived",
       "came back to the desk",
     );
-    // The card's "Updated" tag is raised only for a live (not replayed) event, so seeing it is
-    // evidence that the second arrival came back on this tab's stream as a live event. It lasts 2 s
-    // and the earlier no-show's has long gone (the toasts were awaited), so it is this event's.
-    await expect(page.getByTestId("today-updated").first()).toBeVisible({
-      timeout: 15_000,
-    });
+    // The tag was recorded appearing on the doctor's card after the second mark; the no-show's own
+    // event was awaited above and its tag had gone before the recording began.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as unknown as { __updatedTagSeen: number })
+                .__updatedTagSeen,
+          ),
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0);
     // Wait for the second arrival to come back on this tab's own stream (the feed now lists
     // three events for the visit: arrived, no-show, arrived), which takes the relay and a poll of
     // the gateway; only then is "no second toast" a statement about a toast that could have come.
