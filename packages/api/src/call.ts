@@ -79,6 +79,30 @@ export interface CallOptions {
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
 
+/** The longest a call waits for the Cloud Run identity token (the exchange with Google), which
+ *  happens BEFORE the request is sent and so is not covered by the request's own timeout. The token
+ *  is cached for about an hour and shared by concurrent calls, so a slow exchange is paid once. */
+export const MINT_TIMEOUT_MS = 5_000;
+
+function withinMintTimeout(token: Promise<string>): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("the identity token exchange timed out")),
+      MINT_TIMEOUT_MS,
+    );
+    token.then(
+      (t) => {
+        clearTimeout(timer);
+        resolve(t);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 // What a generated SDK function resolves to, whichever branch it took.
 type SdkOutcome<D> = {
   data?: D;
@@ -165,8 +189,8 @@ export async function callApi<D>(
         }
         if (minting_enabled()) {
           try {
-            const token = await mintIdToken(
-              process.env.API_AUDIENCE ?? "clinic-api",
+            const token = await withinMintTimeout(
+              mintIdToken(process.env.API_AUDIENCE ?? "clinic-api"),
             );
             req.headers.set("x-serverless-authorization", `Bearer ${token}`);
           } catch (err) {

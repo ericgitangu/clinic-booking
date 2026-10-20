@@ -37,27 +37,30 @@ test.describe("live notifications", () => {
     // serves one stream, which the owner's page holds, so the admin's page opens none.) The
     // toast is for what someone ELSE did: a change the signed-in person makes is theirs.
     const adminContext = await browser.newContext();
-    await adminContext.route("**/live/stream**", (route) => route.abort());
-    await signIn(adminContext, EMAIL.admin);
-    const tabA = await adminContext.newPage();
-    await tabA.goto(`/dashboard/appointments/${made.id}`);
-    await tap(tabA.getByRole("button", { name: "Mark arrived" }));
-    const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
-    await ask.getByLabel("Reason").fill("patient is at the desk");
-    await ask.getByRole("button", { name: "Mark arrived" }).click();
+    try {
+      await adminContext.route("**/live/stream**", (route) => route.abort());
+      await signIn(adminContext, EMAIL.admin);
+      const tabA = await adminContext.newPage();
+      await tabA.goto(`/dashboard/appointments/${made.id}`);
+      await tap(tabA.getByRole("button", { name: "Mark arrived" }));
+      const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
+      await ask.getByLabel("Reason").fill("patient is at the desk");
+      await ask.getByRole("button", { name: "Mark arrived" }).click();
 
-    const toast = tabB
-      .locator("[data-sonner-toast]")
-      .filter({ hasText: `Marked arrived: ${made.name}` });
-    await expect(toast).toBeVisible({ timeout: 2000 });
-    await expect(tabB.getByTestId("live-unread")).toHaveText("1 new", {
-      timeout: 2000,
-    });
+      const toast = tabB
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: `Marked arrived: ${made.name}` });
+      await expect(toast).toBeVisible({ timeout: 2000 });
+      await expect(tabB.getByTestId("live-unread")).toHaveText("1 new", {
+        timeout: 2000,
+      });
 
-    // Looking at the panel clears the count.
-    await tabB.getByTestId("live-feed").scrollIntoViewIfNeeded();
-    await expect(tabB.getByTestId("live-unread")).toHaveText("");
-    await adminContext.close();
+      // Looking at the panel clears the count.
+      await tabB.getByTestId("live-feed").scrollIntoViewIfNeeded();
+      await expect(tabB.getByTestId("live-unread")).toHaveText("");
+    } finally {
+      await adminContext.close();
+    }
   });
 
   test("a burst of bookings becomes one toast", async ({ as }) => {

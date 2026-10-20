@@ -242,12 +242,15 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	// database's own clock read now: a row whose occurred_at is before this moment was written
 	// before the stream opened. occurred_at is not the commit time, and the two tables set it
 	// differently: appointment_events uses now(), the START of its transaction;
-	// staff_action_audit uses clock_timestamp(), the moment of the INSERT. Both are at or before
+	// staff_action_audit uses clock_timestamp(), the moment of each INSERT. Both are at or before
 	// the commit, so a row written before this moment and committed after it is counted as
-	// backlog (its event is not toasted; it still shows in the feed). And because the clocks
-	// differ, one long transaction can straddle the moment: its event (stamped at the start) is
-	// backlog, an audit row it inserts after the moment is not. Both are named limits, and both
-	// fail in the quiet direction.
+	// backlog (its event is not toasted; it still shows in the feed). That is a named limit, and it
+	// fails in the quiet direction. A transaction can straddle the moment only where it writes
+	// SEVERAL audit rows that are streamed in their own right with a clock_timestamp() each, which
+	// is "running late" (one row per patient told): the rows inserted before the moment are
+	// backlog and the ones after are not. An appointment event and the audit row beside it do not
+	// straddle: the audit row of an attendance, veto or booking is not a frame of its own, it only
+	// names who did it on the event.
 	var opened time.Time
 	if from != nil {
 		if opened, err = lease.Now(r.Context()); err != nil {

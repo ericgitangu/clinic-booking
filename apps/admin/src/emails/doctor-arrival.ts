@@ -31,7 +31,9 @@
 //      (Resend dedupes the email itself for 24 hours); that is a named limit.
 //
 // Time: five calls at most (claim, reserve, send, two results), each cut off after 5 s, so about
-// 25 s, off the request path. The dashboard sets maxDuration = 60 for it (app/dashboard/layout.tsx).
+// 25 s, off the request path. The dashboard sets maxDuration = 120 for it
+// (app/dashboard/layout.tsx); lib/arrival-budget.ts adds up the whole action and a test keeps the
+// sum inside it.
 //
 // It never throws. Logs carry ids and outcomes only: no address, no name.
 import "server-only";

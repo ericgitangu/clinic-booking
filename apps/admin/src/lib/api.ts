@@ -3,7 +3,7 @@
 // against the contract (see packages/api/src/call.ts). The /internal calls carry the signed
 // assertion for `caller`; the two public reads (one appointment, free times) carry none.
 import "server-only";
-import { callApi, type Caller } from "@clinic/api/call";
+import { callApi, DEFAULT_TIMEOUT_MS, type Caller } from "@clinic/api/call";
 import { memo, readKey } from "@/lib/render-cache";
 import { CALL_TIMEOUT_MS } from "@/emails/ports";
 import {
@@ -56,9 +56,10 @@ export const sessionInfo = (caller: Caller) =>
     callApi(
       "sessionInfo",
       (client) => getSessionInfoInternalAdminSessionGet({ client }),
-      // The default timeout, on purpose: this is the role lookup of every page and action, and a
-      // cold API can take longer than the short one used on the arrival path (lib/arrival-budget.ts).
-      { caller },
+      // The default timeout, on purpose and said out loud: this is the role lookup of every page
+      // and action, and a cold API can take longer than the short one used on the arrival path.
+      // lib/arrival-budget.ts counts exactly this value.
+      { caller, timeoutMs: DEFAULT_TIMEOUT_MS },
     ),
   );
 

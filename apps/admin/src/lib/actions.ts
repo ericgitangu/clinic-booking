@@ -132,7 +132,7 @@ export async function rescheduleAppointment(
 }
 
 // The time this action may take, step by step against the dashboard's maxDuration, is in
-// lib/arrival-budget.ts (about 75 s in the worst case, inside 120 s; a test keeps it so). The mark
+// lib/arrival-budget.ts (about 80 s in the worst case, inside 120 s; a test keeps it so). The mark
 // itself passes the short CALL_TIMEOUT_MS (lib/api.ts); the role lookup keeps the default, since
 // every page and action goes through it and a cold API can need longer than the short one.
 // Arrived or no-show, from 15 minutes before the visit to 2 hours after it starts. Marking what is

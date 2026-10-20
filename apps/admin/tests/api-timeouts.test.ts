@@ -1,13 +1,34 @@
 import { createServer, type Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The calls on the way to the arrival email (the session's role, the mark, the claim of the
-// notification and the result of the send) are cut off at the short timeout the rest of the send
-// path uses. The timeout is made short here (150 ms) and the API answers after 2 s: with the 15 s
-// default the calls would wait for the answer and succeed. Each test also checks that the request
-// REACHED the slow server, so a call that failed before it was sent does not pass for a timeout.
+// The calls of the arrival path (the mark, the claim of the notification and the result of the
+// send) are cut off at the short timeout the rest of the send path uses. The timeout is made short
+// here (150 ms) and the API answers after 2 s: with the 15 s default the calls would wait for the
+// answer and succeed. Each test also checks that the request REACHED the slow server, so a call
+// that failed before it was sent does not pass for a timeout. The role lookup is the exception: it
+// keeps the default, and a test says so, with the value it passes.
 vi.mock("@/emails/ports", () => ({ CALL_TIMEOUT_MS: 150 }));
 
+// What each call passes as its timeout, recorded as it goes to the real callApi.
+const passed = vi.hoisted(
+  () => [] as { operation: string; timeoutMs: number | undefined }[],
+);
+vi.mock("@clinic/api/call", async (original) => {
+  const real = await original<typeof import("@clinic/api/call")>();
+  return {
+    ...real,
+    callApi: ((
+      operation: string,
+      run: never,
+      opts?: { timeoutMs?: number },
+    ) => {
+      passed.push({ operation, timeoutMs: opts?.timeoutMs });
+      return real.callApi(operation, run, opts as never);
+    }) as typeof real.callApi,
+  };
+});
+
+import { DEFAULT_TIMEOUT_MS } from "@clinic/api/call";
 import {
   claimDoctorNotice,
   finishDoctorNotice,
@@ -27,6 +48,7 @@ let hits: string[];
 
 beforeEach(async () => {
   hits = [];
+  passed.length = 0;
   api = createServer((req, res) => {
     hits.push(`${req.method} ${req.url}`);
     setTimeout(() => {
@@ -93,5 +115,13 @@ describe("the role lookup keeps the default timeout", () => {
     expect(hits.some((h) => /GET .*\/session/.test(h))).toBe(true);
     expect(Date.now() - began).toBeGreaterThanOrEqual(1900); // it waited for the 2 s answer
     expect(res.ok).toBe(false); // the stub answers with something that is not a session
+  });
+
+  it("passes DEFAULT_TIMEOUT_MS exactly, the value the budget counts", async () => {
+    await sessionInfo(caller);
+    expect(passed).toEqual([
+      { operation: "sessionInfo", timeoutMs: DEFAULT_TIMEOUT_MS },
+    ]);
+    expect(DEFAULT_TIMEOUT_MS).toBe(15_000);
   });
 });

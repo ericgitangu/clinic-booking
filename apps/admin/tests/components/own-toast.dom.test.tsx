@@ -264,7 +264,7 @@ describe("the toast of the person who marks an arrival", () => {
     });
     // Nothing more was said, not even "still sending", and the looks stopped.
     expect(toasts.calls).toHaveLength(1);
-    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(fetchMock.mock.calls.length).toBe(1); // the one look before it was closed
   });
 
   it("does not toast a veto of a cancel, whose events are about a NEW appointment, when they arrive before the answer", async () => {

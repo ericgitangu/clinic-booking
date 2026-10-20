@@ -5,6 +5,11 @@
 // raising one timeout cannot silently break the budget.
 //
 // The steps run one after another:
+//   first, once
+//     0. the identity token for the API (Cloud Run), fetched before the first call is sent and so
+//        outside that call's own timeout: bounded separately (MINT_TIMEOUT_MS, packages/api/src/
+//        call.ts). It is cached for about an hour and shared, so only the first call pays it, and
+//        if it fails the call fails and the steps below do not run: counted once.
 //   before the response
 //     1. the role lookup (sessionInfo) for anyone but the owner: the default timeout
 //     2. the mark (markAttendance): the short timeout
@@ -18,7 +23,7 @@
 // default and maximum duration are both 300 s
 // (https://vercel.com/docs/functions/configuring-functions/duration, "Duration limits"), so 120 s
 // is inside the free plan.
-import { DEFAULT_TIMEOUT_MS } from "@clinic/api/call";
+import { DEFAULT_TIMEOUT_MS, MINT_TIMEOUT_MS } from "@clinic/api/call";
 import { SEND_TIMEOUT_MS } from "@clinic/api/mail";
 import { CALL_TIMEOUT_MS } from "@/emails/ports";
 
@@ -28,6 +33,7 @@ export interface Step {
 }
 
 export const ARRIVAL_STEPS: readonly Step[] = [
+  { name: "identity token exchange (once)", ms: MINT_TIMEOUT_MS },
   { name: "role lookup", ms: DEFAULT_TIMEOUT_MS },
   { name: "mark attendance", ms: CALL_TIMEOUT_MS },
   { name: "re-render: role lookup", ms: DEFAULT_TIMEOUT_MS },

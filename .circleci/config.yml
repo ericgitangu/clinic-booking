@@ -1322,9 +1322,12 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
-            # The admin app reads the gateway's replay tag and capability flag: it goes live only
-            # after the gateway that sends them (a failed ship-realtime stops the admin ship).
-            - ship-realtime
+            # Not ship-realtime, on purpose. The admin app reads the gateway's replay tag, but it
+            # also works against a gateway that does not send one (the hello lacks `replay_tag`, so
+            # a resumed stream treats the backlog as replay until it goes quiet), so either order of
+            # these two ships is safe. Waiting for ship-realtime would make a failed gateway ship
+            # skip verify-release, smoke-public, zap-prod and every rollback while ship-api and
+            # ship-booking are already live.
             - build-admin
       - verify-release:
           serial-group: << pipeline.project.slug >>/deploy-prod

@@ -104,91 +104,99 @@ test.describe("the arrival email to the doctor", () => {
     const tabB = await as("owner");
     await onDashboard(tabB);
     const adminContext = await browser.newContext();
-    await adminContext.route("**/live/stream**", (route) => route.abort());
-    await signIn(adminContext, EMAIL.admin);
-    const tabA = await adminContext.newPage();
-    await tabA.goto(`/dashboard/appointments/${visit.id}`);
-    await tap(tabA.getByRole("button", { name: "Mark arrived" }));
-    const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
-    await ask.getByLabel("Reason").fill("patient is at the desk");
-    await ask.getByRole("button", { name: "Mark arrived" }).click();
+    try {
+      await adminContext.route("**/live/stream**", (route) => route.abort());
+      await signIn(adminContext, EMAIL.admin);
+      const tabA = await adminContext.newPage();
+      await tabA.goto(`/dashboard/appointments/${visit.id}`);
+      await tap(tabA.getByRole("button", { name: "Mark arrived" }));
+      const ask = tabA.getByRole("dialog", { name: "Mark as arrived?" });
+      await ask.getByLabel("Reason").fill("patient is at the desk");
+      await ask.getByRole("button", { name: "Mark arrived" }).click();
 
-    // The admin's own toast is the one confirmation they get, updated in place to the end.
-    await expect(
-      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(tabA.locator("[data-sonner-toast]")).toHaveCount(1);
+      // The admin's own toast is the one confirmation they get, updated in place to the end.
+      await expect(
+        tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(tabA.locator("[data-sonner-toast]")).toHaveCount(1);
 
-    // The owner's toast is up within 2 seconds, and goes on to say what became of the email.
-    const toast = tabB
-      .locator("[data-sonner-toast]")
-      .filter({ hasText: `Marked arrived: ${visit.name}` });
-    await expect(toast).toBeVisible({ timeout: 2000 });
-    await expect(toast).toContainText("doctor emailed", { timeout: 10_000 });
+      // The owner's toast is up within 2 seconds, and goes on to say what became of the email.
+      const toast = tabB
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: `Marked arrived: ${visit.name}` });
+      await expect(toast).toBeVisible({ timeout: 2000 });
+      await expect(toast).toContainText("doctor emailed", { timeout: 10_000 });
 
-    // The row says sent, and the stand-in received exactly one email, for the doctor.
-    await expect
-      .poll(async () => (await notice(visit.id))?.status)
-      .toBe("sent");
-    const mails = (await mailTo(DOCTOR_EMAIL)).sent.slice(before);
-    expect(mails).toHaveLength(1);
-    const mail = mails[0];
-    expect(mail.subject).toMatch(/has arrived for/);
-    // First name and last initial only: "Doctor Email Sent <number>" is read as Doctor S., and
-    // neither the middle word nor the number is in it.
-    const stamp = visit.name.split(" ").pop() as string;
-    expect(mail.subject).toBe(
-      `Doctor S. has arrived for ${mail.subject.split(" for ")[1]}`,
-    );
-    expect(mail.text).toContain("Doctor S.");
-    for (const part of ["Email", stamp]) {
-      expect(mail.text).not.toContain(part);
-      expect(mail.subject).not.toContain(part);
+      // The row says sent, and the stand-in received exactly one email, for the doctor.
+      await expect
+        .poll(async () => (await notice(visit.id))?.status)
+        .toBe("sent");
+      const mails = (await mailTo(DOCTOR_EMAIL)).sent.slice(before);
+      expect(mails).toHaveLength(1);
+      const mail = mails[0];
+      expect(mail.subject).toMatch(/has arrived for/);
+      // First name and last initial only: "Doctor Email Sent <number>" is read as Doctor S., and
+      // neither the middle word nor the number is in it.
+      const stamp = visit.name.split(" ").pop() as string;
+      expect(mail.subject).toBe(
+        `Doctor S. has arrived for ${mail.subject.split(" for ")[1]}`,
+      );
+      expect(mail.text).toContain("Doctor S.");
+      for (const part of ["Email", stamp]) {
+        expect(mail.text).not.toContain(part);
+        expect(mail.subject).not.toContain(part);
+      }
+      expect(mail.text).not.toMatch(/\+254|@example|notes/i);
+      expect(mail.text).toContain(`/dashboard/appointments/${visit.id}`);
+      expect(mail.text).toContain("East Africa Time");
+
+      // Marked arrived again in the browser (to no-show and back, which runs the same server action
+      // twice): the row stays sent, one attempt, and the stand-in never sees a second email.
+      const attempts = (await notice(visit.id))?.attempts;
+      expect(attempts).toBe(1);
+      await tabA.goto(`/dashboard/appointments/${visit.id}`);
+      await tap(tabA.getByRole("button", { name: "Change to no-show" }));
+      const flip = tabA.getByRole("dialog", { name: "Change to no-show?" });
+      await flip.getByLabel("Reason").fill("left before being seen");
+      await flip.getByRole("button", { name: "Change to no-show" }).click();
+      await expect(tabA.getByText("Marked no-show.")).toBeVisible();
+      await tap(tabA.getByRole("button", { name: "Change to arrived" }));
+      const back = tabA.getByRole("dialog", { name: "Change to arrived?" });
+      await back.getByLabel("Reason").fill("came back to the desk");
+      await back.getByRole("button", { name: "Change to arrived" }).click();
+      // The person who marked it sees one toast, and it already says "doctor emailed": the server
+      // action found the row sent, so it scheduled no send.
+      await expect(
+        tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+      ).toHaveCount(1);
+      // Then the row stays terminal with the same attempts, and the stand-in's count stays at one,
+      // over a bounded window of samples (six, half a second apart): a sample that passes at the
+      // first look does not count, because a stray second send would show up later than that.
+      let steady = 0;
+      await expect
+        .poll(
+          async () => {
+            const n = await notice(visit.id);
+            const sentMails = (await mailTo(DOCTOR_EMAIL)).sent.slice(
+              before,
+            ).length;
+            const same =
+              n?.status === "sent" &&
+              n.attempts === attempts &&
+              sentMails === 1;
+            steady = same ? steady + 1 : 0;
+            return steady;
+          },
+          { intervals: [500], timeout: 15_000 },
+        )
+        .toBeGreaterThanOrEqual(6);
+      expect(await notice(visit.id)).toMatchObject({
+        status: "sent",
+        attempts,
+      });
+    } finally {
+      await adminContext.close();
     }
-    expect(mail.text).not.toMatch(/\+254|@example|notes/i);
-    expect(mail.text).toContain(`/dashboard/appointments/${visit.id}`);
-    expect(mail.text).toContain("East Africa Time");
-
-    // Marked arrived again in the browser (to no-show and back, which runs the same server action
-    // twice): the row stays sent, one attempt, and the stand-in never sees a second email.
-    const attempts = (await notice(visit.id))?.attempts;
-    expect(attempts).toBe(1);
-    await tabA.goto(`/dashboard/appointments/${visit.id}`);
-    await tap(tabA.getByRole("button", { name: "Change to no-show" }));
-    const flip = tabA.getByRole("dialog", { name: "Change to no-show?" });
-    await flip.getByLabel("Reason").fill("left before being seen");
-    await flip.getByRole("button", { name: "Change to no-show" }).click();
-    await expect(tabA.getByText("Marked no-show.")).toBeVisible();
-    await tap(tabA.getByRole("button", { name: "Change to arrived" }));
-    const back = tabA.getByRole("dialog", { name: "Change to arrived?" });
-    await back.getByLabel("Reason").fill("came back to the desk");
-    await back.getByRole("button", { name: "Change to arrived" }).click();
-    // The person who marked it sees one toast, and it already says "doctor emailed": the server
-    // action found the row sent, so it scheduled no send.
-    await expect(
-      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
-    ).toHaveCount(1);
-    // Then the row stays terminal with the same attempts, and the stand-in's count stays at one,
-    // over a bounded window of samples (six, half a second apart): a sample that passes at the
-    // first look does not count, because a stray second send would show up later than that.
-    let steady = 0;
-    await expect
-      .poll(
-        async () => {
-          const n = await notice(visit.id);
-          const sentMails = (await mailTo(DOCTOR_EMAIL)).sent.slice(
-            before,
-          ).length;
-          const same =
-            n?.status === "sent" && n.attempts === attempts && sentMails === 1;
-          steady = same ? steady + 1 : 0;
-          return steady;
-        },
-        { intervals: [500], timeout: 15_000 },
-      )
-      .toBeGreaterThanOrEqual(6);
-    expect(await notice(visit.id)).toMatchObject({ status: "sent", attempts });
-    await adminContext.close();
     await allowMailTo(DOCTOR_EMAIL);
     await setDoctorEmail(visit.doctorId, null);
   });
@@ -241,6 +249,12 @@ test.describe("the arrival email to the doctor", () => {
       "Change to arrived",
       "came back to the desk",
     );
+    // Wait for the second arrival to come back on this tab's own stream (the feed now lists
+    // three events for the visit: arrived, no-show, arrived), which takes the relay and a poll of
+    // the gateway; only then is "no second toast" a statement about a toast that could have come.
+    await expect(
+      page.getByTestId("live-event").filter({ hasText: visit.name }),
+    ).toHaveCount(3, { timeout: 15_000 });
     await expect(
       page.getByText("Marked arrived. Doctor emailed.", { exact: true }),
     ).toHaveCount(1);

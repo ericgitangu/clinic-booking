@@ -43,7 +43,9 @@ export interface LiveStreamOptions {
   /**
    * Called with each event frame's SSE id, event name and data. `replay` is true for a frame that
    * is part of the backlog the gateway sent after a resume: the gateway tags those frames itself
-   * (`replay: true`) and this trusts that tag alone. Frames it does not tag are live.
+   * (`replay: true`) and this trusts that tag alone. Frames it does not tag are live. The one
+   * exception is a gateway whose hello does not say it tags (`replay_tag`): against that, a
+   * resumed stream reports frames as replay until it goes quiet (LEGACY_CATCHUP_QUIET_MS).
    */
   onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
