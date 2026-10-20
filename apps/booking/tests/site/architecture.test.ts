@@ -20,7 +20,12 @@ describe("the architecture section matches the landing page", () => {
   it("has the same table, row for row", () => {
     const rows = section
       .split("\n")
-      .filter((l) => l.startsWith("| ") && !l.startsWith("| Component"))
+      .filter(
+        (l) =>
+          l.startsWith("| ") &&
+          !l.startsWith("| Component") &&
+          !/^\|( :?-{3,}:? \|)+$/.test(l),
+      )
       .map((l) => l.slice(2, -2).split(" | "));
     expect(rows).toHaveLength(DECISIONS.length);
     rows.forEach((cells, i) => {
