@@ -1,5 +1,8 @@
 # Docker repo with cleanup policies: keep the newest 2 versions, delete untagged, delete
-# older than 7d (KEEP wins over DELETE). Target: <= 2 versions/package, sizeBytes < 400 MB.
+# older than 7d (KEEP wins over DELETE). Target: <= 2 versions/package. The size gate lives in
+# scripts/cost_check.sh C5 and has two checks: the repository sizeBytes (plus the projected Go
+# images) must stay under the ceiling derived from the approved $0.50 a month total less the live
+# Secret Manager version count at $0.06 each, and the kept images must total at most 200 MB.
 resource "google_artifact_registry_repository" "clinic" {
   location      = var.region
   repository_id = "clinic"
