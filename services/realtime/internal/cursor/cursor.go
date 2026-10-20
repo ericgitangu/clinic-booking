@@ -1,4 +1,4 @@
-// Package cursor is the commit-safe stream position of docs/adr/0009: the pair (txid, id) of the last
+// Package cursor is the commit-safe stream position (the live feed, /decisions#go): the pair (txid, id) of the last
 // delivered row. It is the SSE event id and the resume token, rendered as "<txid>.<id>".
 package cursor
 

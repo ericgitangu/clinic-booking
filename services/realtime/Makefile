@@ -13,7 +13,7 @@ export TEST_OWNER_DSN    ?= postgres://clinic:clinic@127.0.0.1:$(DB_HOST_PORT)/c
 export TEST_REALTIME_DSN ?= postgres://clinic_realtime:clinic_realtime_local@127.0.0.1:$(DB_HOST_PORT)/clinic
 export TEST_API_URL      ?= http://127.0.0.1:$(API_HOST_PORT)
 
-# Pinned tool versions (docs/adr/0017), run with `go run` so nothing is installed globally.
+# Pinned tool versions (security testing), run with `go run` so nothing is installed globally.
 GOLANGCI_LINT := github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 STATICCHECK   := honnef.co/go/tools/cmd/staticcheck@v0.8.2
 GOVULNCHECK   := golang.org/x/vuln/cmd/govulncheck@v1.9.0

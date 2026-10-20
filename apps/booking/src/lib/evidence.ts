@@ -3,7 +3,8 @@
 // a path, a Swagger link or an error code that stops existing fails the build.
 export const GITHUB = "https://github.com/ericgitangu/clinic-booking";
 export const README = `${GITHUB}/blob/main/README.md`;
-export const ADR = (file: string) => `${GITHUB}/blob/main/docs/adr/${file}`;
+// A tile links to the matching entry on /decisions; the test checks the id exists in decisions.ts.
+export const decisionHref = (id: string) => `/decisions#${id}`;
 
 export type Evidence = {
   method: "GET" | "POST" | "PATCH";
@@ -147,25 +148,27 @@ export const TILES = [
   {
     title: "One slot, one booking, enforced by the database",
     body: "FastAPI and Postgres. A partial unique index refuses a second active booking of the same doctor and time, so the guarantee holds however many requests arrive at once.",
-    adr: "0003-double-booking-partial-unique-index.md",
+    decision: "double-booking",
     label: "Read the double-booking decision",
   },
   {
     title: "Cloud Run is IAM-only, behind a Vercel proxy",
     body: "Nothing public reaches the API directly. Only named service identities may call it (the web apps and a smoke-test account), and /api forwards requests with a short-lived token.",
-    adr: "0023-zero-cost-edge-front-door.md",
+    decision: "hosting-and-cost",
     label: "Read the front-door decision",
   },
   {
     title: "Tested on every pull request, deployed on merge",
     body: "CircleCI runs the tests, scans and both end-to-end suites on every PR, deploys main to Cloud Run and Vercel, checks the live site, and is set up to roll back if that check fails.",
-    adr: "0016-cicd-circleci-keyless-deploy.md",
-    label: "Read the CI/CD decision",
+    extra: {
+      href: `${README}#9-deployment--cicd`,
+      label: "README section 9",
+    },
   },
   {
     title: "$0, with one stated exception",
     body: "Everything runs inside free tiers. The project shares a billing account whose other projects already used up two free tiers, so it bills about $0.28 a month. The README says so.",
-    adr: "0014-hosting-region-and-cost.md",
+    decision: "hosting-and-cost",
     label: "Read the hosting and cost decision",
     extra: {
       href: `${README}#10-operations-cost--security-posture`,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Lighthouse CI over the booking app's production build (docs/adr/0026). Serves `next start` on its
+# Lighthouse CI over the booking app's production build. Serves `next start` on its
 # own port against the API already running, then runs @lhci/cli (exact version in
 # scripts/ci/lighthouse/package.json and its lockfile, released 2025-06-25) with the budgets in scripts/ci/lighthouserc.cjs. Zero cost: it runs inside the
 # e2e-real job's machine, after the build and the Playwright scenarios, and calls no public URL.

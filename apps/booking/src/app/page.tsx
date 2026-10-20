@@ -21,7 +21,7 @@ import {
 import { EvidenceCard } from "@/components/landing/evidence-card";
 import { StatusLine, StatusPending } from "@/components/landing/status-line";
 import {
-  ADR,
+  decisionHref,
   BONUS,
   GITHUB,
   README,
@@ -233,9 +233,11 @@ export default function Home() {
                 {t.body}
               </dd>
               <dd className="mt-3 flex flex-wrap gap-x-5 text-base">
-                <a className={LINK} href={ADR(t.adr)}>
-                  {t.label}
-                </a>
+                {"decision" in t ? (
+                  <Link className={LINK} href={decisionHref(t.decision)}>
+                    {t.label}
+                  </Link>
+                ) : null}
                 {"extra" in t ? (
                   <a className={LINK} href={t.extra.href}>
                     {t.extra.label}

@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { zProblemCode } from "@clinic/api/generated/zod.gen";
-import { BONUS, REQUIRED, STEPS, TILES, swaggerLink } from "@/lib/evidence";
+import { DECISIONS } from "@/content/decisions";
+import {
+  BONUS,
+  REQUIRED,
+  STEPS,
+  TILES,
+  decisionHref,
+  swaggerLink,
+} from "@/lib/evidence";
 
 // The landing page makes claims about the API; each one is checked here against the contract.
 const spec = JSON.parse(
@@ -82,12 +90,13 @@ describe("the verification steps and the architecture tiles", () => {
     expect(STEPS[2].body).toContain("409");
   });
 
-  it("points every tile at an ADR file that exists", () => {
+  it("points every tile at a /decisions entry that exists", () => {
+    const ids = new Set(DECISIONS.map((d) => d.id));
     for (const t of TILES) {
-      const file = fileURLToPath(
-        new URL(`../../../../docs/adr/${t.adr}`, import.meta.url),
-      );
-      expect(() => readFileSync(file), t.adr).not.toThrow();
+      expect("decision" in t || "extra" in t, t.title).toBe(true);
+      if (!("decision" in t)) continue;
+      expect(ids.has(t.decision), t.decision).toBe(true);
+      expect(decisionHref(t.decision)).toBe(`/decisions#${t.decision}`);
     }
   });
 });

@@ -22,7 +22,7 @@
 # Budget (fails closed above it): BUDGET_VCPU_S_PER_HOUR, default 1100 = the 900 a quarter-vCPU
 # instance holds for an hour plus about 20% for the cold start. Derivation: the shared account's
 # request-based free tier had 21,619 vCPU-seconds of headroom after every other project and the API
-# (docs/adr/0014, `make shared-headroom` re-measures it); at 1100 vCPU-s per connected hour that is
+# (the figure last measured; `make shared-headroom` re-measures it); at 1100 vCPU-s per connected hour that is
 # about 19 connected hours a month, and the gateway should be given no more than a quarter of the
 # headroom (about 5 hours), which is what the idle close and the visible-tab rule are for.
 set -euo pipefail

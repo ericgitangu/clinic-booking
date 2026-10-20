@@ -32,7 +32,7 @@
 # developer.ericgitangu@gmail.com; nothing in this script needs that account.
 #
 # Cost rules ($0): us-east1 state bucket (Always Free region), Cloud Run min=0 max=3, no
-# allUsers, custom audience clinic-api. See docs/ for the decision records.
+# allUsers, custom audience clinic-api. See https://clinic.ericgitangu.com/decisions.
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT}"
@@ -108,7 +108,7 @@ step_service() {
       --add-custom-audiences=clinic-api \
       --quiet
   fi
-  # The live-feed gateway (docs/adr/0021), in the shape ship-realtime deploys and cost_check pins:
+  # The live-feed gateway (/decisions#go), in the shape ship-realtime deploys and cost_check pins:
   # scale from zero to at most two instances, one stream each, 0.25 vCPU, request-based billing.
   # Needs the runtime SA from terraform apply (infra/terraform/realtime.tf).
   if exists gcloud run services describe clinic-realtime --account "$GCLOUD_ACCOUNT" --project "$PROJECT" --region "$REGION"; then
