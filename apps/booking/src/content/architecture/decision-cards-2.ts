@@ -99,7 +99,7 @@ export const DECISION_CARDS_2: readonly DecisionCard[] = [
       "Accepted, partly done. The `v1.0.0` tag exists; the README disclosure section is still mine to finish.",
     decision:
       "Commits follow Conventional Commits, one pull request per change, squash-merged, with no tooling trailers on commits I write. How the work was made is disclosed in a single README section, not scattered through commit messages. Local tooling files stay out of the repository through a local exclude file.",
-    cost: "Keeping that disclosure current while I work is a discipline cost. The history is not trailer-free as a whole: Dependabot's own commits carry its bot lines, and I kept them rather than rewrite merged history. The `v1.0.0` tag is on be149b8.",
+    cost: "Keeping that disclosure current while I work is a discipline cost. The history is not trailer-free as a whole: Dependabot's own commits carry its bot lines, and I kept them rather than rewrite merged history. The `v1.0.0` tag now points at c9e1119, the same tree as before the message rewrite.",
     revisit:
       "Nothing is planned. I finish the README section before submission.",
   },
