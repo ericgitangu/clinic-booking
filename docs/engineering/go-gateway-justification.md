@@ -34,7 +34,7 @@ plain text here because the page does not exist on main until #69 merges.
 
 | Claim | Checked against |
 |---|---|
-| The brief offers FastAPI or Go | The assessment line quoted in the original gateway ADR ("REST API in FastAPI, DRF or Go"); the brief itself is not in the repository, so the engineer should confirm the wording. |
+| The brief offers FastAPI or Go | The assessment line quoted when the gateway was first designed ("REST API in FastAPI, DRF or Go"); the brief itself is not in the repository, so the engineer should confirm the wording. |
 | Every write stays in FastAPI | Migration `backend/migrations/versions/0014_realtime_reader_role.py` grants SELECT only; `backend/tests/integration/test_realtime_role.py` logs in as `clinic_realtime` and gets SQLSTATE 42501 for every insert, update, delete, DDL and for every column or table outside the grant; `services/realtime/internal/store/readonly_test.go` fails if any Go source sends a non-SELECT statement or calls a writing driver method (mutation-checked). |
 | Patient events carry no personal data | `backend/app/schemas/events.py` (`SlotEvent`: `extra="forbid"`, fields `doctor_id`, `local_date`, `starts_at`, `kind`, `seq`), `contracts/events/slot-event.v1.schema.json`, and the banned-name check in `backend/tests/unit/test_realtime_domain.py`. |
 | The old Ably admin channel carries no personal data either | `AdminEvent` in the same file. It is still published by the relay and nothing subscribes to it now; turning that publish off would save Ably messages. |
@@ -43,7 +43,7 @@ plain text here because the page does not exist on main until #69 merges.
 | Below 1 vCPU Cloud Run allows one request per instance | The Cloud Run CPU limits page, "Maximum concurrency must be set to 1" (read 2026-10-19). |
 | 0 to 2 instances and back to zero | The deploy line in `.circleci/config.yml` (`--min-instances 0 --max-instances 2`), pinned by `scripts/cost_check.sh --static` and its 17 mutation cases, and by the live check C1 (max exactly 2, min 0, throttling on). Scale-to-zero itself is not yet observed: it needs the deployed service. |
 | About 900 vCPU-seconds per connected hour | 0.25 vCPU x 3,600 s (deduced). `scripts/ops/measure_realtime_cost.sh` measures it on the deployed service and fails above 1,100. Not yet measured. |
-| About 21,619 vCPU-seconds of shared headroom | The figure recorded in the hosting cost analysis; `make shared-headroom` re-measures it. |
+| About 21,619 vCPU-seconds of shared headroom | The figure last measured; `make shared-headroom` re-measures it. |
 | Streams close at 290 s | `MAX_CONNECTION` in `services/realtime/internal/config/config.go`, tested in `lifecycle_test.go`; Vercel Hobby caps a function at 300 s (the Vercel limits page, as recorded in the front-door analysis). |
 | The third client sees "Live feed busy, refreshing every 30 s" | `apps/admin/e2e/live-feed.spec.ts` (second viewer) and `apps/admin/tests/live-stream.test.ts`. |
 | Revisit at more than two staff viewers | Follows from two instances at concurrency 1. |

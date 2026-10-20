@@ -10,4 +10,4 @@
 
 - [ ] make lint typecheck test passes locally
 - [ ] new error codes added to docs/api-errors.md
-- [ ] README/ADR updated if a decision changed
+- [ ] README or the decisions page updated if a decision changed

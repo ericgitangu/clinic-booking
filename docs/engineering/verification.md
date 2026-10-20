@@ -8,7 +8,7 @@ How each pull request was checked before it merged. Every figure on this page is
 2. A separate red-team review read the diff and ran its own checks against a real stack: real Postgres, real HTTP, a real browser. It either signed off or listed required changes.
 3. Merges happened only when CircleCI was green as a separate check and only into `main` (a stacked PR once merged into a feature branch, which is why the base branch is now checked first).
 
-The same rules are in [ADR-0018](../adr/0018-testing-strategy.md) (no mocks of our own code) and the repository's PR template.
+The same rule (no mocks of our own code) is in the repository's PR template.
 
 ## Per pull request
 
@@ -45,7 +45,7 @@ Defects are counted as the red-team comment wrote them. "Rounds" is the number o
 | 44 live availability over Ably | `9deff7e` | `748d7d8` | Approved. Acceptance (a) to (h) pass. Minor follow-ups: the duplicate-delivery unit test does not isolate the `seq <= lastSeq` check because the cursor check masks it; a local stand-in run of (g) failed 1 in 5 on a fresh database after a rebuild (skipped in CI, cause not captured) | (a) a booked slot disappears from a second page in under 2 s and (b) a cancel frees it in under 3 s, both against real Ably in CI (`ably-real` 3105, `e2e-real` 3110); (c) with the push host blocked the page shows `data-stream=polling` and converges within 15 s; (d) a token 429 leaves polling running; (e) a StrictMode double mount mints one token; (h) a patient token cannot read `admin:events`. Mutations caught: accepting an older cursor, applying a duplicate, removing memoisation. CI 15/15. Also noted: (g) duplicate delivery runs only against the local stand-in, because the real service drops a repeated id itself, and that a patient token on `admin:events` gets silence from the real service, not an error frame |
 | 48 double-submit spec | `df122dc` | `562a2a1` | Root cause: the service worker interfered with the spec's request accounting. No assertion weakened. Follow-up, test only: the spec books `slots[0]` of a picked day, so parallel `--repeat-each` collides (4 of 10 with 4 workers) and seed capacity runs out after a few dozen bookings; stress runs need `--workers=1` and a fresh seed | The spec ran 10/10 against a real stack and the full booking suite passed once; unblocking the service worker brings the original failure back. CI 14/14 |
 
-PR 29 (ADR corrections) merged as `ccaee70`. PR 35 (the README) merged as `9520d57`. PR 22 (the AI reflection) has no review comment.
+PR 29 (decision record corrections) merged as `ccaee70`. PR 35 (the README) merged as `9520d57`. PR 22 (the AI reflection) has no review comment.
 
 ## Proofs that a test can fail
 
@@ -56,14 +56,14 @@ A test that has never been seen failing proves little, so these are the mutation
 - PR 33: reverting the idle-stop fix fails its e2e.
 - PR 34: echoing part of an unreadable response body fails the leak tests.
 - PR 39: seven mutations in the relay and budget code each fail a named test; one route (`reschedule_appointment`) passed the first mutation, which exposed a gap the test then closed.
-- The race suite itself carries its own control: the same barrier against a database without the index must book more than once ([ADR-0018](../adr/0018-testing-strategy.md)).
+- The race suite itself carries its own control: the same barrier against a database without the index must book more than once.
 
 ## Live production checks
 
 - PR 19: the admin host returned 200 for `/` and `/dashboard` before merge.
 - PR 34 and PR 28: the environment check ran read-only against the real Vercel projects and reported 11 required names for booking and 12 for admin, without printing values.
 - PR 28 sign-off: `ship-api` sets `INTERNAL_SIGNING_KEY` from Secret Manager, which matched the live API revision.
-- The release pipeline runs `scripts/verify_claims.py` against each new tagged revision before it gets traffic, and `verify-release` checks the public URL afterwards; which pipelines have run it is in README section 4.3 ([ADR-0016](../adr/0016-cicd-circleci-keyless-deploy.md)).
+- The release pipeline runs `scripts/verify_claims.py` against each new tagged revision before it gets traffic, and `verify-release` checks the public URL afterwards; which pipelines have run it is in README section 4.3.
 
 ### Release of 2026-10-18, observed after the pipeline for PR 43 (commit `0cc0608`)
 
@@ -77,7 +77,7 @@ A test that has never been seen failing proves little, so these are the mutation
 
 - `ship-api`, `cost-check`, `ship-booking` and `ably-real` succeeded. `ship-admin` failed because `VERCEL_ADMIN_TOKEN` is not added yet, so `verify-release`, `smoke-public` and `zap-prod` did not run.
 - `POST https://clinic.ericgitangu.com/api/realtime/token/patient` through the proxy: with the site `Origin`, HTTP 200 with `Cache-Control: no-store` and the body fields `channel`, `expires_at`, `stream_url`, `token`, `ttl_seconds`; with a cross-site `Origin`, HTTP 403.
-- A real Chrome on the booking page for Dr. Achieng Otieno (`?date=2026-10-21`) rendered 16 slot chips and two always-mounted `role=status` regions. On load: `data-stream="polling"`, `data-polling="armed"`; no token is minted before user input, by design (ADR-0031). After one scroll and one key press: `data-stream="live"`, meaning the token was minted and the stream connected to Ably.
+- A real Chrome on the booking page for Dr. Achieng Otieno (`?date=2026-10-21`) rendered 16 slot chips and two always-mounted `role=status` regions. On load: `data-stream="polling"`, `data-polling="armed"`; no token is minted before user input, by design (the live push design). After one scroll and one key press: `data-stream="live"`, meaning the token was minted and the stream connected to Ably.
 - So patient live push is on in production. The admin live feed moved to the Go service in PR 71, which came later.
 
 ## Known limits of the test setup
@@ -87,7 +87,7 @@ A test that has never been seen failing proves little, so these are the mutation
 - The Lighthouse `/` performance rule is a warning, not an error: CI medians varied from 77 to 89 run to run (PR 42), and the 0.85 budget has not been lowered.
 - `test_ably_real.py` needs the CI Ably key, so it is skipped locally and runs only in CI.
 
-- Resend Domains page, observed on 2026-10-18: `mail.ericgitangu.com` is the only domain with status Verified. The booking emails in PR 27 are sent from it, per the ADR-0025 amendment in that PR.
+- Resend Domains page, observed on 2026-10-18: `mail.ericgitangu.com` is the only domain with status Verified. The booking emails in PR 27 are sent from it, per the email design change in that PR.
 
 ### Booking and cancellation emails, observed on 2026-10-18
 

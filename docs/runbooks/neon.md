@@ -50,7 +50,7 @@ SQL
 
 Acceptance: connected as `clinic_app`, `CREATE TABLE x(i int)` is `permission denied`.
 
-## Record (into ADR-0003 and ADR-0014)
+## Record (what the double booking and hosting decisions rest on)
 
 ```sql
 SHOW max_connections;

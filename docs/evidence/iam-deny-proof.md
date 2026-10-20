@@ -1,4 +1,4 @@
-# IAM deny-proof evidence (ADR-0016, ADR-0023)
+# IAM deny-proof evidence (keyless deploy, IAM-only Cloud Run)
 
 Status: **TEMPLATE, no production run recorded yet.** The sections below hold the record format
 and a local dry run against stand-ins. The first release (run-app probe) and the first push of

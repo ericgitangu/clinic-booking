@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# ZAP baseline scan of the live site after a release (docs/adr/0017). PASSIVE only: zap-baseline.py
+# ZAP baseline scan of the live site after a release. PASSIVE only: zap-baseline.py
 # spiders the public pages and inspects the responses; it never sends attack payloads. It reuses
 # the PR DAST job's image digest and rules file (.zap/rules.tsv) and the same pass/fail mapping:
 # exit 0 (no alerts) and 2 (warnings only) pass; 1 and 3 fail.
 #
 # Rate-friendly on purpose: a one-minute spider and a three-minute ceiling, so it costs a few
-# hundred requests through the front door once per release (docs/adr/0023 free-tier budget).
+# hundred requests through the front door once per release (the free-tier request budget, /decisions#hosting-and-cost).
 #
 # Usage: zap_prod_baseline.sh            (reads WEB from scripts/ci/public-urls.env)
 # Env:   ZAP_DOCKER   docker binary (tests substitute a fake)

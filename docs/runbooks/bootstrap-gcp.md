@@ -11,7 +11,7 @@ account is a different one, so **every `gcloud` call passes `--account`**:
 export PROJECT=sil-clinic-booking
 export GCLOUD_ACCOUNT=the.ace.guru@gmail.com                  # project Owner: every IAM, Terraform and WIF step
 export BILLING_GCLOUD_ACCOUNT=developer.ericgitangu@gmail.com   # billing and budget steps only
-export BILLING_ACCOUNT=01C382-12CD13-DCA6EF                     # SHARED "Firebase Payment" account (see ADR-0014)
+export BILLING_ACCOUNT=01C382-12CD13-DCA6EF                     # SHARED "Firebase Payment" account (see the hosting and cost decision on /decisions)
 export REGION=us-east4
 ```
 
@@ -19,7 +19,7 @@ The two accounts are not interchangeable. `the.ace.guru` is the project Owner (t
 created there because `developer.ericgitangu` hit Google's project-creation quota). `developer`
 holds only `roles/editor` on the project and `roles/billing.projectManager`, so it runs the
 billing and budget steps and nothing that sets IAM. The billing account is shared with four
-other projects: read the cost analysis in ADR-0014.8 before relying on "$0".
+other projects: read the cost disclosure in README section 10 before relying on "$0".
 
 Every `bootstrap.sh` mode is re-runnable and honours `DRY_RUN=1` (prints each command, runs
 nothing). Dry-run first, read the output, then run it for real.
@@ -140,7 +140,7 @@ bash infra/bootstrap.sh service invoker
 ```
 
 `service` creates each missing shell on the hello image and leaves an existing service untouched:
-`clinic-api`, and `clinic-realtime` (the live-feed gateway, ADR-0021) with exactly the shape
+`clinic-api`, and `clinic-realtime` (the live-feed gateway) with exactly the shape
 `ship-realtime` deploys and `cost_check` pins: `--min-instances 0 --max-instances 2 --concurrency 1
 --cpu 0.25 --memory 256Mi --execution-environment gen1 --timeout 900`, service account
 `clinic-realtime-runtime`, custom audience `clinic-realtime`, no public access.
@@ -215,7 +215,7 @@ vercel project add clinic-web --scope "$TEAM"
    # alias on a *.vercel.app name sits behind Vercel's deployment protection and redirects to a login.
    ```
 
-   - note (2026-10-18): the public hostnames are now `https://clinic.ericgitangu.com` (booking) and `https://clinic-admin.ericgitangu.com` (admin), per ADR-0028; the `sil-clinic-booking.vercel.app` name above is the cut-over alias. `scripts/ci/public-urls.env` holds the real values;
+   - note (2026-10-18): the public hostnames are now `https://clinic.ericgitangu.com` (booking) and `https://clinic-admin.ericgitangu.com` (admin), as set in `scripts/ci/public-urls.env`; the `sil-clinic-booking.vercel.app` name above is the cut-over alias. `scripts/ci/public-urls.env` holds the real values;
    - add `PUBLIC_BASE_URL=$WEB/api` and `WEB_ORIGIN=$WEB` to the `gcp-deploy` context;
    - write both URLs into `scripts/ci/public-urls.env` (`WEB=` and `RUN_APP_URL=`) and commit
      it **before the first push to `main`**. `smoke-public` fails fast while the placeholders
@@ -312,7 +312,7 @@ gcloud recaptcha keys create --web --integration-type=score \
 gcloud recaptcha keys list --account "$GCLOUD_ACCOUNT" --project "$PROJECT"
 ```
 
-The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `apps/booking/.env.local`. There is no secret: the BFF calls the API as `clinic-recaptcha` through the Vercel identity (ADR-0022).
+The key id printed is the public site key: set it as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in Vercel (production) and in the gitignored `apps/booking/.env.local`. There is no secret: the BFF calls the API as `clinic-recaptcha` through the Vercel identity.
 
 ## Accepted risks
 

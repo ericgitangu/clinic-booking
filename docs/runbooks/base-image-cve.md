@@ -24,4 +24,4 @@ When `trivy image` fails the `build-scan` job on a HIGH/CRITICAL in the base ima
    after that, only a release-blocking CVE justifies a new base image.
 
 Cost note: scanning stays in CI (Trivy). The GCP Artifact Analysis / container-scanning APIs
-stay disabled (ADR-0016, ADR-0014).
+stay disabled (keyless deploy and the $0 rule, see [README section 9](../../README.md#9-deployment--cicd) and the [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost) decisions).

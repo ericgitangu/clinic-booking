@@ -14,7 +14,7 @@ staff shapes further down do, and only the Go gateway sends them.
 The admin channel also carries the staff annotations `vetoed`, `unlocked`, `arrived` and `no_show`
 in the same `AdminEvent` shape.
 
-The Go gateway (`services/realtime`, ADR-0021) streams the admin feed to the admin app over its own
+The Go gateway (`services/realtime`) streams the admin feed to the admin app over its own
 IAM-protected SSE stream, never through the push service. A viewer gets the shapes on the left, an
 owner or admin the ones on the right:
 

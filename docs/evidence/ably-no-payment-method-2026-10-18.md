@@ -1,6 +1,6 @@
 # Evidence: Ably account has no payment method (2026-10-18)
 
-Supports [ADR-0031](../adr/0031-realtime-push-via-ably-sse.md): the Ably message cap is bounded by us, and one of the bounds is that the account holds no payment method, so usage past the free package cannot be billed.
+Supports [the polling then push decision](https://clinic.ericgitangu.com/decisions#polling-then-push): the Ably message cap is bounded by us, and one of the bounds is that the account holds no payment method, so usage past the free package cannot be billed.
 
 ## What was observed
 
@@ -25,4 +25,4 @@ The Secret Manager and CircleCI entries are as reported to the author of this fi
 
 ## What this does not prove
 
-The other bounds in ADR-0031 (the 25,000 a month publish cap, the 80 percent stats alarm) are build items and are not evidenced here.
+The other bounds in the live push design (the 25,000 a month publish cap, the 80 percent stats alarm) are build items and are not evidenced here.
