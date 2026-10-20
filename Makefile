@@ -30,12 +30,13 @@ migrate: ## Run migrations (one-shot)
 seed: ## Run the seed against the running stack
 	docker compose exec -T api python -m app.scripts.seed
 
-lint: ## markdown, TypeScript, Python (ruff + mypy --strict), zero warnings (husky and the CI lint job call this)
+lint: ## markdown, TypeScript, Python (ruff + mypy --strict), env example names, zero warnings (husky and the CI lint job call this)
 	pnpm exec markdownlint-cli2
 	pnpm -r --if-present lint
 	pnpm -r --if-present typecheck
 	($(BE) ruff check .) && ($(BE) ruff format --check .)
 	$(BE) mypy --strict app tests migrations
+	python3 scripts/check_env_example.py
 	@echo "lint: Go checks are not part of this target; they run in 'make lint-go' (the go-quality CI job and the pre-push hook)"
 
 # Split from `lint` because the CI lint image has no Go toolchain; go-quality (Go image) calls this.
