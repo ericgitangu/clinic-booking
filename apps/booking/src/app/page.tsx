@@ -195,7 +195,11 @@ export default function Home() {
         </ol>
         <p className="mt-8 max-w-[65ch] text-base leading-7 text-muted-foreground">
           To run them against a local stack, set{" "}
-          <code>API=http://localhost:8080</code> in the first block.
+          <code>API=http://localhost:8080</code> in the first block.{" "}
+          <a className={LINK} href={`${README}#12-run-locally`}>
+            Run it locally
+          </a>{" "}
+          says what that needs.
         </p>
         <p className="mt-3 text-base">
           The same checks, with what I saw when I ran them, are in{" "}

@@ -10,6 +10,7 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Click.** <https://clinic.ericgitangu.com/book> for the patient flow (Google sign-in), <https://clinic.ericgitangu.com/docs> for Swagger UI against the real API (no sign-in: the brief is silent on authentication, and I kept the public `/api` open so Try it out works).
 - **Read first.** [3.4 The concurrency guarantee](#34-the-concurrency-guarantee) and the decision behind it, [double booking](https://clinic.ericgitangu.com/decisions#double-booking). The race test and its control are described in 3.4. If that logic is wrong, nothing else matters.
 - **Run.** [Section 2](#2-verify-the-claims-in-10-minutes) is a copy-paste path against production: 20 simultaneous bookings of one slot, then cancelling twice.
+- **Run it locally.** [Section 12](#12-run-locally) lists what you need and which commands work without my Vercel login: the API, the tests, the Postman collection and `make verify`.
 - **Try the API.** `make api-check` runs a Postman collection of the whole booking journey against a local stack; the same files import into Postman ([Try the API](#try-the-api)).
 - **Architecture.** One diagram and a table with the choice and the reason for each component, including the Go service: [Architecture](#architecture).
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and, for the headline choices, an entry on the [decisions page](https://clinic.ericgitangu.com/decisions) that names what it costs. [The Architecture tab](https://clinic.ericgitangu.com/decisions#architecture) has the diagrams (context, containers, booking, push, release, data handling), [the engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions) the long decisions index, and [the verification card](https://clinic.ericgitangu.com/decisions#verification) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
@@ -79,7 +80,7 @@ flowchart LR
 | Database | Neon Postgres 17; a partial unique index decides double booking | The engine enforces it across instances, with no application lock. |
 | Live updates | Outbox rows relayed to Ably right after each commit; the patient booking page subscribes over SSE with a 5 minute token (staff get their own feed from the Go service below) | Ably's free package needs no card, and no server of ours holds streams open. |
 | Staff live feed | clinic-realtime, a small Go service on Cloud Run: read-only database role, 0 to 2 instances, one stream per instance, IAM-only, streaming to the admin app over SSE | Staff events carry patient names, so they stay inside Google Cloud instead of going to a third-party pub/sub. |
-| Email | Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders | A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send. |
+| Email | Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders; the admin app also emails a doctor when a patient is marked arrived, only if staff have set that doctor's address | A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send. |
 | Human check | The browser gets a reCAPTCHA token; the booking server creates a reCAPTCHA Enterprise assessment for each booking, cancel and reschedule, with an access token it gets through the same Vercel OIDC federation | It runs on the server for every screen flow, and no secret is stored because the call uses the Vercel identity. |
 | Migrations | clinic-migrate, a Cloud Run Job that runs alembic as the clinic_owner role with its own database secret, before each deploy | The running service has no DDL rights, and migrations are expand-only so the previous revision keeps working. |
 | Images | Artifact Registry, with CircleCI pushing each image by digest and only the two newest versions kept | A rollback needs the previous image, and the registry's free tier is small. |
@@ -106,23 +107,38 @@ Four runtimes is a cost for an app this size, so each one has to earn its place:
 |---|---|
 | Landing page | <https://clinic.ericgitangu.com> |
 | Booking app | <https://clinic.ericgitangu.com/book> |
-| API base | <https://clinic.ericgitangu.com/api> |
+| API (a base path: `/api` itself is a 404, try `/api/doctors`) | <https://clinic.ericgitangu.com/api/doctors> |
 | Swagger UI | <https://clinic.ericgitangu.com/docs> |
 | ReDoc | <https://clinic.ericgitangu.com/redoc> |
 | OpenAPI spec | <https://clinic.ericgitangu.com/openapi.json> |
 | Admin app (allowlisted) | <https://clinic-admin.ericgitangu.com> |
 | Pipelines | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
 
-The earlier address, <https://sil-clinic-booking.vercel.app>, answers with a 308 redirect to the host above. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
+The earlier address, <https://sil-clinic-booking.vercel.app>, answers its pages (`/`, `/book`, `/docs`) with a 308 redirect to the host above. Its `/api/...` paths are not redirected: they are answered directly (`/api/doctors` returns 200 there too). I checked both with plain GET requests on 2026-10-20. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
 ## 2. Verify the claims in 10 minutes
 
-I ran everything below against production on 2026-10-18 (UTC). The commands are copy-paste. You need `curl`, `jq` and `python3`.
+I ran everything below against production on 2026-10-18 (UTC). The commands are copy-paste. You need `curl`, `jq` and `python3`. Everything after this block uses `$API` and nothing sets it again, so to run the same steps against a local stack (`make up`, [section 12](#12-run-locally)) change this block only:
 
 ```bash
-W=https://clinic.ericgitangu.com
-for p in / /docs /openapi.json /api/doctors /api/ready; do
-  printf '%-14s ' $p; curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $W$p
+BASE=https://clinic.ericgitangu.com
+API=$BASE/api
+# local stack instead:  API=http://localhost:8080
+```
+
+If a request comes back as a 403 HTML page with `x-vercel-mitigated: challenge`, that is Vercel's bot protection reacting to a burst (the 20-way race below). Wait a minute, or run the same steps against localhost.
+
+```bash
+for p in /doctors /ready; do
+  printf '%-10s ' $p; curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $API$p
+done
+```
+
+The next lines exist only on production (the web host serves `/`, `/docs` and the spec, and Cloud Run is the IAM-only service behind it):
+
+```bash
+for p in / /docs /openapi.json; do
+  printf '%-14s ' $p; curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $BASE$p
 done
 curl -s -o /dev/null -w 'direct Cloud Run: %{http_code}\n' https://clinic-api-2shno7sa7q-uk.a.run.app/ready
 ```
@@ -132,14 +148,13 @@ curl -s -o /dev/null -w 'direct Cloud Run: %{http_code}\n' https://clinic-api-2s
 | `/` | `200 text/html` |
 | `/docs` (Swagger UI) | `200 text/html` |
 | `/openapi.json` | `200 application/json` |
-| `/api/doctors` | `200 application/json`, 5 doctors seeded, the first is "Dr. Achieng Otieno" |
-| `/api/ready` | `200 application/json` (the proxy reaches Cloud Run) |
+| `$API/doctors` | `200 application/json`, 5 doctors seeded, the first is "Dr. Achieng Otieno" |
+| `$API/ready` | `200 application/json` (in production the proxy reaches Cloud Run) |
 | Cloud Run directly, `/ready` | `403`: it is IAM-only |
 
 **Step 0: your own patient and a free slot.** Use a patient of your own, not mine. The loop looks for the first day in the next week on which the first doctor has a free slot.
 
 ```bash
-API=$W/api
 PATIENT=$(curl -s -XPOST $API/patients -H 'content-type: application/json' -d '{"full_name":"Your Name"}' | jq -r .id)
 DOCTOR=$(curl -s $API/doctors | jq -r '.items[0].id')
 for n in 3 4 5 6 7 8 9; do
@@ -274,7 +289,7 @@ flowchart LR
 - **Why a second language.** The brief allows FastAPI or Go. I kept all the rules in FastAPI and used Go for the one job it suits best: many long-lived, mostly idle connections with a small memory footprint. The cost is a second runtime to build, scan and deploy: a CI job (`go-quality`), an image scan, and a `ship-realtime` job with a smoke test and a rollback.
 - **Why not Ably for staff too.** Patient events say only that a time was taken or freed. The model forbids any other field and a test fails if a field name hints at a person (`backend/app/schemas/events.py`, `backend/tests/unit/test_realtime_domain.py`), so a third-party pub/sub is fine for them. Staff events carry the patient's name and a cancellation reason. That is health-adjacent personal data, so it stays inside our Google Cloud boundary: Go reads Postgres directly and streams to the IAM-protected admin app. A viewer gets the same events without the name, the reason or the appointment id; that is tested on the wire and in the browser.
 - **What I gave up.** Cloud Run bills an instance while a stream is open. Below 1 vCPU Cloud Run allows one request per instance at a time ([the CPU limits page](https://docs.cloud.google.com/run/docs/configuring/services/cpu)), so the service scales from zero to at most two instances on demand and back to zero when idle. That means at most two live staff streams. A third client sees "Live feed busy, refreshing every 30 s" and the dashboard falls back to refreshing. One connected hour at 0.25 vCPU is about 900 vCPU-seconds (0.25 x 3,600, deduced) against roughly 21,619 vCPU-seconds of shared free-tier headroom. The server closes every stream itself (at 290 s because Vercel Hobby caps the admin route at 300 s, and after four quiet minutes), and the browser lets go of its stream after five minutes in a hidden tab.
-- **Measured cost.** <!-- realtime-cost:start -->Measured cost of one connected hour: to be measured after the first deploy.<!-- realtime-cost:end --> (`bash scripts/ops/measure_realtime_cost.sh` holds a few streams, reads Cloud Monitoring and rewrites this line; it fails above 1,100 vCPU-seconds per connected hour.)
+- **Measured cost.** <!-- realtime-cost:start -->Measured cost of one connected hour: not measured yet.<!-- realtime-cost:end --> (`bash scripts/ops/measure_realtime_cost.sh` holds a few streams, reads Cloud Monitoring and rewrites this line; it fails above 1,100 vCPU-seconds per connected hour.)
 - **When I would revisit.** More than two staff viewing at once, or more than one clinic. Then each connection should not hold an instance, and the gateway would move to pooled pub/sub inside Google Cloud (Pub/Sub or Redis).
 - **How this was decided.** I first designed the Go gateway. The realtime design then moved everything to Ably and the gateway was marked superseded, which I had not signed off. On 2026-10-19 I reversed that, because the staff view needs names and those should not leave Google Cloud.
 
@@ -292,7 +307,7 @@ Each row is the decision, what it costs me, and the entry on the [decisions page
 | UTC `timestamptz`, the clinic zone as data, naive datetimes rejected, an injected clock | One extra join to read the zone; no DST zone is in the seed data | [time model](https://clinic.ericgitangu.com/decisions#time) |
 | REST with OpenAPI 3.1, RFC 9457 errors with a closed code catalogue, and a TypeScript client generated from the contract | Type safety comes from codegen and a CI drift gate instead of inference; the generator is 0.x and pinned; no `/v1` prefix | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors) |
 | Reschedule is an in-place update under a row lock with one deadlock retry; a booking retry replays through an idempotency key stored on the appointment | A slot swap can end with both requests rejected; a key is bound to one doctor and time | [3.5](#35-appointment-state-machine) |
-| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.34 a month on the shared billing account | [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost) |
+| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.35 a month against a $0.50 ceiling on the shared billing account | [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost) |
 | CircleCI, keyless OIDC to workload identity federation, promote by tag after a smoke test, roll back automatically | `VERCEL_TOKEN` is long-lived; a main pipeline takes about 10 to 12 minutes (an estimate) | [section 9](#9-deployment--cicd) |
 | The brief is silent on authentication; I kept the public API unauthenticated so Swagger's Try it out works, while patients and staff sign in with Google in the web apps, with one reCAPTCHA check per action and roles checked on every request | Anyone holding an appointment id can change it through the public API (an IDOR I disclose in section 10) | [the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer) |
 | Real Postgres in every test, a race harness that fails if it stops being concurrent, and a control that proves the index is what holds | Slower suites and a compose database in CI; no mocks to hide behind | [3.4](#34-the-concurrency-guarantee) |
@@ -308,7 +323,7 @@ Each row is the decision, what it costs me, and the entry on the [decisions page
 - **Early session revocation.** Sessions are stateless cookies, so a role is looked up in `staff_access` on every request instead of living in the cookie ([the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)).
 - **Measured latency and load.** The latency and 10x figures above are estimates and are labelled as such.
 - **Admin events on Ably.** The relay still publishes the PII-free admin events to Ably and nothing subscribes to them now, because the staff feed goes through the Go service in [3.7](#37-the-live-feed-a-go-service-beside-fastapi). Turning that publish off would save Ably messages.
-- **The admin release path.** It was blocked on a project-scoped Vercel token until `VERCEL_ADMIN_TOKEN` was added to the `vercel-prod` context. Since then `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` pass on every release, last on `be149b8` (pipeline 506).
+- **The admin release path.** It was blocked on a project-scoped Vercel token until `VERCEL_ADMIN_TOKEN` was added to the `vercel-prod` context. Since then `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` pass on every release, last on `0d6cde8` (pipeline 512).
 - **End-to-end tests assume a fresh database per run.** CI provides one, and `make e2e` recreates the compose volume itself. Running Playwright directly on a reused database (`pnpm -C apps/booking test:e2e`, or `KEEP_STACK=1 make e2e-admin`) fails the double-booking specs and the fixed-slot `booking.spec` test (also on `main`); run `make down` first. Per-run port and database isolation is descoped for time.
 - **The daily reminder has not been seen live.** Booking and cancellation emails were verified live on 2026-10-18, but the first send of the 15:00 UTC reminder cron is still to be confirmed in the Resend logs.
 - **Live notifications on the dashboard.** Each live event (a booking, a change, an arrival, a no-show, a veto) shows a toast to the staff who did not make it, an unread count on the live feed and a short highlight on the doctor's card; a burst collapses into one "N updates" toast and viewers never see patient names. It uses the existing stream, so it opens no new connection.
@@ -363,7 +378,9 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 | `backend/migrations/`, `backend/tests/` | Alembic (expand-only, linted by `scripts/migration_lint.sh`); unit, integration, concurrency, contract, migration tests |
 | `apps/booking/`, `apps/admin/` | The two Next.js apps |
 | `packages/api/`, `packages/ui/` | Generated client and the `/api` proxy; shared UI |
-| `contracts/` | The committed OpenAPI contract |
+| `services/realtime/` | The Go service behind the staff live feed ([3.7](#37-the-live-feed-a-go-service-beside-fastapi)) |
+| `collections/` | The Postman collection and its two environments, run by `make api-check` ([Try the API](#try-the-api)) |
+| `contracts/` | The committed contract: the OpenAPI spec, the error catalogue ([`api-errors.md`](contracts/api-errors.md)) and the event schemas in `events/` |
 | `infra/`, `.circleci/`, `scripts/` | Terraform and bootstrap, the pipelines, verification and cost scripts |
 
 `make help` lists every task.
@@ -421,7 +438,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Rollback.** Going back is a traffic move, not a rebuild. What has and has not run is in section 4.3. After the web deploy, `verify-release` checks the public URL with no credentials (including `/ready`, which runs `SELECT 1` against Neon); if that fails, one job puts the API back on the revision that was live before and a second job, run only if the first succeeded, points the Vercel alias at the previous deployment, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. The runbook is [the rollback runbook](https://clinic.ericgitangu.com/decisions#rollback).
 
-**Release pipeline (read from CircleCI on 2026-10-20).** The release on `be149b8` (pipeline 506, tagged `v1.0.0`) shipped the API, the Go service, the booking app and the admin app, and passed `verify-release`, `smoke-public` and `zap-prod`. Its `cost-check` failed because each image repository still held a third image built before a history rewrite (limit: the live image and one rollback). Those two images were deleted and the next release's `cost-check` checks it again; until then the badge can read "failing" for a release that is up and verified.
+**Release pipeline (read from CircleCI on 2026-10-20).** The release on `0d6cde8` (pipeline 512) is fully green: all 51 commit statuses are `success`, `cost-check` and `cost-static` included, and it shipped the API, the Go service, the booking app and the admin app past `verify-release`, `smoke-public` and `zap-prod`. The same holds for the current `main`, `aa9c9e3` (pipeline 514: 51 of 51). The earlier release on `be149b8` (pipeline 506, tagged `v1.0.0`) had a failing `cost-check` because each image repository still held a third image built before a history rewrite (limit: the live image and one rollback); I deleted those images and the next release passed.
 
 ## 10. Operations, cost & security posture
 
@@ -452,18 +469,60 @@ The design came before the code: the design and decision records were committed 
 
 ## 12. Run locally
 
-Prerequisites: Docker, uv and pnpm, plus the Vercel CLI for the web app's environment.
+### What you need
 
-The booking app reads its settings from `apps/booking/.env.local`, which is gitignored. `apps/booking/.env.example` lists every variable name with a comment and no values. Run this once, signed in to Vercel, to fill the file from the project's Development environment. Vercel never returns variables marked Sensitive (the Google client, the auth secret and the like), so the command prints which ones to copy into the file by hand:
+| Tool | Version | Needed for |
+|---|---|---|
+| Docker with Compose v2 | any recent release (I used Docker 29 and Compose v5) | `make up`, `make api-check`, `make e2e` |
+| `uv` | any recent release (0.11 here); it installs Python 3.12 from `backend/pyproject.toml` | `make test`, `make verify` |
+| Node | 24 (CircleCI runs 24.14) | the web apps |
+| `pnpm` | 12.5.1, the version CircleCI installs | `pnpm install` for the web apps and shared packages |
+| Go | 1.26 (`services/realtime/go.mod`) | only to build or test the gateway outside Docker |
+| Chrome | the installed Chrome; Playwright uses `channel: "chrome"` | `make e2e` and `make e2e-admin` |
+
+newman needs no install: `make api-check` runs it from a pinned Docker image.
+
+### Without my Vercel login
+
+These need Docker or `uv` and nothing from my accounts:
+
+- the API and its database: `make up` (migrations and seed included);
+- the backend tests: `make test`, `make test-race` and the rest of `make help`;
+- the Postman collection: `make api-check` starts its own stack and removes it afterwards;
+- the claims script: `make verify URL=http://localhost:8080`;
+- the Go service, through the compose `realtime` profile: `docker compose --profile realtime up -d --build --wait`;
+- [section 2](#2-verify-the-claims-in-10-minutes) against localhost, by changing the one `API=` line.
 
 ```bash
-make env-pull
-```
-
-```bash
-make up        # docker compose up -d --build --wait: Postgres, migrations plus seed, the API on :8080
+make up                      # Postgres, migrations plus seed, the API on :8080
 curl -s localhost:8080/ready
-make test      # full backend suite against that database
+make test                    # backend suite against that database
+make verify URL=http://localhost:8080
+make api-check               # own stack, Docker only
 ```
 
-The API alone needs only Docker, so you can run [section 2](#2-verify-the-claims-in-10-minutes) against `http://localhost:8080` (set `API=http://localhost:8080`).
+`make test` empties `appointments`, `appointment_events`, the staff access and invitation tables and every patient that is not seed data, in the database it connects to. Run it only against a stack you can throw away, never against one you have been clicking around in.
+
+If 5432 or 8080 is already taken on your machine, move the stack and give `make test` the same database port:
+
+```bash
+DB_HOST_PORT=5433 API_HOST_PORT=8081 make up
+DB_HOST_PORT=5433 make test
+make verify URL=http://localhost:8081
+```
+
+### What needs my Vercel login
+
+The two web apps sign in with Google, and the values for that are in my Vercel project. `make env-pull` (needs the Vercel CLI, signed in as the project owner) fills `apps/booking/.env.local` from the Development environment. Vercel does not return variables marked Sensitive (the Google client, the auth secret, the signing key, the Resend key and the cron secret), so those are copied by hand. A reviewer without that access cannot sign in locally; that includes the admin app.
+
+What does work without it: the `.env.example` files hold names and no values, so the booking app does not start from them as they are. With `API_URL=http://localhost:8080` set and nothing else, the public pages render (the landing page, `/decisions`, `/about`), and `/book` lists the doctors from your local API (no ID token is minted outside Vercel). I checked those four with `next dev` and no other variable set. The routes that need Google sign-in (`/auth`, `/appointments`, the details step and the confirmation) answer a plain 503 "Sign-in is not configured" page, and the server log names the missing variables (`apps/booking/src/proxy.ts`). To see the booking journey in a browser without Google, use the Playwright suite, which starts the app with test values: `make e2e`.
+
+### The environment files
+
+Each one lists the variable names that part of the code reads. A script (`scripts/check_env_example.py`) fails CI when one drifts from the code. None holds a value, and none should.
+
+- [`.env.example`](.env.example): the union of all of them, plus Terraform and CI variables;
+- [`backend/.env.example`](backend/.env.example): the API;
+- [`apps/booking/.env.example`](apps/booking/.env.example): the booking app;
+- [`apps/admin/.env.example`](apps/admin/.env.example): the admin app;
+- [`services/realtime/.env.example`](services/realtime/.env.example): the Go gateway.

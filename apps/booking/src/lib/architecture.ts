@@ -58,7 +58,7 @@ export const DECISIONS: readonly Decision[] = [
   {
     component: "Email",
     choice:
-      "Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders",
+      "Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders; the admin app also emails a doctor when a patient is marked arrived, only if staff have set that doctor's address",
     why: "A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send.",
   },
   {
