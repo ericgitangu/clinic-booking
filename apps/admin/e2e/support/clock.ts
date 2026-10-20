@@ -6,6 +6,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { CLINIC_TZ } from "../../src/lib/clinic-time";
+import { nextHalfHourMoveSql, noFreeNextHalfHourMessage } from "./slot-sql";
 
 // Reach the stack under test the way whoever started it did. A run that set COMPOSE_PROJECT_NAME
 // (scripts/e2e_admin.sh does) is followed by name; CI starts the stack with a plain `docker compose
@@ -53,7 +54,12 @@ function runPast(
   execute(sql, id);
 }
 
-function execute(sql: string, id: string): void {
+function execute(
+  sql: string,
+  id: string,
+  failure: (psql: string) => string = (out) =>
+    `no free half hour to move ${id} to (psql said: ${out.trim()})`,
+): void {
   const out = execFileSync(
     "docker",
     [
@@ -74,9 +80,7 @@ function execute(sql: string, id: string): void {
     { stdio: "pipe" },
   ).toString();
   if (!/UPDATE 1/.test(out)) {
-    throw new Error(
-      `no free half hour to move ${id} to (psql said: ${out.trim()})`,
-    );
+    throw new Error(failure(out));
   }
 }
 
@@ -97,15 +101,13 @@ export function moveToPastHalfHour(
   runPast(id, back, back <= 3, anyStatus);
 }
 
-/** The next half hour that is at least 20 minutes away: inside the last hour before the visit. */
+/**
+ * The next half hour that is at least 20 minutes away: inside the last hour before the visit. The
+ * doctor is found, not assumed: the first one with no booked visit at that start (see slot-sql.ts).
+ */
 export function moveToNextHalfHour(id: string): void {
-  const start = `(date_trunc('hour', now() + interval '50 minutes')
-        + CASE WHEN extract(minute FROM now() + interval '50 minutes') >= 30
-               THEN interval '30 minutes' ELSE interval '0' END)`;
-  execute(
-    `UPDATE appointments SET starts_at = ${start}, ends_at = ${start} + interval '30 minutes'
-       WHERE id = '${id}' AND status = 'booked'`,
-    id,
+  execute(nextHalfHourMoveSql(id), id, (out) =>
+    noFreeNextHalfHourMessage(id, out),
   );
 }
 
