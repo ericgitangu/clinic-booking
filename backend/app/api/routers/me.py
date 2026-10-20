@@ -158,6 +158,7 @@ async def my_appointments(
                 status=appt.status,
                 cancellation_reason=appt.cancellation_reason,
                 cancelled_at=appt.cancelled_at,
+                locked=appt.staff_locked_at is not None,
                 created_at=appt.created_at,
                 updated_at=appt.updated_at,
                 timezone=appt.timezone,

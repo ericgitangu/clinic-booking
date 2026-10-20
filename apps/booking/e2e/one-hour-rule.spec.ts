@@ -251,3 +251,42 @@ test("a reschedule page left open across the boundary draws itself again and say
   ).toHaveCount(0);
   await context.close();
 });
+
+// A visit staff vetoed is locked: the API refuses a patient's change (APPOINTMENT_LOCKED) and the
+// screen shows no change buttons at all, on the list, on the visit's page and on the reschedule URL.
+// The lock is set in the database, as the staff veto does (staff_locked_at); there is no public way.
+test("a visit the clinic locked shows 'Locked by the clinic' and no change buttons", async ({
+  browser,
+}) => {
+  const { context, page, startsAt, doctorId } = await bookedPerson(
+    browser,
+    1,
+    2,
+  );
+  const id = new URL(page.url()).pathname.split("/").pop()!;
+  await withDb((db) =>
+    db.query(
+      `UPDATE appointments SET staff_locked_at = now()
+        WHERE starts_at = $1::timestamptz AND doctor_id = $2 AND status = 'booked'`,
+      [startsAt, doctorId],
+    ),
+  );
+  await page.goto("/appointments");
+  const card = page
+    .getByRole("listitem")
+    .filter({ hasText: "Locked by the clinic" });
+  await expect(card).toHaveCount(1);
+  await expect(card.getByRole("button")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
+  await page.goto(`/appointments/${id}`);
+  await expect(page.getByTestId("staff-lock")).toContainText(
+    "Locked by the clinic",
+  );
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
+  await page.goto(`/appointments/${id}/reschedule`);
+  await expect(
+    page.getByRole("heading", { name: "Locked by the clinic" }),
+  ).toBeVisible();
+  await context.close();
+});
