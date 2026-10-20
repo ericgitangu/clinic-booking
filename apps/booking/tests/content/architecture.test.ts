@@ -157,7 +157,7 @@ describe("content links and wording", () => {
   it("uses no dashes as punctuation, and no pointer into the removed docs folder", () => {
     for (const s of all) {
       expect(s).not.toMatch(/[–—]/);
-      expect(s).not.toMatch(/docs\/(adr|runbooks|engineering|evidence)/);
+      expect(s).not.toMatch(/docs\/[\w-]+(\/|\.md)/);
     }
   });
 

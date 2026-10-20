@@ -64,13 +64,6 @@ BANNED = (
 )
 
 
-def _docs() -> list[pathlib.Path]:
-    # "adr" is the decision-record folder: history that goes away with the history rewrite, so it
-    # is not scanned (a stale sentence there cannot reach a reader of the README or the site).
-    out = [p for p in (ROOT / "docs").rglob("*.md") if not {"internal", "adr"} & set(p.parts)]
-    return sorted(out)
-
-
 def _clean(line: str) -> str:
     """Drop comment and markdown markers so a wrapped comment reads as the sentence it is."""
     return re.sub(r"^\s*(//+|/?\*+/?|#+|[-*>]|\d+\.)\s?", "", line).strip()
@@ -150,8 +143,6 @@ def _surfaces() -> list[tuple[str, str]]:
     found: list[tuple[str, str]] = []
     for rel in TEXT_FILES:
         found.append((rel, (ROOT / rel).read_text()))
-    for path in _docs():
-        found.append((path.relative_to(ROOT).as_posix(), path.read_text()))
     for rel in JSON_FILES:
         spec = json.loads((ROOT / rel).read_text())
         found.append((rel, "\n".join(_json_strings(spec))))
@@ -212,7 +203,7 @@ def test_the_checker_catches_the_old_wording() -> None:
             "contracts/api-errors.md",
             "Cancel, or reschedule from or to, a time under 60 minutes away.",
         ),
-        ("docs/engineering/x.md", "The contract in one line is **422 on book, 409 on change**."),
+        ("notes/engineering.md", "The contract in one line is **422 on book, 409 on change**."),
     ]
     for name, text in old:
         assert violations([(name, text)]), name
