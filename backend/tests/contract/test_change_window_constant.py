@@ -9,7 +9,7 @@ import os
 import pathlib
 import re
 
-from app.core.config import Settings
+from app.core.config import BOOKING_MIN_LEAD_MINUTES_DEFAULT, Settings
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 APP_FILES = [
@@ -75,6 +75,28 @@ def lead_assignments(text: str) -> list[str]:
     ]
 
 
+def checked_values(rel: str, text: str) -> list[str]:
+    """The values the scan judges. An empty assignment in an ``*.example`` file is unset, not a
+    value (it names the variable and leaves it to the environment), so it is not judged; an empty
+    assignment anywhere else is still refused as unreadable."""
+    values = lead_assignments(text)
+    if rel.endswith(".example"):
+        return [v for v in values if v != ""]
+    return values
+
+
+def test_empty_assignment_in_an_example_file_is_unset() -> None:
+    api = BOOKING_MIN_LEAD_MINUTES_DEFAULT
+
+    def verdict(rel: str, text: str) -> list[str]:
+        return [v for v in checked_values(rel, text) if not (v.isdigit() and int(v) == api)]
+
+    assert verdict(".env.example", "BOOKING_MIN_LEAD_MINUTES=\n") == []
+    assert verdict(".env.example", "BOOKING_MIN_LEAD_MINUTES=60\n") == []
+    assert verdict(".env.example", "BOOKING_MIN_LEAD_MINUTES=5\n") == ["5"]
+    assert verdict("deploy.sh", "BOOKING_MIN_LEAD_MINUTES=\n") == [""]
+
+
 def test_assignment_matrix() -> None:
     assigned = {
         "BOOKING_MIN_LEAD_MINUTES=45": ["45"],
@@ -113,6 +135,8 @@ TEST_ONLY_LEAD_USERS = {
     "scripts/ci/test_ci_scripts.sh",
     ".circleci/config.yml",
     "backend/tests/contract/test_change_window_constant.py",
+    # Reads the file to list its variable names; it builds, ships and starts nothing.
+    "scripts/check_env_example.py",
 }
 
 
@@ -128,7 +152,7 @@ def test_no_config_file_sets_a_different_lead_time() -> None:
             text = path.read_text()
         except UnicodeDecodeError:
             continue
-        for value in lead_assignments(text):
+        for value in checked_values(path.relative_to(ROOT).as_posix(), text):
             where = path.relative_to(ROOT)
             assert value.isdigit(), (where, "the value cannot be read", value)
             allowed = TEST_ONLY_LEAD.get(where.as_posix(), api)
