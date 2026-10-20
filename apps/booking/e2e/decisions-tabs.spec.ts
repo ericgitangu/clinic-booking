@@ -325,3 +325,26 @@ test("an old #adr-0033 link opens decision 33 on the record tab", async ({
   await expect(page.locator("details#decision-33")).toBeInViewport();
   expect(await page.content()).not.toContain('id="adr-');
 });
+
+test("a footer link to a card in a slow tab still opens the card", async ({
+  page,
+  context,
+}) => {
+  // The race: the fragment arrives late and the CPU is slow, so the link is followed while the
+  // page is still settling. The card must end up open whatever the order of arrival.
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  await page.route("**/decisions/panel/api", async (route) => {
+    await new Promise((r) => setTimeout(r, 1_200));
+    await route.continue();
+  });
+  await page.goto("/about");
+  await page
+    .getByRole("contentinfo")
+    .getByRole("link", { name: "API collection (Newman)" })
+    .click();
+  await expect(page).toHaveURL(/\/decisions#api-collection$/);
+  const card = page.locator("details#api-collection");
+  await expect(card).toHaveAttribute("open", "");
+  await expect(card.locator("summary")).toBeInViewport();
+});

@@ -14,8 +14,22 @@ type Tab = { id: string; label: string };
 
 const byId = (id: string) => document.getElementById(id);
 
-async function load(panel: HTMLElement): Promise<boolean> {
-  if (panel.dataset.loaded === "1") return true;
+// One fetch per panel at a time. The effect that loads a panel can run again while the first fetch
+// is still out (a re-render hands it a new props array); a second fetch would replace the HTML the
+// first one had just put in, and with it the card that was opened.
+const inFlight = new WeakMap<HTMLElement, Promise<boolean>>();
+
+export function load(panel: HTMLElement): Promise<boolean> {
+  if (panel.dataset.loaded === "1" || !panel.dataset.src)
+    return Promise.resolve(true);
+  const running = inFlight.get(panel);
+  if (running) return running;
+  const p = fetchPanel(panel).finally(() => inFlight.delete(panel));
+  inFlight.set(panel, p);
+  return p;
+}
+
+async function fetchPanel(panel: HTMLElement): Promise<boolean> {
   const src = panel.dataset.src;
   if (!src) return true;
   panel.setAttribute("aria-busy", "true");
