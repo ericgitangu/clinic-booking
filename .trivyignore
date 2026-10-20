@@ -1,4 +1,4 @@
 # Trivy ignore list. Each entry MUST carry a justification and a dated expiry.
 # Format: CVE-ID  # <reason>; expires <YYYY-MM-DD>
 # Empty by default: unfixed HIGH/CRITICAL base-image CVEs are handled by rebuilding on the
-# newest python:3.12-slim digest (docs/runbooks/base-image-cve.md), not by blanket ignores.
+# newest python:3.12-slim digest (https://clinic.ericgitangu.com/architecture#base-image-cve), not by blanket ignores.

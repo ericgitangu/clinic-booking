@@ -1,6 +1,6 @@
 // The architecture table, in one place. The README's "Architecture" section carries the same rows
 // word for word, and tests/site/architecture.test.ts fails if the two drift. The diagram itself is
-// docs/architecture/architecture.mmd, rendered ahead of time to public/architecture-{light,dark}.svg
+// apps/booking/src/content/architecture.mmd, rendered ahead of time to public/architecture-{light,dark}.svg
 // (see scripts/render_architecture.sh); nothing renders Mermaid in the browser.
 
 export interface Decision {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds the reviewer collection in docs/api/ from contracts/openapi.json.
+// Builds the reviewer collection in collections/ from contracts/openapi.json.
 //
 //   node scripts/api_collection.mjs          write the collection and the two environments
 //   node scripts/api_collection.mjs --check  fail if the committed files differ from a fresh build
@@ -17,7 +17,7 @@ import { clinicDayAhead, naiveStart, nightStart, offGridStart } from "./api_coll
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SPEC = JSON.parse(readFileSync(join(ROOT, "contracts/openapi.json"), "utf8"));
-const OUT = join(ROOT, "docs/api");
+const OUT = join(ROOT, "collections");
 
 // The lead time this deployment enforces (BOOKING_MIN_LEAD_MINUTES), as the contract states it. The
 // API fills it into the availability description when it builds the document, so a different value
@@ -660,12 +660,12 @@ for (const [name, body] of Object.entries(files)) {
       // a missing file is drift, reported below
     }
     if (current !== text) {
-      process.stderr.write(`docs/api/${name} is out of date: run node scripts/api_collection.mjs\n`);
+      process.stderr.write(`collections/${name} is out of date: run node scripts/api_collection.mjs\n`);
       drift += 1;
     }
   } else {
     writeFileSync(target, text);
-    process.stdout.write(`wrote docs/api/${name}\n`);
+    process.stdout.write(`wrote collections/${name}\n`);
   }
 }
 process.exit(drift ? 1 : 0);
