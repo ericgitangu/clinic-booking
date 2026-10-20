@@ -106,6 +106,8 @@ export default defineConfig({
       ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
       BETTER_AUTH_URL: ORIGIN,
+      // The e2e error fixture (page.e2e.tsx) only gets a nonce at runtime when this is set.
+      SHELL_E2E: "1",
       // Present only so the auth instance can be built; no test ever reaches Google.
       GOOGLE_CLIENT_ID: randomUUID(),
       GOOGLE_CLIENT_SECRET: randomUUID(),

@@ -44,7 +44,7 @@ from app.services.realtime_tokens import MinuteLimiter
 def create_app(settings: Settings) -> FastAPI:
     configure_logging(settings.LOG_LEVEL)
     app = FastAPI(
-        title="Clinic Booking API",
+        title="Idyllic Clinic API",
         version="1.0.0",
         root_path="",
         openapi_url="/openapi.json",

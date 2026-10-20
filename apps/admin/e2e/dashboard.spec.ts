@@ -668,6 +668,9 @@ test.describe("owner dashboard", () => {
     await expect(help).toHaveCount(0);
 
     const rows = page.locator("a[data-row-link]:visible");
+    // The rows stream in after the page frame. A j pressed before they exist has nothing to move to
+    // and is dropped, so wait until there is a row before pressing it.
+    await expect(rows.first()).toBeVisible();
     await page.keyboard.press("j");
     await expect(rows.nth(0)).toBeFocused();
     await page.keyboard.press("j");

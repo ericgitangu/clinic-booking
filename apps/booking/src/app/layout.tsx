@@ -9,6 +9,7 @@ import { NAV_LINKS } from "@/components/layout/nav-links";
 import { FOOTER_COLUMNS } from "@/lib/footer-links";
 import { fontVars } from "@/lib/fonts";
 import { metadata, viewport } from "@/lib/metadata";
+import { SHELL_ROUTES } from "@/lib/shell-routes";
 import { FOOTER_NOTICE, SITE } from "@/lib/site";
 
 // Atkinson Hyperlegible was drawn for legibility, which suits a booking form. One family keeps the
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             navLinks={NAV_LINKS}
             footerColumns={FOOTER_COLUMNS}
             footerNotice={FOOTER_NOTICE}
+            routes={SHELL_ROUTES}
             headerTrailing={<SessionMenu />}
           >
             {children}
