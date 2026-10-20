@@ -12,7 +12,17 @@ describe("identityFrom", () => {
       sub: "104857600123456789012",
       email: "pat@example.test",
       name: "Pat Person",
+      image: null,
     });
+  });
+  it("carries the Google picture URL when there is one, trimmed", () => {
+    const withPic = {
+      ...ok,
+      user: { ...ok.user, image: " https://lh3.googleusercontent.com/a/x " },
+    };
+    expect(identityFrom(withPic)?.image).toBe(
+      "https://lh3.googleusercontent.com/a/x",
+    );
   });
   it("is nobody without Google's subject, even with a user id in the session", () => {
     expect(identityFrom({ ...ok, googleSub: null })).toBeNull();

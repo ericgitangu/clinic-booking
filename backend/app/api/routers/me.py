@@ -25,6 +25,7 @@ from app.api.deps import (
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.avatar import safe_google_image
 from app.domain.booking_rules import RULE_BOOK, RULE_CANCEL, RULE_RESCHEDULE
 from app.domain.errors import AppointmentNotFound, PatientNotFound
 from app.models.appointment import Appointment as AppointmentModel
@@ -100,17 +101,21 @@ async def link_account(
     verified email and records the link (201); every later call returns the same patient (200).
     It never adopts an existing patient that happens to share a phone number or an email."""
     response.headers.update(_NO_STORE)
+    image = safe_google_image(body.image)
     existing = await account_repo.patient_id_for(session, who.sub)
-    await session.rollback()
     if existing is not None:
+        # Every sign-in brings the current picture (or none): follow it. Never logged.
+        await account_repo.set_image(session, sub=who.sub, url=image)
+        await session.commit()
         return AccountLinked(patient_id=existing, created=False)
+    await session.rollback()
     try:
         async with session.begin():
             patient = await insert_patient(
                 session, full_name=body.full_name.strip(), phone=None, email=who.email
             )
             created = await account_repo.insert_link(
-                session, sub=who.sub, patient_id=patient.id, email=who.email
+                session, sub=who.sub, patient_id=patient.id, email=who.email, url=image
             )
             if created is None:
                 # Another request linked this sign-in first: undo the patient made for this one.

@@ -133,7 +133,7 @@ export async function bookAppointment(
 
   const caller = callerFor(who);
   // Idempotent: makes the patient the first time this person books, finds it every time after.
-  const linked = await api.linkAccount(caller, patientName(who));
+  const linked = await api.linkAccount(caller, patientName(who), who.image ?? null);
   if (!linked.ok) return failed(linked);
 
   // The form makes one key per booking attempt and sends the same one with every submit of that
