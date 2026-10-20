@@ -1,0 +1,103 @@
+/* The site frame on /docs and /redoc: static twin of packages/ui/src/components/app-shell. Colours
+   come from shell-tokens.css (generated from packages/ui/src/theme.css by scripts/vendor-docs.mjs). */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  scroll-padding-top: calc(var(--shell-header-offset) + 0.75rem);
+  color-scheme: light;
+}
+html.dark { color-scheme: dark; }
+[id] { scroll-margin-top: calc(var(--shell-header-offset) + 0.75rem); }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+  font: 400 1rem/1.5 "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+a:focus-visible { border-radius: 0.25rem; box-shadow: 0 0 0 5px color-mix(in oklab, var(--ring) 30%, transparent); }
+.shell-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.shell-skip {
+  position: absolute; left: -999px; top: 0;
+}
+.shell-skip:focus {
+  position: fixed; left: 1rem; top: calc(env(safe-area-inset-top) + 0.5rem); z-index: 50;
+  padding: 0.5rem 1rem; border-radius: 0.5rem;
+  background: var(--primary); color: var(--primary-foreground);
+}
+
+.shell-header {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
+}
+.shell-header[data-scrolled="true"] {
+  box-shadow: 0 6px 16px -12px color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.shell-bar, .shell-trail, #main, .shell-footer-inner {
+  width: 100%; max-width: 64rem; margin-inline: auto;
+  padding-inline: max(1.25rem, env(safe-area-inset-left)) max(1.25rem, env(safe-area-inset-right));
+}
+.shell-bar { height: calc(var(--shell-header-h) - 1px); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.shell-brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; min-height: 2.75rem; text-decoration: none; border-radius: 0.5rem; }
+.shell-brand img { border-radius: 1.05rem; flex: none; }
+html.dark .shell-brand img { background: rgb(255 255 255 / 0.95); padding: 0.25rem; }
+.shell-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 1rem; line-height: 1.2; letter-spacing: -0.01em; }
+.shell-right { display: flex; align-items: center; flex: none; }
+.shell-primary { display: none; }
+.shell-link { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: 0.75rem; border-radius: 0.5rem; font-weight: 500; text-decoration: none; color: var(--muted-foreground); }
+.shell-link:hover { color: var(--foreground); }
+.shell-link[aria-current="page"] { color: var(--foreground); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.5rem; }
+.shell-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border: 0; border-radius: 0.5rem; background: transparent; color: inherit; cursor: pointer; list-style: none; }
+.shell-icon-btn::-webkit-details-marker { display: none; }
+.shell-icon-btn:hover { background: var(--accent); }
+.i-moon { display: none; }
+html.dark .i-sun { display: none; }
+html.dark .i-moon { display: block; }
+.shell-menu { position: static; }
+.shell-panel { position: absolute; left: 0; right: 0; top: 100%; max-height: calc(100dvh - var(--shell-header-offset)); overflow-y: auto; background: var(--background); border-bottom: 1px solid var(--border); padding: 0.5rem max(1.25rem, env(safe-area-inset-right)); display: flex; flex-direction: column; }
+.shell-panel-link { display: flex; align-items: center; min-height: 3rem; padding-inline: 0.5rem; border-radius: 0.5rem; font-weight: 500; text-decoration: none; }
+.shell-panel-link:hover, .shell-panel-link[aria-current="page"] { background: var(--accent); }
+.shell-panel-link[aria-current="page"] { font-weight: 600; }
+@media (min-width: 640px) {
+  .shell-primary { display: flex; align-items: center; }
+  .shell-menu { display: none; }
+  .shell-brand span { font-size: 1.125rem; }
+}
+
+.shell-trail { padding-top: 0.5rem; color: var(--muted-foreground); font-size: 0.875rem; }
+.shell-back { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 2.75rem; margin-left: -0.5rem; padding-inline: 0.5rem; font-size: 1rem; text-decoration: none; }
+.shell-back:hover, .shell-trail li a:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 0.25rem; }
+.shell-trail li a { text-decoration: none; }
+.i-chev { width: 1rem; height: 1rem; flex: none; }
+.shell-trail ol { display: none; list-style: none; margin: 0; padding: 0; align-items: center; flex-wrap: wrap; gap: 0.25rem; min-height: 2.75rem; margin-left: -0.25rem; }
+.shell-trail li { display: inline-flex; align-items: center; }
+.shell-trail li a { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: 0.25rem; }
+.shell-trail [aria-current="page"] { color: var(--foreground); font-weight: 500; }
+@media (min-width: 640px) {
+  .shell-back { display: none; }
+  .shell-trail ol { display: flex; }
+}
+
+#main { flex: 1; outline: none; }
+/* Swagger UI and ReDoc only ship a light theme, so the viewer sits on a white sheet in both themes. */
+.docs-sheet { border-radius: 0.5rem; margin-block: 1rem; overflow-x: auto; }
+@media (min-width: 640px) { #main { max-width: 80rem; } }
+
+.shell-footer { border-top: 1px solid var(--border); margin-top: 2rem; color: var(--muted-foreground); }
+.shell-footer-inner { padding-top: 2rem; padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
+.shell-cols { display: grid; gap: 2rem; }
+@media (min-width: 640px) { .shell-cols { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .shell-cols { grid-template-columns: repeat(4, 1fr); } }
+.shell-footer h2 { margin: 0; font-size: 1rem; color: var(--foreground); }
+.shell-footer ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.shell-footer li a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+.shell-footer p { margin: 0.5rem 0; }
+.shell-footer p a { display: inline-block; padding-block: 0.75rem; margin-block: -0.75rem; text-underline-offset: 0.25rem; }
+
+@media print { .shell-header { position: static; } }

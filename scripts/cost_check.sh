@@ -354,6 +354,14 @@ unverified_allowed() {
   local id; for id in $UNVERIFIED; do case " ${1:-} " in *" $id "*) ;; *) return 1 ;; esac; done
 }
 
+# c6_judge <package> <all versions> <tagged versions>: C6 counts tagged versions only; untagged ones
+# are pending cleanup (delete-untagged) and are a note, not a failure.
+c6_judge() {
+  local base="$1" all="$2" tagged="$3"
+  if [ "$tagged" -le 2 ]; then pass "C6 $base tagged versions=$tagged"; else fail "C6 artifact-registry $base tagged versions=$tagged > 2"; fi
+  if [ "$all" -gt "$tagged" ]; then echo "note  C6 $base has $((all - tagged)) untagged version(s) pending the delete-untagged cleanup policy ($all versions in all); their bytes are capped by C5"; fi
+}
+
 gc() { # gcloud with the engineer's account when GCLOUD_ACCOUNT is set
   if [ -n "${GCLOUD_ACCOUNT:-}" ]; then gcloud --account "$GCLOUD_ACCOUNT" "$@"; else gcloud "$@"; fi
 }
@@ -533,13 +541,19 @@ live_checks() {
   fi
   rm -f "$c5_err"
 
-  # C6: <= 2 versions per package (the listed name is a full path; use its basename).
-  local pkg base cnt
+  # C6: <= 2 TAGGED versions per package (the listed name is a full path; use its basename). Untagged
+  # versions are what the delete-untagged cleanup policy removes on its own schedule, so counting them
+  # races that policy (a fresh push shows up as extra versions until the sweep runs). They are reported
+  # as a note; the bytes they hold stay capped by C5.
+  local pkg base cnt tagged vjson ijson
   while IFS= read -r pkg; do
     [ -z "$pkg" ] && continue
     base="${pkg##*/}"
-    cnt="$(gc artifacts versions list --package "$base" --repository clinic --location "$REGION" --project "$PROJECT" --format=json | jq length)"
-    if [ "$cnt" -le 2 ]; then pass "C6 $base versions=$cnt"; else fail "artifact-registry $base versions=$cnt > 2"; fi
+    vjson="$(gc artifacts versions list --package "$base" --repository clinic --location "$REGION" --project "$PROJECT" --format=json 2>/dev/null)"
+    ijson="$(gc artifacts docker images list "$REGION-docker.pkg.dev/$PROJECT/clinic/$base" --include-tags --project "$PROJECT" --format=json 2>/dev/null)"
+    cnt="$(jq -e 'if type == "array" then length else empty end' <<<"$vjson" 2>/dev/null)" || { fail "C6 $base versions unreadable"; continue; }
+    tagged="$(jq -e 'if type == "array" then [.[] | select((.tags // []) | length > 0)] | length else empty end' <<<"$ijson" 2>/dev/null)" || { fail "C6 $base tagged versions unreadable"; continue; }
+    c6_judge "$base" "$cnt" "$tagged"
   done < <(gc artifacts packages list --repository clinic --location "$REGION" --project "$PROJECT" --format='value(name)' 2>/dev/null)
 
   # C7 + C8: <= 6 active secret versions, automatic replication. The count also sets C5's ceiling.
@@ -653,11 +667,12 @@ case "$MODE" in
   --ar-ceiling) ar_budget_ceiling_bytes "${2:-}" || { echo "bad secret version count '${2:-}'" >&2; exit 2; } ;;
   # the verdict logic on its own: --verdict "<unverified ids>" "<allowed ids>"
   --verdict) UNVERIFIED=" ${2:-}" ;;
+  --c6) c6_judge "${2:?package}" "${3:?all}" "${4:?tagged}" ;;
   --ar-kept) if ar_kept_within_bound "${2:-}"; then pass "C5 kept images ${2:-} <= $AR_KEPT_IMAGES_BOUND_BYTES"; else fail "C5 kept images '${2:-}' is not within $AR_KEPT_IMAGES_BOUND_BYTES"; fi ;;
   # the C1 / C2 judgements on their own, so the selftest can prove them without a project
   --c1) judge_c1 < "${2:?usage: $0 --c1 FILE}" ;;
   --c2) PROJECT="${PROJECT:-sil-clinic-booking}" judge_c2 "${2:?service}" "${3:?iam-disabled}" < "${4:?members file}" ;;
-  *) echo "usage: $0 [--static|--live|--ar-size BYTES yes|no VERSIONS|--ar-kept BYTES|--ar-ceiling VERSIONS|--verdict 'IDS' 'ALLOWED'|--c1 FILE|--c2 SERVICE IAM_DISABLED FILE]"; exit 2 ;;
+  *) echo "usage: $0 [--static|--live|--ar-size BYTES yes|no VERSIONS|--ar-kept BYTES|--c6 PACKAGE ALL TAGGED|--ar-ceiling VERSIONS|--verdict 'IDS' 'ALLOWED'|--c1 FILE|--c2 SERVICE IAM_DISABLED FILE]"; exit 2 ;;
 esac
 
 echo

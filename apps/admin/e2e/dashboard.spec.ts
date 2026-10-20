@@ -7,7 +7,7 @@ import { formatLead, shareDelta } from "../src/lib/kpi-delta";
 import { bookOneStraightThroughTheApi } from "./support/booking";
 import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { expect, seeded, tap, test } from "./support/fixtures";
+import { expect, hydrated, seeded, tap, test } from "./support/fixtures";
 
 interface Metrics {
   totals: {
@@ -262,27 +262,35 @@ test.describe("owner dashboard", () => {
     const patient = (await first.locator("td").nth(1).innerText()).split(
       ",",
     )[0]!;
-    await expect(first.getByText(/^\s*(Booked|Cancelled)\s*$/)).toBeVisible();
-    // Click the doctor cell, not the link: the whole row is the target. The link's overlay sits
-    // on top of the cell, so a real mouse click at the cell's centre is what a person does.
-    // The live panel above the table can change height while it connects, which moves the row
-    // between measuring and clicking, so measure and click again until the page has moved.
-    await expect(async () => {
-      await first.scrollIntoViewIfNeeded();
-      const cell = await first.locator("td").nth(2).boundingBox();
-      await page.mouse.click(
-        cell!.x + cell!.width / 2,
-        cell!.y + cell!.height / 2,
-      );
-      await expect(page.getByTestId("sheet-patient")).toBeVisible({
-        timeout: 2500,
-      });
-    }).toPass({ timeout: 15_000 });
+    // Name the row by its appointment id, once. Everything after this (the click, the sheet, the
+    // full page) is checked against that id, never against "whatever row is first or sits at these
+    // coordinates now": the live feed above the table grows and shrinks while the page settles, so
+    // a position read a moment ago can belong to another row by the time it is clicked.
+    const id = (await first.getByRole("link").getAttribute("href"))!
+      .split("/")
+      .pop()!;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    const row = page
+      .getByTestId("appointments-table")
+      .locator("tbody tr")
+      .filter({ has: page.locator(`a[href$="/${id}"]`) });
+    await expect(row.getByText(/^\s*(Booked|Cancelled)\s*$/)).toBeVisible();
+    // Click what a person clicks: the row's link. No force: Playwright waits for the link to be
+    // stable and to receive the click (nothing over it, not moving), which is the same condition a
+    // hand needs. The link only does something once React has attached to it, so wait for that (a
+    // state of the page, not a pause) first.
+    await hydrated(row.getByRole("link"));
+    await row.getByRole("link").click();
+    await expect(page.getByTestId("sheet-patient")).toBeVisible();
+    // The sheet must be for that row's id, whatever else is on the page.
+    await expect(
+      page.getByRole("link", { name: "Open the full page" }),
+    ).toHaveAttribute("href", `/dashboard/appointments/${id}`);
     // A click opens the appointment in a sheet over the dashboard, with the same patient; the full
     // page is one link away.
     await expect(page.getByTestId("sheet-patient")).toHaveText(patient.trim());
     await page.getByRole("link", { name: "Open the full page" }).click();
-    await expect(page).toHaveURL(/\/dashboard\/appointments\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(new RegExp(`/dashboard/appointments/${id}$`));
     await expect(page.getByTestId("appointment-patient")).toHaveText(
       patient.trim(),
     );
@@ -318,6 +326,31 @@ test.describe("owner dashboard", () => {
       await expect(card.getByTestId("running-behind")).toHaveCount(
         d.running_behind.behind ? 1 : 0,
       );
+    }
+  });
+
+  test("the Today board and the utilisation list show doctor portraits, not initials", async ({
+    as,
+  }) => {
+    const page = await as("owner");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("today-board")).toBeVisible();
+    const portraits = page.locator(
+      '[data-testid="today-board"] img[src*="/doctors/"], [data-testid="utilisation-list"] img[src*="/doctors/"]',
+    );
+    await expect(portraits.first()).toBeVisible();
+    expect(await portraits.count()).toBeGreaterThan(0);
+    // Loaded for real: a 404 would fall through to the illustration and then the initials.
+    for (const img of await portraits.all()) {
+      await expect
+        .poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
+        .toBeGreaterThan(0);
+      expect(await img.getAttribute("src")).toMatch(
+        /\/doctors\/[0-9a-f-]{36}-(128|256|512)\.webp$/,
+      );
+      expect(await img.getAttribute("width")).toMatch(/^\d+$/);
+      expect(await img.getAttribute("height")).toMatch(/^\d+$/);
     }
   });
 
@@ -635,6 +668,9 @@ test.describe("owner dashboard", () => {
     await expect(help).toHaveCount(0);
 
     const rows = page.locator("a[data-row-link]:visible");
+    // The rows stream in after the page frame. A j pressed before they exist has nothing to move to
+    // and is dropped, so wait until there is a row before pressing it.
+    await expect(rows.first()).toBeVisible();
     await page.keyboard.press("j");
     await expect(rows.nth(0)).toBeFocused();
     await page.keyboard.press("j");

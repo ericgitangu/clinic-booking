@@ -34,7 +34,7 @@ const ROWS = [
   ],
   [
     "Google profile (name, email, picture)",
-    "Sign-in only",
+    "Sign-in; the picture is also shown to the clinic's owner and admins next to your appointments",
     "Neon database; session cookie in your browser",
     "Until you ask for deletion; the cookie ends with your session",
   ],
@@ -64,6 +64,15 @@ export default function DataPage() {
       <p className="rounded-md border border-border bg-muted px-4 py-3 text-sm">
         Illustrative, written for an assessment. The retention periods are what
         I set for a demonstration, not a promise for a live clinic.
+      </p>
+
+      <h2>Demo patients are not real</h2>
+      <p>
+        The patients and bookings you see when this clinic is reviewed (names,
+        phone numbers, emails ending in <code>example.com</code>, appointments
+        and cancellation reasons) are AI-generated, fictional and Nairobi-local.
+        They were created to make the clinic reviewable and describe no real
+        person.
       </p>
 
       <h2>What is collected</h2>

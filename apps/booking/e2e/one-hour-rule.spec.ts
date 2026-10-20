@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 import { hhmm, pick } from "./api";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
@@ -239,6 +239,27 @@ test("a reschedule page left open across the boundary draws itself again and say
   await expect(
     page.getByRole("button", { name: "Move appointment" }),
   ).toBeVisible();
+  // The page's check runs from an effect, so it exists only once React has taken the page over; the
+  // server-drawn button is on screen before that. Jumping the clock earlier would skip the check
+  // (and the offset it reads at start would swallow the jump), so wait for React's mark on the
+  // button, then for the effects of that commit to have run.
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Move appointment"),
+    );
+    return (
+      button !== undefined &&
+      Object.keys(button).some((k) => k.startsWith("__reactFiber"))
+    );
+  });
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const { port1, port2 } = new MessageChannel();
+        port1.onmessage = () => done();
+        port2.postMessage(0);
+      }),
+  );
   // The visit is brought forward in the database (the server will now see it inside the hour) and
   // 45 minutes pass in the browser: the page's own check notices and asks for a fresh render.
   await moveById(id, 30);
@@ -249,5 +270,44 @@ test("a reschedule page left open across the boundary draws itself again and say
   await expect(
     page.getByRole("button", { name: "Move appointment" }),
   ).toHaveCount(0);
+  await context.close();
+});
+
+// A visit staff vetoed is locked: the API refuses a patient's change (APPOINTMENT_LOCKED) and the
+// screen shows no change buttons at all, on the list, on the visit's page and on the reschedule URL.
+// The lock is set in the database, as the staff veto does (staff_locked_at); there is no public way.
+test("a visit the clinic locked shows 'Locked by the clinic' and no change buttons", async ({
+  browser,
+}) => {
+  const { context, page, startsAt, doctorId } = await bookedPerson(
+    browser,
+    1,
+    2,
+  );
+  const id = new URL(page.url()).pathname.split("/").pop()!;
+  await withDb((db) =>
+    db.query(
+      `UPDATE appointments SET staff_locked_at = now()
+        WHERE starts_at = $1::timestamptz AND doctor_id = $2 AND status = 'booked'`,
+      [startsAt, doctorId],
+    ),
+  );
+  await page.goto("/appointments");
+  const card = page
+    .getByRole("listitem")
+    .filter({ hasText: "Locked by the clinic" });
+  await expect(card).toHaveCount(1);
+  await expect(card.getByRole("button")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
+  await page.goto(`/appointments/${id}`);
+  await expect(page.getByTestId("staff-lock")).toContainText(
+    "Locked by the clinic",
+  );
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reschedule" })).toHaveCount(0);
+  await page.goto(`/appointments/${id}/reschedule`);
+  await expect(
+    page.getByRole("heading", { name: "Locked by the clinic" }),
+  ).toBeVisible();
   await context.close();
 });

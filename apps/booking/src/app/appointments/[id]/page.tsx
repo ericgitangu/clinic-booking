@@ -165,6 +165,7 @@ export default async function AppointmentPage({
           when={when}
           startsAt={a.starts_at}
           serverNow={new Date().toISOString()}
+          staffLocked={a.locked}
         />
       )}
     </section>

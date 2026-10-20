@@ -64,6 +64,12 @@ export type AccountLinkRequest = {
      * Full Name
      */
     full_name: string;
+    /**
+     * Image
+     *
+     * The Google profile picture URL. Kept only when it is an https URL on lh3.googleusercontent.com; anything else is silently stored as null. Updated on every call, and cleared when absent.
+     */
+    image?: string | null;
 };
 
 /**
@@ -121,6 +127,12 @@ export type AdminAppointment = {
      * Attendance
      */
     attendance?: 'arrived' | 'no_show' | null;
+    /**
+     * Avatar Url
+     *
+     * The patient's Google profile picture (https on lh3.googleusercontent.com), only for owners and admins; null for viewers, for patients who never signed in with Google or have no picture, and for every demo patient. Show initials when null.
+     */
+    avatar_url?: string | null;
     /**
      * Cancellation Reason
      */
@@ -266,6 +278,10 @@ export type Appointment = {
      */
     id: string;
     /**
+     * Locked
+     */
+    locked: boolean;
+    /**
      * Patient Id
      */
     patient_id: string;
@@ -334,6 +350,10 @@ export type AppointmentWithDoctor = {
      * Id
      */
     id: string;
+    /**
+     * Locked
+     */
+    locked: boolean;
     /**
      * Patient Id
      */
@@ -474,6 +494,10 @@ export type Availability = {
  * BoardAppointment
  */
 export type BoardAppointment = {
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
     /**
      * Ends At
      */
@@ -1300,9 +1324,23 @@ export type Lineage = {
      */
     appointment_id: string;
     /**
+     * Avatar Url
+     *
+     * As on the appointment list: owners and admins only, else null.
+     */
+    avatar_url?: string | null;
+    /**
      * Events
      */
     events: Array<LineageEvent>;
+    /**
+     * Patient Id
+     */
+    patient_id: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
 };
 
 /**
@@ -1935,6 +1973,10 @@ export type StaffAppointmentChange = {
      * Id
      */
     id: string;
+    /**
+     * Locked
+     */
+    locked: boolean;
     /**
      * Patient Email
      */

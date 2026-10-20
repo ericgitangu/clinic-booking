@@ -1,3 +1,5 @@
+import { SITE } from "@/lib/site";
+import { docsDocument } from "@/lib/docs-chrome";
 import { docsResponse } from "@/lib/docs-page";
 
 // Static Swagger UI served from this origin (public/docs-assets, copied from the pinned
@@ -5,20 +7,14 @@ import { docsResponse } from "@/lib/docs-page";
 // force-static: never reaches Cloud Run.
 export const dynamic = "force-static";
 
-const HTML = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Clinic Booking API — Swagger</title>
-    <link rel="stylesheet" href="/docs-assets/swagger-ui/swagger-ui.css" />
-  </head>
-  <body>
-    <div id="swagger-ui"></div>
-    <script src="/docs-assets/swagger-ui/swagger-ui-bundle.js"></script>
-    <script src="/docs-assets/swagger-init.js"></script>
-  </body>
-</html>`;
+const HTML = docsDocument({
+  path: "/docs",
+  title: `API docs | ${SITE.name}`,
+  head: '<link rel="stylesheet" href="/docs-assets/swagger-ui/swagger-ui.css" />',
+  main: '<div class="docs-sheet" data-viewer="swagger"><div id="swagger-ui"></div></div>',
+  scripts: `<script src="/docs-assets/swagger-ui/swagger-ui-bundle.js"></script>
+    <script src="/docs-assets/swagger-init.js"></script>`,
+});
 
 export async function GET(): Promise<Response> {
   return docsResponse(HTML);

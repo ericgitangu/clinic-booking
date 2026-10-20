@@ -100,3 +100,10 @@ Incident earlier the same day:
 
 - Booking through the UI failed with a reCAPTCHA missing-token error because the offline CI build had an empty site key. Fixed in PR 51 (the build now gets its public `NEXT_PUBLIC` values).
 - The first email was rejected with a 400 `validation_error` because the stored `RESEND_API_KEY` was the wrong value. The key was replaced, and PR 52 added Resend's error message to the logs, with addresses redacted.
+
+### The earlier test rows are excluded, not deleted (2026-10-18)
+
+- The release pipeline's smoke test and the manual release checks had written real rows into production before the `synthetic` flag existed (patients named `verify-claims %` and `Release Gate Check%`, their cancelled appointments and events). Migration 0012 marks them `synthetic = true`, so every admin metric, chart, list and utilisation figure leaves them out. Nothing is deleted. A patient linked to a sign-in account is never marked, whatever name they typed.
+- The two "Brief Audit Probe" patients the pre-submission audit created (and their four cancelled appointments) are marked `synthetic` by the same migration, matched by exact id and exact name.
+- `scripts/ops/purge_synthetic.sh` still exists as an operator's tool for removing them; it is not part of any release or review step and has not been applied.
+- Demo data: `python -m app.scripts.seed_demo` (run by hand, not in the migrate job) adds about 100 invented patients (`demo = true`, visible in the admin views) with four weeks of bookings; see [`docs/runbooks/demo-seed.md`](../runbooks/demo-seed.md).

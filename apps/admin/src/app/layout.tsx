@@ -8,6 +8,7 @@ import { StaffMenu } from "@/components/staff-menu";
 import { FOOTER_COLUMNS } from "@/lib/footer";
 import { fontVars } from "@/lib/fonts";
 import { metadata, viewport } from "@/lib/metadata";
+import { SHELL_ROUTES, SIGNED_OUT_NAV } from "@/lib/shell-routes";
 import { getStaff } from "@/lib/session";
 import {
   ACCESS_LINK,
@@ -30,9 +31,11 @@ export default async function RootLayout({
 }) {
   // A failed lookup must not break every page; the page itself reports it.
   const staff = await getStaff().catch(() => null);
-  const navLinks = can(staff?.role ?? null, "manage-access")
-    ? [...NAV_LINKS, ACCESS_LINK, AUDIT_LINK]
-    : [...NAV_LINKS];
+  const navLinks = !staff
+    ? [...SIGNED_OUT_NAV]
+    : can(staff.role, "manage-access")
+      ? [...NAV_LINKS, ACCESS_LINK, AUDIT_LINK]
+      : [...NAV_LINKS];
   return (
     <html lang="en" suppressHydrationWarning style={fontVars}>
       <body className="min-h-dvh font-sans antialiased">
@@ -42,6 +45,7 @@ export default async function RootLayout({
             navLinks={navLinks}
             footerColumns={FOOTER_COLUMNS}
             footerNotice={FOOTER_NOTICE}
+            routes={SHELL_ROUTES}
             headerTrailing={
               staff ? (
                 <div className="flex items-center">

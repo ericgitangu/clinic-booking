@@ -1,7 +1,7 @@
 // Portraits load on the doctor list (including the ones deferred until scrolled to) and on each
 // doctor's page, and patient-facing digits are drawn without the slashed zero. Real production
 // build, real API and browser.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 import { API, pick } from "./api";
 
 type Doctor = { id: string; full_name: string };
