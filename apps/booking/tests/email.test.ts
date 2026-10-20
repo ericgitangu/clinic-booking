@@ -382,6 +382,7 @@ describe("an acknowledgement when the allowance cannot be reserved", () => {
         timezone: "Africa/Nairobi",
         cancellation_reason: null,
         cancelled_at: null,
+        locked: false,
         created_at: "2026-10-19T04:00:00Z",
         updated_at: "2026-10-19T04:00:00Z",
       },
@@ -429,6 +430,7 @@ describe("without RESEND_API_KEY", () => {
       timezone: "Africa/Nairobi",
       cancellation_reason: null,
       cancelled_at: null,
+      locked: false,
       created_at: "2026-10-19T04:00:00Z",
       updated_at: "2026-10-19T04:00:00Z",
     };

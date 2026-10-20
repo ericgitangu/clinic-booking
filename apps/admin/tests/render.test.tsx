@@ -143,6 +143,25 @@ describe("today board", () => {
     expect(html).toContain("day-sheet");
   });
 
+  it("draws a seeded doctor's portrait, sized, with the illustration as the fallback", () => {
+    const id = "e52e9da0-f7f3-5a6a-93d3-d7f658947afa";
+    const html = render(false, false, {
+      ...board,
+      doctors: [{ ...board.doctors[0]!, doctor_id: id }],
+    });
+    const img = /<img\b[^>]*>/.exec(html)?.[0] ?? "";
+    expect(img).toContain(`src="/doctors/${id}-256.webp"`);
+    expect(img).toContain("AI-generated portrait of a fictional doctor");
+    expect(img).toContain('width="44"');
+    expect(img).toContain('height="44"');
+  });
+
+  it("falls back to the initials for a doctor with no art", () => {
+    const html = render(false, false);
+    expect(html).not.toMatch(/<img\b[^>]*\/doctors\//);
+    expect(html).toContain("TD");
+  });
+
   it("shows a viewer's initials as the API sent them, untidied", () => {
     const html = render(false, false, {
       ...board,
