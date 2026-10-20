@@ -77,6 +77,7 @@ async def _get(admin: httpx.AsyncClient, path: str) -> httpx.Response:
         "aud": AUDIENCE, "sub": "s", "email": OWNER, "role": "owner",
         "iat": int(FIXED_NOW.timestamp()), "exp": int(FIXED_NOW.timestamp()) + 60,
         "m": "GET", "p": path, "bh": body_hash(b""), "ev": True,
+        "jti": uuid.uuid4().hex,
     }  # fmt: skip
     return await admin.get(path, headers={"X-Internal-Assertion": sign(claims, KEY.encode())})
 

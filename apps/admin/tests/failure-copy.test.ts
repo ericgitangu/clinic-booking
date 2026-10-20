@@ -15,6 +15,19 @@ describe("failure copy", () => {
     }
   });
 
+  it("tells staff how long to wait when the API sends Retry-After, and names a replayed request", () => {
+    const limited = {
+      ...problem(429, "RATE_LIMITED"),
+      retryAfter: 42,
+    } as unknown as ApiFailure;
+    expect(describeFailure(limited, "x").message).toBe(
+      "Too many changes just now. Try again in 42 s.",
+    );
+    expect(
+      describeFailure(problem(401, "ASSERTION_REPLAYED"), "x").message,
+    ).toMatch(/already sent/);
+  });
+
   it("keeps the specific words for the specific codes", () => {
     expect(describeFailure(problem(409, "SLOT_TAKEN"), "x").message).toMatch(
       /taken/,

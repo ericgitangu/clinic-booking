@@ -30,6 +30,7 @@ import json
 import os
 import sys
 import time
+import uuid
 from urllib.parse import urlsplit
 
 import httpx
@@ -68,6 +69,7 @@ def stream_assertion(key: str, target: str, *, now: int | None = None) -> str:
         "m": "GET",
         "p": target,
         "bh": hashlib.sha256(b"").hexdigest(),
+        "jti": uuid.uuid4().hex,
     }
     canonical = json.dumps(claims, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     payload = _b64(canonical.encode("utf-8"))

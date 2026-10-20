@@ -123,6 +123,8 @@ func (a *API) Staff(s Staffer, method, path string, body any, want int, out any)
 	header, err := assertion.Sign(map[string]any{
 		"aud": assertion.Audience, "sub": "sub-" + s.Email, "email": s.Email, "role": s.Role,
 		"iat": now, "exp": now + 60, "m": method, "p": path, "bh": assertion.BodyHash(raw), "ev": true,
+		// A fresh nonce: the API accepts a signed write once, and these tests repeat requests.
+		"jti": fmt.Sprintf("%d-%d", time.Now().UnixNano(), randN(1<<62)),
 	}, []byte(key))
 	if err != nil {
 		a.t.Fatal(err)

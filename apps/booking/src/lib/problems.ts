@@ -110,6 +110,10 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "The owner's access cannot be changed.",
     severity: "warning",
   },
+  ASSERTION_REPLAYED: {
+    message: "That request was already sent. Please try again.",
+    severity: "warning",
+  },
   ROLE_ESCALATION: {
     message: "Your role does not allow changing that access.",
     severity: "warning",
