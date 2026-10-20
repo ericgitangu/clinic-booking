@@ -30,12 +30,13 @@ migrate: ## Run migrations (one-shot)
 seed: ## Run the seed against the running stack
 	docker compose exec -T api python -m app.scripts.seed
 
-lint: ## markdown, TypeScript, Python (ruff + mypy --strict), zero warnings (husky and the CI lint job call this)
+lint: ## markdown, TypeScript, Python (ruff + mypy --strict), env example names, zero warnings (husky and the CI lint job call this)
 	pnpm exec markdownlint-cli2
 	pnpm -r --if-present lint
 	pnpm -r --if-present typecheck
 	($(BE) ruff check .) && ($(BE) ruff format --check .)
 	$(BE) mypy --strict app tests migrations
+	python3 scripts/check_env_example.py
 	@echo "lint: Go checks are not part of this target; they run in 'make lint-go' (the go-quality CI job and the pre-push hook)"
 
 # Split from `lint` because the CI lint image has no Go toolchain; go-quality (Go image) calls this.
@@ -140,7 +141,7 @@ e2e: ## Playwright checks against the real API and database (their own docker co
 	pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts && \
 	cd apps/booking && SHELL_E2E=1 pnpm build && pnpm test:e2e
 
-api-collection: ## Rebuild the reviewer collection in docs/api/ from contracts/openapi.json
+api-collection: ## Rebuild the reviewer collection in collections/ from contracts/openapi.json
 	node scripts/api_collection.mjs
 
 api-check: ## Run the reviewer collection with newman against its own compose stack (Docker only)

@@ -14,7 +14,7 @@
 # instance is not billed). Concurrency 1 is not a choice: Cloud Run requires it below 1 vCPU
 # (docs.cloud.google.com/run/docs/configuring/services/cpu), and 1 vCPU would cost four times as
 # much per connected hour. If Cloud Run rejects 0.25 vCPU with 256 MiB, the fallback is --cpu 0.5,
-# which cost_check accepts; record the real error text in docs/engineering/go-gateway-justification.md.
+# which cost_check accepts; record the real error text in https://clinic.ericgitangu.com/architecture#go-gateway.
 
 resource "google_service_account" "realtime_runtime" {
   account_id   = "clinic-realtime-runtime"
@@ -23,7 +23,7 @@ resource "google_service_account" "realtime_runtime" {
 }
 
 # A container only. The version (the URL of the read-only clinic_realtime login on the direct Neon
-# endpoint) is added out of band: docs/runbooks/neon.md, "Optional realtime feature".
+# endpoint) is added out of band: https://clinic.ericgitangu.com/architecture#neon, "Optional realtime feature".
 resource "google_secret_manager_secret" "database_url_realtime" {
   secret_id = "clinic-database-url-realtime"
   replication {

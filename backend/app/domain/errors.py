@@ -2,7 +2,7 @@
 
 Every non-2xx maps to one ``DomainError`` subclass or a catalogue entry. ``code`` is
 UPPER_SNAKE; ``slug`` is its kebab-case form and the path segment under ``/problems``.
-``docs/api-errors.md`` is generated to match this catalogue and tested against it
+``contracts/api-errors.md`` is generated to match this catalogue and tested against it
 (``test_error_catalogue``).
 """
 

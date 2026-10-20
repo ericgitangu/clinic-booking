@@ -827,7 +827,7 @@ jobs:
           when: on_fail
 
   api-check:
-    # The reviewer collection (docs/api/) with newman against the compose stack: the whole booking
+    # The reviewer collection (collections/) with newman against the compose stack: the whole booking
     # journey, every problem code it covers, and every body against the contract's schema. Also
     # fails when the committed collection no longer matches a build from contracts/openapi.json.
     # That drift check covers openapi -> collection only; backend -> openapi is backend-contract's.
@@ -844,7 +844,7 @@ jobs:
           name: Skip when nothing this job covers changed (fails closed)
           # Makefile and README.md are left out: the job runs scripts/api_check.sh directly and reads
           # no prose, so a change to either cannot change its result.
-          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ docs/api/ scripts/api_check.sh scripts/api_check.compose.yml scripts/api_collection.mjs scripts/ci/skip_unless_changed.sh docker-compose.yml .circleci/
+          command: bash scripts/ci/skip_unless_changed.sh backend/ contracts/ collections/ scripts/api_check.sh scripts/api_check.compose.yml scripts/api_collection.mjs scripts/ci/skip_unless_changed.sh docker-compose.yml .circleci/
       - run:
           name: Collection against the compose stack (newman, pinned image)
           command: REPORT_DIR=/tmp/newman bash scripts/api_check.sh local
@@ -1069,7 +1069,7 @@ jobs:
       - run:
           name: IAM deny-proof, direct run.app (403 anonymous, 401 junk bearer; no credentials)
           command: |
-            # Written as a redacted record and kept as an artifact (the saved WIF-deny and context-deny logs the keyless deploy rule asks for, see docs/evidence).
+            # Written as a redacted record and kept as an artifact (the saved WIF-deny and context-deny logs the keyless deploy rule asks for, see infra/evidence).
             mkdir -p /tmp/evidence
             bash scripts/ci/deny_probe.sh run-app /tmp/evidence/iam-deny-run-app.txt
       - store_artifacts:

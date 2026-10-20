@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Renders docs/architecture/architecture.mmd to the two SVGs the booking landing page serves.
+# Renders apps/booking/src/content/architecture.mmd to the two SVGs the booking landing page serves.
 # A one-off authoring tool: Mermaid is not a dependency of any app, and nothing renders it in the
 # browser. Needs Node and network access (npx fetches mermaid-cli and a headless Chrome).
 set -euo pipefail
@@ -13,7 +13,7 @@ for theme in light dark; do
   # labels plain SVG text instead of foreignObject boxes that clip when the font differs.
   printf '{"theme":"%s","htmlLabels":false,"flowchart":{"htmlLabels":false,"curve":"basis"},"themeVariables":{"fontFamily":"system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"18px"}}' "$t" > "$tmp/$theme.json"
   npx -y @mermaid-js/mermaid-cli@11.4.2 -p "$tmp/puppeteer.json" -c "$tmp/$theme.json" -b transparent \
-    -i docs/architecture/architecture.mmd -o "apps/booking/public/architecture-$theme.svg"
+    -i apps/booking/src/content/architecture.mmd -o "apps/booking/public/architecture-$theme.svg"
 done
 
 # mermaid-cli writes width="100%", which gives an <img> no intrinsic size. Give the root element the

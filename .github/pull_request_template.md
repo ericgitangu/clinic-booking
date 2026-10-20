@@ -9,5 +9,5 @@
 ## Checklist
 
 - [ ] make lint typecheck test passes locally
-- [ ] new error codes added to docs/api-errors.md
+- [ ] new error codes added to contracts/api-errors.md
 - [ ] README or the decisions page updated if a decision changed

@@ -22,9 +22,10 @@ Two parts, both expand-only.
 
 2. The privileges of ``clinic_realtime``, the login the Go gateway (``services/realtime``) uses.
    The role itself is created outside the migration, like ``clinic_app`` (``docker/initdb`` locally
-   and in CI, ``docs/runbooks/neon.md`` on Neon). Unlike migration 0001 this does not fail when the
-   role is missing: it raises a NOTICE and grants nothing, because ``ship-api`` runs
-   ``alembic upgrade head`` on every merge and the optional gateway must never block an API release.
+   and in CI, ``https://clinic.ericgitangu.com/architecture#neon`` on Neon). Unlike migration 0001
+   this does not fail when the role is missing: it raises a NOTICE and grants nothing, because
+   ``ship-api`` runs ``alembic upgrade head`` on every merge and the optional gateway must never
+   block an API release.
    The runbook step re-applies the same grants (``scripts/ops/realtime_grants.sql``), so a skipped
    grant is recoverable without a new migration. ``tests/integration/test_realtime_role.py`` asserts
    the result with a real login.
@@ -113,7 +114,7 @@ def upgrade() -> None:
           IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'clinic_realtime') THEN
             {GRANTS}
           ELSE
-            RAISE NOTICE 'role clinic_realtime missing: no grants made (docs/runbooks/neon.md)';
+            RAISE NOTICE 'role clinic_realtime missing: no grants made (https://clinic.ericgitangu.com/architecture#neon)';
           END IF;
         END $$;
     """)
