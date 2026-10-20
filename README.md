@@ -435,6 +435,16 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Which branch deploys.** Only `main`. Pull requests run the verify jobs: lint, backend quality, tests and contract tests, the real-Ably test (`ably-real`), gitleaks, semgrep, pip-audit, an image build with a trivy scan, the ZAP API scan (`dast`), web quality, `e2e-real`, `admin-e2e` and the static cost check, plus `go-quality` for the Go service and `api-check`, which runs the Postman collection with newman. A push to `main` runs the same jobs except `dast`: the ZAP API scan is a pull-request job, and the release runs a ZAP baseline against the public URL (`zap-prod`) after the deploy instead. Then it ships: build and push the image by digest, run migrations (expand-only, as `clinic_owner`), deploy a no-traffic revision, run `scripts/verify_claims.py` against its tagged URL, and promote it only if the commit is still the head of `main`. The booking and admin apps deploy to Vercel after the API. The deploy contexts are restricted to `main` and so is the workload identity federation condition, so a branch pipeline cannot deploy even if someone edits the config file.
 
+**How long it takes, and what you can skip.** Measured on 2026-10-20: a pull request pipeline takes about 18 minutes from push to the last check, and a release on `main` about 28, because the jobs run in parallel and the slowest sets the pace. The three long ones are the end-to-end suites, and I keep them on every pull request because they are the ones that run the real thing:
+
+| Job | Typical time | What it proves |
+| --- | --- | --- |
+| `e2e-real` | about 18 min | The booking app in a real browser against the real API and Postgres, including the double booking and the one-hour rule |
+| `admin-e2e` | about 10 min | The admin dashboard against the same stack, roles and the live feed included |
+| `backend-test` | about 9 min | The full backend suite on real Postgres, with the race test and its control |
+
+Everything else finishes in under 5 minutes. If you rerun the checks yourself and want a quick answer, `make test` (about 2.5 minutes on my machine), `make api-check` and `make verify` cover the booking rules and the API contract without a browser; `make e2e` and `make e2e-admin` are the slow ones, and the latest release on `main` passed all three in CI. I have not turned any of them off or made them optional, and I would not: `backend-test`, for example, failed 19 tests on a migration that would have broken staff invitations, and stopped it before it merged.
+
 **Rollback.** Going back is a traffic move, not a rebuild. What has and has not run is in section 4.3. After the web deploy, `verify-release` checks the public URL with no credentials (including `/ready`, which runs `SELECT 1` against Neon); if that fails, one job puts the API back on the revision that was live before and a second job, run only if the first succeeded, points the Vercel alias at the previous deployment, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. The runbook is [the rollback runbook](https://clinic.ericgitangu.com/decisions#rollback).
 
 **Release status.** A release on `main` runs 51 jobs: the ships, `verify-release`, `smoke-public`, `zap-prod`, the rollback guards and the live `cost-check`. The badge at the top shows the latest one. One kind of failure is worth knowing about: `cost-check` allows each image repository only the live image and one rollback, and when one release was replaced by another seconds later, the replaced release's image used to be kept as if it were still on its way, so the count went one over. The prune step now keeps a newer image only when it belongs to the current head of `main`. The live check also reports C11 (budgets), C13 and C14 as UNVERIFIED, because CI has no billing role for them, so a run ends "PARTIAL, not OK" even when everything it can check passes.
@@ -511,6 +521,8 @@ The design came before the code: the design and decision records were committed 
 | Chrome | the installed Chrome; Playwright uses `channel: "chrome"` | `make e2e` and `make e2e-admin` |
 
 newman needs no install: `make api-check` runs it from a pinned Docker image.
+
+The slowest local commands are the browser suites (`make e2e`, `make e2e-admin`); [section 9](#9-deployment--cicd) has the times for each CI job and which ones you can skip for a quick check.
 
 ### Without my Vercel login
 
