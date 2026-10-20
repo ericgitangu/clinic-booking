@@ -1,0 +1,82 @@
+/* Wrapper rules for the two third-party viewers on /docs and /redoc. Neither viewer ships a dark
+   theme or tunes itself for a phone, so the fixes live here, outside their bundles. */
+
+/* Swagger UI: a dark theme under html.dark (set from the stored choice or prefers-color-scheme by
+   docs-shell.js, which also sets data-theme). Inverting the viewer and turning the hue back keeps
+   every colour pair it already has, so the dark theme has the light theme's contrast. The viewer
+   carries its own light background so the inversion lands on a dark one (and so a contrast checker,
+   which ignores filters, sees the same pair the eye does). Images are inverted back. */
+[data-viewer="swagger"] { background: #fff; color: #3b4151; }
+html.dark [data-viewer="swagger"] { background: var(--card); }
+html.dark [data-viewer="swagger"] .swagger-ui {
+  /* Chosen so that, after the filter, the panel is the site's own card colour (#111a42, near enough),
+     not black. Computed from the filter's matrix. */
+  background: #dae3ff;
+  filter: invert(1) hue-rotate(180deg);
+}
+html.dark [data-viewer="swagger"] .swagger-ui .scheme-container { background: #dae3ff; }
+html.dark [data-viewer="swagger"] .swagger-ui img { filter: invert(1) hue-rotate(180deg); }
+
+/* Swagger's palette fails WCAG AA in places (white on #49cc90 is 2:1; its blue link is 3.3:1). Same
+   hues, darker, so the method colours stay recognisable. */
+[data-viewer="swagger"] .swagger-ui .opblock-summary-method { color: #fff; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-post .opblock-summary-method,
+[data-viewer="swagger"] .swagger-ui .opblock-post .opblock-summary-method { background: #1a7f52; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-get .opblock-summary-method { background: #1b62c4; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-put .opblock-summary-method { background: #a85208; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-patch .opblock-summary-method { background: #0f766e; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-delete .opblock-summary-method { background: #bd2a20; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-head .opblock-summary-method { background: #7a3fc0; }
+[data-viewer="swagger"] .swagger-ui .opblock.opblock-options .opblock-summary-method { background: #0b5a9c; }
+[data-viewer="swagger"] .swagger-ui .info .title small { background: #5b6270; }
+[data-viewer="swagger"] .swagger-ui .info .title small.version-stamp { background: #4d6700; }
+[data-viewer="swagger"] .swagger-ui .info .title small pre { color: #fff; }
+[data-viewer="swagger"] .swagger-ui a.nostyle,
+[data-viewer="swagger"] .swagger-ui .info a,
+[data-viewer="swagger"] .swagger-ui .info .url,
+[data-viewer="swagger"] .swagger-ui .link { color: #1b55a8; }
+[data-viewer="swagger"] .swagger-ui .json-schema-2020-12-expand-deep-button,
+[data-viewer="swagger"] .swagger-ui .json-schema-2020-12-accordion,
+[data-viewer="swagger"] .swagger-ui .json-schema-2020-12__attribute { color: #3f4654; }
+[data-viewer="swagger"] .swagger-ui .opblock .opblock-summary-description,
+[data-viewer="swagger"] .swagger-ui .opblock .opblock-summary-path,
+[data-viewer="swagger"] .swagger-ui .opblock-tag small,
+[data-viewer="swagger"] .swagger-ui .info .base-url,
+[data-viewer="swagger"] .swagger-ui table thead tr th,
+[data-viewer="swagger"] .swagger-ui .parameter__type,
+[data-viewer="swagger"] .swagger-ui .response-col_links { color: #1f2430; }
+
+/* ReDoc 3 has a dark theme of its own. It follows the system colour scheme (or the choice stored
+   under its own key), not this site's toggle: a known limit of the third-party viewer. In the light
+   theme the sheet is white. */
+html:not(.dark) [data-viewer="redoc"] { background: #fff; color: #333; }
+
+/* ReDoc's side-menu method labels (get, patch) are #25b869 and #f5c31d on white (2.6:1 and 1.7:1), and
+   one caption is #9b9ca8 (2.7:1). These are styled-components class names of the pinned redoc
+   version (scripts/vendor-docs.mjs copies exactly that one); e2e/shell.spec.ts runs axe on /redoc,
+   so an upgrade that renames them fails there instead of passing silently. */
+html:not(.dark) [data-viewer="redoc"] .sc-eldhqJ { color: #2b2d36 !important; }
+html:not(.dark) [data-viewer="redoc"] .sc-cQUxGG { color: #5a5c68 !important; }
+
+html.dark [data-viewer="redoc"] .sc-cQUxGG { color: #a9abb7 !important; }
+
+/* Narrow screens: ReDoc left-pads its content by 40px and breaks section titles mid-word
+   ("appointme-nts"). Less padding, and words break only when a single word is wider than the line. */
+@media (max-width: 640px) {
+  [data-viewer="redoc"] h1,
+  [data-viewer="redoc"] h2,
+  [data-viewer="redoc"] h3,
+  [data-viewer="redoc"] h5,
+  [data-viewer="redoc"] label,
+  [data-viewer="redoc"] td,
+  [data-viewer="redoc"] p {
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: manual;
+  }
+  [data-viewer="redoc"] h2 { font-size: 1.375rem; }
+  /* The title and its Copy button share a row that does not wrap, which squeezed the title to 125px.
+     Let the row wrap and keep the title at the width of its longest word. */
+  [data-viewer="redoc"] div:has(> div > h2) { flex-wrap: wrap; gap: 0.5rem; }
+  [data-viewer="redoc"] div:has(> h2) { min-width: min-content; }
+}

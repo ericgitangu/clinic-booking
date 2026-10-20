@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 import { hhmm, pick } from "./api";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";
@@ -239,6 +239,27 @@ test("a reschedule page left open across the boundary draws itself again and say
   await expect(
     page.getByRole("button", { name: "Move appointment" }),
   ).toBeVisible();
+  // The page's check runs from an effect, so it exists only once React has taken the page over; the
+  // server-drawn button is on screen before that. Jumping the clock earlier would skip the check
+  // (and the offset it reads at start would swallow the jump), so wait for React's mark on the
+  // button, then for the effects of that commit to have run.
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Move appointment"),
+    );
+    return (
+      button !== undefined &&
+      Object.keys(button).some((k) => k.startsWith("__reactFiber"))
+    );
+  });
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const { port1, port2 } = new MessageChannel();
+        port1.onmessage = () => done();
+        port2.postMessage(0);
+      }),
+  );
   // The visit is brought forward in the database (the server will now see it inside the hour) and
   // 45 minutes pass in the browser: the page's own check notices and asks for a fresh render.
   await moveById(id, 30);

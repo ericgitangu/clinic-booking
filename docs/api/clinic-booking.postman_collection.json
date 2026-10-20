@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Clinic Booking API reviewer journey",
+    "name": "Idyllic Clinic API reviewer journey",
     "description": "Built from contracts/openapi.json (API version 1.0.0) by scripts/api_collection.mjs; edit that script, not this file.\n\nPick the `local` or `production` environment and run the folders in order. IDs and times flow from one request to the next through collection variables, and every time is computed from now, so the run never goes stale.\n\nRequests other than GET go to `writeBaseUrl`. The local environment sets it; the production environment does not, so those requests are skipped there, and a client that ignores the scripts has no host to send them to.\n\nPublic operations not in the journey:\n- `POST /realtime/token/patient`: the booking site's live-updates token: it answers only the site's own Origin and needs an Ably key, which the compose stack does not have.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

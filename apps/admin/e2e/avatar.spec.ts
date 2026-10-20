@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/fixtures";
 import { sessionCookies } from "./support/test-auth";
 
 // The staff bar shows the person's Google profile picture, or their initials, as the account menu.
