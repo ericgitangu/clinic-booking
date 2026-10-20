@@ -220,6 +220,11 @@ export default function Home() {
             </div>
           ))}
         </dl>
+        <p className="mt-8 text-base">
+          <Link className={LINK} href="/decisions#go">
+            Why a Go service sits next to the FastAPI one
+          </Link>
+        </p>
       </section>
 
       <Separator />

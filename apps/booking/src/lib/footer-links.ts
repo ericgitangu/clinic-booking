@@ -44,8 +44,8 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
       },
       {
         label: "Architecture decisions",
-        href: `${GITHUB}/tree/main/docs/adr`,
-        external: true,
+        href: "/decisions",
+        external: false,
         icon: "list",
       },
       {
