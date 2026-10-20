@@ -1,3 +1,5 @@
+import { ZONE_NOTE } from "@clinic/ui/lib/zone-note";
+
 // One place for the facts every page, icon, sitemap and manifest repeats.
 export const SITE = {
   name: "Idyllic Clinic",
@@ -8,8 +10,7 @@ export const SITE = {
   locale: "en_KE",
 } as const;
 
-export const FOOTER_NOTICE =
-  "© 2026 Eric Gitangu. A take-home assessment for Savannah Informatics, not a live medical service. Times are shown in East Africa Time (UTC+3).";
+export const FOOTER_NOTICE = `© 2026 Eric Gitangu. A take-home assessment for Savannah Informatics, not a live medical service. ${ZONE_NOTE}.`;
 
 export const CONTACT_EMAIL = "developer.ericgitangu@gmail.com";
 

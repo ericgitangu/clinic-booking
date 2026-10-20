@@ -12,6 +12,7 @@ import Home from "@/app/page";
 import PrivacyPage from "@/app/privacy/page";
 import TermsPage from "@/app/terms/page";
 import { CONTACT_EMAIL, FOOTER_NOTICE, SITE } from "@/lib/site";
+import { ZONE_NOTE } from "@clinic/ui/lib/zone-note";
 import { PageShell } from "@clinic/ui/components/layout/page-shell";
 import {
   RECAPTCHA_ATTRIBUTION,
@@ -46,6 +47,10 @@ describe("page shell", () => {
     expect(text).toContain(RECAPTCHA_ATTRIBUTION);
     expect(html).toContain('href="https://policies.google.com/privacy"');
     expect(html).toContain('href="https://policies.google.com/terms"');
+  });
+
+  it("names the clinic's zone in the footer with the same sentence the pages use", () => {
+    expect(FOOTER_NOTICE).toContain(`${ZONE_NOTE}.`);
   });
 
   it("links the privacy and terms pages from the footer", () => {

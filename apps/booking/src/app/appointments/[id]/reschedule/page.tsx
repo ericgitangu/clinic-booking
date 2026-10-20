@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { notFound } from "next/navigation";
 import { DateStrip } from "@/components/booking/date-strip";
 import { SlotChooser } from "@/components/booking/slot-chooser";
@@ -139,8 +140,9 @@ export default async function Reschedule({
         Reschedule
       </h1>
       <p className="mt-1 text-base text-muted-foreground">
-        Now: {formatWhen(appt.data.starts_at)}. Nairobi time.
+        Now: {formatWhen(appt.data.starts_at)}.
       </p>
+      <ZoneNote className="mt-1" />
       <div className="mt-6">
         <DateStrip
           today={today}

@@ -807,7 +807,7 @@ export const daySheetInternalAdminOpsDaySheetCsvGetQueryKey = (options: Options<
 /**
  * Day Sheet
  *
- * The day's appointments as CSV (one row each: doctor, time, status, patient, phone, email, cancellation reason), for `date` (clinic-local) and optionally one doctor. Owner and admin get full details; a viewer gets initials and a masked phone and no email or reason. Cells that would run as a spreadsheet formula are neutralised.
+ * The day's appointments as CSV (one row each: doctor, time, status, patient, phone, email, cancellation reason, timezone: the IANA zone the time column is in), for `date` (clinic-local) and optionally one doctor. Owner and admin get full details; a viewer gets initials and a masked phone and no email or reason. Cells that would run as a spreadsheet formula are neutralised.
  */
 export const daySheetInternalAdminOpsDaySheetCsvGetOptions = (options: Options<DaySheetInternalAdminOpsDaySheetCsvGetData>) => queryOptions<unknown, DefaultError, unknown, ReturnType<typeof daySheetInternalAdminOpsDaySheetCsvGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

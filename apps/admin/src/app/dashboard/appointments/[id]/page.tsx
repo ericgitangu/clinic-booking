@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeftIcon } from "lucide-react";
+import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { DoctorAvatar } from "@clinic/ui/components/doctor-avatar";
 import { LockedNote, StaffControls } from "@/components/staff-controls";
 import { AttendanceActions } from "@/components/attendance-actions";
@@ -70,6 +71,7 @@ export default async function AppointmentPage({
           <span className="tabular-nums">{formatSlot(appt.starts_at)}</span>
           <StatusBadge status={appt.status} attendance={row.attendance} />
         </p>
+        <ZoneNote />
         {row && (
           <p className="flex items-center gap-2 text-muted-foreground">
             <span aria-hidden="true" className="contents">
