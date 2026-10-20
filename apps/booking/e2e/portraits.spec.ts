@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 import { hhmm } from "./api";
 import { farCell } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";

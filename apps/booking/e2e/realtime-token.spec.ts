@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 import { pick } from "./api";
 
 // The live-updates token route through the real proxy (this app's /api route) to the real API and

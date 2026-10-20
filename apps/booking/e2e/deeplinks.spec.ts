@@ -5,7 +5,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { hhmm } from "./api";
 import {
   chip,

@@ -39,7 +39,7 @@ describe("avatar map", () => {
     expect(doctorPhoto("constructor")).toBeNull();
   });
 
-  it("has one source set per id, and a byte-identical static copy of every file in the booking app", () => {
+  it("has one source set per id, and a byte-identical static copy of every file in both apps", () => {
     const dir = fileURLToPath(new URL("../assets/doctors/", import.meta.url));
     const files = readdirSync(dir).filter((f) =>
       /\.(svg|webp|png|jpe?g|avif)$/.test(f),
@@ -57,7 +57,7 @@ describe("avatar map", () => {
       ])
         expect(files, f).toContain(f);
     }
-    for (const app of ["booking"]) {
+    for (const app of ["booking", "admin"]) {
       const pub = fileURLToPath(
         new URL(`../../../apps/${app}/public/doctors/`, import.meta.url),
       );

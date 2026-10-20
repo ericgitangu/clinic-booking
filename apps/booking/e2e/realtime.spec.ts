@@ -4,7 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { expectFree, expectInactive } from "./support/chips";
 import { farCell } from "./support/cells";
 import { newPerson, sessionCookies } from "./support/auth";

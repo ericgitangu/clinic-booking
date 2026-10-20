@@ -7,7 +7,7 @@
     "predev": "node scripts/vendor-docs.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/snapshot-openapi.mjs && node scripts/vendor-docs.mjs",
-    "build": "next build",
+    "build": "next build && node ../../packages/ui/scripts/csp-hashes.mjs .",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",

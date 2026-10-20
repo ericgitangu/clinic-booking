@@ -4,6 +4,13 @@ import { resetNotConfiguredLog } from "@clinic/api/auth-env";
 import { NextRequest } from "next/server";
 import { config, proxy } from "@/proxy";
 
+// Vitest runs with NODE_ENV=test, which the options read as development; these tests are about the
+// production policy.
+vi.mock("@/lib/csp-options", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/csp-options")>();
+  return { ...real, CSP_OPTIONS: { ...real.CSP_OPTIONS, dev: false } };
+});
+
 const req = (url = "https://clinic.ericgitangu.com/appointments") =>
   new NextRequest(url);
 
@@ -60,10 +67,33 @@ describe("proxy when sign-in is not configured", () => {
     expect(runs(path)).toBe(true);
   });
 
-  it.each(["/", "/docs", "/about", "/book", "/robots.txt", "/openapi.json"])(
-    "does not guard %s",
+  // The pages rendered per request run the proxy for their nonce, but need no sign-in settings.
+  it.each(["/", "/book", "/book/abc"])(
+    "gives %s a nonce without needing sign-in",
     (path) => {
-      expect(runs(path)).toBe(false);
+      expect(runs(path)).toBe(true);
+      const res = proxy(req(`https://clinic.ericgitangu.com${path}`));
+      expect(res.status).toBe(200);
+      const csp = res.headers.get("content-security-policy") ?? "";
+      expect(csp).toMatch(
+        /script-src 'nonce-[^']+' 'sha256-[^']+' 'strict-dynamic'/,
+      );
+      expect(csp).not.toContain("unsafe-inline'; style"); // scripts never allow inline
+      expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
     },
   );
+
+  // Pages built once cannot carry a nonce; next.config.ts gives them their own policy.
+  it.each([
+    "/docs",
+    "/redoc",
+    "/about",
+    "/data",
+    "/privacy",
+    "/terms",
+    "/robots.txt",
+    "/openapi.json",
+  ])("does not run the proxy for %s", (path) => {
+    expect(runs(path)).toBe(false);
+  });
 });

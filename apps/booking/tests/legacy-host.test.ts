@@ -135,10 +135,11 @@ describe("everything else keeps serving", () => {
   });
 
   it.each(others)(
-    "%s is not redirected and public pages skip the proxy",
+    "%s is not redirected and pages built once skip the proxy",
     (host) => {
       expect(legacyRedirect(host, "/book", "?a=1")).toBeNull();
-      for (const path of ["/", "/book", "/docs", "/about", "/openapi.json"])
+      // "/" and "/book" run it too now, for their nonce, but never redirect (checked above).
+      for (const path of ["/docs", "/about", "/privacy", "/openapi.json"])
         expect(runs(host, path), `${host}${path}`).toBe(false);
     },
   );

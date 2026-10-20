@@ -329,6 +329,31 @@ test.describe("owner dashboard", () => {
     }
   });
 
+  test("the Today board and the utilisation list show doctor portraits, not initials", async ({
+    as,
+  }) => {
+    const page = await as("owner");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("today-board")).toBeVisible();
+    const portraits = page.locator(
+      '[data-testid="today-board"] img[src*="/doctors/"], [data-testid="utilisation-list"] img[src*="/doctors/"]',
+    );
+    await expect(portraits.first()).toBeVisible();
+    expect(await portraits.count()).toBeGreaterThan(0);
+    // Loaded for real: a 404 would fall through to the illustration and then the initials.
+    for (const img of await portraits.all()) {
+      await expect
+        .poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
+        .toBeGreaterThan(0);
+      expect(await img.getAttribute("src")).toMatch(
+        /\/doctors\/[0-9a-f-]{36}-(128|256|512)\.webp$/,
+      );
+      expect(await img.getAttribute("width")).toMatch(/^\d+$/);
+      expect(await img.getAttribute("height")).toMatch(/^\d+$/);
+    }
+  });
+
   test("gaps to fill lists the API's free slots for the next 48 hours, or says there is none", async ({
     as,
   }) => {
@@ -643,6 +668,9 @@ test.describe("owner dashboard", () => {
     await expect(help).toHaveCount(0);
 
     const rows = page.locator("a[data-row-link]:visible");
+    // The rows stream in after the page frame. A j pressed before they exist has nothing to move to
+    // and is dropped, so wait until there is a row before pressing it.
+    await expect(rows.first()).toBeVisible();
     await page.keyboard.press("j");
     await expect(rows.nth(0)).toBeFocused();
     await page.keyboard.press("j");
