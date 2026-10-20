@@ -302,6 +302,14 @@ async def test_setting_the_address_normalises_it_and_audits_before_and_after(
     assert json.loads(last["after"])["email"] is None
 
 
+async def test_the_audit_trail_reads_back_a_doctor_email_change(env: Env) -> None:
+    # A stored action the response model did not list made the whole audit page a 500.
+    await set_address(env, REAL_LOOKING)
+    resp = await env.req("GET", "/internal/admin/audit?limit=25", role="admin")
+    assert resp.status_code == 200, resp.text
+    assert "doctor_email" in {item["action"] for item in resp.json()["items"]}
+
+
 async def test_setting_what_is_already_there_records_nothing(
     env: Env, owner_conn: asyncpg.Connection
 ) -> None:
