@@ -1174,7 +1174,7 @@ expect "measure: 1 vCPU (3600 per hour) exceeds the budget" "$(judge_rc 360 360)
 expect "measure: too few connected seconds fails closed" "$(judge_rc 60 15)" 1
 expect "measure: no CPU recorded fails closed" "$(judge_rc 360 0)" 1
 expect "measure: non-numbers fail closed" "$(judge_rc abc 10)" 1
-expect "measure: the README line is a placeholder until measured" "$(EVIDENCE="$WORK/none.json" bash "$MEASURE" --readme-line)" "Measured cost of one connected hour: to be measured after the first deploy."
+expect "measure: the README line is a placeholder until measured" "$(EVIDENCE="$WORK/none.json" bash "$MEASURE" --readme-line)" "Measured cost of one connected hour: not measured yet."
 echo '{"measured_at":"2026-10-20T10:00:00Z","connected_seconds":360,"vcpu_seconds_per_connected_hour":912,"budget":1100,"hours_of_shared_headroom":23.7}' > "$WORK/ev.json"
 expect "measure: the README line is generated from the evidence file" "$(EVIDENCE="$WORK/ev.json" bash "$MEASURE" --readme-line | grep -c '912 vCPU-seconds per connected hour')" 1
 

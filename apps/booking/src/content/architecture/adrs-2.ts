@@ -96,12 +96,12 @@ export const ADRS_2: readonly AdrCard[] = [
     number: "0020",
     title: "Clean git history, disclosure in one place",
     status:
-      "Accepted, partly done. The release tag and the README disclosure section are still mine to finish.",
+      "Accepted, partly done. The `v1.0.0` tag exists; the README disclosure section is still mine to finish.",
     decision:
       "Commits follow Conventional Commits, one pull request per change, squash-merged, with no tooling trailers on commits I write. How the work was made is disclosed in a single README section, not scattered through commit messages. Local tooling files stay out of the repository through a local exclude file.",
-    cost: "Keeping that disclosure current while I work is a discipline cost. The history is not trailer-free as a whole: Dependabot's own commits carry its bot lines, and I kept them rather than rewrite merged history. There is no `v1.0.0` tag yet.",
+    cost: "Keeping that disclosure current while I work is a discipline cost. The history is not trailer-free as a whole: Dependabot's own commits carry its bot lines, and I kept them rather than rewrite merged history. The `v1.0.0` tag is on be149b8.",
     revisit:
-      "Nothing is planned. I finish the tag and the README section before submission.",
+      "Nothing is planned. I finish the README section before submission.",
   },
   {
     id: "adr-0021",

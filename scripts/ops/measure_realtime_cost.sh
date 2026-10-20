@@ -52,7 +52,7 @@ judge() {
 
 readme_line() {
   if [ ! -f "$EVIDENCE" ]; then
-    echo "Measured cost of one connected hour: to be measured after the first deploy."
+    echo "Measured cost of one connected hour: not measured yet."
     return
   fi
   jq -r '"Measured on the deployed service (\(.measured_at[0:10]), \(.connected_seconds) connected seconds): \(.vcpu_seconds_per_connected_hour) vCPU-seconds per connected hour against a budget of \(.budget), about \(.hours_of_shared_headroom) connected hours a month from the shared headroom."' "$EVIDENCE"
