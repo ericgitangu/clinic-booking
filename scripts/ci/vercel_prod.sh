@@ -30,7 +30,7 @@ vercel_json() {
   out="$("$VERCEL" api "$1" --raw 2>&1)" || true
   case "$out" in
     *"Not authorized"*)
-      echo "vercel_prod: the Vercel token was refused (403) for $1. It needs access to this team and to the project behind the host; see https://clinic.ericgitangu.com/architecture#rollback." >&2
+      echo "vercel_prod: the Vercel token was refused (403) for $1. It needs access to this team and to the project behind the host; see https://clinic.ericgitangu.com/decisions#rollback." >&2
       return 1 ;;
     *"{"*) printf '{%s' "${out#*\{}" ;;
     *)
