@@ -38,6 +38,7 @@ case "$*" in
   "artifacts docker images list"*)
     cat "$FX/images.json" ;;
   "artifacts docker images delete"*)
+    [ -f "$FX/delfail" ] && { echo "ERROR: (gcloud.artifacts) 503" >&2; exit 1; }
     echo "$*" >> "$FX/calls" ;;
   *) echo "fake gcloud: unhandled: $*" >&2; exit 99 ;;
 esac
@@ -210,10 +211,10 @@ J
 # Newest-first by update time: B, A (skipped), P (live), O. The old "newest two" rule would
 # have kept B and A and deleted P, the real rollback target.
 cat > "$FX/images.json" <<'J'
-[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb"},
- {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:aaa"},
- {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:ppp"},
- {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:ooo"}]
+[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb","createTime":"2026-01-01T00:00:00Z"},
+ {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:aaa","createTime":"2026-01-01T00:00:00Z"},
+ {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:ppp","createTime":"2026-01-01T00:00:00Z"},
+ {"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:ooo","createTime":"2026-01-01T00:00:00Z"}]
 J
 export CIRCLE_SHA1="$HEAD_SHA" GOOGLE_PROJECT_ID=p PROMOTE_DIR="$WORK/promoted.1"
 bash "$HERE/promote.sh" sha-b >/dev/null 2>&1; rc=$?
@@ -243,7 +244,7 @@ cat > "$FX/revision_images.json" <<'J'
 {"rev-b":"us-east4-docker.pkg.dev/p/clinic/clinic-api@sha256:bbb","rev-hello":"us-docker.pkg.dev/cloudrun/container/hello"}
 J
 cat > "$FX/images.json" <<'J'
-[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb"}]
+[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb","createTime":"2026-01-01T00:00:00Z"}]
 J
 export PROMOTE_DIR="$WORK/promoted.2"
 bash "$HERE/promote.sh" sha-b >/dev/null 2>&1; bash "$HERE/prune.sh" >/dev/null 2>&1
@@ -258,7 +259,7 @@ cat > "$FX/service_before.json" <<'J'
 J
 cp "$FX/service_before.json" "$FX/service_after.json"
 echo '{"rev-x":"us-docker.pkg.dev/cloudrun/container/hello"}' > "$FX/revision_images.json"
-echo '[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:zzz"}]' > "$FX/images.json"
+echo '[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:zzz","createTime":"2026-01-01T00:00:00Z"}]' > "$FX/images.json"
 export PROMOTE_DIR="$WORK/promoted.3"
 bash "$HERE/promote.sh" sha-x >/dev/null 2>&1; bash "$HERE/prune.sh" >/dev/null 2>&1
 expect "prune: refuses to delete images when no kept digest resolves" "$(cnt 'images delete')" 0
@@ -291,31 +292,73 @@ J
   export GOOGLE_PROJECT_ID=p CIRCLE_SHA1="$HEAD_SHA"
   NEWER_SHA="$(git rev-parse HEAD)"; export NEWER_SHA
 }
-img() { printf '{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"%s","tags":"%s"}' "$1" "$2"; }
+img() { # <digest> <tags> [createTime]: all older than the serving image unless a time is given
+  printf '{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"%s","tags":"%s","createTime":"%s"}' "$1" "$2" "${3:-2026-01-01T00:00:00Z}"
+}
 
-prune_fx inflight
-echo "[$(img sha256:bbb sha-b),$(img sha256:ppp sha-p),$(img sha256:aaa ""),$(img sha256:ooo "sha-${HEAD_SHA:0:7}"),$(img sha256:nnn "sha-${NEWER_SHA:0:7}"),$(img sha256:uuu sha-deadbee)]" > "$FX/images.json"
+# Unresolvable tag (the commit no longer exists after a history rewrite): serving B, rollback P,
+# sha-f01cf5d (not in git), another old one. Only the serving and rollback images survive.
+prune_fx unresolvable_tag
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d),$(img sha256:ooo "sha-${HEAD_SHA:0:7}")]" > "$FX/images.json"
 bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
-expect "prune: a release that is not yet deployed (newer commit) is never deleted" "$(cnt 'sha256:nnn')" 0
-expect "prune: a tag for a commit this checkout cannot resolve is never deleted" "$(cnt 'sha256:uuu')" 0
-expect "prune: the superseded and old images are still deleted" "$rc:$(grep -c 'images delete' "$FX/calls")" "0:2"
+expect "prune: an unresolvable sha tag is deleted along with the old image" \
+  "$rc:$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | sort | paste -sd, -)" "0:sha256:fff,sha256:ooo"
+expect "prune: serving and rollback images are kept" "$(cnt 'images delete.*sha256:bbb')$(cnt 'images delete.*sha256:ppp')" 00
 expect "prune: every call names the project" "$(grep -vc -- '--project p' "$FX/calls.all")" 0
 
+# a pushed-but-not-deployed image from a newer pipeline (created after the serving image) is kept
+prune_fx newer_inflight
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d),$(img sha256:nnn sha-0abc123 2026-01-03T00:00:00Z)]" > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: an image newer than the serving one is kept; the unresolvable older one is deleted" \
+  "$rc:$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | paste -sd, -)" "0:sha256:fff"
+# no creation time for the serving image: fail closed
+prune_fx nocreate
+echo '[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb"},{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:fff"}]' > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: no creation time for the serving image deletes nothing" "$rc:$([ -e "$FX/calls" ] && echo changed || echo none)" "1:none"
+
+# an unresolvable tag that a revision still runs is kept (the revision protects it, not git)
+prune_fx unresolvable_inuse
+jq -n '{"rev-b":"r/clinic-api@sha256:bbb","rev-p":"r/clinic-api@sha256:ppp","rev-a":"r/clinic-api@sha256:fff","rev-o":"r/clinic-api@sha256:ooo"}' > "$FX/revision_images.json"
+cat > "$FX/service_before.json" <<'J'
+{"status":{"traffic":[{"revisionName":"rev-b","percent":90,"tag":"sha-b"},{"revisionName":"rev-a","percent":10,"tag":"sha-f01cf5d"},
+ {"revisionName":"rev-p","percent":0,"tag":"sha-p"},{"revisionName":"rev-o","percent":0,"tag":"sha-o"}]}}
+J
+cp "$FX/service_before.json" "$FX/service_after.json"
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d),$(img sha256:ooo sha-o)]" > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: an unresolvable tag that a serving revision runs is kept; the old one goes" \
+  "$rc:$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | paste -sd, -)" "0:sha256:ooo"
+
+# nothing beyond serving + rollback: nothing to delete
+prune_fx onlykept
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p)]" > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: only serving and rollback present deletes no image" "$rc:$(cnt 'images delete')" "0:0"
+
+# a deletion failure is a WARNING and the release stays green
+prune_fx delfail
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d)]" > "$FX/images.json"
+touch "$FX/delfail"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a failed deletion warns and exits 0" "$rc:$(grep -c 'WARNING could not delete' "$FX/out")" "0:1"
+
 prune_fx dry
-echo "[$(img sha256:bbb sha-b),$(img sha256:ppp sha-p),$(img sha256:aaa ""),$(img sha256:ooo "sha-${HEAD_SHA:0:7}")]" > "$FX/images.json"
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:aaa ""),$(img sha256:ooo "sha-${HEAD_SHA:0:7}")]" > "$FX/images.json"
 bash "$HERE/prune.sh" --dry-run >"$FX/out" 2>&1; rc=$?
 expect "prune --dry-run: exit 0, lists the tag removal and both deletions" "$rc:$(grep -c '^dry-run: would run' "$FX/out")" "0:3"
 expect "prune --dry-run: changes nothing" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
 
 prune_fx failclosed
-echo "[$(img sha256:bbb sha-b),$(img sha256:aaa sha-a),$(img sha256:ooo sha-o)]" > "$FX/images.json"
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:aaa sha-a),$(img sha256:ooo sha-o)]" > "$FX/images.json"
 touch "$FX/revfail"
 bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
 expect "prune: a failing revision lookup exits non-zero" "$([ "$rc" -ne 0 ] && echo failed)" failed
 expect "prune: a failing revision lookup deletes nothing and removes no tag" "$([ -e "$FX/calls" ] && echo changed || echo none)" none
 rm -f "$FX/revfail"
 prune_fx undigested
-echo "[$(img sha256:bbb sha-b),$(img sha256:aaa ""),$(img sha256:ooo "")]" > "$FX/images.json"
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:aaa ""),$(img sha256:ooo "")]" > "$FX/images.json"
 jq -n '{"rev-b":"r/clinic-api@sha256:bbb","rev-p":"us-east4-docker.pkg.dev/p/clinic/clinic-api:latest","rev-a":"r/clinic-api@sha256:aaa","rev-o":"r/clinic-api@sha256:ooo"}' > "$FX/revision_images.json"
 bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
 expect "prune: a kept revision of our image with no digest fails closed (exit 1, says why)" "$rc:$(grep -c 'does not resolve to a digest' "$FX/out")" "1:1"
