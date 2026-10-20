@@ -71,7 +71,7 @@ flowchart LR
 ```
 
 | Component | Choice | Why |
-|---|---|---|
+| --- | --- | --- |
 | Browser | Next.js pages with a shell-only service worker; polling as the fallback | A stale slot list is the UX failure of the race the brief names. Push is an optimisation and polling is the floor. |
 | Booking and admin apps | Two Next.js apps on Vercel in one pnpm workspace | Separate auth surfaces and deploys without publishing shared packages. |
 | Sign-in and roles | Better Auth with Google and stateless cookies; staff roles looked up on every request | Maintained, no auth database, and a revoke applies on the next request. |
@@ -104,7 +104,7 @@ Four runtimes is a cost for an app this size, so each one has to earn its place:
 ## 1. Live URLs
 
 | What | Where |
-|---|---|
+| --- | --- |
 | Landing page | <https://clinic.ericgitangu.com> |
 | Booking app | <https://clinic.ericgitangu.com/book> |
 | API (a base path: `/api` itself is a 404, try `/api/doctors`) | <https://clinic.ericgitangu.com/api/doctors> |
@@ -144,7 +144,7 @@ curl -s -o /dev/null -w 'direct Cloud Run: %{http_code}\n' https://clinic-api-2s
 ```
 
 | Path | Observed |
-|---|---|
+| --- | --- |
 | `/` | `200 text/html` |
 | `/docs` (Swagger UI) | `200 text/html` |
 | `/openapi.json` | `200 application/json` |
@@ -300,7 +300,7 @@ flowchart LR
 Each row is the decision, what it costs me, and the entry on the [decisions page](https://clinic.ericgitangu.com/decisions) that weighs it where there is one. [The engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions) adds the alternative I rejected on each row.
 
 | Decision | What it costs | Decisions page |
-|---|---|---|
+| --- | --- | --- |
 | A partial unique index on `(doctor_id, starts_at) WHERE status = 'booked'` decides double booking, with no application lock | Correct only for fixed, aligned 30-minute slots; variable lengths mean migrating to an `EXCLUDE USING gist` constraint | [double booking](https://clinic.ericgitangu.com/decisions#double-booking) |
 | Slots are computed from working hours, never stored | No slot row to lock, so uniqueness lives on the appointment | [double booking](https://clinic.ericgitangu.com/decisions#double-booking) |
 | FastAPI is the single system of record; Go serves only the read-only staff live feed (3.7) | Python cold starts are slower than Go's; I mitigate with `--cpu-boost` and have not measured it | [one API](https://clinic.ericgitangu.com/decisions#one-api), [the Go decision](https://clinic.ericgitangu.com/decisions#go) |
@@ -323,10 +323,8 @@ Each row is the decision, what it costs me, and the entry on the [decisions page
 - **Early session revocation.** Sessions are stateless cookies, so a role is looked up in `staff_access` on every request instead of living in the cookie ([the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)).
 - **Measured latency and load.** The latency and 10x figures above are estimates and are labelled as such.
 - **Admin events on Ably.** The relay still publishes the PII-free admin events to Ably and nothing subscribes to them now, because the staff feed goes through the Go service in [3.7](#37-the-live-feed-a-go-service-beside-fastapi). Turning that publish off would save Ably messages.
-- **The admin release path.** It was blocked on a project-scoped Vercel token until `VERCEL_ADMIN_TOKEN` was added to the `vercel-prod` context. Since then `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` pass on every release, last on `382f08a` (pipeline 512, which CircleCI lists under its pre-rewrite id `0d6cde8`).
 - **End-to-end tests assume a fresh database per run.** CI provides one, and `make e2e` recreates the compose volume itself. Running Playwright directly on a reused database (`pnpm -C apps/booking test:e2e`, or `KEEP_STACK=1 make e2e-admin`) fails the double-booking specs and the fixed-slot `booking.spec` test (also on `main`); run `make down` first. Per-run port and database isolation is descoped for time.
 - **The daily reminder has not been seen live.** Booking and cancellation emails were verified live on 2026-10-18, but the first send of the 15:00 UTC reminder cron is still to be confirmed in the Resend logs.
-- **Live notifications on the dashboard.** Each live event (a booking, a change, an arrival, a no-show, a veto) shows a toast to the staff who did not make it, an unread count on the live feed and a short highlight on the doctor's card; a burst collapses into one "N updates" toast and viewers never see patient names. It uses the existing stream, so it opens no new connection.
 - **Doctor notifications are narrow** ([the doctor notifications card](https://clinic.ericgitangu.com/decisions#notifications)). Marking a patient arrived emails the doctor, but only if staff have set that doctor's address on the doctor's card: seeded doctors have none, so nothing is emailed from seed data, and the dashboard says "email not sent (no doctor email)". The email goes out through the same sender and the same daily and monthly allowance as acknowledgements and reminders (100 a day, 3,000 a month, shared), so a busy day can use it up and the row then says so (staff emails and the doctor's arrival email stop `EMAIL_ACK_RESERVE`, 20, short of the day's limit, so booking acknowledgements always have room). Nothing runs in the background, so a send that was cut off stays pending until staff press "Send the email again" on the appointment sheet, which they are offered after two minutes if nothing ever claimed the send, or after 15 minutes if a sender claimed it and died (until then the sheet says it is on its way, and an open sheet stops looking after about two minutes). There is no per-doctor preference, no morning digest yet and no bounce handling. **Named limit:** the doctor's email shows the patient's first name and the first letter of the last ("Amina W."), and reads "Surname, First" when there is a comma; a name written surname-first without a comma, or a Chinese, Japanese or Korean name, still shows its family name, because a patient has one free-text name field. The fix is a given-name field on patients.
 - **The admin app cannot be tried without an invitation**, for the reason in the Start here list.
 
@@ -336,7 +334,7 @@ Each row is the decision, what it costs me, and the entry on the [decisions page
 
 - **Race-proof tests with a naive control** that must fail without the index: `make test-race`, `make test-control`.
 - **Idempotency keys** on booking: a retry after a lost response returns the original booking instead of telling the real booker they lost the slot.
-- **Immutable releases and rollback.** Every release is a tagged Cloud Run revision smoke-tested before it gets traffic. In the pipeline config, `verify-release` runs the public check after both web deploys and records the result; `rollback-api`, `rollback-booking` and `rollback-admin` act only when that result is `failed`, and halt otherwise. <!-- ROLLBACK-STATUS: edit only the next sentence after a full green release --> What has run, read from CircleCI on 2026-10-20: `verify-release` and `rollback-api` succeeded on main pipelines 61 and 64 (2026-10-17, before the admin app existed), the public check passed, and on 64 `rollback-api` halted with "nothing to roll back". On the main pipelines from 67 to 247 and on 277 that have these jobs, `ship-admin` failed or did not run, and `verify-release` and the rollback jobs did not run there. From pipeline 285 (commit 2888eb8) they ran: on 285, 290, 306, 314, 329 and 372 `ship-admin`, `verify-release`, the rollback jobs, `smoke-public` and `zap-prod` succeeded. Pipeline 329 (7dde6ef, the Go gateway) was fully green, including `ship-realtime` and `cost-check`. No pipeline I read has moved traffic back; that step is covered by the CI script tests (`make ci-test`) only. ([rollback runbook](https://clinic.ericgitangu.com/decisions#rollback)).
+- **Immutable releases and rollback.** Every release is a tagged Cloud Run revision that is smoke-tested before it gets traffic. After both web deploys, `verify-release` checks the public URL and records the result; `rollback-api`, `rollback-booking` and `rollback-admin` act only when that result is `failed`, and stand down otherwise. They run on every release on `main`. None has had to move traffic back yet, so the move itself is proven by the CI script tests (`make ci-test`), not by a real rollback ([rollback runbook](https://clinic.ericgitangu.com/decisions#rollback)).
 - **Keyless deploy.** No long-lived GCP credential exists; CircleCI exchanges its OIDC token for a short-lived one, and only for `main`.
 - **Security gates in CI.** gitleaks, semgrep, pip-audit, a trivy image and config scan and a ZAP API scan, each wired as a CI job that fails on findings (ZAP fails on exit codes 1 and 3; warnings only pass).
 - **Cost guards.** `cost_check.sh` runs statically on every PR and live after each deploy, and has a self-test that mutates the config to prove it fails. The [hosting and cost decision](https://clinic.ericgitangu.com/decisions#hosting-and-cost) summarises the limits it guards.
@@ -346,6 +344,7 @@ Each row is the decision, what it costs me, and the entry on the [decisions page
 - **Request-id logging** with no PII in logs, and branding, a web manifest and a sitemap.
 - **A shell-only PWA and slot lists that stay current.** The booking page subscribes to live slot events and polls every 60 seconds while push is healthy; when push is blocked or refused it polls every 15 seconds with backoff, and it keeps the idle stop ([the polling then push decision](https://clinic.ericgitangu.com/decisions#polling-then-push), [the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)).
 - **Live slot events.** The API publishes them through an outbox relay to Ably, with a hard monthly publish budget (25,000) and polling as the fallback ([diagram](https://clinic.ericgitangu.com/decisions#slot-push)). Both sides are live. Publishing: on 2026-10-18 one booking and one cancel in production moved the Ably message count from 17 to 21. Subscribing: the booking page subscribes with a short-lived, subscribe-only token and falls back to the 15 second polling when the push host is blocked or a token is refused (PR 44; its acceptance cases passed in CI, a booked and a cancelled slot reaching a second browser through the real service in `e2e-real` job 3110). Patient live push is on in production (observed after release `748d7d8`: the token endpoint returned 200 with `no-store` for the site origin and 403 for a cross-site origin, and a real Chrome on a booking page went from `data-stream="polling"` on load to `data-stream="live"` after a scroll and a key press, because no token is minted before user input). The staff live feed is a separate path: the Go service in [3.7](#37-the-live-feed-a-go-service-beside-fastapi), not Ably.
+- **Live notifications on the dashboard.** Each live event (a booking, a change, an arrival, a no-show, a veto) shows a toast to the staff who did not make it, an unread count on the live feed and a short highlight on the doctor's card; a burst collapses into one "N updates" toast and viewers never see patient names. It uses the existing stream, so it opens no new connection.
 - **Booking emails and a daily reminder** through Resend, sent only to verified, linked accounts. Merged (PR 27). Booking and cancellation emails verified live on 2026-10-18; the daily reminder's first send is unconfirmed.
 - **Swagger UI, ReDoc and fonts served from the repo**, so the first click does not depend on a CDN.
 - **A production ZAP baseline, Lighthouse budgets, an image prune and a kill switch** for the deployed services ([rollback runbook](https://clinic.ericgitangu.com/decisions#rollback)). The Lighthouse `/` performance rule is a warning: CI medians varied from 77 to 89 run to run.
@@ -357,7 +356,7 @@ The status of each item (shipped, declared, descoped) and what it costs is in [t
 The live, interactive reference is [Swagger UI](https://clinic.ericgitangu.com/docs); the contract is committed at `contracts/openapi.json`. The public base is `/api` (`https://clinic.ericgitangu.com/api`), and the brief's paths sit under it unchanged: `POST /api/appointments` is the brief's `POST /appointments`. The public endpoints:
 
 | Method and path | Purpose | Success |
-|---|---|---|
+| --- | --- | --- |
 | `GET /doctors`, `GET /doctors/{id}` | Doctors with clinic and working hours | 200 |
 | `GET /doctors/{id}/availability?date=` | Free 30-minute slots on a clinic-local day | 200 |
 | `POST /patients` | Create a patient | 201 |
@@ -373,7 +372,7 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 ## 6. Code structure
 
 | Path | What is in it |
-|---|---|
+| --- | --- |
 | `backend/app/` | FastAPI service: `api/`, `services/`, `domain/` (pure rules), `repositories/`, `models/`, `schemas/`, `core/` |
 | `backend/migrations/`, `backend/tests/` | Alembic (expand-only, linted by `scripts/migration_lint.sh`); unit, integration, concurrency, contract, migration tests |
 | `apps/booking/`, `apps/admin/` | The two Next.js apps |
@@ -438,7 +437,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **Rollback.** Going back is a traffic move, not a rebuild. What has and has not run is in section 4.3. After the web deploy, `verify-release` checks the public URL with no credentials (including `/ready`, which runs `SELECT 1` against Neon); if that fails, one job puts the API back on the revision that was live before and a second job, run only if the first succeeded, points the Vercel alias at the previous deployment, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. The runbook is [the rollback runbook](https://clinic.ericgitangu.com/decisions#rollback).
 
-**Release pipeline (read from CircleCI on 2026-10-20).** The release on `382f08a` (pipeline 512, which CircleCI lists under its pre-rewrite id `0d6cde8`) is fully green: all 51 commit statuses are `success`, `cost-check` and `cost-static` included, and it shipped the API, the Go service, the booking app and the admin app past `verify-release`, `smoke-public` and `zap-prod`. The same holds for the current `main`, `df0fd29` (pipeline 514, which CircleCI lists as `aa9c9e3`: 51 of 51). The earlier release on `c9e1119` (pipeline 506, which CircleCI lists as `be149b8`; tagged `v1.0.0`) had a failing `cost-check` because each image repository still held a third image built before a history rewrite (limit: the live image and one rollback); I deleted those images and the next release passed.
+**Release status.** A release on `main` runs 51 jobs: the ships, `verify-release`, `smoke-public`, `zap-prod`, the rollback guards and the live `cost-check`. The badge at the top shows the latest one. One kind of failure is worth knowing about: `cost-check` allows each image repository only the live image and one rollback, and when one release was replaced by another seconds later, the replaced release's image used to be kept as if it were still on its way, so the count went one over. The prune step now keeps a newer image only when it belongs to the current head of `main`. The live check also reports C11 (budgets), C13 and C14 as UNVERIFIED, because CI has no billing role for them, so a run ends "PARTIAL, not OK" even when everything it can check passes.
 
 ## 10. Operations, cost & security posture
 
@@ -461,7 +460,7 @@ Much of the code in this repository was generated by AI. I directed it, reviewed
 I did not keep a running count of agent-written against hand-written lines, and git cannot tell them apart, so I will not put a percentage on it. By area:
 
 | Area | Who wrote it | How it was checked before merge |
-|---|---|---|
+| --- | --- | --- |
 | Plan and decision records | AI drafts from my constraints; I cut, reversed and signed off | My sign-off on each record before any code |
 | Backend: FastAPI, migrations, tests | AI | Real Postgres in every test, the race test with its naive control, a review round per pull request |
 | Booking and admin apps | AI | Browser tests against the real API and database, accessibility checks |
@@ -503,7 +502,7 @@ The design came before the code: the design and decision records were committed 
 ### What you need
 
 | Tool | Version | Needed for |
-|---|---|---|
+| --- | --- | --- |
 | Docker with Compose v2 | any recent release (I used Docker 29 and Compose v5) | `make up`, `make api-check`, `make e2e` |
 | `uv` | any recent release (0.11 here); it installs Python 3.12 from `backend/pyproject.toml` | `make test`, `make verify` |
 | Node | 24 (CircleCI runs 24.14) | the web apps |
