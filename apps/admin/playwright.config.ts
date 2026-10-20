@@ -81,6 +81,9 @@ export default defineConfig({
   ],
   use: {
     baseURL: ORIGIN,
+    // Kept for a failed scenario only (written to ./test-results, the default outputDir), so CI can
+    // store them (.circleci/config.yml, admin-e2e). No screenshots or video: the trace holds both.
+    trace: "retain-on-failure",
     ...(process.env.PW_CHROME_PATH
       ? { launchOptions: { executablePath: process.env.PW_CHROME_PATH } }
       : process.env.PW_BUNDLED
