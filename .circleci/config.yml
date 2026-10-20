@@ -1116,7 +1116,7 @@ jobs:
 
   wif-deny-probe:
     # Runs only on the test/wif-deny branch (workflow wif-deny), on the empty oidc-probe context:
-    # the token exchange must be refused and no deploy variable may be present (the keyless deploy rule, /decisions#keyless-deploy).
+    # the token exchange must be refused and no deploy variable may be present (the keyless deploy rule).
     docker:
       - image: mirror.gcr.io/cimg/base:current
     resource_class: small
