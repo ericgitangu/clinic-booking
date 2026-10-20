@@ -7,7 +7,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_clock, get_session, get_settings
+from app.api.deps import get_clock, get_relay, get_session, get_settings
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.domain.booking_rules import RULE_AVAILABILITY
@@ -19,6 +19,7 @@ from app.schemas.availability import Availability
 from app.schemas.doctor import Clinic, Doctor, DoctorList, WorkingWindow
 from app.schemas.problem import problem_responses
 from app.services.availability import get_availability
+from app.services.relay import Relay
 
 router = APIRouter(tags=["doctors"])
 
@@ -110,9 +111,13 @@ async def doctor_availability(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    relay: Relay = Depends(get_relay),
 ) -> Availability | Response:
     response.headers.update(_NO_STORE)
     body = await get_availability(session, clock, settings, doctor_id, date)
+    # A trigger that ran out of time leaves events for "the next trigger"; there is no worker, so a
+    # read is one: a cheap check, and a relay run only when an event is really owed.
+    await relay.flush_if_owed(clock)
     tag = _etag(body)
     if _matches(request.headers.get("if-none-match"), tag):
         return Response(status_code=304, headers={"ETag": tag, **_NO_STORE})

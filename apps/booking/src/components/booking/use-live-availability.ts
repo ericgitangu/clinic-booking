@@ -86,6 +86,10 @@ export function useLiveAvailability(initial: Availability) {
   const takenByEvent = useRef<{ startsAt: string; seq: string }[]>([]);
   // Polled responses dropped as older than the one on screen (shown as data-dropped for traces).
   const [dropped, setDropped] = useState(0);
+  // What the stream has handed this page: how many pushed events and what the last one did to the
+  // grid ("taken", "freed" or "ignored"), as "<count>:<what>". Shown as data-pushed so a trace of a
+  // missed update says whether the event reached the page or the page set it aside.
+  const [pushed, setPushed] = useState("0:none");
   const streamRef = useRef<StreamState>("polling");
   // Refreshes that failed in a row; reset by the first success. Read by refetchInterval.
   const failures = useRef(0);
@@ -183,6 +187,7 @@ export function useLiveAvailability(initial: Availability) {
       if (!cur) return;
       const r = applyEvent(cur, lastSeq.current, ev);
       lastSeq.current = r.lastSeq;
+      setPushed((p) => `${Number(p.split(":")[0]) + 1}:${r.effect}`);
       if (r.effect === "taken") {
         takenByEvent.current = [
           ...takenByEvent.current.filter((t) => t.startsAt !== ev.starts_at),
@@ -254,6 +259,7 @@ export function useLiveAvailability(initial: Availability) {
     armed,
     stream,
     dropped,
+    pushed,
     // The last refresh failed: the list on screen may be out of date.
     failing: query.isError,
     resume,
