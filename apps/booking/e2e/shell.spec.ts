@@ -89,6 +89,12 @@ const CASES: Case[] = [
   { name: "terms", path: () => "/terms", parent: "/", parentName: "Home" },
   { name: "data", path: () => "/data", parent: "/", parentName: "Home" },
   {
+    name: "decisions",
+    path: () => "/decisions",
+    parent: "/",
+    parentName: "Home",
+  },
+  {
     name: "swagger docs",
     path: () => "/docs",
     parent: "/",
