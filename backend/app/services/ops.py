@@ -144,6 +144,7 @@ async def today_board(
                     status=status,
                     patient_name=a["full_name"] if full else initials(a["full_name"]),
                     patient_phone=a["phone"] if full else mask_phone(a["phone"]),
+                    avatar_url=a["image_url"] if full else None,
                     locked=a["locked"],
                     patient_changed=is_vetoable(
                         a["latest_event_type"], a["latest_actor"], a["has_successor"]

@@ -14,6 +14,7 @@ import {
   isValidDay,
 } from "@/lib/clinic-time";
 import { CHANGE_WINDOW_NOTE, insideChangeWindow } from "@/lib/change-window";
+import { STAFF_LOCK_NOTE, STAFF_LOCK_TITLE } from "@/lib/staff-lock";
 import { ChangeWindowWatch } from "@/components/booking/change-window-watch";
 import { shouldTrackRenders } from "@/lib/test-run";
 import { ownBooked } from "@/lib/own";
@@ -76,6 +77,22 @@ export default async function Reschedule({
             Book a new one
           </Link>
           .
+        </p>
+      </section>
+    );
+  }
+
+  if (appt.data.locked) {
+    return (
+      <section className="py-10">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          {STAFF_LOCK_TITLE}
+        </h1>
+        <p role="status" className="mt-4 text-base">
+          {STAFF_LOCK_NOTE}{" "}
+          <Link href="/appointments" className="underline underline-offset-4">
+            My appointments
+          </Link>
         </p>
       </section>
     );

@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Clinic Booking API reviewer journey",
+    "name": "Idyllic Clinic API reviewer journey",
     "description": "Built from contracts/openapi.json (API version 1.0.0) by scripts/api_collection.mjs; edit that script, not this file.\n\nPick the `local` or `production` environment and run the folders in order. IDs and times flow from one request to the next through collection variables, and every time is computed from now, so the run never goes stale.\n\nRequests other than GET go to `writeBaseUrl`. The local environment sets it; the production environment does not, so those requests are skipped there, and a client that ignores the scripts has no host to send them to.\n\nPublic operations not in the journey:\n- `POST /realtime/token/patient`: the booking site's live-updates token: it answers only the site's own Origin and needs an Ably key, which the compose stack does not have.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -582,7 +582,7 @@
                 "exec": [
                   "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "const appt = pm.response.json();",
                   "pm.test(\"booked at the slot asked for\", () => {",
@@ -657,7 +657,7 @@
                 "exec": [
                   "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "pm.test(\"same appointment returned\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"appointmentId\")));",
                   "pm.test(\"Idempotent-Replayed: true\", () => pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"true\"));"
@@ -797,7 +797,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "pm.test(\"it is the booked appointment\", () => {",
                   "  const a = pm.response.json();",
@@ -850,7 +850,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"items\":{\"items\":{\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor\":{\"properties\":{\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"specialty\":{\"type\":\"string\"}},\"required\":[\"id\",\"full_name\",\"specialty\"],\"type\":\"object\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\",\"doctor\"],\"type\":\"object\"},\"type\":\"array\"},\"next_cursor\":{\"type\":\"null\"}},\"required\":[\"items\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"items\":{\"items\":{\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor\":{\"properties\":{\"full_name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"specialty\":{\"type\":\"string\"}},\"required\":[\"id\",\"full_name\",\"specialty\"],\"type\":\"object\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\",\"doctor\"],\"type\":\"object\"},\"type\":\"array\"},\"next_cursor\":{\"type\":\"null\"}},\"required\":[\"items\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "const ids = pm.response.json().items.map((a) => a.id);",
                   "pm.test(\"the replay made no second booking\", () => pm.expect(ids).to.eql([pm.collectionVariables.get(\"appointmentId\")]));"
@@ -1193,7 +1193,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "const a = pm.response.json();",
                   "pm.test(\"same appointment, new time\", () => {",
@@ -1263,7 +1263,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "pm.test(\"returns the appointment unchanged\", () => {",
                   "  const a = pm.response.json();",
@@ -1332,7 +1332,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "const a = pm.response.json();",
                   "pm.test(\"cancelled with the reason given\", () => {",
@@ -1550,7 +1550,7 @@
                 "exec": [
                   "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "pm.collectionVariables.set(\"changeAppointmentId\", pm.response.json().id);"
                 ]
@@ -1753,7 +1753,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"content-type is application/json\", () => pm.expect(pm.response.headers.get(\"Content-Type\") || \"\").to.match(/^application\\/json/));",
-                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
+                  "const schema = {\"properties\":{\"cancellation_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"cancelled_at\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}]},\"created_at\":{\"type\":\"string\"},\"doctor_id\":{\"type\":\"string\"},\"ends_at\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"locked\":{\"type\":\"boolean\"},\"patient_id\":{\"type\":\"string\"},\"starts_at\":{\"type\":\"string\"},\"status\":{\"enum\":[\"booked\",\"cancelled\"],\"type\":\"string\"},\"timezone\":{\"type\":\"string\"},\"updated_at\":{\"type\":\"string\"}},\"required\":[\"timezone\",\"id\",\"doctor_id\",\"patient_id\",\"starts_at\",\"ends_at\",\"status\",\"cancellation_reason\",\"cancelled_at\",\"locked\",\"created_at\",\"updated_at\"],\"type\":\"object\"};",
                   "pm.test(\"body matches the contract schema\", () => pm.response.to.have.jsonSchema(schema));",
                   "pm.test(\"the same visit cancels under the normal lead time\", () => {",
                   "  const a = pm.response.json();",
@@ -2402,7 +2402,10 @@
                   "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
                   "  pm.execution.skipRequest();",
                   "} else {",
-                  "  pm.collectionVariables.set(\"naiveStart\", pm.collectionVariables.get(\"slotStartNew\").slice(0, 19));",
+                  "  function naiveStart(slotStartIso) {",
+                  "    return slotStartIso.slice(0, 19);",
+                  "  }",
+                  "  pm.collectionVariables.set(\"naiveStart\", naiveStart(pm.collectionVariables.get(\"slotStartNew\")));",
                   "}"
                 ]
               }
@@ -2545,7 +2548,10 @@
                   "  pm.execution.skipRequest();",
                   "} else {",
                   "  // Seven minutes after a free slot: inside working hours, off the grid.",
-                  "  pm.collectionVariables.set(\"offGridStart\", new Date(new Date(pm.collectionVariables.get(\"slotStartNew\")).getTime() + 7 * 60000).toISOString());",
+                  "  function offGridStart(slotStartIso) {",
+                  "    return new Date(new Date(slotStartIso).getTime() + 7 * 60000).toISOString();",
+                  "  }",
+                  "  pm.collectionVariables.set(\"offGridStart\", offGridStart(pm.collectionVariables.get(\"slotStartNew\")));",
                   "}"
                 ]
               }
@@ -2606,7 +2612,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\",\"slotDay\"];",
+                  "const needs = [\"writeBaseUrl\",\"doctorId\",\"otherPatientId\",\"slotStartNew\"];",
                   "const missing = needs.filter((name) => !pm.variables.get(name));",
                   "if (missing.includes(\"writeBaseUrl\")) {",
                   "  console.log(\"skipped (writes are off; set writeBaseUrl to the API base to run it): \" + pm.info.requestName);",
@@ -2615,9 +2621,17 @@
                   "  console.log(\"skipped (\" + missing.join(\", \") + \" not set): \" + pm.info.requestName);",
                   "  pm.execution.skipRequest();",
                   "} else {",
-                  "  // 03:00 clinic time on the day the slots came from, with the offset the API used for them.",
+                  "  // 03:00 clinic time two clinic days from today, with the offset the API used for the slots. Not the",
+                  "  // slots' day: that can be the clinic's today, where 03:00 is inside the lead time, which is checked first.",
+                  "  function clinicDayAhead(nowMs, n) {",
+                  "    const clinicOffsetMs = 3 * 3600000; // Africa/Nairobi: UTC+3 all year",
+                  "    return new Date(nowMs + clinicOffsetMs + n * 86400000).toISOString().slice(0, 10);",
+                  "  }",
+                  "  function nightStart(nowMs, offset) {",
+                  "    return clinicDayAhead(nowMs, 2) + \"T03:00:00\" + offset;",
+                  "  }",
                   "  const start = pm.collectionVariables.get(\"slotStartNew\");",
-                  "  pm.collectionVariables.set(\"nightStart\", pm.collectionVariables.get(\"slotDay\") + \"T03:00:00\" + start.slice(19));",
+                  "  pm.collectionVariables.set(\"nightStart\", nightStart(Date.now(), start.slice(19)));",
                   "}"
                 ]
               }

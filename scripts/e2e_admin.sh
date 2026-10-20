@@ -24,5 +24,6 @@ cleanup() {
 trap cleanup EXIT
 
 docker compose --profile realtime up -d --build --wait api realtime
-pnpm -C apps/admin build
+# SHELL_E2E=1 adds the test-only error page the shell specs open; real builds do not have it.
+SHELL_E2E=1 pnpm -C apps/admin build
 pnpm -C apps/admin test:e2e

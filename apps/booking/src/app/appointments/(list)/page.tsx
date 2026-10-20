@@ -119,6 +119,7 @@ export default async function MyAppointments({
                     when={formatWhen(a.starts_at)}
                     startsAt={a.starts_at}
                     serverNow={serverNow}
+                    staffLocked={a.locked}
                   />
                 </li>
               ))}

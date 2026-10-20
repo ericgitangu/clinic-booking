@@ -81,6 +81,9 @@ export default defineConfig({
   ],
   use: {
     baseURL: ORIGIN,
+    // Kept for a failed scenario only (written to ./test-results, the default outputDir), so CI can
+    // store them (.circleci/config.yml, admin-e2e). No screenshots or video: the trace holds both.
+    trace: "retain-on-failure",
     ...(process.env.PW_CHROME_PATH
       ? { launchOptions: { executablePath: process.env.PW_CHROME_PATH } }
       : process.env.PW_BUNDLED
@@ -103,6 +106,8 @@ export default defineConfig({
       ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
       BETTER_AUTH_URL: ORIGIN,
+      // The e2e error fixture (page.e2e.tsx) only gets a nonce at runtime when this is set.
+      SHELL_E2E: "1",
       // Present only so the auth instance can be built; no test ever reaches Google.
       GOOGLE_CLIENT_ID: randomUUID(),
       GOOGLE_CLIENT_SECRET: randomUUID(),

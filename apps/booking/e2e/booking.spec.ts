@@ -5,7 +5,7 @@ import {
   type BrowserContext,
   type BrowserContextOptions,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { callApi } from "@clinic/api/call";
 import {
   bookMineInternalMeAppointmentsPost,

@@ -88,6 +88,24 @@ for (const scheme of SCHEMES) {
       expect(report(await auditFeed(page))).toBe("");
     });
 
+    test("the dashboard with its doctor portraits loaded has none either", async ({
+      as,
+    }) => {
+      const page = await as("owner");
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto("/dashboard");
+      const portrait = page
+        .locator('[data-testid="today-board"] img[src*="/doctors/"]')
+        .first();
+      await expect(portrait).toBeVisible();
+      await expect
+        .poll(() =>
+          portrait.evaluate((el: HTMLImageElement) => el.naturalWidth),
+        )
+        .toBeGreaterThan(0);
+      expect(report(await audit(page))).toBe("");
+    });
+
     test("the dashboard on a phone has none either", async ({ as }) => {
       const page = await as("owner");
       await page.setViewportSize({ width: 375, height: 800 });

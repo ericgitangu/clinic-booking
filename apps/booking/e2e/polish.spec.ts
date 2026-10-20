@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 
 // Vibration, the install surface and the page head, checked in a real browser against the real build.
 // Chrome on a laptop has navigator.vibrate but cannot buzz, so each case installs its own recorder

@@ -38,7 +38,8 @@ export const zAccessList = z.object({
  * What the web app knows from the sign-in besides the signed identity: the display name.
  */
 export const zAccountLinkRequest = z.object({
-    full_name: z.string().min(2).max(200)
+    full_name: z.string().min(2).max(200),
+    image: z.string().max(2048).nullish()
 });
 
 /**
@@ -76,6 +77,7 @@ export const zAdminActionEvent = z.object({
  */
 export const zAdminAppointment = z.object({
     attendance: z.enum(['arrived', 'no_show']).nullish(),
+    avatar_url: z.string().nullish(),
     cancellation_reason: z.string().nullable(),
     created_at: z.iso.datetime({ offset: true }),
     doctor_id: z.uuid(),
@@ -136,6 +138,7 @@ export const zAppointment = z.object({
     doctor_id: z.uuid(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
+    locked: z.boolean(),
     patient_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
@@ -206,6 +209,7 @@ export const zAuditPage = z.object({
  * BoardAppointment
  */
 export const zBoardAppointment = z.object({
+    avatar_url: z.string().nullish(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
     locked: z.boolean(),
@@ -378,6 +382,7 @@ export const zAppointmentWithDoctor = z.object({
     doctor_id: z.uuid(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
+    locked: z.boolean(),
     patient_id: z.uuid(),
     starts_at: z.iso.datetime({ offset: true }),
     status: z.enum(['booked', 'cancelled']),
@@ -631,7 +636,10 @@ export const zLineageEvent = z.object({
  */
 export const zLineage = z.object({
     appointment_id: z.uuid(),
-    events: z.array(zLineageEvent)
+    avatar_url: z.string().nullish(),
+    events: z.array(zLineageEvent),
+    patient_id: z.uuid(),
+    patient_name: z.string()
 });
 
 /**
@@ -1013,6 +1021,7 @@ export const zStaffAppointmentChange = z.object({
     doctor_name: z.string(),
     ends_at: z.iso.datetime({ offset: true }),
     id: z.uuid(),
+    locked: z.boolean(),
     patient_email: z.string().nullable(),
     patient_id: z.uuid(),
     patient_name: z.string(),

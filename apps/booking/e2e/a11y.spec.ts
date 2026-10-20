@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 import { farCell } from "./support/cells";
 import { withDb } from "./support/db";
 import { newPerson, sessionCookies } from "./support/auth";

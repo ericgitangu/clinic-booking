@@ -34,7 +34,7 @@ const ROWS = [
   ],
   [
     "Google profile (name, email, picture)",
-    "Sign-in only",
+    "Sign-in; the picture is also shown to the clinic's owner and admins next to your appointments",
     "Neon database; session cookie in your browser",
     "Until you ask for deletion; the cookie ends with your session",
   ],

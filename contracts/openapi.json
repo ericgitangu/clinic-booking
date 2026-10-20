@@ -106,6 +106,19 @@
             "minLength": 2,
             "title": "Full Name",
             "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Google profile picture URL. Kept only when it is an https URL on lh3.googleusercontent.com; anything else is silently stored as null. Updated on every call, and cleared when absent.",
+            "title": "Image"
           }
         },
         "required": [
@@ -216,6 +229,18 @@
               }
             ],
             "title": "Attendance"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The patient's Google profile picture (https on lh3.googleusercontent.com), only for owners and admins; null for viewers, for patients who never signed in with Google or have no picture, and for every demo patient. Show initials when null.",
+            "title": "Avatar Url"
           },
           "cancellation_reason": {
             "anyOf": [
@@ -489,6 +514,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_id": {
             "format": "uuid",
             "title": "Patient Id",
@@ -527,6 +556,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at"
         ],
@@ -608,6 +638,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_id": {
             "format": "uuid",
             "title": "Patient Id",
@@ -646,6 +680,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at",
           "doctor"
@@ -848,6 +883,17 @@
       },
       "BoardAppointment": {
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
           "ends_at": {
             "format": "date-time",
             "title": "Ends At",
@@ -2197,16 +2243,39 @@
             "title": "Appointment Id",
             "type": "string"
           },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As on the appointment list: owners and admins only, else null.",
+            "title": "Avatar Url"
+          },
           "events": {
             "items": {
               "$ref": "#/components/schemas/LineageEvent"
             },
             "title": "Events",
             "type": "array"
+          },
+          "patient_id": {
+            "format": "uuid",
+            "title": "Patient Id",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
           }
         },
         "required": [
           "appointment_id",
+          "patient_id",
+          "patient_name",
           "events"
         ],
         "title": "Lineage",
@@ -3302,6 +3371,10 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "patient_email": {
             "anyOf": [
               {
@@ -3367,6 +3440,7 @@
           "status",
           "cancellation_reason",
           "cancelled_at",
+          "locked",
           "created_at",
           "updated_at",
           "audit_id",
@@ -3739,7 +3813,7 @@
     }
   },
   "info": {
-    "title": "Clinic Booking API",
+    "title": "Idyllic Clinic API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",

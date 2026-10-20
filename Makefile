@@ -116,6 +116,14 @@ env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development
 	  'INTERNAL_SIGNING_KEY, RESEND_API_KEY, CRON_SECRET and the API/proxy variables. The example file marks them' \
 	  '"sensitive: copy manually". Local sign-in uses the http://localhost:3000/auth/callback/google redirect.'
 
+# The compose project and the host ports of `make e2e` can be overridden, so two worktrees can run it
+# side by side:  make e2e E2E_PROJECT=clinic-e2e-b E2E_API_PORT=18180 E2E_DB_PORT=15532
+# (The app itself is served on 3100; the Playwright config refuses to attach to a server already
+# there, so a busy port is an error, never another worktree's server.)
+E2E_PROJECT ?= clinic-e2e
+E2E_API_PORT ?= 18080
+E2E_DB_PORT ?= 15432
+
 e2e: ## Playwright checks against the real API and database (their own docker compose project, migrations and seed) and a production build
 	# Its own compose project, ports and keys, and a fresh database every time, so it never touches (or
 	# `down -v`s) a developer's running stack, and the scenarios always start from an empty database.
@@ -123,14 +131,14 @@ e2e: ## Playwright checks against the real API and database (their own docker co
 	# BETTER_AUTH_SECRET, and the reminder route wants CRON_SECRET: throwaway values for this run. The
 	# email allowances are raised so the day's counter never limits a run: every booking sends an email,
 	# and the cap itself is exercised by its own scenario (e2e/emails-cap.spec.ts) and the backend tests.
-	export COMPOSE_PROJECT_NAME=clinic-e2e API_HOST_PORT=18080 DB_HOST_PORT=15432 \
-	  E2E_API_URL=http://127.0.0.1:18080 REAL_API_URL=http://127.0.0.1:18080 \
+	export COMPOSE_PROJECT_NAME=$(E2E_PROJECT) API_HOST_PORT=$(E2E_API_PORT) DB_HOST_PORT=$(E2E_DB_PORT) \
+	  E2E_API_URL=http://127.0.0.1:$(E2E_API_PORT) REAL_API_URL=http://127.0.0.1:$(E2E_API_PORT) \
 	  WEB_ORIGIN=http://localhost:3100 INTERNAL_SIGNING_KEY=$$(openssl rand -hex 32) BETTER_AUTH_SECRET=$$(openssl rand -hex 32) CRON_SECRET=$$(openssl rand -hex 32) \
 	  EMAIL_DAILY_LIMIT=100000 EMAIL_MONTHLY_LIMIT=1000000 EMAIL_ACK_RESERVE=0; \
-	docker compose -p clinic-e2e down -v && docker compose -p clinic-e2e up -d --build --wait && \
+	docker compose -p $(E2E_PROJECT) down -v && docker compose -p $(E2E_PROJECT) up -d --build --wait && \
 	pnpm -C packages/api exec vitest run tests/real-api.test.ts && \
 	pnpm -C apps/booking exec vitest run tests/two-instances.test.ts tests/email-allowance.test.ts && \
-	cd apps/booking && pnpm build && pnpm test:e2e
+	cd apps/booking && SHELL_E2E=1 pnpm build && pnpm test:e2e
 
 api-collection: ## Rebuild the reviewer collection in docs/api/ from contracts/openapi.json
 	node scripts/api_collection.mjs
