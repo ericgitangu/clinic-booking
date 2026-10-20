@@ -17,4 +17,6 @@ curl -fsS --max-time 20 -o /dev/null "${WEB}/docs"
 test "$(code "${PUBLIC_API}/openapi.json")" = 308
 test "$(code "${RUN_APP_URL}/health")" = 403   # direct run.app stays an IAM denial
 test "$(code -L "${ADMIN}")" = 200         # the admin app serves its sign-in gate
-python3 scripts/verify_claims.py --base-url "$PUBLIC_API"
+# Read-only: this step has no signing key, so a booking flow here would add ordinary patients to the
+# live admin views on every run (and every retry). The signed flow runs on the tag URL before promotion.
+python3 scripts/verify_claims.py --base-url "$PUBLIC_API" --read-only

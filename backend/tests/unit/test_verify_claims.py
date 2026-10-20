@@ -47,3 +47,57 @@ def test_the_old_join_was_wrong_under_a_prefix() -> None:
     old = urljoin("https://h.example/api" + "/", "/api/appointments/x".lstrip("/"))
     assert old == "https://h.example/api/api/appointments/x"
     assert verify_claims.location_url("https://h.example/api", "/api/appointments/x") != old
+
+
+def _serve(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, str]]) -> None:
+    import httpx
+
+    real = httpx.Client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path.removeprefix("/api")
+        seen.append((request.method, path))
+        if path == "/doctors":
+            return httpx.Response(200, json={"items": [{"id": "d1"}]})
+        if path == "/doctors/d1/availability":
+            return httpx.Response(
+                200, json={"slots": [{"starts_at": "2026-10-21T09:00:00+03:00"}] * 2}
+            )
+        if path.startswith("/appointments/"):
+            return httpx.Response(
+                404, json={}, headers={"content-type": "application/problem+json"}
+            )
+        return httpx.Response(200, json={"info": {"title": "Clinic Booking API"}})
+
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+
+
+def test_read_only_sends_only_gets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The public smoke has no signing key; it must never create a patient."""
+    seen: list[tuple[str, str]] = []
+    _serve(monkeypatch, seen)
+    verify_claims.RESULTS.clear()
+    verify_claims.run_read_only("https://h.example/api", {})
+    assert seen and {m for m, _ in seen} == {"GET"}
+    assert all(ok for ok, _ in verify_claims.RESULTS)
+
+
+def test_ci_without_the_key_refuses_to_write(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seen: list[tuple[str, str]] = []
+    _serve(monkeypatch, seen)
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.delenv("SMOKE_SIGNING_KEY", raising=False)
+    monkeypatch.setattr("sys.argv", ["verify_claims.py", "--base-url", "https://h.example/api"])
+    assert verify_claims.main() == 2
+    assert seen == []  # refused before any request
+    assert "SMOKE_SIGNING_KEY" in capsys.readouterr().err
+
+
+def test_the_public_smoke_script_runs_read_only() -> None:
+    script = SCRIPT.parent / "ci" / "public_smoke.sh"
+    calls = [ln for ln in script.read_text().splitlines() if "verify_claims.py" in ln]
+    assert calls and all("--read-only" in ln for ln in calls)

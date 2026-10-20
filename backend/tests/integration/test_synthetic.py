@@ -324,6 +324,50 @@ async def test_verify_claims_signs_in_a_way_the_endpoint_accepts_and_marks_its_p
     assert row["full_name"].startswith("verify-claims ")
 
 
+async def test_smoke_patient_is_flagged_ordinary_is_not_and_the_appointments_table_hides_it(
+    api: httpx.AsyncClient, owner_conn: asyncpg.Connection, reset_appointments: None
+) -> None:
+    """Both patients through the real endpoints, both booked through the public API, then the
+    admin appointments table: only the ordinary patient's visit is listed."""
+    smoke = await _post_smoke(
+        api,
+        lambda p, b: _headers(p, SMOKE_KEY, role="smoke", sub=SMOKE_SUB, method="POST", body=b),
+    )
+    ordinary = await api.post("/patients", json={"full_name": "verify-claims 20261020T041539 1"})
+    assert smoke.status_code == 201 and ordinary.status_code == 201
+    flags = {
+        r["id"]: r["synthetic"]
+        for r in await owner_conn.fetch(
+            "SELECT id, synthetic FROM patients WHERE id = ANY($1::uuid[])",
+            [uuid.UUID(smoke.json()["id"]), uuid.UUID(ordinary.json()["id"])],
+        )
+    }
+    assert flags[uuid.UUID(smoke.json()["id"])] is True
+    # The name alone never marks a row: only the signed path does.
+    assert flags[uuid.UUID(ordinary.json()["id"])] is False
+
+    ids: dict[str, str] = {}
+    for label, patient, starts_at in (
+        ("smoke", smoke.json()["id"], "2026-10-21T09:00:00+03:00"),
+        ("ordinary", ordinary.json()["id"], "2026-10-21T10:00:00+03:00"),
+    ):
+        booked = await api.post(
+            "/appointments",
+            json={"doctor_id": str(OTIENO), "patient_id": patient, "starts_at": starts_at},
+        )
+        assert booked.status_code == 201, booked.text
+        ids[label] = booked.json()["id"]
+
+    listed = await _admin_get(api, "/internal/admin/appointments?status=all&limit=100")
+    assert listed.status_code == 200, listed.text
+    assert [i["id"] for i in listed.json()["items"]] == [ids["ordinary"]]
+    await owner_conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
+    await owner_conn.execute(
+        "DELETE FROM patients WHERE id = ANY($1::uuid[])",
+        [uuid.UUID(smoke.json()["id"]), uuid.UUID(ordinary.json()["id"])],
+    )
+
+
 # --- the realtime admin feed skips synthetic rows ---------------------------------------------
 
 

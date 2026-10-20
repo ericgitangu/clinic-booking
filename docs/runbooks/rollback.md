@@ -56,7 +56,7 @@ Follow `docs/runbooks/base-image-cve.md`, then re-release.
 What has and has not run in CI is recorded in README section 4.3.
 
 After `ship-booking` and `ship-admin`, `verify-release` (no credentials) runs `scripts/ci/public_smoke.sh`, which
-includes `/ready` through the public URL, for about 90 seconds of retries (cold starts). If it
+includes `/ready` through the public URL and a read-only pass of `verify_claims.py` (GETs only: with no signing key it must not create a patient), for about 90 seconds of retries (cold starts). If it
 still fails, `rollback-api` (only the `gcp-deploy` context) runs `scripts/ci/rollback.sh`, then
 `rollback-booking` and `rollback-admin` (both the `rollback-app` job, only the `vercel-prod` context) point production at the previous deployment of each app by
 id (`scripts/ci/vercel_prod.sh rollback <id>`), and `smoke-public` fails so the release stays red.
