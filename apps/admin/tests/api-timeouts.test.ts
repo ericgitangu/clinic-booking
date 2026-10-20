@@ -46,7 +46,7 @@ afterEach(async () => {
   await new Promise((ok) => api.close(ok));
 });
 
-const calls: [string, () => Promise<unknown>, RegExp][] = [
+const short: [string, () => Promise<unknown>, RegExp][] = [
   [
     "the claim of the notification",
     () => claimDoctorNotice(caller, ID),
@@ -62,22 +62,36 @@ const calls: [string, () => Promise<unknown>, RegExp][] = [
     () => markAttendance(caller, ID, "arrived", "at the desk"),
     /POST .*\/arrived/,
   ],
-  ["the session's role", () => sessionInfo(caller), /GET .*\/session/],
 ];
 
-describe("the calls on the way to the doctor email keep to the short timeout", () => {
-  it.each(calls)("%s gives up on a slow API", async (_name, call, route) => {
+describe("the calls on the arrival path keep to the short timeout", () => {
+  it.each(short)("%s gives up on a slow API", async (_name, call, route) => {
     const began = Date.now();
     const res = (await call()) as {
       ok: boolean;
       code?: string;
       status?: number;
     };
+    const took = Date.now() - began;
     expect(res.ok).toBe(false);
-    // The request was sent (the server saw it), and what failed was the wait for the answer.
+    // The request was sent (the server saw it) and the wait for the answer was what ended it: it
+    // took about the timeout (150 ms), not less (which a refused or reset connection would) and
+    // not the 2 s the server needed.
     expect(hits.some((h) => route.test(h))).toBe(true);
+    expect(took).toBeGreaterThanOrEqual(140);
+    expect(took).toBeLessThan(1500);
     expect(res.code).toBe("UPSTREAM_UNREACHABLE");
-    expect(res.status).toBe(503);
-    expect(Date.now() - began).toBeLessThan(1500);
+  });
+});
+
+describe("the role lookup keeps the default timeout", () => {
+  it("waits for a slow API instead of giving up at the short timeout", async () => {
+    // Every page and every action resolves the role through this call, and a cold API can take
+    // longer than the short timeout: it must not be cut at 150 ms (5 s for real).
+    const began = Date.now();
+    const res = (await sessionInfo(caller)) as { ok: boolean };
+    expect(hits.some((h) => /GET .*\/session/.test(h))).toBe(true);
+    expect(Date.now() - began).toBeGreaterThanOrEqual(1900); // it waited for the 2 s answer
+    expect(res.ok).toBe(false); // the stub answers with something that is not a session
   });
 });

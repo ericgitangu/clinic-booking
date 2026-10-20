@@ -166,10 +166,8 @@ test.describe("the arrival email to the doctor", () => {
     // The person who marked it sees one toast, and it already says "doctor emailed": the server
     // action found the row sent, so it scheduled no send.
     await expect(
-      tabA
-        .getByText("Marked arrived. Doctor emailed.", { exact: true })
-        .first(),
-    ).toBeVisible();
+      tabA.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+    ).toHaveCount(1);
     // Then the row stays terminal with the same attempts, and the stand-in's count stays at one,
     // over a bounded window of samples (six, half a second apart): a sample that passes at the
     // first look does not count, because a stray second send would show up later than that.
@@ -190,7 +188,64 @@ test.describe("the arrival email to the doctor", () => {
       )
       .toBeGreaterThanOrEqual(6);
     expect(await notice(visit.id)).toMatchObject({ status: "sent", attempts });
+    await adminContext.close();
     await allowMailTo(DOCTOR_EMAIL);
+    await setDoctorEmail(visit.doctorId, null);
+  });
+
+  test("the person who marks an arrival, with their own stream open, gets exactly one toast", async ({
+    as,
+  }) => {
+    test.setTimeout(90_000);
+    const visit = await visitAtTheDesk("Doctor Email Own");
+    await setDoctorEmail(visit.doctorId, DOCTOR_EMAIL);
+    const page = await as("admin");
+    await onDashboard(page); // this tab holds the stream: its own event comes back to it
+    const card = () =>
+      page.getByTestId("today-visit").filter({ hasText: visit.name });
+    const toasts = page.locator("[data-sonner-toast]");
+    const confirm = async (title: string, label: string, reason: string) => {
+      const ask = page.getByRole("dialog", { name: title });
+      await ask.getByLabel("Reason").fill(reason);
+      await ask.getByRole("button", { name: label }).click();
+    };
+
+    await tap(card().getByRole("button", { name: "Mark arrived" }));
+    await confirm("Mark as arrived?", "Mark arrived", "patient is at the desk");
+    // The event is back on the admin's own stream (the feed lists it)...
+    await expect(
+      page.getByTestId("live-event").filter({ hasText: visit.name }),
+    ).toBeVisible({ timeout: 5000 });
+    // ...and still the confirmation is the only toast, and it ends on the final state.
+    await expect(
+      page.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(toasts).toHaveCount(1);
+    await expect(toasts).not.toContainText(`Marked arrived: ${visit.name}`);
+    await expect(toasts).toHaveCount(0, { timeout: 15_000 }); // it goes after its 6 s
+
+    // Marking it arrived a second time (to no-show and back): one toast again, no live one.
+    await tap(card().getByRole("button", { name: "Change to no-show" }));
+    await confirm(
+      "Change to no-show?",
+      "Change to no-show",
+      "left before being seen",
+    );
+    await expect(
+      page.getByText("Marked no-show.", { exact: true }),
+    ).toBeVisible();
+    await expect(toasts).toHaveCount(0, { timeout: 15_000 });
+    await tap(card().getByRole("button", { name: "Change to arrived" }));
+    await confirm(
+      "Change to arrived?",
+      "Change to arrived",
+      "came back to the desk",
+    );
+    await expect(
+      page.getByText("Marked arrived. Doctor emailed.", { exact: true }),
+    ).toHaveCount(1);
+    await expect(toasts).toHaveCount(1);
+    await expect(toasts).not.toContainText(`Marked arrived: ${visit.name}`);
     await setDoctorEmail(visit.doctorId, null);
   });
 

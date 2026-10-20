@@ -56,9 +56,9 @@ export const sessionInfo = (caller: Caller) =>
     callApi(
       "sessionInfo",
       (client) => getSessionInfoInternalAdminSessionGet({ client }),
-      // Short, like every call on the way to an action that sends email: see the budget in
-      // actions.ts (markAttendance).
-      { caller, timeoutMs: CALL_TIMEOUT_MS },
+      // The default timeout, on purpose: this is the role lookup of every page and action, and a
+      // cold API can take longer than the short one used on the arrival path (lib/arrival-budget.ts).
+      { caller },
     ),
   );
 

@@ -77,7 +77,7 @@ export interface CallOptions {
   caller?: Caller;
 }
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+export const DEFAULT_TIMEOUT_MS = 15_000;
 
 // What a generated SDK function resolves to, whichever branch it took.
 type SdkOutcome<D> = {

@@ -111,6 +111,35 @@ func TestVetoAndUnlockCarryWhoAndWhyForStaffOnly(t *testing.T) {
 	noneOf(t, vf, booking.PatientName, apiAdmin.Email, unlockReason)
 }
 
+// A staff veto of a patient's CANCEL books the slot again as a NEW appointment. Its events (the
+// booking and the veto) are about the new id, and they carry the admin who did it: the admin app
+// relies on that to know the change is the signed-in person's own.
+func TestCancelVetoEventsOfTheNewAppointmentNameTheActor(t *testing.T) {
+	h := start(t, nil)
+	schema := compile(t, "staff-event.v1.schema.json")
+	api := h.env.NewAPI(t)
+	testenv.GrantStaff(t, h.env, apiAdmin.Email, "admin")
+	booking := api.Book(api.Doctor())
+	api.Cancel(booking, "changed my mind")
+
+	owner := h.hello(asOwner, q())
+	var successor struct {
+		ID string `json:"id"`
+	}
+	api.Staff(apiAdmin, http.MethodPost, "/internal/admin/appointments/"+booking.ID+"/veto",
+		map[string]any{"reason": "Doctor asked to keep the slot"}, http.StatusOK, &successor)
+	if successor.ID == "" || successor.ID == booking.ID {
+		t.Fatalf("a veto of a cancel should give a NEW appointment, got %q", successor.ID)
+	}
+	for _, kind := range []string{"booked", "vetoed"} {
+		f, m := owner.until(t, kind, forAppointment(successor.ID))
+		valid(t, schema, f.Data)
+		if str(m, "actor_email") != apiAdmin.Email || str(m, "actor_role") != "admin" {
+			t.Fatalf("%s frame of the new appointment = %s: it should name the admin", kind, f.Data)
+		}
+	}
+}
+
 // A booking and a cancellation made by staff name the staff member; a patient's own change does
 // not (actor fields are null).
 func TestStaffBookAndCancelNameTheActor(t *testing.T) {

@@ -57,6 +57,7 @@ test.describe("live notifications", () => {
     // Looking at the panel clears the count.
     await tabB.getByTestId("live-feed").scrollIntoViewIfNeeded();
     await expect(tabB.getByTestId("live-unread")).toHaveText("");
+    await adminContext.close();
   });
 
   test("a burst of bookings becomes one toast", async ({ as }) => {

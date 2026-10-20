@@ -77,9 +77,11 @@ describe("markAttendance, the producer of the confirmation toast", () => {
     },
   );
 
-  it("is a plain no-show confirmation with nothing to watch", async () => {
+  it("sends nothing and schedules nothing for a no-show, even if a pending notice came back", async () => {
     h.notice = { id: "n4", status: "pending", reason: null };
     const res = await markAttendance(ID, "no_show", "left");
     expect(res).toEqual({ ok: true, message: "Marked no-show." });
+    expect(h.afterCalls).toBe(0);
+    expect(h.sent).toEqual([]);
   });
 });

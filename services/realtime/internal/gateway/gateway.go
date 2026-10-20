@@ -239,10 +239,15 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A resumed stream is sent a backlog. Which rows are backlog is decided per row, against the
-	// database's own clock read now: a row whose occurred_at is before this moment was there
-	// before the stream opened. (occurred_at is the transaction's start, so a long transaction that
-	// started before this moment and commits after it is counted as backlog too: its event is
-	// not toasted, but it still appears in the feed. Failing that way is deliberate.)
+	// database's own clock read now: a row whose occurred_at is before this moment was written
+	// before the stream opened. occurred_at is not the commit time, and the two tables set it
+	// differently: appointment_events uses now(), the START of its transaction;
+	// staff_action_audit uses clock_timestamp(), the moment of the INSERT. Both are at or before
+	// the commit, so a row written before this moment and committed after it is counted as
+	// backlog (its event is not toasted; it still shows in the feed). And because the clocks
+	// differ, one long transaction can straddle the moment: its event (stamped at the start) is
+	// backlog, an audit row it inserts after the moment is not. Both are named limits, and both
+	// fail in the quiet direction.
 	var opened time.Time
 	if from != nil {
 		if opened, err = lease.Now(r.Context()); err != nil {
@@ -368,7 +373,10 @@ func closeEvent(reason string) string {
 // run is the stream loop. It returns the close reason.
 func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	g := s.g
-	hello := fmt.Sprintf(`{"cursor":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
+	// "replay_tag": this gateway tags the backlog of a resumed stream (see frameTagged); a client
+	// that finds the flag missing is talking to an older gateway and must not trust the absence of
+	// a tag as "live".
+	hello := fmt.Sprintf(`{"cursor":%q,"replay_tag":true,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
 		s.pos, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
 	if err := s.frame(s.pos.String(), "hello", hello); err != nil {
 		return ReasonClient

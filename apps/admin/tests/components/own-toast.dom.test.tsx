@@ -10,11 +10,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Every toast either component raises goes through notify; record them all, in order.
 const toasts = vi.hoisted(() => ({
-  calls: [] as { fn: string; message: string; id?: string }[],
+  calls: [] as {
+    fn: string;
+    message: string;
+    id?: string;
+    onDismiss?: () => void;
+  }[],
 }));
 vi.mock("@clinic/ui/lib/notify", () => {
-  const rec = (fn: string) => (message: string, data?: { id?: string }) =>
-    void toasts.calls.push({ fn, message, id: data?.id });
+  type Data = { id?: string; onDismiss?: () => void };
+  const rec = (fn: string) => (message: string, data?: Data) =>
+    void toasts.calls.push({
+      fn,
+      message,
+      id: data?.id,
+      onDismiss: data?.onDismiss,
+    });
   return {
     notify: {
       success: rec("success"),
@@ -23,8 +34,17 @@ vi.mock("@clinic/ui/lib/notify", () => {
       error: rec("error"),
       quiet: rec("quiet"),
       // A later version of a toast: no buzz; recorded with its look.
-      update: (kind: string, message: string, data?: { id?: string }) =>
-        void toasts.calls.push({ fn: `update:${kind}`, message, id: data?.id }),
+      update: (
+        kind: string,
+        message: string,
+        data?: { id?: string; onDismiss?: () => void },
+      ) =>
+        void toasts.calls.push({
+          fn: `update:${kind}`,
+          message,
+          id: data?.id,
+          onDismiss: data?.onDismiss,
+        }),
       dismiss: () => undefined,
     },
   };
@@ -209,6 +229,42 @@ describe("the toast of the person who marks an arrival", () => {
       "Marked arrived. Doctor email on its way.",
       "Marked arrived. Doctor emailed.",
     ]);
+  });
+
+  it("stops, and brings nothing back, once the person closes the toast", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        notice: {
+          id: "n",
+          status: "pending",
+          reason: null,
+          attempts: 1,
+          sentAt: null,
+          retryable: false,
+        },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <Page
+        run={async () => ({
+          ok: true,
+          message: "Marked arrived. Doctor email on its way.",
+          watch: { appointmentId: APPT },
+        })}
+      />,
+    );
+    await mark();
+    const first = toasts.calls[0];
+    await act(async () => {
+      first.onDismiss?.(); // swiped away
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    // Nothing more was said, not even "still sending", and the looks stopped.
+    expect(toasts.calls).toHaveLength(1);
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(2);
   });
 
   it("does not toast a veto of a cancel, whose events are about a NEW appointment, when they arrive before the answer", async () => {

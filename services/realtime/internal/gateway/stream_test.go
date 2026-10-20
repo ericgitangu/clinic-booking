@@ -250,6 +250,9 @@ func TestSSEHeadersAreProxySafeAndFirstFrameIsPrompt(t *testing.T) {
 	if err := json.Unmarshal([]byte(f.Data), &hello); err != nil || hello.Role != "owner" || hello.Lifetime != 30 || hello.Idle != 30 {
 		t.Fatalf("hello = %+v (%v)", hello, err)
 	}
+	if !strings.Contains(f.Data, `"replay_tag":true`) {
+		t.Fatalf("hello %s does not say this gateway tags its backlog", f.Data)
+	}
 
 }
 
@@ -276,7 +279,19 @@ func resumedBacklogThenLive(t *testing.T, backlog int) {
 	}
 	fresh.close()
 
+	// The order of events is fixed by an open transaction, not by a race: it holds the horizon, so
+	// nothing is delivered until it ends. The backlog is written and committed first, the stream
+	// opens (and the first poll finds nothing), the live booking is made after the stream opened,
+	// and only then is the horizon let go: backlog and live row come out together, backlog first.
 	ctx := context.Background()
+	holder := testenv.Connect(t, h.env.OwnerDSN)
+	tx, err := holder.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_current_xact_id()`); err != nil {
+		t.Fatal(err)
+	}
 	owner := testenv.Connect(t, h.env.OwnerDSN)
 	if _, err := owner.Exec(ctx, `INSERT INTO appointment_events
 	  (appointment_id, doctor_id, event_type, to_starts_at, local_date)
@@ -289,8 +304,10 @@ func resumedBacklogThenLive(t *testing.T, backlog int) {
 	if f, _ := second.nextEvent(t, 5*time.Second); f.Event != "hello" || f.Replay {
 		t.Fatalf("resumed hello = %+v", f)
 	}
-	// A real booking while the backlog is still being sent: written after the stream opened.
-	live := api.Book(doctor)
+	live := api.Book(doctor) // written after the stream opened
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	tagged := 0
 	for {

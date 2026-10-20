@@ -315,11 +315,13 @@ describe("LiveStream", () => {
     t.streams.push(a);
     t.live.start();
     await tick();
-    a.push('id: 7.3\nevent: hello\ndata: {"role":"owner"}\n\n');
+    a.push(
+      'id: 7.3\nevent: hello\ndata: {"role":"owner","replay_tag":true}\n\n',
+    );
     a.push("id: 7.4\nevent: booked\ndata: {}\n\n");
     await tick();
     expect(t.urls).toEqual(["/live/stream?cursor=7.3"]);
-    expect(t.hellos).toEqual(['7.3:{"role":"owner"}']);
+    expect(t.hellos).toEqual(['7.3:{"role":"owner","replay_tag":true}']);
     expect(t.events).toEqual(["7.4:booked"]);
     expect(t.live.cursor).toBe("7.4");
     t.live.stop();
@@ -364,6 +366,8 @@ describe("LiveStream: replay after a resume", () => {
   afterEach(() => vi.useRealTimers());
 
   const hello = (id: string) =>
+    `id: ${id}\nevent: hello\ndata: ${JSON.stringify({ cursor: id, replay_tag: true })}\n\n`;
+  const oldHello = (id: string) =>
     `id: ${id}\nevent: hello\ndata: ${JSON.stringify({ cursor: id })}\n\n`;
   const backlog = (id: string, event: string) =>
     `id: ${id}\nevent: ${event}\nreplay: true\ndata: {"x":1}\n\n`;
@@ -414,6 +418,50 @@ describe("LiveStream: replay after a resume", () => {
     a.push(live("9.1", "booked"));
     await tick();
     expect(t.events).toEqual(["9.1:booked"]);
+  });
+
+  it("against a gateway that does not say it tags (an older one), a resumed stream treats the backlog as replay until the stream goes quiet", async () => {
+    const a = sse();
+    const t = setup([a.response], { cursor: "5.0" });
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push(oldHello("5.0"));
+    a.push(live("5.1", "booked"));
+    await tick(900); // the next batch of the same backlog
+    a.push(live("5.2", "arrived"));
+    await tick(2000); // quiet longer than the gateway's poll: what comes now is live
+    a.push(live("6.1", "arrived"));
+    await tick();
+    expect(t.events).toEqual([
+      "5.1:booked:replay",
+      "5.2:arrived:replay",
+      "6.1:arrived",
+    ]);
+  });
+
+  it("against an older gateway a fresh stream (no cursor) is live from the first frame", async () => {
+    const a = sse();
+    const t = setup([a.response]);
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push(oldHello("9.0"));
+    a.push(live("9.1", "booked"));
+    await tick();
+    expect(t.events).toEqual(["9.1:booked"]);
+  });
+
+  it("a gateway that says it tags is trusted: no guessing, even right after the hello", async () => {
+    const a = sse();
+    const t = setup([a.response], { cursor: "5.0" });
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push(hello("5.0"));
+    a.push(live("5.1", "booked"));
+    await tick();
+    expect(t.events).toEqual(["5.1:booked"]);
   });
 
   it("ignores a replay field with any other value", async () => {

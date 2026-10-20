@@ -84,13 +84,28 @@ export function ConfirmAction({
         if (res.watch) {
           // One toast for the whole story: updated in place as the email to the doctor is sent.
           const id = `confirm-${nextSerial()}`;
-          notify.success(res.message, { id, duration: WHILE_PENDING_MS });
+          // The person closing the toast ends the story: no more updates, nothing recreated.
+          let closedByPerson = false;
+          const closed = {
+            onDismiss: () => {
+              closedByPerson = true;
+            },
+          };
+          notify.success(res.message, {
+            id,
+            duration: WHILE_PENDING_MS,
+            ...closed,
+          });
           void followArrivalToast(
             res.watch.appointmentId,
             id,
             (tid, message, kind, ms) =>
-              notify.update(kind, message, { id: tid, duration: ms }),
-            { initial: res.message },
+              notify.update(kind, message, {
+                id: tid,
+                duration: ms,
+                ...closed,
+              }),
+            { initial: res.message, alive: () => !closedByPerson },
           );
         } else {
           notify.success(res.message);

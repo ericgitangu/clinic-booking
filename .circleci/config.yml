@@ -1322,6 +1322,9 @@ workflows:
           serial-group: << pipeline.project.slug >>/deploy-prod
           requires:
             - ship-api
+            # The admin app reads the gateway's replay tag and capability flag: it goes live only
+            # after the gateway that sends them (a failed ship-realtime stops the admin ship).
+            - ship-realtime
             - build-admin
       - verify-release:
           serial-group: << pipeline.project.slug >>/deploy-prod

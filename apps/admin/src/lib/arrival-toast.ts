@@ -6,9 +6,13 @@
 // The email is sent after the response and can take as long as the after() bound allows (about
 // 25 s: claim, reserve, send and two results at 5 s each, see emails/doctor-arrival.ts), so the
 // looks run to 40 s: 2.5, 6, 15, 30 and 40 s. If the last look still says pending, or none of them
-// could read, the toast says so and stops: it never closes on "on its way". An update by id after
-// the toast was closed makes a new toast with that id, which is wanted here: this is the person's
-// own action, and its outcome should not be lost silently. Every update by id restarts sonner's
+// could read, the toast says so and stops: it never closes on "on its way".
+//
+// If the PERSON closes the toast (swipe or close button) the looks stop and nothing brings it back:
+// closing it is an answer. (Sonner waits 200 ms before it removes a closed toast, so an update that
+// lands in that window is lost along with it, which is the same answer.) A toast that went some
+// other way is made again by an update with its id: the person's own action should not lose its
+// outcome silently. Every update by id restarts sonner's
 // timer (its timer effect depends on the toast object, which an update replaces; sonner 2.0.8,
 // dist/index.mjs), so a finite duration on an update starts a fresh countdown; Infinity has none.
 import { watchDoctorNotice, type WatchOptions } from "@/lib/doctor-notice-read";
@@ -67,6 +71,8 @@ export function followArrivalToast(
     },
   ).then(() => {
     // The looks ran out with the email still pending (or unreadable): say so, and let the toast go.
-    if (!finished) show(id, STILL_SENDING, "info", FINAL_MS);
+    // Not if whoever wanted the answer has gone (the person closed the toast).
+    if (!finished && (options.alive ?? (() => true))())
+      show(id, STILL_SENDING, "info", FINAL_MS);
   });
 }

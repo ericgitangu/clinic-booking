@@ -131,15 +131,10 @@ export async function rescheduleAppointment(
   return { ok: true, message: "Appointment rescheduled." };
 }
 
-// The time this action may take, against the dashboard's maxDuration of 60 s (app/dashboard/
-// layout.tsx), which covers the response AND the after() work that follows it:
-//   before the response  sessionInfo 5 s (when the role is not the owner's) + markAttendance 5 s
-//                        + the page's re-render for revalidatePath, whose reads run together and
-//                        each stop at 15 s  =  at most about 25 s
-//   after the response   the doctor email: claim, reserve, send and two results, 5 s each = 25 s
-//   total                about 50 s, 10 s inside the 60. Both calls above pass CALL_TIMEOUT_MS
-//                        (lib/api.ts) so the first line cannot grow; tests/api-timeouts.test.ts.
-//
+// The time this action may take, step by step against the dashboard's maxDuration, is in
+// lib/arrival-budget.ts (about 75 s in the worst case, inside 120 s; a test keeps it so). The mark
+// itself passes the short CALL_TIMEOUT_MS (lib/api.ts); the role lookup keeps the default, since
+// every page and action goes through it and a cold API can need longer than the short one.
 // Arrived or no-show, from 15 minutes before the visit to 2 hours after it starts. Marking what is
 // already marked changes nothing; changing an earlier mark needs a reason (the API says so).
 export async function markAttendance(
@@ -159,7 +154,7 @@ export async function markAttendance(
   // The arrival is recorded and the response is on its way; telling the doctor happens after it,
   // and never changes it. A row that is not pending (no address on file, already sent) sends nothing.
   const notice = res.data.doctor_notice;
-  if (notice && notice.status === "pending") {
+  if (kind === "arrived" && notice && notice.status === "pending") {
     after(() => sendDoctorArrival({ caller, id: notice.id }, doctorPorts()));
   }
   updateTag(METRICS_TAG);
