@@ -159,7 +159,9 @@ async def test_a_claim_hands_out_what_to_send_once_and_a_provider_failure_can_be
     assert held.json()["send"] is None
 
     failed = await env.req(
-        "POST", notice_path(notice, "finish"), body={"outcome": "failed", "error": "timeout"}
+        "POST",
+        notice_path(notice, "finish"),
+        body={"attempt": 1, "outcome": "failed", "error": "timeout"},
     )
     assert failed.status_code == 200 and failed.json()["status"] == "failed"
     row = (await rows(owner_conn))[0]
@@ -169,7 +171,9 @@ async def test_a_claim_hands_out_what_to_send_once_and_a_provider_failure_can_be
     retry = (await env.req("POST", notice_path(notice, "claim"))).json()["send"]
     assert retry["attempt"] == 2
     sent = await env.req(
-        "POST", notice_path(notice, "finish"), body={"outcome": "sent", "provider_id": "re_123"}
+        "POST",
+        notice_path(notice, "finish"),
+        body={"attempt": 2, "outcome": "sent", "provider_id": "re_123"},
     )
     assert sent.json() == {"id": notice, "status": "sent", "updated": True}
     row = (await rows(owner_conn))[0]
@@ -178,7 +182,9 @@ async def test_a_claim_hands_out_what_to_send_once_and_a_provider_failure_can_be
 
     # Sent is final: no more claims, and a late finish changes nothing.
     assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"] is None
-    late = await env.req("POST", notice_path(notice, "finish"), body={"outcome": "failed"})
+    late = await env.req(
+        "POST", notice_path(notice, "finish"), body={"attempt": 2, "outcome": "failed"}
+    )
     assert late.json()["status"] == "sent" and late.json()["updated"] is False
 
 
@@ -201,7 +207,9 @@ async def test_the_attempts_run_out(env: Env, owner_conn: asyncpg.Connection) ->
     for n in (1, 2, 3):
         send = (await env.req("POST", notice_path(notice, "claim"))).json()["send"]
         assert send["attempt"] == n
-        await env.req("POST", notice_path(notice, "finish"), body={"outcome": "failed"})
+        await env.req(
+            "POST", notice_path(notice, "finish"), body={"attempt": n, "outcome": "failed"}
+        )
     assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"] is None
     assert (await rows(owner_conn))[0]["status"] == "failed"
 
@@ -215,7 +223,9 @@ async def test_a_spent_allowance_is_recorded_as_skipped_and_the_arrival_stands(
     notice = (await rows(owner_conn))[0]["id"]
     assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]
     done = await env.req(
-        "POST", notice_path(notice, "finish"), body={"outcome": "skipped", "reason": reason}
+        "POST",
+        notice_path(notice, "finish"),
+        body={"attempt": 1, "outcome": "skipped", "reason": reason},
     )
     assert done.json()["status"] == "skipped"
     row = (await rows(owner_conn))[0]
@@ -257,7 +267,7 @@ async def test_a_viewer_can_neither_claim_nor_finish(env: Env) -> None:
     notice = body["doctor_notice"]["id"]
     assert (await env.req("POST", notice_path(notice, "claim"), role="viewer")).status_code == 403
     finish = await env.req(
-        "POST", notice_path(notice, "finish"), role="viewer", body={"outcome": "sent"}
+        "POST", notice_path(notice, "finish"), role="viewer", body={"attempt": 1, "outcome": "sent"}
     )
     assert finish.status_code == 403
 
@@ -397,3 +407,139 @@ async def test_the_row_is_written_in_the_arrivals_own_transaction(
     # With the privilege back, the same request succeeds and writes both.
     again = await env.req("POST", appt_path(appt, "arrived"))
     assert again.status_code == 200 and len(await rows(owner_conn)) == 1
+
+
+# --- findings from review: stale rows, stale senders, the ack reserve --------------------------
+
+
+async def test_a_finish_from_an_earlier_claim_cannot_overwrite_a_newer_one(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    await set_address(env, REAL_LOOKING)
+    _, body = await arrive(env)
+    notice = body["doctor_notice"]["id"]
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 1
+    env.clock.set(START.replace(hour=START.hour + 1))  # sender A's lease ran out
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 2
+    # Sender A, late, says it failed: refused. Sender B's own result is then recorded.
+    late = await env.req(
+        "POST", notice_path(notice, "finish"), body={"attempt": 1, "outcome": "failed"}
+    )
+    assert late.json()["updated"] is False
+    row = (await rows(owner_conn))[0]
+    assert row["status"] == "pending" and row["leased_at"] is not None
+    done = await env.req(
+        "POST", notice_path(notice, "finish"), body={"attempt": 2, "outcome": "sent"}
+    )
+    assert done.json() == {"id": notice, "status": "sent", "updated": True}
+
+
+async def test_a_pending_row_nothing_is_sending_can_be_resent_and_is_never_stuck(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    await set_address(env, REAL_LOOKING)
+    appt, body = await arrive(env)
+    notice = body["doctor_notice"]["id"]
+    assert body["doctor_notice"]["retryable"] is False
+
+    async def state() -> dict[str, Any]:
+        got: dict[str, Any] = (await env.req("GET", appt_path(appt, "doctor-notification"))).json()
+        return got
+
+    fresh = await state()
+    assert (fresh["status"], fresh["retryable"]) == ("pending", False)  # just written: on its way
+
+    # Never claimed, two minutes on: the after() that should have sent it is not coming.
+    env.clock.set(START.replace(minute=START.minute + 3))
+    unclaimed = await state()
+    assert (unclaimed["status"], unclaimed["retryable"]) == ("pending", True)
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 1
+
+    # Claimed and held: still on its way. Claimed and the claim ran out: resend.
+    held = await state()
+    assert (held["status"], held["retryable"]) == ("pending", False)
+    env.clock.set(START.replace(hour=START.hour + 1))
+    gone = await state()
+    assert (gone["status"], gone["retryable"]) == ("pending", True)
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 2
+
+    # Every attempt used and nothing sending: shown as failed, not "on its way" forever.
+    env.clock.set(START.replace(hour=START.hour + 2))
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"]["attempt"] == 3
+    env.clock.set(START.replace(hour=START.hour + 3))
+    spent = await state()
+    assert (spent["status"], spent["retryable"], spent["attempts"]) == ("failed", False, 3)
+    assert (await rows(owner_conn))[0]["status"] == "pending"  # the derived view, not a rewrite
+    assert (await env.req("POST", notice_path(notice, "claim"))).json()["send"] is None
+
+
+async def test_failed_with_attempts_left_is_retryable_and_with_none_left_is_not(env: Env) -> None:
+    await set_address(env, REAL_LOOKING)
+    appt, body = await arrive(env)
+    notice = body["doctor_notice"]["id"]
+    for n in (1, 2, 3):
+        await env.req("POST", notice_path(notice, "claim"))
+        await env.req(
+            "POST", notice_path(notice, "finish"), body={"attempt": n, "outcome": "failed"}
+        )
+        state = (await env.req("GET", appt_path(appt, "doctor-notification"))).json()
+        assert (state["status"], state["retryable"]) == ("failed", n < 3)
+
+
+async def _spend(env: Env, owner_conn: asyncpg.Connection, used: int) -> None:
+    """Bring today's counter to ``used`` through the real counter table."""
+    day = env.clock.now().date()
+    month = day.replace(day=1)
+    await owner_conn.execute("DELETE FROM email_counter WHERE day = $1", day)
+    await owner_conn.execute("DELETE FROM email_month_counter WHERE month = $1", month)
+    await owner_conn.execute("INSERT INTO email_counter (day, sent) VALUES ($1, $2)", day, used)
+    await owner_conn.execute(
+        "INSERT INTO email_month_counter (month, sent) VALUES ($1, $2)", month, used
+    )
+
+
+async def test_the_room_held_for_acknowledgements_is_not_open_to_other_emails(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    from tests.conftest import make_settings
+
+    limit, reserve = make_settings().EMAIL_DAILY_LIMIT, make_settings().EMAIL_ACK_RESERVE
+    await _spend(env, owner_conn, limit - reserve)
+    other = await env.req("POST", "/internal/emails/reserve?purpose=other", role="admin")
+    assert other.json()["granted"] is False and other.json()["reason"] == "day"
+    ack = await env.req("POST", "/internal/emails/reserve", role="admin")  # an acknowledgement
+    assert ack.json()["granted"] is True
+    await _spend(env, owner_conn, 0)
+
+
+async def test_a_spent_allowance_is_skipped_through_the_real_counter(
+    env: Env, owner_conn: asyncpg.Connection
+) -> None:
+    """What the web app does, call by call: claim, reserve against the shared counter, and record
+    the refusal as skipped; the arrival stands and the counter is not decremented below its cap."""
+    from tests.conftest import make_settings
+
+    limit, reserve = make_settings().EMAIL_DAILY_LIMIT, make_settings().EMAIL_ACK_RESERVE
+    await set_address(env, REAL_LOOKING)
+    appt, body = await arrive(env)
+    notice = body["doctor_notice"]["id"]
+    await _spend(env, owner_conn, limit - reserve)
+    try:
+        send = (await env.req("POST", notice_path(notice, "claim"))).json()["send"]
+        assert send["attempt"] == 1
+        granted = await env.req("POST", "/internal/emails/reserve?purpose=other", role="admin")
+        assert granted.json()["granted"] is False
+        done = await env.req(
+            "POST",
+            notice_path(notice, "finish"),
+            body={"attempt": 1, "outcome": "skipped", "reason": "allowance_day"},
+        )
+        assert done.json()["status"] == "skipped"
+        used = await owner_conn.fetchval(
+            "SELECT sent FROM email_counter WHERE day = $1", env.clock.now().date()
+        )
+        assert used == limit - reserve  # a refusal takes nothing
+        state = (await env.req("GET", appt_path(appt, "doctor-notification"))).json()
+        assert (state["status"], state["reason"]) == ("skipped", "allowance_day")
+    finally:
+        await _spend(env, owner_conn, 0)

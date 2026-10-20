@@ -24,7 +24,8 @@ _INSERT = text(
 
 _BY_APPOINTMENT = text(
     """
-    SELECT id, appointment_id, doctor_id, status, reason, attempts, sent_at, last_error
+    SELECT id, appointment_id, doctor_id, status, reason, attempts, sent_at, last_error,
+           leased_at, updated_at
     FROM doctor_notification
     WHERE appointment_id = :appointment_id AND kind = 'patient_arrived'
     """
@@ -61,6 +62,7 @@ _SENT = text(
     SET status = 'sent', sent_at = :now, provider_id = :provider_id, leased_at = NULL,
         last_error = NULL, updated_at = :now
     WHERE id = :id AND status IN ('pending', 'failed') AND leased_at IS NOT NULL
+      AND attempts = :attempt
     RETURNING id
     """
 )
@@ -70,6 +72,7 @@ _FAILED = text(
     UPDATE doctor_notification
     SET status = 'failed', last_error = :error, leased_at = NULL, updated_at = :now
     WHERE id = :id AND status IN ('pending', 'failed') AND leased_at IS NOT NULL
+      AND attempts = :attempt
     RETURNING id
     """
 )
@@ -79,6 +82,7 @@ _SKIPPED = text(
     UPDATE doctor_notification
     SET status = 'skipped', reason = :reason, leased_at = NULL, updated_at = :now
     WHERE id = :id AND status IN ('pending', 'failed') AND leased_at IS NOT NULL
+      AND attempts = :attempt
     RETURNING id
     """
 )
@@ -165,25 +169,34 @@ async def claim(
 
 
 async def finish_sent(
-    session: AsyncSession, notification_id: uuid.UUID, *, provider_id: str | None, now: datetime
+    session: AsyncSession,
+    notification_id: uuid.UUID,
+    *,
+    attempt: int,
+    provider_id: str | None,
+    now: datetime,
 ) -> bool:
     res = await session.execute(
-        _SENT, {"id": notification_id, "provider_id": provider_id, "now": now}
+        _SENT, {"id": notification_id, "attempt": attempt, "provider_id": provider_id, "now": now}
     )
     return res.first() is not None
 
 
 async def finish_failed(
-    session: AsyncSession, notification_id: uuid.UUID, *, error: str, now: datetime
+    session: AsyncSession, notification_id: uuid.UUID, *, attempt: int, error: str, now: datetime
 ) -> bool:
-    res = await session.execute(_FAILED, {"id": notification_id, "error": error[:300], "now": now})
+    res = await session.execute(
+        _FAILED, {"id": notification_id, "attempt": attempt, "error": error[:300], "now": now}
+    )
     return res.first() is not None
 
 
 async def finish_skipped(
-    session: AsyncSession, notification_id: uuid.UUID, *, reason: str, now: datetime
+    session: AsyncSession, notification_id: uuid.UUID, *, attempt: int, reason: str, now: datetime
 ) -> bool:
-    res = await session.execute(_SKIPPED, {"id": notification_id, "reason": reason, "now": now})
+    res = await session.execute(
+        _SKIPPED, {"id": notification_id, "attempt": attempt, "reason": reason, "now": now}
+    )
     return res.first() is not None
 
 

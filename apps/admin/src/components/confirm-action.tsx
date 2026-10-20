@@ -16,6 +16,7 @@ import {
 import { Label } from "@clinic/ui/components/ui/label";
 import { Textarea } from "@clinic/ui/components/ui/textarea";
 import { notify } from "@clinic/ui/lib/notify";
+import { rememberOwn } from "@/lib/own-actions";
 import type { ActionResult } from "@/lib/failure-copy";
 
 export const MIN_REASON = 3;
@@ -41,6 +42,7 @@ export function ConfirmAction({
   reasonLabel = "Reason",
   reasonHint,
   onDone,
+  ownsAppointment,
 }: {
   /** The button that opens the dialog (a real button element, rendered as the trigger). */
   trigger: ReactNode;
@@ -60,6 +62,9 @@ export function ConfirmAction({
   reasonLabel?: string;
   reasonHint?: string;
   onDone?: () => void;
+  /** The appointment this changes: the live toast for the change is then left to this
+   *  confirmation in this tab (other tabs, and other people, still get it). */
+  ownsAppointment?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,6 +75,8 @@ export function ConfirmAction({
 
   function go() {
     start(async () => {
+      // Before the call: the live event can arrive before the answer does.
+      if (ownsAppointment) rememberOwn(ownsAppointment);
       const res = await run(text);
       if (res.ok) {
         notify.success(res.message);

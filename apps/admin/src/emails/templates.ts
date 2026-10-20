@@ -338,14 +338,34 @@ export function staffInvite(f: {
   });
 }
 
-/** The patient's first name and the first letter of the last one: "Amina W.". Nothing else about
- *  the patient goes to the doctor's inbox. */
+/** A name token without punctuation other than the hyphen and apostrophe inside a name. */
+const word = (t: string) =>
+  t.replace(/[^\p{L}\p{M}'’-]/gu, "").replace(/^['’-]+|['’-]+$/gu, "");
+
+/**
+ * The patient as the doctor's inbox may see them: the first name and the first letter of the last
+ * one, "Amina W.". The name is free text, so it is read with care. "Kamau, Amina" (surname first)
+ * is read as Amina K. A name of one word is not known to be a first name or a surname, so only its
+ * initial is given ("Patient A."). Nothing past the first name and one letter is ever returned.
+ */
 export function firstNameAndInitial(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "A patient";
-  if (parts.length === 1) return parts[0];
-  const last = [...parts[parts.length - 1]][0]?.toUpperCase() ?? "";
-  return `${parts[0]} ${last}.`;
+  const comma = fullName.indexOf(",");
+  const tokens = (text: string) => text.split(/\s+/).map(word).filter(Boolean);
+  let first: string | undefined;
+  let last: string | undefined;
+  if (comma >= 0) {
+    const before = tokens(fullName.slice(0, comma));
+    const after = tokens(fullName.slice(comma + 1));
+    first = after[0] ?? before[0];
+    last = after[0] ? before[before.length - 1] : undefined;
+  } else {
+    const all = tokens(fullName);
+    first = all[0];
+    last = all.length > 1 ? all[all.length - 1] : undefined;
+  }
+  if (!first) return "A patient";
+  if (!last) return `Patient ${[...first][0].toUpperCase()}.`;
+  return `${first} ${[...last][0].toUpperCase()}.`;
 }
 
 const DOCTOR_WHY =

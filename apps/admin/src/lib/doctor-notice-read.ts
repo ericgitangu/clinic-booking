@@ -3,24 +3,53 @@
 import type { DoctorNoticeView } from "@/lib/detail-read";
 import { toastSuffix } from "@/lib/doctor-notice-words";
 
-/** Reads the state at once, then again after RECHECK_MS while it is still pending (the email goes
- *  out a moment after the arrival, off the request). Never throws; says nothing if it cannot read. */
-export const RECHECK_MS = 2500;
+/** Waits between reads while the email is still pending: 2.5 s, 6 s and 15 s after the arrival
+ *  (the email goes out after the response and, with the real provider, can take several seconds). */
+export const RECHECK_AFTER_MS = [2500, 6000, 15000] as const;
 
-export async function doctorEmailSuffix(
+/**
+ * Reads the state at once, then again at each of RECHECK_AFTER_MS while it is still pending, and
+ * stops at the first final state, when `alive` says whoever wants it is gone, or when the delays
+ * run out. Never throws; says nothing if it cannot read.
+ */
+export async function watchDoctorNotice(
   appointmentId: string,
-  add: (suffix: string) => void,
+  onNotice: (notice: DoctorNoticeView) => void,
+  alive: () => boolean = () => true,
   read: (id: string) => Promise<DoctorNoticeView | null> = readNotice,
   wait: (ms: number) => Promise<void> = (ms) =>
     new Promise((r) => setTimeout(r, ms)),
 ): Promise<void> {
-  const first = await read(appointmentId);
-  if (!first) return;
-  add(toastSuffix(first));
-  if (first.status !== "pending") return;
-  await wait(RECHECK_MS);
-  const later = await read(appointmentId);
-  if (later && later.status !== "pending") add(toastSuffix(later));
+  let waited = 0;
+  for (let step = 0; step <= RECHECK_AFTER_MS.length; step++) {
+    if (!alive()) return;
+    const notice = await read(appointmentId);
+    if (notice) {
+      onNotice(notice);
+      if (notice.status !== "pending") return;
+    }
+    const next = RECHECK_AFTER_MS[step];
+    if (next === undefined) return;
+    await wait(next - waited);
+    waited = next;
+  }
+}
+
+/** The same, as the words at the end of a toast. */
+export function doctorEmailSuffix(
+  appointmentId: string,
+  add: (suffix: string) => void,
+  alive?: () => boolean,
+  read?: (id: string) => Promise<DoctorNoticeView | null>,
+  wait?: (ms: number) => Promise<void>,
+): Promise<void> {
+  return watchDoctorNotice(
+    appointmentId,
+    (n) => add(toastSuffix(n)),
+    alive,
+    read,
+    wait,
+  );
 }
 
 async function readNotice(id: string): Promise<DoctorNoticeView | null> {

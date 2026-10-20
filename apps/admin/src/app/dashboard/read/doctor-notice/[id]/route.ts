@@ -28,6 +28,7 @@ export async function GET(
     reason: res.data.reason,
     attempts: res.data.attempts,
     sentAt: res.data.sent_at,
+    retryable: res.data.retryable,
   };
   return Response.json({ ok: true, notice }, { headers });
 }

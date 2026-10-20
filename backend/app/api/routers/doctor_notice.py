@@ -78,9 +78,11 @@ async def get_doctor_notification(
     appointment_id: uuid.UUID,
     response: Response,
     session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+    settings: Settings = Depends(get_settings),
 ) -> DoctorNoticeState:
     response.headers.update(_NO_STORE)
-    return await doctor_notice.state_for(session, appointment_id)
+    return await doctor_notice.state_for(session, clock, settings, appointment_id)
 
 
 @router.post(

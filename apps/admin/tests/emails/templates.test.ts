@@ -197,7 +197,8 @@ describe("escaping", () => {
     });
     expect(m.html).not.toContain("<script>");
     expect(m.html).not.toContain("<b>Eve");
-    expect(m.html).toContain("&lt;b&gt;Eve");
+    expect(m.html).not.toContain("alert(1)");
+    expect(m.html).toContain("bEveb");
   });
 
   it.each(

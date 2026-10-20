@@ -118,6 +118,7 @@ export function TodayBoard({
               <TodayCard
                 key={d.doctor_id}
                 doctorId={d.doctor_id}
+                doctorName={d.name}
                 date={date}
                 data-testid={`today-${d.doctor_id}`}
                 className="min-w-0 rounded-xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm"

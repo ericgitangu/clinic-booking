@@ -55,7 +55,13 @@ export function makePorts(
     async reserve(caller) {
       const r = await callApi(
         "reserveEmail",
-        (client) => reserveEmailInternalEmailsReservePost({ client }),
+        (client) =>
+          // "other": the room EMAIL_ACK_RESERVE keeps for booking acknowledgements is not open to the
+          // admin app's emails.
+          reserveEmailInternalEmailsReservePost({
+            client,
+            query: { purpose: "other" },
+          }),
         { caller, timeoutMs },
       );
       return r.ok ? { ok: true, data: r.data } : failure(r);

@@ -13,6 +13,7 @@ import random
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.exc import DBAPIError
@@ -220,6 +221,17 @@ async def emails_today(
 )
 async def reserve_email(
     response: Response,
+    purpose: Annotated[
+        Literal["ack", "other"],
+        Query(
+            description=(
+                "`ack`: a booking acknowledgement, which may use the whole allowance (the default, "
+                "so the patient app is unchanged). `other`: any other email (staff emails, the "
+                "doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the "
+                "room kept for acknowledgements cannot be used up by them."
+            )
+        ),
+    ] = "ack",
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
@@ -230,14 +242,15 @@ async def reserve_email(
     response.headers.update(_NO_STORE)
     now = clock.now()
     day, month = now.astimezone(UTC).date(), _month_of(now)
+    held_back = settings.EMAIL_ACK_RESERVE if purpose == "other" else 0
     reason = await _counter_txn(
         session,
         lambda: reminder_repo.reserve(
             session,
             day=day,
             month=month,
-            day_cap=settings.EMAIL_DAILY_LIMIT,
-            month_cap=settings.EMAIL_MONTHLY_LIMIT,
+            day_cap=settings.EMAIL_DAILY_LIMIT - held_back,
+            month_cap=settings.EMAIL_MONTHLY_LIMIT - held_back,
         ),
     )
     if reason is not None and (reason, month if reason == "month" else day) not in _spent_logged:

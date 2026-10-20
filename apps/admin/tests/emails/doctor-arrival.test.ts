@@ -3,6 +3,7 @@ import type { DoctorNoticeFinish } from "@clinic/api/generated";
 import { doctorArrived, firstNameAndInitial } from "@/emails";
 import {
   sendDoctorArrival,
+  sendKey,
   type DoctorNoticePorts,
 } from "@/emails/doctor-arrival";
 import { SITE } from "@/lib/site";
@@ -59,7 +60,7 @@ function ports(over: Partial<DoctorNoticePorts> = {}) {
 describe("the Patient arrived email", () => {
   it("names the patient by first name and last initial and nothing else about them", () => {
     expect(firstNameAndInitial("Wanjiru Kamau Mwangi")).toBe("Wanjiru M.");
-    expect(firstNameAndInitial("  amina  ")).toBe("amina");
+    expect(firstNameAndInitial("  amina  ")).toBe("Patient A.");
     const mail = doctorArrived({
       patientName: "Wanjiru Kamau Mwangi",
       doctor: "Dr. Achieng Otieno",
@@ -85,6 +86,45 @@ describe("the Patient arrived email", () => {
   });
 });
 
+describe("firstNameAndInitial reads a free-text name with care", () => {
+  it.each([
+    ["Kamau, Amina", "Amina K."],
+    ["Kamau,Amina Wanjiru", "Amina K."],
+    ["Amina Wanjiru Kamau", "Amina K."],
+    ["Mary-Anne O'Brien", "Mary-Anne O."],
+    ["AminaWanjiru", "Patient A."],
+    ["Kamau,", "Patient K."],
+    ["  ,  ", "A patient"],
+    ["", "A patient"],
+    ["Amina (Mina) K.", "Amina K."],
+  ])("%s -> %s", (name, shown) => {
+    expect(firstNameAndInitial(name)).toBe(shown);
+  });
+
+  it("never lets the rest of a name into the email", () => {
+    for (const name of [
+      "Kamau, Amina",
+      "AminaWanjiru",
+      "Wanjiru Kamau Mwangi",
+    ]) {
+      const mail = doctorArrived({
+        patientName: name,
+        doctor: "Dr. Otieno",
+        startsAt: "2026-10-27T07:00:00Z",
+        appointmentId: APPT,
+      });
+      for (const part of ["Kamau", "Wanjiru", "Mwangi", "AminaWanjiru"]) {
+        if (
+          name.includes(part) &&
+          !firstNameAndInitial(name).startsWith(part)
+        ) {
+          expect(mail.html + mail.text + mail.subject).not.toContain(part);
+        }
+      }
+    }
+  });
+});
+
 describe("sendDoctorArrival", () => {
   beforeEach(() => vi.stubEnv("RESEND_API_KEY", "re_test_key_value"));
   afterEach(() => vi.unstubAllEnvs());
@@ -95,8 +135,10 @@ describe("sendDoctorArrival", () => {
     expect(out).toBe("sent");
     expect(t.sends).toHaveLength(1);
     expect(t.sends[0].to).toBe("dr.otieno@clinic.co.ke");
-    expect(t.sends[0].key).toBe(`doctor-arrival/${ID}`);
-    expect(t.finished).toEqual([{ outcome: "sent", provider_id: "re_1" }]);
+    expect(t.sends[0].key).toBe(sendKey(ID, "dr.otieno@clinic.co.ke"));
+    expect(t.finished).toEqual([
+      { attempt: 1, outcome: "sent", provider_id: "re_1" },
+    ]);
     expect(t.p.release).not.toHaveBeenCalled();
   });
 
@@ -129,7 +171,7 @@ describe("sendDoctorArrival", () => {
       });
       expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe("cap-hit");
       expect(t.sends).toHaveLength(0);
-      expect(t.finished).toEqual([{ outcome: "skipped", reason }]);
+      expect(t.finished).toEqual([{ attempt: 1, outcome: "skipped", reason }]);
     },
   );
 
@@ -168,7 +210,7 @@ describe("sendDoctorArrival", () => {
       "not-configured",
     );
     expect(t.finished).toEqual([
-      { outcome: "skipped", reason: "not_configured" },
+      { attempt: 1, outcome: "skipped", reason: "not_configured" },
     ]);
     expect(t.sends).toHaveLength(0);
   });
@@ -181,9 +223,61 @@ describe("sendDoctorArrival", () => {
     });
     expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe("error");
     expect(t.p.release).toHaveBeenCalledTimes(1);
-    expect(t.finished[0]).toEqual({
-      outcome: "failed",
-      error: "Unexpected error.",
+    expect(t.finished).toEqual([]); // the claim is left to run out; the sheet offers a resend
+  });
+
+  it("a claim call that fails sends nothing, records nothing and says so", async () => {
+    const t = ports({
+      claim: async () => ({ ok: false, code: "UPSTREAM_UNREACHABLE" }),
     });
+    expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe(
+      "claim-failed",
+    );
+    expect(t.sends).toHaveLength(0);
+    expect(t.finished).toEqual([]);
+    expect(t.p.release).not.toHaveBeenCalled();
+  });
+
+  it("tries again to record a send that went out, and does not send twice or reserve twice", async () => {
+    let calls = 0;
+    const t = ports({
+      finish: async (_c, _id, body) => {
+        calls += 1;
+        if (calls < 3) return { ok: false, code: "UPSTREAM_UNREACHABLE" };
+        t.finished.push(body);
+        return { ok: true, data: true };
+      },
+    });
+    const reserve = vi.spyOn(t.p, "reserve");
+    expect(await sendDoctorArrival({ caller, id: ID }, t.p)).toBe("sent");
+    expect(calls).toBe(3);
+    expect(t.sends).toHaveLength(1);
+    expect(reserve).toHaveBeenCalledTimes(1);
+    expect(t.finished).toEqual([
+      { attempt: 1, outcome: "sent", provider_id: "re_1" },
+    ]);
+  });
+
+  it("names the attempt the claim returned in every result", async () => {
+    const t = ports({
+      claim: async () => ({ ok: true, data: { ...job, attempt: 2 } }),
+    });
+    await sendDoctorArrival({ caller, id: ID }, t.p);
+    expect(t.finished[0].attempt).toBe(2);
+  });
+});
+
+describe("the send key", () => {
+  it("is the same for the same address and new for a corrected one (Resend refuses a reused key with a different payload for 24 hours)", () => {
+    expect(sendKey(ID, "dr@clinic.co.ke")).toBe(
+      sendKey(ID, " Dr@Clinic.co.ke "),
+    );
+    expect(sendKey(ID, "dr@clinic.co.ke")).not.toBe(
+      sendKey(ID, "doctor@clinic.co.ke"),
+    );
+    expect(sendKey(ID, "dr@clinic.co.ke")).not.toContain("clinic.co.ke");
+    expect(sendKey(ID, "dr@clinic.co.ke")).toMatch(
+      new RegExp(`^doctor-arrival/${ID}/[0-9a-f]{12}$`),
+    );
   });
 });

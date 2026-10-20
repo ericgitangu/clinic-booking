@@ -385,6 +385,7 @@ export const zDoctorLoad = z.object({
  * DoctorNoticeFinish
  */
 export const zDoctorNoticeFinish = z.object({
+    attempt: z.int().gte(1),
     error: z.string().max(300).nullish(),
     outcome: z.enum([
         'sent',
@@ -430,6 +431,7 @@ export const zDoctorNoticeState = z.object({
         'demo_address',
         'not_configured'
     ]).nullable(),
+    retryable: z.boolean(),
     sent_at: z.iso.datetime({ offset: true }).nullable(),
     status: z.enum([
         'pending',
@@ -1724,6 +1726,10 @@ export const zReleaseEmailInternalEmailsReleasePostBody = zEmailRelease;
  * Successful Response
  */
 export const zReleaseEmailInternalEmailsReleasePostResponse = zEmailBudget;
+
+export const zReserveEmailInternalEmailsReservePostQuery = z.object({
+    purpose: z.enum(['ack', 'other']).optional().default('ack')
+});
 
 /**
  * Successful Response

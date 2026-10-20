@@ -14,7 +14,7 @@ after, in the transaction of the change (``set_email``).
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,15 +38,41 @@ from app.schemas.doctor_notice import (
 
 # A row is sent at most this many times (the first try and two retries).
 MAX_ATTEMPTS = 3
+# A pending row nobody has claimed this long after it was written is not going to be sent by the
+# after() that was meant to (it was cut off, or its claim call failed): the sheet offers a resend.
+UNCLAIMED_GRACE = timedelta(minutes=2)
 
 
-def _state(row: dict[str, Any]) -> DoctorNoticeState:
+def _state(
+    row: dict[str, Any], *, now: datetime | None = None, lease: timedelta | None = None
+) -> DoctorNoticeState:
+    """The row as the sheet and the toast see it. With ``now`` and ``lease`` it also says whether a
+    resend can help: a failed row with attempts left, or a pending row nothing is sending any more.
+    A pending row that has used every attempt and is no longer being sent is reported as failed, so
+    it never reads "on its way" forever."""
+    status = row["status"]
+    attempts = row.get("attempts", 0)
+    retryable = False
+    if now is not None and lease is not None:
+        leased_at = row.get("leased_at")
+        if status == "failed":
+            retryable = attempts < MAX_ATTEMPTS
+        elif status == "pending":
+            held = leased_at is not None and leased_at >= now - lease
+            unclaimed = leased_at is None and row["updated_at"] < now - UNCLAIMED_GRACE
+            gone = leased_at is not None and not held
+            if unclaimed or gone:
+                if attempts >= MAX_ATTEMPTS:
+                    status = "failed"
+                else:
+                    retryable = True
     return DoctorNoticeState(
         id=row["id"],
-        status=row["status"],
+        status=status,
         reason=row.get("reason"),
-        attempts=row.get("attempts", 0),
+        attempts=attempts,
         sent_at=row.get("sent_at"),
+        retryable=retryable,
     )
 
 
@@ -79,12 +105,14 @@ async def record_arrival(
     return _state({**row, "attempts": 0, "sent_at": None})
 
 
-async def state_for(session: AsyncSession, appointment_id: uuid.UUID) -> DoctorNoticeState:
+async def state_for(
+    session: AsyncSession, clock: Clock, settings: Settings, appointment_id: uuid.UUID
+) -> DoctorNoticeState:
     row = await repo.for_appointment(session, appointment_id)
     await session.rollback()
     if row is None:
         raise NotFoundRoute("No doctor notification for this appointment.")
-    return _state(row)
+    return _state(row, now=clock.now(), lease=timedelta(minutes=settings.REMINDER_LEASE_MINUTES))
 
 
 async def claim(
@@ -111,6 +139,7 @@ async def claim(
             await repo.finish_skipped(
                 session,
                 notification_id,
+                attempt=row["attempts"],
                 reason="no_email" if not email else "demo_address",
                 now=now,
             )
@@ -136,21 +165,35 @@ async def finish(
     notification_id: uuid.UUID,
     body: DoctorNoticeFinish,
 ) -> DoctorNoticeFinished:
-    """Record the result of a send for a claim this caller holds. A row that is not held, or is
-    already sent or skipped, is left alone and the answer says what it is."""
+    """Record the result of a send made under a claim. The result names the attempt the claim
+    returned and is applied only to that attempt: a sender whose lease ran out and whose row was
+    claimed again since cannot overwrite the newer claim. A row that is not held, is already sent
+    or skipped, or is on another attempt is left alone and the answer says what it is."""
     now = clock.now()
     async with session.begin():
         if body.outcome == "sent":
             done = await repo.finish_sent(
-                session, notification_id, provider_id=body.provider_id, now=now
+                session,
+                notification_id,
+                attempt=body.attempt,
+                provider_id=body.provider_id,
+                now=now,
             )
         elif body.outcome == "failed":
             done = await repo.finish_failed(
-                session, notification_id, error=body.error or "send failed", now=now
+                session,
+                notification_id,
+                attempt=body.attempt,
+                error=body.error or "send failed",
+                now=now,
             )
         else:
             done = await repo.finish_skipped(
-                session, notification_id, reason=body.reason or "not_configured", now=now
+                session,
+                notification_id,
+                attempt=body.attempt,
+                reason=body.reason or "not_configured",
+                now=now,
             )
         row = await repo.by_id(session, notification_id)
     if row is None:

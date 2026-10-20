@@ -229,13 +229,19 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var pos cursor.Cursor
-	if from != nil {
-		pos = *from
-	} else if pos, err = lease.Horizon(r.Context()); err != nil {
+	// The horizon at connect: every row with a txid below it is already committed, so a row the
+	// stream sends below it was there before this client connected (a catch-up after a resume) and
+	// one at or above it happened after. A fresh connection starts there; a resume starts at its
+	// cursor and says where the horizon is, so the client can tell the two apart without a clock.
+	horizon, err := lease.Horizon(r.Context())
+	if err != nil {
 		g.log.Error("horizon failed", slog.String("error", err.Error()))
 		g.dbUnavailable(w, r)
 		return
+	}
+	pos := horizon
+	if from != nil {
+		pos = *from
 	}
 
 	h := w.Header()
@@ -247,7 +253,7 @@ func (g *Gateway) stream(w http.ResponseWriter, r *http.Request) {
 		slog.Bool("resumed", from != nil))
 
 	begin := time.Now()
-	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, role: current,
+	s := &session{g: g, w: w, rc: http.NewResponseController(w), pos: pos, horizon: horizon, role: current,
 		staff: current == "owner" || current == "admin", email: principal.Email, smoke: smoke,
 		appointment: appointment, lifeEnd: begin.Add(g.cfg.MaxConnection)}
 	reason := s.run(r.Context(), lease)
@@ -282,15 +288,17 @@ func (g *Gateway) dbUnavailable(w http.ResponseWriter, r *http.Request) {
 }
 
 type session struct {
-	g     *Gateway
-	w     http.ResponseWriter
-	rc    *http.ResponseController
-	pos   cursor.Cursor
-	role  string
-	staff bool
-	email string
-	smoke bool
-	sent  int
+	g   *Gateway
+	w   http.ResponseWriter
+	rc  *http.ResponseController
+	pos cursor.Cursor
+	// horizon is the commit-safe position at connect (see the hello frame).
+	horizon cursor.Cursor
+	role    string
+	staff   bool
+	email   string
+	smoke   bool
+	sent    int
 	// appointment, when not "", limits the stream to one appointment.
 	appointment string
 	lifeEnd     time.Time
@@ -338,8 +346,8 @@ func closeEvent(reason string) string {
 // run is the stream loop. It returns the close reason.
 func (s *session) run(ctx context.Context, lease *store.Lease) string {
 	g := s.g
-	hello := fmt.Sprintf(`{"cursor":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
-		s.pos, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
+	hello := fmt.Sprintf(`{"cursor":%q,"horizon":%q,"role":%q,"lifetime_seconds":%d,"idle_seconds":%d}`,
+		s.pos, s.horizon, s.role, int(g.cfg.MaxConnection.Seconds()), int(g.cfg.Idle.Seconds()))
 	if err := s.frame(s.pos.String(), "hello", hello); err != nil {
 		return ReasonClient
 	}

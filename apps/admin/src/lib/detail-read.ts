@@ -18,6 +18,8 @@ export interface DoctorNoticeView {
     | null;
   attempts: number;
   sentAt: string | null;
+  /** Whether sending again can help now (failed with tries left, or pending and nothing sending). */
+  retryable: boolean;
 }
 
 export interface AppointmentDetail {
@@ -69,16 +71,12 @@ export async function loadDetail(id: string): Promise<DetailResult> {
   if (!lineage.found || !row)
     return { ok: false, message: "That appointment could not be found." };
   const mayAudit = can(staff.role, "manage-appointments");
-  const audit = mayAudit
-    ? await auditList(callerFor(staff, staff.role), {
-        appointment_id: id,
-        limit: 25,
-      })
-    : null;
-  const notice =
-    mayAudit && row.attendance === "arrived"
-      ? await doctorNotice(callerFor(staff, staff.role), id)
-      : null;
+  const caller = callerFor(staff, staff.role);
+  // Both reads need only the row, so they go out together.
+  const [audit, notice] = await Promise.all([
+    mayAudit ? auditList(caller, { appointment_id: id, limit: 25 }) : null,
+    mayAudit && row.attendance === "arrived" ? doctorNotice(caller, id) : null,
+  ]);
   return {
     ok: true,
     detail: {
@@ -104,6 +102,7 @@ export async function loadDetail(id: string): Promise<DetailResult> {
               reason: notice.data.reason,
               attempts: notice.data.attempts,
               sentAt: notice.data.sent_at,
+              retryable: notice.data.retryable,
             }
           : null,
       nowMs: Date.now(),

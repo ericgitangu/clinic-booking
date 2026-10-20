@@ -8,31 +8,43 @@ import {
   ToastBatcher,
   cardsTouched,
   highlights,
+  nextSerial,
   toastText,
   wantsEmailStatus,
   type ToastSink,
 } from "@/lib/live-notices";
+import { isOwn } from "@/lib/own-actions";
 import { sharedStream } from "@/lib/live-share";
 import type { Role } from "@/lib/roles";
 
 const SUMMARY_MS = 6000;
-// An arrival toast stays up long enough to be updated with what became of the doctor's email.
-const ARRIVAL_MS = 6000;
+const TOAST_MS = 6000;
+// A toast still waiting to hear what became of the doctor's email stays up until the next look.
+const WAITING_MS = 12_000;
 
-/** Toasts through the shared notify setup: quiet (no buzz, no sound) and loaded on the first one. */
-const sink = (): ToastSink => {
-  let n = 0;
-  return {
-    show: (text) => {
-      const id = `live-${(n += 1)}`;
-      notify.quiet(text, { id, duration: ARRIVAL_MS });
-      return id;
-    },
-    update: (id, text) => notify.quiet(text, { id, duration: ARRIVAL_MS }),
-    dismiss: (id) => notify.dismiss(id),
-    summary: (id, text) => notify.quiet(text, { id, duration: SUMMARY_MS }),
-  };
-};
+/** Toasts through the shared notify setup: quiet (no buzz, no sound) and loaded on the first one.
+ *  Ids come from one counter for the page, so a toast of an earlier mount is never overwritten. */
+const sink = (): ToastSink => ({
+  show: (text, gone) => {
+    const id = `live-${nextSerial()}`;
+    notify.quiet(text, {
+      id,
+      duration: TOAST_MS,
+      onDismiss: gone,
+      onAutoClose: gone,
+    });
+    return id;
+  },
+  update: (id, text, gone) =>
+    notify.quiet(text, {
+      id,
+      duration: text.endsWith("on its way") ? WAITING_MS : TOAST_MS,
+      onDismiss: gone,
+      onAutoClose: gone,
+    }),
+  dismiss: (id) => notify.dismiss(id),
+  summary: (id, text) => notify.quiet(text, { id, duration: SUMMARY_MS }),
+});
 
 /**
  * Draws attention to what happens while nobody is watching the feed panel: a toast for each live
@@ -60,7 +72,7 @@ export function LiveNotifications({
   });
   useEffect(() => {
     const batch = new ToastBatcher(sink());
-    return sharedStream(person).subscribe({
+    const off = sharedStream(person).subscribe({
       role,
       onStatus: () => undefined,
       onRefresh: () => undefined,
@@ -71,16 +83,23 @@ export function LiveNotifications({
         for (const key of cardsTouched(ev)) highlights.mark(key);
         const doctor = latest.current.find((d) => d.id === ev.doctorId)?.name;
         if (!isToastKind(ev.kind)) return;
+        // The tab that made the change already says so (its own confirmation); a second toast for
+        // the same action would also count towards a burst and fold colleagues' updates away.
+        if (ev.appointmentId && isOwn(ev.appointmentId)) return;
         // Owner and admin hear what became of the email to the doctor; a viewer's stream carries
         // no names, and nothing about the doctor's address either.
         const follow =
-          wantsEmailStatus(ev, role) && ev.appointmentId
-            ? (add: (suffix: string) => void) =>
-                void doctorEmailSuffix(ev.appointmentId as string, add)
+          wantsEmailStatus(ev, role, document.hidden) && ev.appointmentId
+            ? (add: (suffix: string) => void, alive: () => boolean) =>
+                void doctorEmailSuffix(ev.appointmentId as string, add, alive)
             : undefined;
         batch.push(toastText(ev, doctor, role), follow);
       },
     });
+    return () => {
+      off();
+      batch.dispose();
+    };
   }, [person, role]);
   return null;
 }

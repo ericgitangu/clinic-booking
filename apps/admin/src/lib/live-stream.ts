@@ -14,6 +14,7 @@
 // One browser holds one of these at a time: live-share.ts elects a leader tab that owns it and
 // passes its events to the other tabs.
 import { createSseParser } from "@clinic/api/realtime";
+import { after } from "@/lib/live-events";
 
 export type LiveStatus =
   | "connecting"
@@ -29,20 +30,12 @@ export const HIDDEN_CLOSE_MS = 5 * 60_000;
 export const BUSY_REFRESH_MS = 30_000;
 export const BUSY_RETRY_BASE_MS = 30_000;
 export const BUSY_RETRY_MAX_MS = 4 * 60_000;
-/**
- * The gateway sends no marker between the events it replays on a resume and the ones that follow
- * as they happen. It replays straight after the hello frame, batch after batch, one batch per poll
- * (1 s by default). A frame that arrives more than this after the one before it (or after the
- * hello) is therefore not part of the replay. Longer than the poll interval, shorter than any
- * pause a person would notice.
- */
-export const CATCHUP_QUIET_MS = 1500;
-
 export interface LiveStreamOptions {
   /**
    * Called with each event frame's SSE id, event name and data. `replay` is true for a frame that
-   * is part of the catch-up after a resume (see CATCHUP_QUIET_MS): it happened while this client
-   * was away, not just now.
+   * is part of the catch-up after a resume: it was already committed when this connection was made
+   * (its id is below the `horizon` the hello frame carries), so it happened while this client was
+   * away, not just now. A gateway that sends no horizon marks nothing as replay.
    */
   onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
@@ -58,8 +51,6 @@ export interface LiveStreamOptions {
   random?: () => number;
   fetchImpl?: typeof fetch;
   isHidden?: () => boolean;
-  /** Milliseconds, for the catch-up rule; Date.now by default. */
-  now?: () => number;
   timers?: {
     setTimeout: (f: () => void, ms: number) => Handle;
     clearTimeout: (h: Handle) => void;
@@ -201,7 +192,6 @@ export class LiveStream {
     const doFetch = this.o.fetchImpl ?? fetch;
     const base = this.o.url ?? "/live/stream";
     const query = new URLSearchParams();
-    const resuming = this.lastId !== null;
     if (this.lastId) query.set("cursor", this.lastId);
     const qs = query.toString();
     const url = qs ? `${base}?${qs}` : base;
@@ -253,17 +243,13 @@ export class LiveStream {
     this.set("live");
 
     let closeReason: string | null = null;
-    // Only a connection that sent a cursor is replayed anything: without one the gateway starts at
-    // its horizon.
-    let catchingUp = resuming;
-    let lastFrameAt = (this.o.now ?? Date.now)();
+    // The gateway's horizon at connect: every row below it was committed before this connection.
+    let horizon: string | null = null;
     const parser = createSseParser((f) => {
       if (f.kind !== "event") return;
       if (f.id) this.lastId = f.id;
-      const at = (this.o.now ?? Date.now)();
-      const quiet = at - lastFrameAt > CATCHUP_QUIET_MS;
-      lastFrameAt = at;
       if (f.event === "hello") {
+        horizon = horizonOf(f.data);
         this.o.onHello?.(f.id ?? "", f.data);
         return;
       }
@@ -271,8 +257,11 @@ export class LiveStream {
         closeReason = f.event === "idle" ? "idle" : this.reason(f.data);
         return;
       }
-      if (catchingUp && quiet) catchingUp = false;
-      this.o.onEvent(f.id ?? "", f.event, f.data, catchingUp);
+      const replay =
+        horizon !== null &&
+        SEQ.test(f.id ?? "") &&
+        after(horizon, f.id as string);
+      this.o.onEvent(f.id ?? "", f.event, f.data, replay);
     });
     const reader = res.body.getReader();
     try {
@@ -319,5 +308,17 @@ export class LiveStream {
     this.startRefreshing();
     const { baseMs, maxMs } = this.o.backoff ?? { baseMs: 2000, maxMs: 30_000 };
     this.later(Math.min(baseMs * 2 ** this.failures++, maxMs));
+  }
+}
+
+const SEQ = /^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/;
+
+/** The horizon in a hello frame's data, if it has a well-formed one. */
+function horizonOf(data: string): string | null {
+  try {
+    const h = (JSON.parse(data) as { horizon?: unknown }).horizon;
+    return typeof h === "string" && SEQ.test(h) ? h : null;
+  } catch {
+    return null;
   }
 }

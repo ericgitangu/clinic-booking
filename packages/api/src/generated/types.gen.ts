@@ -926,6 +926,12 @@ export type DoctorNoticeClaim = {
  */
 export type DoctorNoticeFinish = {
     /**
+     * Attempt
+     *
+     * The `attempt` the claim returned: a result for any other is refused.
+     */
+    attempt: number;
+    /**
      * Error
      */
     error?: string | null;
@@ -981,6 +987,12 @@ export type DoctorNoticeState = {
      * Reason
      */
     reason: 'no_email' | 'allowance_day' | 'allowance_month' | 'demo_address' | 'not_configured' | null;
+    /**
+     * Retryable
+     *
+     * Whether sending again can help now: a failed row with attempts left, or a pending row nothing is sending any more (never claimed after a grace period, or its claim ran out). A row that is pending with every attempt used is reported as failed.
+     */
+    retryable: boolean;
     /**
      * Sent At
      */
@@ -4176,7 +4188,14 @@ export type ReleaseEmailInternalEmailsReleasePostResponse = ReleaseEmailInternal
 export type ReserveEmailInternalEmailsReservePostData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Purpose
+         *
+         * `ack`: a booking acknowledgement, which may use the whole allowance (the default, so the patient app is unchanged). `other`: any other email (staff emails, the doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the room kept for acknowledgements cannot be used up by them.
+         */
+        purpose?: 'ack' | 'other';
+    };
     url: '/internal/emails/reserve';
 };
 
@@ -4189,6 +4208,10 @@ export type ReserveEmailInternalEmailsReservePostErrors = {
      * Problem (RFC 9457)
      */
     403: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
 };
 
 export type ReserveEmailInternalEmailsReservePostResponses = {

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { doctorEmailSuffix } from "@/lib/doctor-notice-read";
+import { RECHECK_AFTER_MS, doctorEmailSuffix } from "@/lib/doctor-notice-read";
 import {
+  arrivalMessage,
+  sheetLead,
   sheetLine,
   toastSuffix,
   type NoticeFacts,
@@ -45,6 +47,27 @@ describe("what the toast and the sheet say about the doctor's email", () => {
   });
 });
 
+describe("the lead and the arrival message follow the status", () => {
+  it("says 'notified' only when the doctor was", () => {
+    expect(sheetLead({ ...base, status: "sent" })).toBe("Doctor notified.");
+    for (const status of ["pending", "failed", "skipped"] as const)
+      expect(sheetLead({ ...base, status })).not.toMatch(/^Doctor notified/);
+    expect(sheetLead({ ...base, status: "pending" })).toBe(
+      "Doctor not notified yet.",
+    );
+  });
+
+  it("gives the person who marked the arrival one message with the email's state", () => {
+    expect(arrivalMessage(null)).toBe("Marked arrived.");
+    expect(arrivalMessage({ status: "pending", reason: null })).toBe(
+      "Marked arrived. Doctor email on its way.",
+    );
+    expect(arrivalMessage({ status: "skipped", reason: "no_email" })).toBe(
+      "Marked arrived. Email not sent (no doctor email).",
+    );
+  });
+});
+
 describe("doctorEmailSuffix", () => {
   const view = (over: Partial<DoctorNoticeView>): DoctorNoticeView => ({
     id: "n",
@@ -52,13 +75,18 @@ describe("doctorEmailSuffix", () => {
     reason: null,
     attempts: 0,
     sentAt: null,
+    retryable: false,
     ...over,
   });
+  const yes = () => true;
+  const sent = view({ status: "sent", sentAt: "2026-10-27T07:00:01Z" });
 
   it("says nothing when the state cannot be read", async () => {
     const add = vi.fn();
-    await doctorEmailSuffix("a", add, async () => null);
+    const wait = vi.fn(async () => undefined);
+    await doctorEmailSuffix("a", add, yes, async () => null, wait);
     expect(add).not.toHaveBeenCalled();
+    expect(wait).toHaveBeenCalledTimes(RECHECK_AFTER_MS.length); // it keeps looking, then stops
   });
 
   it("reports a skipped email once, with the reason", async () => {
@@ -66,24 +94,50 @@ describe("doctorEmailSuffix", () => {
     const read = vi.fn(async () =>
       view({ status: "skipped", reason: "no_email" }),
     );
-    await doctorEmailSuffix("a", add, read);
+    await doctorEmailSuffix("a", add, yes, read);
     expect(add.mock.calls).toEqual([["email not sent (no doctor email)"]]);
     expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it("reads again while pending and reports the final state", async () => {
+  it("looks again at 2.5 s, 6 s and 15 s while pending, then stops", async () => {
     const add = vi.fn();
-    const answers = [
-      view({}),
-      view({ status: "sent", sentAt: "2026-10-27T07:00:01Z" }),
-    ];
+    const waits: number[] = [];
+    const read = vi.fn(async () => view({}));
+    await doctorEmailSuffix(
+      "a",
+      add,
+      yes,
+      read,
+      async (ms) => void waits.push(ms),
+    );
+    expect(waits).toEqual([2500, 3500, 9000]); // the gaps between reads at 2.5, 6 and 15 s
+    expect(read).toHaveBeenCalledTimes(4);
+    expect(add).toHaveBeenCalledTimes(4);
+  });
+
+  it("a send that finishes after the second look still updates the toast", async () => {
+    const add = vi.fn();
+    const answers = [view({}), view({}), view({}), sent];
     const read = vi.fn(async () => answers.shift() ?? null);
-    const wait = vi.fn(async () => undefined);
-    await doctorEmailSuffix("a", add, read, wait);
-    expect(add.mock.calls).toEqual([
-      ["doctor email on its way"],
-      ["doctor emailed"],
-    ]);
-    expect(wait).toHaveBeenCalledTimes(1);
+    await doctorEmailSuffix("a", add, yes, read, async () => undefined);
+    expect(add.mock.calls.at(-1)).toEqual(["doctor emailed"]);
+    expect(read).toHaveBeenCalledTimes(4);
+  });
+
+  it("stops asking once the toast is gone", async () => {
+    const add = vi.fn();
+    let up = true;
+    const read = vi.fn(async () => {
+      up = false; // swiped away after the first look
+      return view({});
+    });
+    await doctorEmailSuffix(
+      "a",
+      add,
+      () => up,
+      read,
+      async () => undefined,
+    );
+    expect(read).toHaveBeenCalledTimes(1);
   });
 });

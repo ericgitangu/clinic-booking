@@ -243,10 +243,34 @@ func TestSSEHeadersAreProxySafeAndFirstFrameIsPrompt(t *testing.T) {
 	}
 	var hello struct {
 		Role     string `json:"role"`
+		Horizon  string `json:"horizon"`
+		Cursor   string `json:"cursor"`
 		Lifetime int    `json:"lifetime_seconds"`
 		Idle     int    `json:"idle_seconds"`
 	}
 	if err := json.Unmarshal([]byte(f.Data), &hello); err != nil || hello.Role != "owner" || hello.Lifetime != 30 || hello.Idle != 30 {
+		t.Fatalf("hello = %+v (%v)", hello, err)
+	}
+	// A fresh connection starts at the horizon, and says so.
+	if hello.Horizon == "" || hello.Horizon != hello.Cursor {
+		t.Fatalf("hello horizon %q, cursor %q: a fresh stream starts at the horizon", hello.Horizon, hello.Cursor)
+	}
+}
+
+// A resumed stream starts at the cursor it was given and reports where the horizon is, so the client
+// can tell the backlog it is sent (below the horizon) from what happens after it connected.
+func TestResumeHelloCarriesTheCursorAndTheHorizon(t *testing.T) {
+	h := start(t, nil)
+	s := h.open(asOwner, q("cursor", "1.1"))
+	f, ok := s.nextEvent(t, 3*time.Second)
+	if !ok || f.Event != "hello" || f.ID != "1.1" {
+		t.Fatalf("hello %+v: a resume starts at the cursor it was given", f)
+	}
+	var hello struct {
+		Cursor  string `json:"cursor"`
+		Horizon string `json:"horizon"`
+	}
+	if err := json.Unmarshal([]byte(f.Data), &hello); err != nil || hello.Cursor != "1.1" || hello.Horizon == "" || hello.Horizon == "1.1" {
 		t.Fatalf("hello = %+v (%v)", hello, err)
 	}
 }

@@ -242,6 +242,7 @@ function Body({
 
         {d.doctorNotice && (
           <DoctorNoticeLine
+            appointmentId={d.id}
             notice={d.doctorNotice}
             canAct={canAct}
             reload={reload}

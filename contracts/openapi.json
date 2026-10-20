@@ -1631,6 +1631,12 @@
       "DoctorNoticeFinish": {
         "additionalProperties": false,
         "properties": {
+          "attempt": {
+            "description": "The `attempt` the claim returned: a result for any other is refused.",
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
           "error": {
             "anyOf": [
               {
@@ -1684,6 +1690,7 @@
           }
         },
         "required": [
+          "attempt",
           "outcome"
         ],
         "title": "DoctorNoticeFinish",
@@ -1750,6 +1757,11 @@
             ],
             "title": "Reason"
           },
+          "retryable": {
+            "description": "Whether sending again can help now: a failed row with attempts left, or a pending row nothing is sending any more (never claimed after a grace period, or its claim ran out). A row that is pending with every attempt used is reported as failed.",
+            "title": "Retryable",
+            "type": "boolean"
+          },
           "sent_at": {
             "anyOf": [
               {
@@ -1778,7 +1790,8 @@
           "status",
           "reason",
           "attempts",
-          "sent_at"
+          "sent_at",
+          "retryable"
         ],
         "title": "DoctorNoticeState",
         "type": "object"
@@ -7375,6 +7388,24 @@
       "post": {
         "description": "Take one email from the day's and the month's allowance before sending it, atomically: under\nany number of concurrent senders the caps are never exceeded. A refusal is a normal answer\n(``granted`` false and the cap that said no), not an error: the caller just does not send.",
         "operationId": "reserve_email_internal_emails_reserve_post",
+        "parameters": [
+          {
+            "description": "`ack`: a booking acknowledgement, which may use the whole allowance (the default, so the patient app is unchanged). `other`: any other email (staff emails, the doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the room kept for acknowledgements cannot be used up by them.",
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "default": "ack",
+              "description": "`ack`: a booking acknowledgement, which may use the whole allowance (the default, so the patient app is unchanged). `other`: any other email (staff emails, the doctor's arrival email); it stops EMAIL_ACK_RESERVE short of the caps, so the room kept for acknowledgements cannot be used up by them.",
+              "enum": [
+                "ack",
+                "other"
+              ],
+              "title": "Purpose",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7397,6 +7428,9 @@
               "application/problem+json": {}
             },
             "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
           }
         },
         "summary": "Reserve Email",

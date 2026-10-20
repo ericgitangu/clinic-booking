@@ -19,6 +19,7 @@ import {
   revokeAccess as revoke,
 } from "@/lib/api";
 import { doctorPorts, sendDoctorArrival } from "@/emails/doctor-arrival";
+import { arrivalMessage } from "@/lib/doctor-notice-words";
 import { SITE } from "@/lib/site";
 import { noticeOfInvite, noticeToPatient } from "@/lib/staff-mail";
 import { describeFailure as describe } from "@/lib/failure-copy";
@@ -156,7 +157,8 @@ export async function markAttendance(
   revalidatePath("/dashboard", "layout");
   return {
     ok: true,
-    message: kind === "arrived" ? "Marked arrived." : "Marked no-show.",
+    // The one toast the person who marked it sees, so it also says what became of the email.
+    message: kind === "arrived" ? arrivalMessage(notice) : "Marked no-show.",
   };
 }
 

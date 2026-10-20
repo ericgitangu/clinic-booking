@@ -65,6 +65,13 @@ class DoctorNoticeState(BaseModel):
     reason: NoticeReason | None
     attempts: int
     sent_at: _dt.datetime | None
+    retryable: bool = Field(
+        description=(
+            "Whether sending again can help now: a failed row with attempts left, or a pending "
+            "row nothing is sending any more (never claimed after a grace period, or its claim "
+            "ran out). A row that is pending with every attempt used is reported as failed."
+        )
+    )
 
 
 class DoctorNoticeToSend(BaseModel):
@@ -82,6 +89,12 @@ class DoctorNoticeToSend(BaseModel):
 
 class DoctorNoticeFinish(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    attempt: Annotated[
+        int,
+        Field(
+            ge=1, description="The `attempt` the claim returned: a result for any other is refused."
+        ),
+    ]
     outcome: Literal["sent", "failed", "skipped"]
     provider_id: Annotated[Annotated[str, Field(max_length=200)] | None, Field()] = None
     error: Annotated[Annotated[str, Field(max_length=300)] | None, Field()] = None

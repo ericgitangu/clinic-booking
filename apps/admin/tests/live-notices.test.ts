@@ -40,18 +40,29 @@ const staffShape = (over: Record<string, unknown> = {}) =>
 
 function sink() {
   const calls: string[] = [];
+  const gone = new Map<string, () => void>();
+  const rawSummary: string[] = [];
   let n = 0;
   const s: ToastSink = {
-    show: (text) => {
+    show: (text, onGone) => {
       const id = `t${(n += 1)}`;
+      gone.set(id, onGone);
       calls.push(`show ${id} ${text}`);
       return id;
     },
     dismiss: (id) => calls.push(`dismiss ${id}`),
-    summary: (id, text) => calls.push(`summary ${id} ${text}`),
-    update: (id, text) => calls.push(`update ${id} ${text}`),
+    // The id is one counter for the page, so its number depends on what ran before: the calls
+    // name summaries by order within this sink, and `rawSummary` keeps the real ids.
+    summary: (id, text) => {
+      if (!rawSummary.includes(id)) rawSummary.push(id);
+      calls.push(`summary live-updates-${rawSummary.indexOf(id) + 1} ${text}`);
+    },
+    update: (id, text, onGone) => {
+      gone.set(id, onGone);
+      calls.push(`update ${id} ${text}`);
+    },
   };
-  return { s, calls };
+  return { s, calls, gone, rawSummary };
 }
 
 describe("ToastBatcher", () => {
@@ -150,6 +161,70 @@ describe("ToastBatcher follow-up words", () => {
   });
 });
 
+describe("ToastBatcher: late words, folds and counts", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("does not bring back a toast that was swiped away or timed out", () => {
+    const { s, calls, gone } = sink();
+    const b = new ToastBatcher(s);
+    let late: (x: string) => void = () => undefined;
+    b.push("Marked arrived: A", (add) => (late = add));
+    gone.get("t1")?.(); // the person swiped it away
+    late("doctor emailed");
+    expect(calls).toEqual(["show t1 Marked arrived: A"]);
+  });
+
+  it("drops late words once the page that raised the toast is gone", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    let late: (x: string) => void = () => undefined;
+    b.push("Marked arrived: A", (add) => (late = add));
+    b.dispose();
+    late("doctor emailed");
+    expect(calls).toEqual(["show t1 Marked arrived: A"]);
+  });
+
+  it("tells the follow-up whether its toast is still there, so it can stop asking", () => {
+    const { s, gone } = sink();
+    const b = new ToastBatcher(s);
+    let alive: () => boolean = () => false;
+    b.push("x", (_add, a) => (alive = a));
+    expect(alive()).toBe(true);
+    gone.get("t1")?.();
+    expect(alive()).toBe(false);
+  });
+
+  it("counts every event whose toast it takes away, even across a longer stretch", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    // Three toasts, then two more 2.6 s later, then a sixth: all five are folded, so six updates.
+    for (const t of ["a", "b", "c"]) {
+      b.push(t);
+      vi.advanceTimersByTime(500);
+    }
+    vi.advanceTimersByTime(1100);
+    b.push("d");
+    vi.advanceTimersByTime(100);
+    b.push("e");
+    vi.advanceTimersByTime(100);
+    b.push("f");
+    expect(calls.at(-1)).toBe("summary live-updates-1 6 updates");
+    expect(calls.filter((c) => c.startsWith("dismiss"))).toHaveLength(5);
+  });
+
+  it("gives summary ids that are unique across batchers", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 2; i++) {
+      const { s, rawSummary } = sink();
+      const b = new ToastBatcher(s);
+      for (const t of ["a", "b", "c", "d"]) b.push(t);
+      ids.add(rawSummary[0]);
+    }
+    expect(ids.size).toBe(2);
+  });
+});
+
 describe("what a toast says", () => {
   it("names the patient, the time and the doctor for an owner", () => {
     const ev = parseLiveEvent(JSON.stringify(staffShape()), "owner")!;
@@ -190,6 +265,8 @@ describe("the doctor's email in a toast", () => {
       "owner",
     )!;
     expect(wantsEmailStatus(booked, "owner")).toBe(false);
+    // A tab nobody is looking at does not ask.
+    expect(wantsEmailStatus(owner, "owner", true)).toBe(false);
   });
 });
 

@@ -8,9 +8,10 @@ Expand-only. Three additions and no backfill:
 
 * ``doctors.email``: nullable, one spelling (lower case, no spaces, one ``@``). A doctor has none
   until staff set one, so a seeded doctor is never emailed. Writing it is a staff action and is
-  audited, so ``staff_action_audit.action`` takes one more name (the CHECK is replaced with a
-  superset; no existing row can violate it and the previous API revision only writes names both
-  lists contain).
+  audited, so ``staff_action_audit.action`` takes one more name. The CHECK is replaced with the
+  list 0014 left (every name already allowed, ``invite_accept`` included) plus ``doctor_email``;
+  a test compares the database's list with ``StaffActionName`` so a future migration that drops a
+  name fails CI.
 * ``doctor_notification``: one row per (appointment, kind), written in the transaction of the
   arrival it is about. ``status`` is pending (to be sent), sent, failed (the provider refused, it
   may be tried again) or skipped; ``reason`` says why a row was skipped and is queryable
@@ -45,7 +46,7 @@ def upgrade() -> None:
     op.execute("""
         ALTER TABLE staff_action_audit ADD CONSTRAINT staff_action_audit_action_check
         CHECK (action IN ('book', 'reschedule', 'cancel', 'veto', 'unlock',
-                          'invite_create', 'invite_revoke',
+                          'invite_create', 'invite_revoke', 'invite_accept',
                           'arrived', 'no_show', 'reminder_now', 'running_late',
                           'doctor_email'));
     """)
@@ -101,7 +102,7 @@ def downgrade() -> None:
     op.execute("""
         ALTER TABLE staff_action_audit ADD CONSTRAINT staff_action_audit_action_check
         CHECK (action IN ('book', 'reschedule', 'cancel', 'veto', 'unlock',
-                          'invite_create', 'invite_revoke',
+                          'invite_create', 'invite_revoke', 'invite_accept',
                           'arrived', 'no_show', 'reminder_now', 'running_late'));
     """)
     op.execute("ALTER TABLE doctors DROP CONSTRAINT IF EXISTS ck_doctors_email;")

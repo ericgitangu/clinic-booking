@@ -5,6 +5,7 @@
 import "server-only";
 import { callApi, type Caller } from "@clinic/api/call";
 import { memo, readKey } from "@/lib/render-cache";
+import { CALL_TIMEOUT_MS } from "@/emails/ports";
 import {
   cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch,
   changeAccessRoleInternalAdminAccessEmailPatch,
@@ -489,7 +490,7 @@ export const claimDoctorNotice = (caller: Caller, id: string) =>
       claimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPost(
         { client, path: { notification_id: id } },
       ),
-    { caller },
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
   );
 
 export const finishDoctorNotice = (
@@ -503,5 +504,5 @@ export const finishDoctorNotice = (
       finishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPost(
         { client, path: { notification_id: id }, body },
       ),
-    { caller },
+    { caller, timeoutMs: CALL_TIMEOUT_MS },
   );

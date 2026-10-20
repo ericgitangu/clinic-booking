@@ -123,18 +123,49 @@ test.describe("the arrival email to the doctor", () => {
     expect(mails).toHaveLength(1);
     const mail = mails[0];
     expect(mail.subject).toMatch(/has arrived for/);
-    // First name and last initial only: the rest of the name (here a number) is not in it.
+    // First name and last initial only: "Doctor Email Sent <number>" is read as Doctor S., and
+    // neither the middle word nor the number is in it.
     const stamp = visit.name.split(" ").pop() as string;
-    expect(mail.text).toContain(`Doctor ${stamp[0]}.`);
-    expect(mail.text).not.toContain(stamp);
-    expect(mail.subject).not.toContain(stamp);
+    expect(mail.subject).toBe(
+      `Doctor S. has arrived for ${mail.subject.split(" for ")[1]}`,
+    );
+    expect(mail.text).toContain("Doctor S.");
+    for (const part of ["Email", stamp]) {
+      expect(mail.text).not.toContain(part);
+      expect(mail.subject).not.toContain(part);
+    }
     expect(mail.text).not.toMatch(/\+254|@example|notes/i);
     expect(mail.text).toContain(`/dashboard/appointments/${visit.id}`);
     expect(mail.text).toContain("East Africa Time");
 
-    // Marking again changes nothing and sends nothing more.
-    await arrive(visit.id);
+    // Marked arrived again in the browser (to no-show and back, which runs the same server action
+    // twice): the row stays sent, one attempt, and the stand-in never sees a second email.
+    const attempts = (await notice(visit.id))?.attempts;
+    expect(attempts).toBe(1);
+    await tabA.goto(`/dashboard/appointments/${visit.id}`);
+    await tap(tabA.getByRole("button", { name: "Change to no-show" }));
+    const flip = tabA.getByRole("dialog", { name: "Change to no-show?" });
+    await flip.getByLabel("Reason").fill("left before being seen");
+    await flip.getByRole("button", { name: "Change to no-show" }).click();
+    await expect(tabA.getByText("Marked no-show.")).toBeVisible();
+    await tap(tabA.getByRole("button", { name: "Change to arrived" }));
+    const back = tabA.getByRole("dialog", { name: "Change to arrived?" });
+    await back.getByLabel("Reason").fill("came back to the desk");
+    await back.getByRole("button", { name: "Change to arrived" }).click();
+    await expect(tabA.getByText(/^Marked arrived\./)).toBeVisible();
+    await expect
+      .poll(
+        async () => (await mailTo(DOCTOR_EMAIL)).sent.slice(before).length,
+        {
+          timeout: 4000,
+          intervals: [500],
+        },
+      )
+      .toBe(1);
+    // ...and stays one while anything that was going to run has had time to.
+    await tabA.waitForTimeout(3000);
     expect((await mailTo(DOCTOR_EMAIL)).sent.slice(before)).toHaveLength(1);
+    expect(await notice(visit.id)).toMatchObject({ status: "sent", attempts });
     await allowMailTo(DOCTOR_EMAIL);
     await setDoctorEmail(visit.doctorId, null);
   });
@@ -215,17 +246,29 @@ test.describe("the arrival email to the doctor", () => {
     const visit = await visitAtTheDesk("Doctor Email Viewer");
     await setDoctorEmail(visit.doctorId, DOCTOR_EMAIL);
     const page = await as("viewer");
+    const asked: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/dashboard/read/doctor-notice"))
+        asked.push(r.url());
+    });
     await onDashboard(page);
     await arrive(visit.id);
     const toast = page
       .locator("[data-sonner-toast]")
       .filter({ hasText: "Marked arrived" });
     await expect(toast.first()).toBeVisible({ timeout: 2000 });
-    const text = (await toast.first().innerText()).toLowerCase();
+    // Past the first look an owner's toast makes (2.5 s) and still on screen (toasts last 6 s).
+    await page.waitForTimeout(4000);
+    const text = (
+      await toast.first().innerText({ timeout: 1500 })
+    ).toLowerCase();
     expect(text).not.toContain(visit.name.toLowerCase());
     expect(text).not.toContain("email");
     expect(text).not.toContain("doctor.e2e");
-    // And the page never carried the address.
+    // Then past the last look (15 s): the page never asked about the email.
+    await page.waitForTimeout(13_000);
+    // A viewer's page never asks about the email, and never carried the address.
+    expect(asked).toEqual([]);
     expect(await page.content()).not.toContain(DOCTOR_EMAIL);
     await setDoctorEmail(visit.doctorId, null);
   });

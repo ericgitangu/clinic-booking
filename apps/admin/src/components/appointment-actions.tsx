@@ -59,6 +59,7 @@ export function AppointmentActions({
         title="Cancel this appointment?"
         description="The slot is released and the patient is not told automatically. Say why; it is kept with the appointment."
         confirmLabel="Cancel appointment"
+        ownsAppointment={appointmentId}
         run={(reason) => cancelAppointment(appointmentId, reason)}
         onDone={onDone}
       />
@@ -109,6 +110,7 @@ function RescheduleAction({
       description="Pick a day, then a free time with the same doctor. Say why; it is kept with the appointment."
       confirmLabel="Move appointment"
       extraReady={!!slot}
+      ownsAppointment={appointmentId}
       run={(reason) => rescheduleAppointment(appointmentId, slot, reason)}
       onDone={() => {
         setDate("");

@@ -46,6 +46,14 @@ export function toastSuffix(n: NoticeFacts): string {
   }
 }
 
+/** The bold lead of the sheet's line. It says "notified" only when the doctor was. */
+export function sheetLead(n: NoticeFacts): string {
+  if (n.status === "sent") return "Doctor notified.";
+  return n.status === "pending"
+    ? "Doctor not notified yet."
+    : "Doctor not notified.";
+}
+
 /** The line on the appointment sheet. */
 export function sheetLine(n: NoticeFacts): string {
   switch (n.status) {
@@ -58,4 +66,14 @@ export function sheetLine(n: NoticeFacts): string {
     case "skipped":
       return `The doctor was not emailed: ${n.reason ? WHY_LONG[n.reason] : "it was skipped"}.`;
   }
+}
+
+/** The confirmation for the person who marked the arrival: "Marked arrived. Doctor email on its
+ *  way." The first words are always "Marked arrived." */
+export function arrivalMessage(
+  notice: Pick<NoticeFacts, "status" | "reason"> | null | undefined,
+): string {
+  if (!notice) return "Marked arrived.";
+  const note = toastSuffix({ ...notice, attempts: 0, sentAt: null });
+  return `Marked arrived. ${note[0].toUpperCase()}${note.slice(1)}.`;
 }
