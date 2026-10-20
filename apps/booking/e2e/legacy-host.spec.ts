@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 
 // The production build served locally, asked for with different Host headers (what Vercel's edge
 // forwards for each address). maxRedirects: 0 shows the redirect itself rather than its target.

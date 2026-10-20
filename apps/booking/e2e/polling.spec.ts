@@ -4,7 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from "@playwright/test";
+} from "./support/csp-guard";
 import { hhmm, pick } from "./api";
 import { ownCell } from "./support/cells";
 import { expectInactive } from "./support/chips";

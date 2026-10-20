@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 
 // Mobile first: the smallest phone we design for, then a tablet and a desktop.
 const VIEWPORTS = [
@@ -61,7 +61,7 @@ test("the phone menu opens and lists the pages", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto("/");
   await page.getByRole("button", { name: "Open menu" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Menu" })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "OpenAPI contract" }),
   ).toBeVisible();
