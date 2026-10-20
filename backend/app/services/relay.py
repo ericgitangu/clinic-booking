@@ -35,8 +35,11 @@ stranded; the clients' poll stays as the last safety net.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
-There is no always-on worker, so an event stuck behind a transaction that stays open past
-``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll covers that gap. After
+A trigger that stopped for lack of time leaves the rest for the next trigger, and the availability
+read (an open page's poll) is one: ``flush_if_owed`` does a lock-free EXISTS and runs the relay only
+when a visible event is owed. There is no always-on worker, so an event stuck behind a transaction
+that stays open past ``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll
+covers that gap. After
 three failed publishes in a row the relay stops trying for a minute (a circuit breaker, logged
 once when it opens).
 """
@@ -326,6 +329,24 @@ class Relay:
         elif self._failures >= BREAKER_FAILURES:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
         return progress.published
+
+    async def flush_if_owed(self, clock: Clock) -> int:
+        """The follow-up for a trigger that ended with events left over (out of time, or lost the
+        cursor to a holder that had already read): called from a read path that exists anyway.
+        One lightweight EXISTS (``_PENDING``: a visible event past the cursor, no lock, no wait);
+        only when it says something is owed does this run the relay. Never raises. An event held
+        back by an older open transaction is not chased here (that would make a read wait)."""
+        if not self.publisher.enabled:
+            return 0
+        if self._paused_until is not None and clock.now() < self._paused_until:
+            return 0
+        try:
+            if not await self._pending_after_release():
+                return 0
+        except Exception:  # noqa: BLE001  # a read must never fail because the check did
+            _log.warning("realtime relay: could not check for owed events", exc_info=True)
+            return 0
+        return await self.run(clock)
 
     @staticmethod
     def _report(progress: _Progress) -> None:
