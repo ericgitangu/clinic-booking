@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { canonicalJson, signAssertion } from "../src/assertion";
 
+const JTI = "ts-jti-0123456789abcdef";
+
 // Produced by backend/app/core/assertion.py (sign) for the same claims and key, so a change on
 // either side that breaks the wire format fails here.
 const FROM_PYTHON = [
@@ -9,16 +11,17 @@ const FROM_PYTHON = [
   "2ZmM2UwODM4YTQwMGVhNjJiNWQwZDQ1NWQwN2JiN",
   "zdjNTMwNzg4YTM3IiwiZW1haWwiOiJvd25lckBjb",
   "GluaWMuZXhhbXBsZSIsImV4cCI6MTc5MjM4MjQ2M",
-  "CwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiUE9TVCIsI",
-  "nAiOiIvaW50ZXJuYWwvYWRtaW4vYWNjZXNzP3g9M",
-  "SIsInJvbGUiOiJvd25lciIsInN1YiI6InN1Yi0xI",
-  "n0.DBDHu2WpPg9J_Qcu8p6hyCR9vWkq1RjPn0OS0",
-  "IXvJU4",
+  "CwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ0cy1qd",
+  "GktMDEyMzQ1Njc4OWFiY2RlZiIsIm0iOiJQT1NUI",
+  "iwicCI6Ii9pbnRlcm5hbC9hZG1pbi9hY2Nlc3M_e",
+  "D0xIiwicm9sZSI6Im93bmVyIiwic3ViIjoic3ViL",
+  "TEifQ.YjVladJUX6gOFUN2xM2ZyxFMt8zbKfquf7",
+  "2RjJBsBEQ",
 ].join("");
 
 // The same, with the email-verified claim, signed by the API side's helper.
 const FROM_PYTHON_VERIFIED =
-  "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiIwODRlYmZmZmYxMTE4ZTUzMDE1OWQ2ZTdhMWYwZTFjNWFkN2NlZDE2Njk0ZWJmYjU4ZjVhZTgxZWYzNDlkYWZhIiwiZW1haWwiOiJvd25lckBjbGluaWMuZXhhbXBsZSIsImV2Ijp0cnVlLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwibSI6IlBPU1QiLCJwIjoiL2ludGVybmFsL2FjY291bnRzL2xpbmsiLCJyb2xlIjoicGF0aWVudCIsInN1YiI6InN1Yi0xIn0.wN5pH-ZNj9s1wxsLIbc6Z5Ed_AGyKI3ea-aTKvV7nz4";
+  "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiIwODRlYmZmZmYxMTE4ZTUzMDE1OWQ2ZTdhMWYwZTFjNWFkN2NlZDE2Njk0ZWJmYjU4ZjVhZTgxZWYzNDlkYWZhIiwiZW1haWwiOiJvd25lckBjbGluaWMuZXhhbXBsZSIsImV2Ijp0cnVlLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwianRpIjoidHMtanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiUE9TVCIsInAiOiIvaW50ZXJuYWwvYWNjb3VudHMvbGluayIsInJvbGUiOiJwYXRpZW50Iiwic3ViIjoic3ViLTEifQ.V9hYTE780PgsMEBem-S5R2du0YsXoYAiwXkW8DAjX5I";
 
 describe("signed assertion", () => {
   it("carries the email-verified claim exactly as the API side signs it", () => {
@@ -32,6 +35,7 @@ describe("signed assertion", () => {
         path: "/internal/accounts/link",
         body: '{"full_name":"A B"}',
         now: new Date("2026-10-19T04:00:00Z"),
+        jti: JTI,
       },
       "k".repeat(32),
     );
@@ -67,6 +71,7 @@ describe("signed assertion", () => {
         path: "/internal/admin/access?x=1",
         body: '{"email":"é@x.io","role":"viewer"}',
         now: new Date("2026-10-19T04:00:00Z"),
+        jti: JTI,
       },
       "k".repeat(32),
     );
@@ -91,5 +96,25 @@ describe("signed assertion", () => {
     const a = signAssertion({ ...base, body: "" }, "k".repeat(32));
     const b = signAssertion({ ...base, body: "{}" }, "k".repeat(32));
     expect(a).not.toBe(b);
+  });
+
+  it("gives every assertion its own jti, which the MAC binds", () => {
+    const claims = {
+      sub: "s",
+      email: "e@x.io",
+      role: "owner",
+      method: "POST",
+      path: "/p",
+      body: "{}",
+      now: new Date("2026-10-19T04:00:00Z"),
+    };
+    const jti = (header: string) =>
+      JSON.parse(Buffer.from(header.split(".")[1], "base64url").toString()).jti;
+    const a = signAssertion(claims, "k".repeat(32));
+    const b = signAssertion(claims, "k".repeat(32));
+    expect(jti(a)).not.toBe(jti(b));
+    expect(jti(a).length).toBeGreaterThanOrEqual(16);
+    expect(jti(a).length).toBeLessThanOrEqual(64);
+    expect(a).not.toBe(b); // two identical writes in one second are two assertions
   });
 });

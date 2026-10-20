@@ -2,7 +2,7 @@
 
 Wire format, header ``X-Internal-Assertion``: ``v1.<payload>.<mac>`` where ``payload`` is the
 base64url (no padding) of the canonical JSON (sorted keys, no whitespace) of
-``{aud, sub, email, role, iat, exp, m, p, bh}`` (plus ``ev``, whether the sign-in provider
+``{aud, sub, email, role, iat, exp, m, p, bh, jti}`` (plus ``ev``, whether the sign-in provider
 verified the email, when the web app sends it) and ``mac`` is the base64url HMAC-SHA256 of the
 payload string with ``INTERNAL_SIGNING_KEY``.
 
@@ -11,9 +11,16 @@ lowercase hex SHA-256 of the request body, so a captured assertion cannot be reu
 method, path, query or body. ``iat``/``exp`` are epoch seconds; the lifetime (``exp - iat``) may
 not exceed 60 seconds and 5 seconds of clock skew are tolerated on both ends.
 
-There is no replay store, on purpose: within its lifetime only a byte-identical request can be
-replayed, and the endpoints behind this check are read-only. An in-process cache would not span
-Cloud Run instances, so it would give a false sense of protection.
+``jti`` is a random id (16 to 64 characters) the signer makes for every assertion; the MAC binds it.
+The API refuses an assertion without one.
+
+Replay: within its lifetime only a byte-identical request can be replayed. Reads may repeat. The
+staff write routes (and accepting an invitation) record each assertion's ``jti`` in
+``assertion_replay`` (a unique key in the database, so first use wins across instances) until the
+assertion can no longer be valid (``exp`` plus the skew, plus a margin), and refuse a second use
+with ``ASSERTION_REPLAYED``; see ``app/services/write_guard.py``. Two legitimate writes that are
+identical in every other way still carry different ``jti`` values, so both go through. Writes
+elsewhere (the patient routes) are protected by their idempotency keys, not by this store.
 """
 
 from __future__ import annotations
@@ -32,6 +39,9 @@ VERSION = "v1"
 MAX_TTL_SECONDS = 60
 TIME_BOUND = 2**40
 SKEW_SECONDS = 5
+# ``jti``: a random id the signer makes for every assertion (128 bits or more, any text up to 64).
+MIN_JTI = 16
+MAX_JTI = 64
 
 
 class InvalidAssertion(Exception):
@@ -49,6 +59,10 @@ class Principal:
     role: str
     # True only when the signed claim ``ev`` is the boolean true. Absent or anything else is False.
     email_verified: bool = False
+    # The assertion's unique id (``jti``) and the last second it can verify (``exp`` plus the skew),
+    # for the replay store. Empty/zero for a Principal built by hand.
+    jti: str = ""
+    valid_until: int = 0
 
 
 def _b64(raw: bytes) -> str:
@@ -136,4 +150,14 @@ def verify(
     sub, email, role = claims.get("sub"), claims.get("email"), claims.get("role")
     if not (isinstance(sub, str) and isinstance(email, str) and isinstance(role, str)):
         raise InvalidAssertion("missing identity")
-    return Principal(sub=sub, email=email, role=role, email_verified=claims.get("ev") is True)
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not MIN_JTI <= len(jti) <= MAX_JTI:
+        raise InvalidAssertion("missing jti")
+    return Principal(
+        sub=sub,
+        email=email,
+        role=role,
+        email_verified=claims.get("ev") is True,
+        jti=jti,
+        valid_until=exp + SKEW_SECONDS,
+    )

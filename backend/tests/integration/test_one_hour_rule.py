@@ -10,6 +10,7 @@ happened still returns its result.
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -151,6 +152,7 @@ async def test_staff_are_exempt_from_the_rule_the_patient_is_held_to(
             "m": "PATCH",
             "p": path,
             "bh": body_hash(body),
+            "jti": uuid.uuid4().hex,  # a fresh nonce: the API refuses a repeated assertion
             "ev": True,
         }
         return {
@@ -236,6 +238,7 @@ def _headers(
         "aud": AUDIENCE, "sub": sub, "email": email, "role": role,
         "iat": int(app_now.timestamp()), "exp": int(app_now.timestamp()) + 60,
         "m": method, "p": path, "bh": body_hash(body), "ev": True,
+        "jti": uuid.uuid4().hex,
     }  # fmt: skip
     return {"X-Internal-Assertion": sign(claims, _KEY.encode()), "content-type": "application/json"}
 

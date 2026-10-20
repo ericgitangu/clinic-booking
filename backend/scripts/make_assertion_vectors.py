@@ -18,6 +18,7 @@ from app.core.assertion import AUDIENCE, _b64, body_hash, canonical, sign
 KEY = "k" * 32
 NOW = datetime(2026, 10, 19, 4, 0, tzinfo=UTC)
 PATH = "/stream?cursor=12.34"
+JTI = "vector-jti-0123456789abcdef"  # any 16 to 64 characters; the Go side ignores it
 OUT = pathlib.Path(__file__).resolve().parents[2] / "contracts" / "assertion-vectors.json"
 
 
@@ -33,6 +34,7 @@ def _claims(**over: object) -> dict[str, object]:
         "m": "GET",
         "p": PATH,
         "bh": body_hash(b""),
+        "jti": JTI,
     }
     base.update(over)
     return base

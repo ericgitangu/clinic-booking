@@ -16,6 +16,7 @@ from pydantic import BaseModel
 class ProblemCode(enum.StrEnum):
     UNAUTHENTICATED = "UNAUTHENTICATED"
     FORBIDDEN = "FORBIDDEN"
+    ASSERTION_REPLAYED = "ASSERTION_REPLAYED"
     ROLE_ESCALATION = "ROLE_ESCALATION"
     CLIENT_ADDRESS_UNKNOWN = "CLIENT_ADDRESS_UNKNOWN"
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -218,3 +219,29 @@ REPLAY_HEADER: dict[int | str, dict[str, object]] = {
         },
     }
 }
+
+
+def throttled_responses() -> dict[int | str, dict[str, object]]:
+    """The 429 of a route that carries the staff write throttle, with its Retry-After header."""
+    return {
+        429: {
+            "model": Problem,
+            "description": (
+                "RATE_LIMITED: this person has made too many staff changes in the current window "
+                "(Problem, RFC 9457). Wait `Retry-After` seconds."
+            ),
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds until the window ends and writes are accepted again.",
+                    "schema": {"type": "integer", "minimum": 1},
+                }
+            },
+            "content": {"application/problem+json": {}},
+        }
+    }
+
+
+def with_throttle(
+    responses: dict[int | str, dict[str, object]],
+) -> dict[int | str, dict[str, object]]:
+    return {**responses, **throttled_responses()}

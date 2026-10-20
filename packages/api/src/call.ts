@@ -37,6 +37,8 @@ export type ApiFailure =
       status: number;
       code: ProblemCode;
       detail: string;
+      /** Whole seconds from a Retry-After header (429), when the API sent one. */
+      retryAfter?: number;
     }
   // 422-style: the request did not match the generated schema, so nothing was sent.
   | {
@@ -221,12 +223,14 @@ export async function callApi<D>(
   const problem = zProblem.safeParse(error);
   if (!problem.success)
     return violation(operation, response.status, "problem", problem.error);
+  const wait = Number(response.headers.get("retry-after"));
   return {
     ok: false,
     kind: "problem",
     status: response.status,
     code: problem.data.code,
     detail: problem.data.detail,
+    ...(Number.isInteger(wait) && wait > 0 ? { retryAfter: wait } : {}),
   };
 }
 
