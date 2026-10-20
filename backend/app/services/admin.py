@@ -70,6 +70,7 @@ def project_for_viewer(item: AdminAppointment) -> AdminAppointment:
             "patient_name": initials(item.patient_name),
             "patient_phone": mask_phone(item.patient_phone),
             "patient_email": None,
+            "avatar_url": None,
             "cancellation_reason": None,
         }
     )
@@ -174,9 +175,15 @@ async def metrics(
     )
 
 
+def may_see_avatars(role: str) -> bool:
+    """A picture can identify a person: owners and admins see it, viewers get initials."""
+    return role in ("owner", "admin")
+
+
 async def appointments(
     session: AsyncSession,
     *,
+    show_avatars: bool = False,
     status: str,
     doctor_id: uuid.UUID | None,
     start: date | None,
@@ -197,6 +204,7 @@ async def appointments(
         to_day=end,
         after=after,
         limit=limit,
+        show_avatars=show_avatars,
     )
     page, has_more = rows[:limit], len(rows) > limit
     items = [AdminAppointment.model_validate(r) for r in page]
@@ -216,15 +224,18 @@ async def appointment(
 ) -> AdminAppointment:
     """One admin appointment row, projected for the role like an item of the list. An unknown id
     and a synthetic patient's appointment are both 404."""
-    row = await repo.appointment_row(session, appointment_id)
+    row = await repo.appointment_row(session, appointment_id, show_avatars=may_see_avatars(role))
     if row is None:
         raise AppointmentNotFound()
     item = AdminAppointment.model_validate(row)
     return item if role in FULL_VIEW_ROLES else project_for_viewer(item)
 
 
-async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
-    if not await repo.appointment_exists(session, appointment_id):
+async def lineage(
+    session: AsyncSession, appointment_id: uuid.UUID, *, show_avatars: bool = False
+) -> Lineage:
+    patient = await repo.appointment_patient(session, appointment_id, show_avatars=show_avatars)
+    if patient is None:
         raise AppointmentNotFound()
     rows = await repo.lineage(session, appointment_id)
     # Each event is rendered in the zone of its doctor's clinic (the query joined it in).
@@ -239,4 +250,10 @@ async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> Lineage:
         )
         for r in rows
     ]
-    return Lineage(appointment_id=appointment_id, events=events)
+    return Lineage(
+        appointment_id=appointment_id,
+        patient_id=patient["patient_id"],
+        patient_name=patient["patient_name"],
+        avatar_url=patient["avatar_url"],
+        events=events,
+    )

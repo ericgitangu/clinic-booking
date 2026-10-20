@@ -53,8 +53,10 @@ export default function PrivacyPage() {
       </p>
       <h3>How it is stored and shared</h3>
       <p>
-        Your name, email address and picture are stored in our database on Neon,
-        and your sign-in session lives in a cookie on this site only. We never
+        Your name, email address and picture are stored in our database on Neon.
+        The clinic's owner and admins can see your name and picture next to your
+        appointments; staff with view-only access see your name only. Your
+        sign-in session lives in a cookie on this site only. We never
         sell Google user data or share it with anyone for their own purposes.
         The only service that receives your email address is Resend, which
         delivers the appointment emails for us.

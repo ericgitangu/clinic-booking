@@ -24,6 +24,8 @@ class BoardAppointment(ClinicZoned):
     # Owner and admin: full name and phone. Viewer: initials and a masked phone.
     patient_name: str
     patient_phone: str | None
+    # The patient's Google picture: owner and admin only, else null (show initials).
+    avatar_url: str | None = None
     locked: bool
     # True when the appointment's latest change was recorded as the patient's and a veto would
     # act on it (the veto action would not answer NOTHING_TO_VETO).

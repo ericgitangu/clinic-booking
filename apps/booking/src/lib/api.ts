@@ -55,13 +55,17 @@ export const ready = () =>
   });
 
 // Idempotent: the first call for a sign-in makes the patient, later calls return the same one.
-export const linkAccount = (caller: Caller, fullName: string) =>
+export const linkAccount = (
+  caller: Caller,
+  fullName: string,
+  image: string | null = null,
+) =>
   callApi(
     "linkAccount",
     (client) =>
       linkAccountInternalAccountsLinkPost({
         client,
-        body: { full_name: fullName },
+        body: { full_name: fullName, ...(image ? { image } : {}) },
       }),
     { caller },
   );

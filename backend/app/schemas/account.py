@@ -12,6 +12,15 @@ class AccountLinkRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     full_name: str = Field(min_length=2, max_length=200)
+    image: str | None = Field(
+        default=None,
+        max_length=2048,
+        description=(
+            "The Google profile picture URL. Kept only when it is an https URL on "
+            "lh3.googleusercontent.com; anything else is silently stored as null. Updated on "
+            "every call, and cleared when absent."
+        ),
+    )
 
 
 class AccountLinked(BaseModel):
