@@ -262,11 +262,12 @@ async def test_a_token_mint_flushes_a_stranded_event_with_no_further_bookings(
 
 @pytest.mark.race
 async def test_nothing_is_published_while_an_older_transaction_is_open(
-    realtime_clean: None, owner_conn: asyncpg.Connection
+    realtime_clean: None, owner_conn: asyncpg.Connection, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The xmin guard is unchanged: the drain never publishes early, and once the open transaction
     ends the next trigger sends everything, once. A transaction that never ends costs a booking at
-    most the bounded wait."""
+    most the bounded wait. The relay says so at the default log level: a trigger that left an event
+    unsent logs a warning with the reason, and the trigger that sends it logs what it published."""
     publisher = RecordingPublisher()
     patients = await _patients(owner_conn, 2)
     app = make_realtime_app(publisher)
@@ -282,8 +283,17 @@ async def test_nothing_is_published_while_an_older_transaction_is_open(
             # It waits for the open transaction only up to the relay's bound, never for good.
             assert took < relay_module.HORIZON_WAIT + 0.5
             assert publisher.messages == []  # not visible yet, so not published
+            # The app configures its own JSON handler on stdout (caplog's handler is replaced), so
+            # the log is read from what it printed.
+            out = capsys.readouterr().out
+            left = [ln for ln in out.splitlines() if "left events unsent" in ln]
+            assert len(left) == 1 and '"WARNING"' in left[0] and "held_back" in left[0], out
             await tx.commit()
             assert (await _book(client, patients[1], SLOTS[1]))[0].status_code == 201
+            out = capsys.readouterr().out
+            sent = [ln for ln in out.splitlines() if "relay published" in ln]
+            assert len(sent) == 1 and "published 4 messages" in sent[0], out
+            assert "left events unsent" not in out
     finally:
         if holder.is_in_transaction():
             await tx.rollback()
@@ -470,3 +480,33 @@ async def test_an_event_behind_an_older_open_transaction_is_sent_when_that_trans
     assert elapsed < CAP, elapsed
     _published_once(publisher, 1)
     assert await _cursor_at_last(owner_conn)
+
+
+@pytest.mark.race
+async def test_a_pass_that_ran_out_of_time_is_finished_by_the_next_availability_read(
+    realtime_clean: None,
+    owner_conn: asyncpg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A slow publish (1.0 s, against the 2 s budget) makes the holder stop before another pass and
+    leave the other bookers' events. Nothing else is booked, no token is minted: a plain read of
+    the availability list (what an open page's poll is) sends them, once, and says so."""
+    publisher, _elapsed, _passes = await _race(5, 1.0, owner_conn, monkeypatch)
+    booked = sum(1 for m in publisher.messages if m.name == "booked")
+    assert 1 <= booked < 5, "the budget should have left events behind"
+    assert not await _cursor_at_last(owner_conn)
+    assert "left events unsent (time)" in capsys.readouterr().out
+    publisher.delay = 0  # the follow-up must not depend on a slow service
+    app = make_realtime_app(publisher)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        got = await client.get(f"/doctors/{OTIENO}/availability", params={"date": "2026-10-26"})
+    assert got.status_code == 200
+    _published_once(publisher, 5)
+    assert await _cursor_at_last(owner_conn)
+    # A read with nothing owed sends nothing more.
+    sent = len(publisher.messages)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        await client.get(f"/doctors/{OTIENO}/availability", params={"date": "2026-10-26"})
+    assert len(publisher.messages) == sent

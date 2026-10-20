@@ -35,8 +35,11 @@ stranded; the clients' poll stays as the last safety net.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
-There is no always-on worker, so an event stuck behind a transaction that stays open past
-``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll covers that gap. After
+A trigger that stopped for lack of time leaves the rest for the next trigger, and the availability
+read (an open page's poll) is one: ``flush_if_owed`` does a lock-free EXISTS and runs the relay only
+when a visible event is owed. There is no always-on worker, so an event stuck behind a transaction
+that stays open past ``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll
+covers that gap. After
 three failed publishes in a row the relay stops trying for a minute (a circuit breaker, logged
 once when it opens).
 """
@@ -150,6 +153,11 @@ class _Progress:
 
     published: int = 0
     failed: bool = False
+    passes: int = 0
+    # Why a trigger ended with events still owed (None when it left nothing behind): "held_back"
+    # (an older open transaction hid them for the whole bounded wait) or "time" (too little of the
+    # budget was left for another pass). Both leave the event to the next trigger or the poll.
+    left: str | None = None
 
 
 @dataclass(frozen=True)
@@ -303,6 +311,7 @@ class Relay:
         except Exception:  # noqa: BLE001  # a push problem must never fail the booking response
             _log.warning("realtime relay failed; a later trigger retries", exc_info=True)
             progress.failed = True
+        self._report(progress)
         if not progress.failed:
             self._failures = 0
             self._paused_until = None
@@ -320,6 +329,43 @@ class Relay:
         elif self._failures >= BREAKER_FAILURES:
             self._paused_until = now + BREAKER_PAUSE  # a failed probe after the pause: pause again
         return progress.published
+
+    async def flush_if_owed(self, clock: Clock) -> int:
+        """The follow-up for a trigger that ended with events left over (out of time, or lost the
+        cursor to a holder that had already read): called from a read path that exists anyway.
+        One lightweight EXISTS (``_PENDING``: a visible event past the cursor, no lock, no wait);
+        only when it says something is owed does this run the relay. Never raises. An event held
+        back by an older open transaction is not chased here (that would make a read wait)."""
+        if not self.publisher.enabled:
+            return 0
+        if self._paused_until is not None and clock.now() < self._paused_until:
+            return 0
+        try:
+            if not await self._pending_after_release():
+                return 0
+        except Exception:  # noqa: BLE001  # a read must never fail because the check did
+            _log.warning("realtime relay: could not check for owed events", exc_info=True)
+            return 0
+        return await self.run(clock)
+
+    @staticmethod
+    def _report(progress: _Progress) -> None:
+        """One line per trigger that sent something or left something behind (nothing for the common
+        empty trigger or a loser). Without it a push that never arrived cannot be told from one that
+        was never sent: the per-pass line below is debug-level and the API runs at info."""
+        if progress.left is not None:
+            _log.warning(
+                "realtime relay left events unsent (%s): published=%s passes=%s",
+                progress.left,
+                progress.published,
+                progress.passes,
+            )
+        elif progress.published:
+            _log.info(
+                "realtime relay published %s messages in %s passes",
+                progress.published,
+                progress.passes,
+            )
 
     async def _pending_after_release(self) -> bool:
         """The holder's last look. A loser that was refused the cursor row while the holder's empty
@@ -349,12 +395,14 @@ class Relay:
         for attempt in range(MAX_PASSES):
             begun = loop.time()
             if attempt > 0 and deadline - begun < max(slowest * PASS_MARGIN, PASS_FLOOR):
+                progress.left = "time"
                 return  # the remainder goes out with the next trigger (see the module docstring)
             result = await relay_once(
                 self.sessionmaker, self.publisher, self.budget, clock, max_age=self._max_age
             )
             slowest = max(slowest, loop.time() - begun)
             progress.published += result.published
+            progress.passes += 1
             _log.debug(
                 "realtime relay pass %s: contended=%s consumed=%s published=%s failed=%s",
                 attempt,
@@ -371,7 +419,10 @@ class Relay:
             if result.consumed == 0 and not await self._pending_after_release():
                 # Nothing visible. An older open transaction may still be hiding a committed event;
                 # that transaction can end without triggering any relay, so wait for it, bounded.
-                if waited >= HORIZON_WAIT or not await self._held_back():
+                held = await self._held_back()
+                if waited >= HORIZON_WAIT or not held:
+                    if held:
+                        progress.left = "held_back"  # waited the whole bound, still hidden
                     return
                 while waited < HORIZON_WAIT and await self._held_back():
                     await asyncio.sleep(HORIZON_STEP)
