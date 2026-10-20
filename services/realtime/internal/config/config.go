@@ -115,7 +115,7 @@ func (c Config) Validate() error {
 		add("MAX_STREAMS_PER_PERSON must be >= 1")
 	}
 	if c.DBMaxConns < 1 || c.DBMaxConns > 2 {
-		add("DB_MAX_CONNS must be 1 or 2 (at most 2 connections per instance: the hosting cost analysis)")
+		add("DB_MAX_CONNS must be 1 or 2 (at most 2 connections per instance)")
 	}
 	for name, d := range map[string]time.Duration{
 		"POLL_INTERVAL": c.PollInterval, "HEARTBEAT_INTERVAL": c.HeartbeatInterval,

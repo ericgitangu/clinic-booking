@@ -49,7 +49,7 @@ PII minimisation for viewers is enforced in the gateway, not by these grants: th
 patient's name, the reasons and the invited address, and the viewer's query simply never selects
 them (``services/realtime/internal/store``; a Go test fails if the viewer query names any of those
 columns). A second, viewer-only role would move that guarantee into the database; it is recorded as
-accepted debt in the hosting and cost analysis (/decisions#hosting-and-cost).
+accepted debt: the grants allow more than the viewer query reads.
 
 Nothing else: no other column (not the patient's email or phone), no other table, no write, no
 sequence, no DDL, no default privileges, and ``idle_in_transaction_session_timeout`` of 30 s so an

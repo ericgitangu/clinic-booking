@@ -8,7 +8,7 @@
 // Vercel Hobby caps a function at 300 s (maxDuration); the gateway closes its streams at 290 s and
 // the browser reconnects from the last event it saw, so a stream never meets the cap. The function
 // is held open for the whole stream, so it runs with the smallest memory that serves it (256 MB,
-// apps/admin/vercel.json): GB-hours per connected hour = 0.25. See /decisions#hosting-and-cost.
+// apps/admin/vercel.json): GB-hours per connected hour = 0.25.
 import { mintIdToken, minting_enabled } from "@clinic/api/proxy/gcp-id-token";
 import { logError } from "@clinic/api/proxy/log";
 import {

@@ -71,7 +71,7 @@ Reading it:
 | Resend email and reminders | Merged (PR 27); booking and cancellation emails verified live 2026-10-18, the daily reminder's first send unconfirmed | README section 4.3 |
 | Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [polling then push](https://clinic.ericgitangu.com/decisions#polling-then-push) |
 | Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [polling then push](https://clinic.ericgitangu.com/decisions#polling-then-push) |
-| Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors) |
+| Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors) (Swagger UI only) |
 | Go gateway for the staff live feed (README 3.7) | Merged (PR 71) and deployed: `clinic-realtime` is Ready in Cloud Run (0.25 vCPU, at most 2 instances, concurrency 1, read on 2026-10-19); the cost per connected hour is not yet measured | [the Go decision](https://clinic.ericgitangu.com/decisions#go) |
 
 ## 3. Booking, with an idempotency key and the unique index

@@ -14,7 +14,7 @@ Product, cost and security calls that were mine. The first column is where it is
 | Decisions are written and locked before any implementation starts; implementation then goes to cheaper models | 2026-10-16 | Memory note (stated twice) |
 | Cut the optional stretch items for admin OAuth and the Turnstile bot check, later reinstated as Google sign-in and reCAPTCHA | 2026-10-16, 2026-10-17 | Decision on admin auth and the bot check |
 | Drop the Docker Hub context and pull CI images through `mirror.gcr.io` | 2026-10-16 | [README section 9](../../README.md#9-deployment--cicd) |
-| Full production frontend in scope; Google sign-in, Resend email, branding | 2026-10-17 | Sign-in, email and branding decisions (decided by the engineer); the scope amendment to the thin web layer decision is dated 2026-10-17 and was recorded as "engineering" |
+| Full production frontend in scope; Google sign-in, Resend email, branding | 2026-10-17 | Sign-in, email and branding decisions (decided by the engineer); the scope change is dated 2026-10-17 and was recorded as "engineering" |
 | Two apps in one workspace, with the public hostnames | 2026-10-17 | Workspace and hostname decisions |
 | The booking flow and its one human check per action; staff roles by email | 2026-10-17 | Booking flow and staff role decisions |
 | No mocks of our own code: "mocks are implementation gaps in disguise"; only third parties may be stood in, and labelled | 2026-10-17 | Memory note; testing strategy decision |

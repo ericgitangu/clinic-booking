@@ -1,6 +1,6 @@
 // Package events maps stream rows to the wire shapes of event contract v1.
 //
-// Two sources share one ordered stream and one cursor (/decisions#polling-then-push, migration 0014):
+// Two sources share one ordered stream and one cursor (the live feed, /decisions#go, migration 0014):
 //
 //   - appointment_events: lifecycle events (booked, rescheduled, cancelled) and the staff
 //     annotations (vetoed, unlocked, arrived, no_show). Viewer shape =
