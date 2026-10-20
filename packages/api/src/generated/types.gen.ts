@@ -395,7 +395,7 @@ export type AuditEntry = {
     /**
      * Action
      */
-    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke' | 'invite_accept';
+    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke' | 'invite_accept' | 'doctor_email';
     /**
      * Actor Email
      */
