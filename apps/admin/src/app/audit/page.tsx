@@ -18,6 +18,10 @@ const ACTION: Record<string, string> = {
   no_show: "Marked no-show",
   reminder_now: "Sent a reminder",
   running_late: "Told patients the doctor is running late",
+  invite_create: "Invited a staff member",
+  invite_revoke: "Revoked an invitation",
+  invite_accept: "Accepted an invitation",
+  doctor_email: "Changed a doctor's arrival email",
 };
 
 // Every change staff made, newest first: who, what, why and whether the patient was told. Owner

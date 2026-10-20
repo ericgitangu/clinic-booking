@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
+from app.domain.staff import StaffActionName
 from app.schemas.access import Email, GrantableRole
 from app.schemas.appointment import Appointment, _strip
 from app.schemas.common import ClinicDatetime, StrAwareDatetime
@@ -103,20 +104,9 @@ class AuditEntry(BaseModel):
     id: uuid.UUID
     actor_email: str
     actor_role: Literal["owner", "admin", "viewer"]
-    action: Literal[
-        "book",
-        "reschedule",
-        "cancel",
-        "veto",
-        "unlock",
-        "arrived",
-        "no_show",
-        "reminder_now",
-        "running_late",
-        "invite_create",
-        "invite_revoke",
-        "invite_accept",
-    ]
+    # The same list the service writes and the database CHECK allows, so a new action can never
+    # be stored and then fail to read back.
+    action: StaffActionName
     appointment_id: uuid.UUID | None
     reason: str
     before: dict[str, Any]

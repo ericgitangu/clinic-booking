@@ -180,7 +180,8 @@ export const zAuditEntry = z.object({
         'running_late',
         'invite_create',
         'invite_revoke',
-        'invite_accept'
+        'invite_accept',
+        'doctor_email'
     ]),
     actor_email: z.string(),
     actor_role: z.enum([

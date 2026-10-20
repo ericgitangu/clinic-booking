@@ -724,7 +724,8 @@
               "running_late",
               "invite_create",
               "invite_revoke",
-              "invite_accept"
+              "invite_accept",
+              "doctor_email"
             ],
             "title": "Action",
             "type": "string"
