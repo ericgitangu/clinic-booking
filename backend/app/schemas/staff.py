@@ -11,6 +11,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_valida
 from app.schemas.access import Email, GrantableRole
 from app.schemas.appointment import Appointment, _strip
 from app.schemas.common import ClinicDatetime, StrAwareDatetime
+from app.schemas.doctor_notice import DoctorNoticeState
 from app.schemas.patient import PatientCreate
 
 # Every staff write says why: trimmed, then 3 to 500 characters, no NUL (same as a cancel reason).
@@ -88,6 +89,9 @@ class StaffAppointmentChange(Appointment):
     doctor_name: str
     # Where the appointment was before a reschedule, cancel or veto of a reschedule.
     previous_starts_at: _dt.datetime | None
+    # Arrival only: the record of telling the doctor, written in this transaction. Null for every
+    # other action, and for a repeat mark that changed nothing.
+    doctor_notice: DoctorNoticeState | None = None
 
 
 class Notified(BaseModel):

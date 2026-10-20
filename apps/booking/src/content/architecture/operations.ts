@@ -678,13 +678,13 @@ FROM staff_access_audit ORDER BY occurred_at DESC LIMIT 20;`,
 
     {
       id: "notifications",
-      title: "Notifications",
+      title: "Doctor notifications",
       summary:
-        "How the dashboard tells staff something happened, and why doctors are told only there.",
+        "How staff and doctors are told that a patient arrived or a booking changed, and what is not built.",
       blocks: [
         {
           t: "p",
-          text: "Arrivals, no-shows, bookings, changes and vetoes already reach the admin dashboard through the one live stream. The feed panel is easy to miss, so the same events now raise a toast, add to an unread count on the feed heading, and outline the doctor's card on the today board for two seconds.",
+          text: "Arrivals, no-shows, bookings, changes and vetoes already reach the admin dashboard through the one live stream. The feed panel is easy to miss, so the same events now raise a toast, add to an unread count on the feed heading, and outline the doctor's card on the today board for two seconds. When a patient is marked arrived, the doctor is also emailed, if staff have set the doctor's address.",
         },
         {
           t: "ul",
@@ -692,13 +692,17 @@ FROM staff_access_audit ORDER BY occurred_at DESC LIMIT 20;`,
             "**Only what happens after the page opens.** When a connection resumes from a cursor, the gateway replays what was missed and sends no marker between the replay and live events. The client treats frames that follow the hello with less than 1.5 s between them as the replay (the gateway polls every second) and does not announce them. A real event inside that window is not toasted, though it still appears in the feed.",
             "**One stream.** The toasts listen to the stream the browser already shares between tabs. They open no connection of their own, so the gateway's two-stream capacity is untouched.",
             '**Bursts.** Up to three events in two seconds are three toasts; a fourth replaces them with one "4 updates" toast that keeps counting. Nothing is held back to decide.',
-            "**Viewers.** A viewer's events carry no patient or staff name, and a viewer's message that does carry one is refused whole. The toast text is built from that minimised shape, so there is nothing to leak.",
+            "**Viewers.** A viewer's events carry no patient or staff name, and a viewer's message that does carry one is refused whole. The toast text is built from that minimised shape, and a viewer is told nothing about the doctor's email.",
             '**No sound, no colour-only cue.** The unread count is words in a polite live region with a fixed box, so the table does not move. The doctor card gets an outline and the word "Updated"; with reduced motion the outline stays still for the same two seconds.',
           ],
         },
         {
+          t: "p",
+          text: '**The email to the doctor.** Marking a patient arrived writes a `doctor_notification` row in the same transaction, one per appointment (a second mark or a double click cannot make another). The admin app then claims the row with a lease, takes one email from the daily and monthly allowance that acknowledgements, reminders and staff emails also use, sends it through the same sender, and records it as sent only after the provider accepted it. A spent allowance, a doctor with no address or a provider failure never changes the arrival: the row says skipped (with the reason) or failed, the toast says "doctor emailed", "doctor email on its way" or "email not sent (no doctor email)", and the appointment sheet shows when it went or why it did not. A failed email can be sent again from the sheet, up to three tries. The email names the patient by first name and last initial and gives the time (East Africa Time), the doctor and a link to the appointment: no phone, email or notes.',
+        },
+        {
           t: "note",
-          text: "Doctors have no accounts and no email address on file, so they are notified only through the dashboard. The fix is a `doctors.email` column linked to `staff_access`, a Resend notification, and a morning digest, all inside the 100 a day cap the booking emails share.",
+          text: "Seeded doctors have no email address until staff set one on the doctor's card, so nothing is emailed from seed data. The address is set by an owner or an admin with a reason, audited with the value before and after, and never in a public response. Honest limits: one address per doctor and no per-doctor preferences, no morning digest yet, no bounce handling, and the email shares the 100 a day and 3,000 a month allowance with every other email, so a busy day can use it up.",
         },
       ],
     },

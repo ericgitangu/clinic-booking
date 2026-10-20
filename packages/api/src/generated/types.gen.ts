@@ -812,6 +812,10 @@ export type DoctorBoard = {
      */
     doctor_id: string;
     /**
+     * Email
+     */
+    email?: string | null;
+    /**
      * Free Slots
      */
     free_slots: number;
@@ -829,6 +833,42 @@ export type DoctorBoard = {
      * Timezone
      */
     timezone: string;
+};
+
+/**
+ * DoctorEmail
+ */
+export type DoctorEmail = {
+    /**
+     * Audit Id
+     *
+     * The audit row of this change; null when the address was already that.
+     */
+    audit_id: string | null;
+    /**
+     * Doctor Id
+     */
+    doctor_id: string;
+    /**
+     * Email
+     */
+    email: string | null;
+};
+
+/**
+ * DoctorEmailRequest
+ *
+ * Set the doctor's address, or clear it with ``email: null`` (or a blank).
+ */
+export type DoctorEmailRequest = {
+    /**
+     * Email
+     */
+    email: string | null;
+    /**
+     * Reason
+     */
+    reason: string;
 };
 
 /**
@@ -869,6 +909,126 @@ export type DoctorLoad = {
      * Utilization
      */
     utilization: number | null;
+};
+
+/**
+ * DoctorNoticeClaim
+ *
+ * ``send`` is set when the caller now holds the claim and should send; otherwise the row is
+ * sent, skipped, out of attempts or held by another sender, and there is nothing to do.
+ */
+export type DoctorNoticeClaim = {
+    send: DoctorNoticeToSend | null;
+};
+
+/**
+ * DoctorNoticeFinish
+ */
+export type DoctorNoticeFinish = {
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Outcome
+     */
+    outcome: 'sent' | 'failed' | 'skipped';
+    /**
+     * Provider Id
+     */
+    provider_id?: string | null;
+    /**
+     * Reason
+     */
+    reason?: 'no_email' | 'allowance_day' | 'allowance_month' | 'demo_address' | 'not_configured' | null;
+};
+
+/**
+ * DoctorNoticeFinished
+ */
+export type DoctorNoticeFinished = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Status
+     */
+    status: 'pending' | 'sent' | 'failed' | 'skipped';
+    /**
+     * Updated
+     *
+     * False when the row was not held by a claim or was final.
+     */
+    updated: boolean;
+};
+
+/**
+ * DoctorNoticeState
+ *
+ * Where telling the doctor stands. ``reason`` says why a row was skipped.
+ */
+export type DoctorNoticeState = {
+    /**
+     * Attempts
+     */
+    attempts: number;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason: 'no_email' | 'allowance_day' | 'allowance_month' | 'demo_address' | 'not_configured' | null;
+    /**
+     * Sent At
+     */
+    sent_at: string | null;
+    /**
+     * Status
+     */
+    status: 'pending' | 'sent' | 'failed' | 'skipped';
+};
+
+/**
+ * DoctorNoticeToSend
+ *
+ * What the web app needs to write and send the arrival email, once it holds the claim.
+ */
+export type DoctorNoticeToSend = {
+    /**
+     * Appointment Id
+     */
+    appointment_id: string;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Doctor Email
+     */
+    doctor_email: string;
+    /**
+     * Doctor Name
+     */
+    doctor_name: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Patient Name
+     */
+    patient_name: string;
+    /**
+     * Starts At
+     */
+    starts_at: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
 };
 
 /**
@@ -1965,6 +2125,7 @@ export type StaffAppointmentChange = {
      * Doctor Name
      */
     doctor_name: string;
+    doctor_notice?: DoctorNoticeState | null;
     /**
      * Ends At
      */
@@ -2893,6 +3054,46 @@ export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchRes
 
 export type CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponse = CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses[keyof CancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatchResponses];
 
+export type GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetData = {
+    body?: never;
+    path: {
+        /**
+         * Appointment Id
+         */
+        appointment_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/appointments/{appointment_id}/doctor-notification';
+};
+
+export type GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: DoctorNoticeState;
+};
+
+export type GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetResponse = GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetResponses[keyof GetDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGetResponses];
+
 export type GetLineageInternalAdminAppointmentsAppointmentIdLineageGetData = {
     body?: never;
     path: {
@@ -3270,6 +3471,130 @@ export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses = {
 };
 
 export type MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponse = MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses[keyof MarkNotifiedInternalAdminAuditAuditIdNotifiedPostResponses];
+
+export type ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostData = {
+    body?: never;
+    path: {
+        /**
+         * Notification Id
+         */
+        notification_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/doctor-notifications/{notification_id}/claim';
+};
+
+export type ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+};
+
+export type ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: DoctorNoticeClaim;
+};
+
+export type ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostResponse = ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostResponses[keyof ClaimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPostResponses];
+
+export type FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostData = {
+    body: DoctorNoticeFinish;
+    path: {
+        /**
+         * Notification Id
+         */
+        notification_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/doctor-notifications/{notification_id}/finish';
+};
+
+export type FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+};
+
+export type FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: DoctorNoticeFinished;
+};
+
+export type FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostResponse = FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostResponses[keyof FinishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPostResponses];
+
+export type SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchData = {
+    body: DoctorEmailRequest;
+    path: {
+        /**
+         * Doctor Id
+         */
+        doctor_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/doctors/{doctor_id}/email';
+};
+
+export type SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
+};
+
+export type SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: DoctorEmail;
+};
+
+export type SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchResponse = SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchResponses[keyof SetDoctorEmailInternalAdminDoctorsDoctorIdEmailPatchResponses];
 
 export type DoctorRunningLateInternalAdminDoctorsDoctorIdRunningLatePostData = {
     body: RunningLateRequest;

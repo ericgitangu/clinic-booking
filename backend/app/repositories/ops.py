@@ -19,7 +19,7 @@ from app.repositories.admin import range_params
 
 _DOCTORS = text(
     """
-    SELECT d.id, d.full_name, d.specialty, c.timezone
+    SELECT d.id, d.full_name, d.specialty, d.email, c.timezone
     FROM doctors d JOIN clinics c ON c.id = d.clinic_id
     WHERE d.is_active
     ORDER BY d.full_name, d.id

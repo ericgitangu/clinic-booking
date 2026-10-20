@@ -38,6 +38,11 @@ import {
   listAppointmentsInternalAdminAppointmentsGet,
   rescheduleForPatientInternalAdminAppointmentsAppointmentIdReschedulePatch,
   revokeAccessInternalAdminAccessEmailDelete,
+  claimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPost,
+  finishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPost,
+  getDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGet,
+  setDoctorEmailInternalAdminDoctorsDoctorIdEmailPatch,
+  type DoctorNoticeFinish,
 } from "@clinic/api/generated";
 
 export type { Caller } from "@clinic/api/call";
@@ -446,4 +451,57 @@ export const adminAppointment = (caller: Caller, id: string) =>
         }),
       { caller },
     ),
+  );
+
+// The doctor's address for arrival emails (owner and admin; the API audits it with the reason), and
+// the record of telling the doctor that a patient arrived.
+export const setDoctorEmail = (
+  caller: Caller,
+  doctorId: string,
+  email: string | null,
+  reason: string,
+) =>
+  callApi(
+    "setDoctorEmail",
+    (client) =>
+      setDoctorEmailInternalAdminDoctorsDoctorIdEmailPatch({
+        client,
+        path: { doctor_id: doctorId },
+        body: { email, reason },
+      }),
+    { caller },
+  );
+
+export const doctorNotice = (caller: Caller, appointmentId: string) =>
+  callApi(
+    "doctorNotice",
+    (client) =>
+      getDoctorNotificationInternalAdminAppointmentsAppointmentIdDoctorNotificationGet(
+        { client, path: { appointment_id: appointmentId } },
+      ),
+    { caller },
+  );
+
+export const claimDoctorNotice = (caller: Caller, id: string) =>
+  callApi(
+    "claimDoctorNotice",
+    (client) =>
+      claimDoctorNotificationInternalAdminDoctorNotificationsNotificationIdClaimPost(
+        { client, path: { notification_id: id } },
+      ),
+    { caller },
+  );
+
+export const finishDoctorNotice = (
+  caller: Caller,
+  id: string,
+  body: DoctorNoticeFinish,
+) =>
+  callApi(
+    "finishDoctorNotice",
+    (client) =>
+      finishDoctorNotificationInternalAdminDoctorNotificationsNotificationIdFinishPost(
+        { client, path: { notification_id: id }, body },
+      ),
+    { caller },
   );

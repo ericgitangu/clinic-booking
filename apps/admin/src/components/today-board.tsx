@@ -10,6 +10,7 @@ import { Button } from "@clinic/ui/components/ui/button";
 import { AppointmentLink } from "@/components/appointment-sheet";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { AttendanceActions } from "@/components/attendance-actions";
+import { DoctorEmail } from "@/components/doctor-email";
 import { DrillSheet } from "@/components/drill-sheet";
 import { StaffControls } from "@/components/staff-controls";
 import { TodayCard } from "@/components/today-card";
@@ -147,6 +148,13 @@ export function TodayBoard({
                     </span>
                   </p>
                 </div>
+                {canAct && (
+                  <DoctorEmail
+                    doctorId={d.doctor_id}
+                    doctorName={d.name}
+                    email={d.email ?? null}
+                  />
+                )}
                 {d.appointments.length > 0 && (
                   <div className="mt-2 flex justify-end">
                     <DrillSheet

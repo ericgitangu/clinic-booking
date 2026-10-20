@@ -1,10 +1,24 @@
 import "server-only";
 
 import type { AuditEntry, LineageEvent } from "@clinic/api/generated";
-import { auditList } from "@/lib/api";
+import { auditList, doctorNotice } from "@/lib/api";
 import { loadAppointmentRow, loadLineage } from "@/lib/dashboard-data";
 import { can } from "@/lib/roles";
 import { authorise, callerFor } from "@/lib/session";
+
+export interface DoctorNoticeView {
+  id: string;
+  status: "pending" | "sent" | "failed" | "skipped";
+  reason:
+    | "no_email"
+    | "allowance_day"
+    | "allowance_month"
+    | "demo_address"
+    | "not_configured"
+    | null;
+  attempts: number;
+  sentAt: string | null;
+}
 
 export interface AppointmentDetail {
   id: string;
@@ -23,6 +37,11 @@ export interface AppointmentDetail {
   events: LineageEvent[];
   /** What staff did to it and why. Owner and admin only: the API gives a viewer none of this. */
   audit: AuditEntry[] | null;
+  /**
+   * Whether the doctor was told of the arrival. Owner and admin only, and only for a visit marked
+   * arrived; null otherwise.
+   */
+  doctorNotice: DoctorNoticeView | null;
   /** The server's clock, for "has it started", never the device's. */
   nowMs: number;
 }
@@ -56,6 +75,10 @@ export async function loadDetail(id: string): Promise<DetailResult> {
         limit: 25,
       })
     : null;
+  const notice =
+    mayAudit && row.attendance === "arrived"
+      ? await doctorNotice(callerFor(staff, staff.role), id)
+      : null;
   return {
     ok: true,
     detail: {
@@ -73,6 +96,16 @@ export async function loadDetail(id: string): Promise<DetailResult> {
       cancellationReason: row.cancellation_reason ?? null,
       events: lineage.events,
       audit: audit && audit.ok ? audit.data.items : null,
+      doctorNotice:
+        notice && notice.ok
+          ? {
+              id: notice.data.id,
+              status: notice.data.status,
+              reason: notice.data.reason,
+              attempts: notice.data.attempts,
+              sentAt: notice.data.sent_at,
+            }
+          : null,
       nowMs: Date.now(),
     },
   };

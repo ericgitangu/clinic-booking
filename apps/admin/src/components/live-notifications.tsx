@@ -2,18 +2,22 @@
 
 import { useEffect, useRef } from "react";
 import { notify } from "@clinic/ui/lib/notify";
+import { doctorEmailSuffix } from "@/lib/doctor-notice-read";
 import { parseLiveEvent } from "@/lib/live-events";
 import {
   ToastBatcher,
   cardsTouched,
   highlights,
   toastText,
+  wantsEmailStatus,
   type ToastSink,
 } from "@/lib/live-notices";
 import { sharedStream } from "@/lib/live-share";
 import type { Role } from "@/lib/roles";
 
 const SUMMARY_MS = 6000;
+// An arrival toast stays up long enough to be updated with what became of the doctor's email.
+const ARRIVAL_MS = 6000;
 
 /** Toasts through the shared notify setup: quiet (no buzz, no sound) and loaded on the first one. */
 const sink = (): ToastSink => {
@@ -21,9 +25,10 @@ const sink = (): ToastSink => {
   return {
     show: (text) => {
       const id = `live-${(n += 1)}`;
-      notify.quiet(text, { id });
+      notify.quiet(text, { id, duration: ARRIVAL_MS });
       return id;
     },
+    update: (id, text) => notify.quiet(text, { id, duration: ARRIVAL_MS }),
     dismiss: (id) => notify.dismiss(id),
     summary: (id, text) => notify.quiet(text, { id, duration: SUMMARY_MS }),
   };
@@ -66,7 +71,14 @@ export function LiveNotifications({
         for (const key of cardsTouched(ev)) highlights.mark(key);
         const doctor = latest.current.find((d) => d.id === ev.doctorId)?.name;
         if (!isToastKind(ev.kind)) return;
-        batch.push(toastText(ev, doctor, role));
+        // Owner and admin hear what became of the email to the doctor; a viewer's stream carries
+        // no names, and nothing about the doctor's address either.
+        const follow =
+          wantsEmailStatus(ev, role) && ev.appointmentId
+            ? (add: (suffix: string) => void) =>
+                void doctorEmailSuffix(ev.appointmentId as string, add)
+            : undefined;
+        batch.push(toastText(ev, doctor, role), follow);
       },
     });
   }, [person, role]);

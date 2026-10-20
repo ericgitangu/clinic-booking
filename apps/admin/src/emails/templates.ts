@@ -337,3 +337,50 @@ export function staffInvite(f: {
     why: "You are getting this because a member of staff at Idyllic Clinic, a demonstration made for an assessment and not a real clinic, invited you.",
   });
 }
+
+/** The patient's first name and the first letter of the last one: "Amina W.". Nothing else about
+ *  the patient goes to the doctor's inbox. */
+export function firstNameAndInitial(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "A patient";
+  if (parts.length === 1) return parts[0];
+  const last = [...parts[parts.length - 1]][0]?.toUpperCase() ?? "";
+  return `${parts[0]} ${last}.`;
+}
+
+const DOCTOR_WHY =
+  "You are getting this because the clinic's reception marked a patient of yours as arrived on the Idyllic Clinic admin dashboard, and your address is set as the doctor's contact there. Idyllic Clinic is a demonstration made for an assessment and not a real clinic.";
+
+/**
+ * "Patient arrived", to the doctor. The patient is the first name and the last initial, the time is
+ * the visit's in the clinic's zone, and the link opens the appointment in the admin (which asks the
+ * doctor's staff login for the rest). No phone, email, notes or reason: the inbox is not a place
+ * for them.
+ */
+export function doctorArrived(f: {
+  /** The patient's full name as the API returned it; only the first name and last initial are used. */
+  patientName: string;
+  /** `doctor_name`. */
+  doctor: string;
+  startsAt: string;
+  timezone?: string;
+  appointmentId: string;
+}): Composed {
+  const who = firstNameAndInitial(f.patientName);
+  const w = when(f);
+  return compose(`${who} has arrived for ${w.when}`, {
+    preview: `${who} is here for the ${w.when} visit`,
+    heading: "A patient has arrived",
+    lead: `Hello ${f.doctor}, ${who} has arrived and is waiting for you.`,
+    box: [
+      { text: who, strong: true },
+      { text: w.when },
+      { text: `${w.zone}, ${APPOINTMENT_MINUTES} minutes.`, muted: true },
+    ],
+    button: {
+      label: "Open the appointment",
+      href: `${SITE.url}/dashboard/appointments/${encodeURIComponent(f.appointmentId)}`,
+    },
+    why: DOCTOR_WHY,
+  });
+}

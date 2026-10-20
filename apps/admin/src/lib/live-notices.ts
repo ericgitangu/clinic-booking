@@ -3,6 +3,7 @@
 // with fake timers. The components that use it are live-notifications.tsx, live-feed.tsx and
 // today-card.tsx.
 import {
+  canSeePeople,
   describe,
   isAboutAppointment,
   type LiveEvent,
@@ -36,7 +37,14 @@ export interface ToastSink {
   dismiss(id: string): void;
   /** Shows, or replaces the text of, the one summary toast. */
   summary(id: string, text: string): void;
+  /** Replaces the words of a toast that is still up. */
+  update(id: string, text: string): void;
 }
+
+/** Called once the toast is up; `add` puts words on its end (" · doctor emailed"), replacing the
+ *  last ones, for as long as the toast is still one of those on screen. A toast the batcher has
+ *  taken away (folded into "N updates") is not brought back. */
+export type Follow = (add: (suffix: string) => void) => void;
 
 /**
  * Up to BURST_MAX toasts, each as the event arrives. The next event inside the same two seconds
@@ -47,6 +55,8 @@ export interface ToastSink {
 export class ToastBatcher {
   private recent: number[] = [];
   private shown: string[] = [];
+  /** Every individual toast that is up and has not been folded into a summary. */
+  private readonly up = new Set<string>();
   private summaryId: string | null = null;
   private count = 0;
   private serial = 0;
@@ -56,7 +66,7 @@ export class ToastBatcher {
     private readonly now: () => number = Date.now,
   ) {}
 
-  push(text: string) {
+  push(text: string, follow?: Follow) {
     const at = this.now();
     this.recent = this.recent.filter((t) => at - t <= BURST_WINDOW_MS);
     if (this.recent.length === 0) {
@@ -73,14 +83,24 @@ export class ToastBatcher {
       return;
     }
     if (this.recent.length > BURST_MAX) {
-      for (const id of this.shown) this.sink.dismiss(id);
+      for (const id of this.shown) {
+        this.up.delete(id);
+        this.sink.dismiss(id);
+      }
       this.shown = [];
       this.summaryId = `live-updates-${(this.serial += 1)}`;
       this.count = this.recent.length;
       this.sink.summary(this.summaryId, updatesText(this.count));
       return;
     }
-    this.shown.push(this.sink.show(text));
+    const id = this.sink.show(text);
+    this.shown.push(id);
+    this.up.add(id);
+    if (follow) {
+      follow((suffix) => {
+        if (this.up.has(id)) this.sink.update(id, `${text} · ${suffix}`);
+      });
+    }
   }
 }
 
@@ -172,4 +192,13 @@ export function nextUnread(
 export function unreadText(count: number): string {
   if (count <= 0) return "";
   return `${count > 99 ? "99+" : count} new`;
+}
+
+/** Whether an arrival's toast should go on to say what became of the email to the doctor. Only for
+ *  owner and admin: a viewer's stream carries no names and the viewer is told nothing about the
+ *  doctor's address either. */
+export function wantsEmailStatus(ev: LiveEvent, role: Role): boolean {
+  return (
+    ev.kind === "arrived" && ev.appointmentId !== null && canSeePeople(role)
+  );
 }

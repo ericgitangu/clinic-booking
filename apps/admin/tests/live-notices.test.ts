@@ -8,6 +8,7 @@ import {
   cardsTouched,
   nextUnread,
   toastText,
+  wantsEmailStatus,
   unreadText,
   type ToastSink,
 } from "@/lib/live-notices";
@@ -48,6 +49,7 @@ function sink() {
     },
     dismiss: (id) => calls.push(`dismiss ${id}`),
     summary: (id, text) => calls.push(`summary ${id} ${text}`),
+    update: (id, text) => calls.push(`update ${id} ${text}`),
   };
   return { s, calls };
 }
@@ -119,6 +121,35 @@ describe("ToastBatcher", () => {
   });
 });
 
+describe("ToastBatcher follow-up words", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("puts the words on the end of a toast that is still up, replacing the last ones", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    b.push("Marked arrived: A", (add) => {
+      add("doctor email on its way");
+      add("doctor emailed");
+    });
+    expect(calls).toEqual([
+      "show t1 Marked arrived: A",
+      "update t1 Marked arrived: A · doctor email on its way",
+      "update t1 Marked arrived: A · doctor emailed",
+    ]);
+  });
+
+  it("does not bring back a toast that was folded into an 'N updates' toast", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    let late: (x: string) => void = () => undefined;
+    b.push("first", (add) => (late = add));
+    for (const t of ["b", "c", "d"]) b.push(t);
+    late("doctor emailed");
+    expect(calls.some((c) => c.startsWith("update"))).toBe(false);
+  });
+});
+
 describe("what a toast says", () => {
   it("names the patient, the time and the doctor for an owner", () => {
     const ev = parseLiveEvent(JSON.stringify(staffShape()), "owner")!;
@@ -144,6 +175,21 @@ describe("what a toast says", () => {
       "viewer",
     )!;
     expect(toastText(ev, undefined, "viewer")).toMatch(/^Vetoed\. /);
+  });
+});
+
+describe("the doctor's email in a toast", () => {
+  it("is asked about for an owner's or admin's arrival, never a viewer's", () => {
+    const owner = parseLiveEvent(JSON.stringify(staffShape()), "owner")!;
+    expect(wantsEmailStatus(owner, "owner")).toBe(true);
+    expect(wantsEmailStatus(owner, "admin")).toBe(true);
+    const viewer = parseLiveEvent(JSON.stringify(viewerShape()), "viewer")!;
+    expect(wantsEmailStatus(viewer, "viewer")).toBe(false);
+    const booked = parseLiveEvent(
+      JSON.stringify(staffShape({ event_type: "booked" })),
+      "owner",
+    )!;
+    expect(wantsEmailStatus(booked, "owner")).toBe(false);
   });
 });
 

@@ -1421,6 +1421,17 @@
             "title": "Doctor Id",
             "type": "string"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "free_slots": {
             "title": "Free Slots",
             "type": "integer"
@@ -1463,6 +1474,76 @@
           "running_behind"
         ],
         "title": "DoctorBoard",
+        "type": "object"
+      },
+      "DoctorEmail": {
+        "properties": {
+          "audit_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The audit row of this change; null when the address was already that.",
+            "title": "Audit Id"
+          },
+          "doctor_id": {
+            "format": "uuid",
+            "title": "Doctor Id",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "email",
+          "audit_id"
+        ],
+        "title": "DoctorEmail",
+        "type": "object"
+      },
+      "DoctorEmailRequest": {
+        "additionalProperties": false,
+        "description": "Set the doctor's address, or clear it with ``email: null`` (or a blank).",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "reason"
+        ],
+        "title": "DoctorEmailRequest",
         "type": "object"
       },
       "DoctorList": {
@@ -1525,6 +1606,233 @@
           "utilization"
         ],
         "title": "DoctorLoad",
+        "type": "object"
+      },
+      "DoctorNoticeClaim": {
+        "description": "``send`` is set when the caller now holds the claim and should send; otherwise the row is\nsent, skipped, out of attempts or held by another sender, and there is nothing to do.",
+        "properties": {
+          "send": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorNoticeToSend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "send"
+        ],
+        "title": "DoctorNoticeClaim",
+        "type": "object"
+      },
+      "DoctorNoticeFinish": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "outcome": {
+            "enum": [
+              "sent",
+              "failed",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_email",
+                  "allowance_day",
+                  "allowance_month",
+                  "demo_address",
+                  "not_configured"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "DoctorNoticeFinish",
+        "type": "object"
+      },
+      "DoctorNoticeFinished": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "sent",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated": {
+            "description": "False when the row was not held by a claim or was final.",
+            "title": "Updated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "updated"
+        ],
+        "title": "DoctorNoticeFinished",
+        "type": "object"
+      },
+      "DoctorNoticeState": {
+        "description": "Where telling the doctor stands. ``reason`` says why a row was skipped.",
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_email",
+                  "allowance_day",
+                  "allowance_month",
+                  "demo_address",
+                  "not_configured"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "sent",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "attempts",
+          "sent_at"
+        ],
+        "title": "DoctorNoticeState",
+        "type": "object"
+      },
+      "DoctorNoticeToSend": {
+        "description": "What the web app needs to write and send the arrival email, once it holds the claim.",
+        "properties": {
+          "appointment_id": {
+            "format": "uuid",
+            "title": "Appointment Id",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "doctor_email": {
+            "title": "Doctor Email",
+            "type": "string"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "appointment_id",
+          "attempt",
+          "doctor_email",
+          "doctor_name",
+          "patient_name",
+          "starts_at",
+          "timezone"
+        ],
+        "title": "DoctorNoticeToSend",
         "type": "object"
       },
       "DoctorRef": {
@@ -3362,6 +3670,16 @@
             "title": "Doctor Name",
             "type": "string"
           },
+          "doctor_notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorNoticeState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ends_at": {
             "format": "date-time",
             "title": "Ends At",
@@ -5079,6 +5397,61 @@
         ]
       }
     },
+    "/internal/admin/appointments/{appointment_id}/doctor-notification": {
+      "get": {
+        "description": "Where telling the doctor of this arrival stands. 404 when there is none.",
+        "operationId": "get_doctor_notification_internal_admin_appointments__appointment_id__doctor_notification_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appointment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Appointment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorNoticeState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Doctor Notification",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/internal/admin/appointments/{appointment_id}/lineage": {
       "get": {
         "operationId": "get_lineage_internal_admin_appointments__appointment_id__lineage_get",
@@ -5785,6 +6158,212 @@
           }
         },
         "summary": "Mark Notified",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/doctor-notifications/{notification_id}/claim": {
+      "post": {
+        "description": "Take the right to send this arrival email, with a lease. `send` is null when there is nothing to send (already sent, skipped, out of attempts, or held by another sender).",
+        "operationId": "claim_doctor_notification_internal_admin_doctor_notifications__notification_id__claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorNoticeClaim"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Doctor Notification",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/doctor-notifications/{notification_id}/finish": {
+      "post": {
+        "description": "Record the result of a send made under a claim: `sent` only after the provider accepted it, `failed` (it can be claimed again until the attempts are used) or `skipped` with the reason (the day's or month's allowance used up, a reserved address).",
+        "operationId": "finish_doctor_notification_internal_admin_doctor_notifications__notification_id__finish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorNoticeFinish"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorNoticeFinished"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "Finish Doctor Notification",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/doctors/{doctor_id}/email": {
+      "patch": {
+        "description": "Set the doctor's official address, or clear it with `email: null`. It is where the arrival email goes, and it is never in a public response. A reason is required and is recorded in the audit trail with the address before and after. Setting what is already there records nothing (`audit_id` null).",
+        "operationId": "set_doctor_email_internal_admin_doctors__doctor_id__email_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doctor_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Doctor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorEmail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set Doctor Email",
         "tags": [
           "admin"
         ]

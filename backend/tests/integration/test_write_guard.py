@@ -396,6 +396,8 @@ def test_every_guarded_write_documents_its_429_with_a_retry_after() -> None:
             if path.startswith("/internal/admin") and method in ("post", "patch", "delete"):
                 if path.endswith("/invites/accept"):
                     continue  # its own attempt limit
+                if "/doctor-notifications/" in path:
+                    continue  # follow-ups of one arrival: replay-guarded, bounded by their attempts
                 guarded.append((method, path))
                 resp = op["responses"].get("429")
                 assert resp is not None, (method, path)
