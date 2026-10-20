@@ -1355,6 +1355,7 @@ workflows:
           context: gcp-deploy
           requires:
             - ship-api
+            - ship-realtime
       - zap-prod:
           requires:
             - smoke-public

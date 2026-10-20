@@ -1397,6 +1397,12 @@ expect "deploy url: a failure prints the size only, never the output" "$(grep -c
 expect "deploy url: the ship step reads the URL through deploy_url.sh" "$(grep -c 'deploy_url.sh < /tmp/deploy.out' "$HERE/../../.circleci/config.yml")" 1
 expect "deploy url: the ship step no longer pipes the deploy through tail -1" "$(grep -c 'vercel deploy --prebuilt --prod | tail -1' "$HERE/../../.circleci/config.yml")" 0
 
+# The live cost guards (C6 counts tagged registry versions) judge the registry only after both
+# release jobs have pruned it; a cost-check that waits for ship-api alone races ship-realtime's prune.
+CCSTEP="$(awk '/^      - cost-check:/{f=1} f&&/^      - zap-prod:/{exit} f' "$HERE/../../.circleci/config.yml")"
+expect "cost-check: waits for ship-api" "$(grep -c -- '- ship-api$' <<<"$CCSTEP")" 1
+expect "cost-check: waits for ship-realtime, so its prune has run before C6 counts" "$(grep -c -- '- ship-realtime$' <<<"$CCSTEP")" 1
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
