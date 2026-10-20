@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _clearCacheForTests,
   mintIdToken,
@@ -196,9 +196,7 @@ describe("a hung mint", () => {
 
     // Straight afterwards, with a working exchange: a FRESH mint, not the hung promise.
     const good = { ...deps(token, oidc, () => now), timeoutMs: 40 };
-    const began = Date.now();
     await expect(mintIdToken("clinic-api", good)).resolves.toBe(token);
-    expect(Date.now() - began).toBeLessThan(30); // it did not wait on the hung one
     expect(oidc).toHaveBeenCalledTimes(2);
   });
 
@@ -223,6 +221,8 @@ describe("a hung mint", () => {
     await expect(mintIdToken("clinic-api", d)).rejects.toThrow();
     expect(signals).toHaveLength(2);
     expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
+    // The whole-mint bound fires first; each request's own signal then fires at its own limit.
+    await vi.waitFor(() => expect(signals.every((s) => s?.aborted)).toBe(true));
   });
 
   it("bounds a Vercel OIDC token that never arrives", async () => {
@@ -232,6 +232,50 @@ describe("a hung mint", () => {
       now: () => 1_000_000,
       timeoutMs: 40,
     };
-    await expect(mintIdToken("clinic-api", d)).rejects.toThrow();
+    const err = await mintIdToken("clinic-api", d).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TokenMintError);
+    expect((err as TokenMintError).stage).toBe("oidc");
+  });
+});
+
+describe("the whole-mint bound", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("cuts off stages that are each under their limit but together over it, and the next call mints afresh", async () => {
+    vi.useFakeTimers();
+    const now = 1_000_000;
+    const token = jwtWithExp(now / 1000 + 3600);
+    const limit = 1_000;
+    const stage = 600; // under the per-stage limit; three of them are 1800, over the whole
+    const later = <T>(value: T) =>
+      new Promise<T>((ok) => setTimeout(() => ok(value), stage));
+    const oidc = vi.fn(() => later("VERCEL_OIDC"));
+    const slow: MintDeps = {
+      oidcToken: oidc,
+      fetchImpl: (async (url: string) =>
+        later(
+          url.includes("sts.googleapis.com")
+            ? new Response(JSON.stringify({ access_token: "STS" }), {
+                status: 200,
+              })
+            : new Response(JSON.stringify({ token }), { status: 200 }),
+        )) as unknown as typeof fetch,
+      now: () => now,
+      timeoutMs: limit,
+    };
+
+    const first = mintIdToken("clinic-api", slow).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(limit + 1);
+    const err = await first;
+    // the outer bound's error, not a stage's: no single stage was over its own limit
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(TokenMintError);
+    expect((err as Error).message).toMatch(/timed out/);
+
+    // Straight afterwards (the cut-off mint is still pending in the background): a fresh mint.
+    const fast = { ...deps(token, oidc, () => now), timeoutMs: limit };
+    oidc.mockImplementation(async () => "VERCEL_OIDC");
+    await expect(mintIdToken("clinic-api", fast)).resolves.toBe(token);
+    expect(oidc).toHaveBeenCalledTimes(2);
   });
 });
