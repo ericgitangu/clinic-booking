@@ -199,12 +199,28 @@ jobs:
       - run:
           name: make lint-go (gofmt, go vet, staticcheck, golangci-lint; strict, no baseline; the pre-push hook runs it too)
           command: make lint-go
+      - restore_cache:
+          keys:
+            - gomod-v1-{{ checksum "services/realtime/go.sum" }}-gosec2.29.0-govulncheck1.9.0
+            - gomod-v1-{{ checksum "services/realtime/go.sum" }}-
+      - run:
+          name: Fetch modules and the scanners (bounded retry, checksums still verified)
+          command: |
+            # sum.golang.org and the module proxy drop the odd stream; retry instead of failing the job
+            retry() { for n in 1 2 3; do "$@" && return 0; echo "attempt $n failed: $*" >&2; sleep $((n * 5)); done; return 1; }
+            (cd services/realtime && retry go mod download)
+            retry go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+            retry go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - save_cache:
+          key: gomod-v1-{{ checksum "services/realtime/go.sum" }}-gosec2.29.0-govulncheck1.9.0
+          paths:
+            - ~/go/pkg/mod
       - run:
           name: gosec and govulncheck (any finding fails)
           command: |
             cd services/realtime
-            go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet ./...
-            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+            "$(go env GOPATH)/bin/gosec" -quiet ./...
+            "$(go env GOPATH)/bin/govulncheck" ./...
       - run:
           name: go test -race against the real database and API
           command: |
