@@ -43,8 +43,8 @@ const ALL_COLUMNS: readonly FooterColumn[] = [
         icon: "docs",
       },
       {
-        label: "Architecture decisions",
-        href: "/decisions",
+        label: "Architecture",
+        href: "/architecture",
         external: false,
         icon: "list",
       },
