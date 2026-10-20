@@ -24,6 +24,7 @@ export const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/about",
+  "/decisions",
   "/data",
   "/docs",
   "/redoc",
