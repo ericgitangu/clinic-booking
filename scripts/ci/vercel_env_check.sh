@@ -21,26 +21,27 @@ required="$(awk -v app="$APP" '$1 == app { print $2 }' scripts/ci/required_env.t
 : "${VERCEL_PROJECT_ID:?set VERCEL_PROJECT_ID}"
 : "${VERCEL_ORG_ID:?set VERCEL_ORG_ID}"
 
-present="$(VERCEL="$VERCEL" TARGET="$TARGET" python3 - <<'PY'
+echo "vercel_env_check: Vercel CLI $("$VERCEL" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+present="$(VERCEL="$VERCEL" TARGET="$TARGET" SCRIPT_DIR="$(dirname "$0")" python3 - <<'PY'
 import json, os, re, subprocess, sys
 
-# Fail closed with a reason that can never carry a value: only a parsed error.code / error.message,
-# a short letters-and-spaces CLI error line, or the size of what came back.
+# Fail closed with a reason that cannot carry a secret. The only thing taken from a Vercel error is a
+# validated error code (scripts/ci/vercel_error_code.py: ^[a-z][a-z0-9_]{0,39}$, from error.code or a
+# whole "Error: <code>" line); with no such code only the size of the response is reported, as before.
+# No free text from Vercel is printed: it can carry scopes, ids and tokens in more shapes than a
+# redaction list can cover. The HTTP status is not shown: the CLI does not print it without
+# `--include`, which would put headers in front of the JSON this script parses.
+sys.path.insert(0, os.environ["SCRIPT_DIR"])
+from vercel_error_code import error_code
+
 def fail(code, why):
     sys.stderr.write("vercel_env_check: could not read the project variables: " + why + "\n")
     sys.exit(code)
 
 def explain(rc, text):
-    body = text[text.find("{"):text.rfind("}") + 1] if "{" in text else ""
-    try:
-        err = json.loads(body).get("error") if body else None
-    except ValueError:
-        err = None
-    if isinstance(err, dict) and (err.get("code") or err.get("message")):
-        return "exit %d, %s: %s" % (rc, str(err.get("code", ""))[:60], str(err.get("message", ""))[:160])
-    line = next((l.strip() for l in text.splitlines() if l.strip().startswith("Error:")), "")
-    if re.fullmatch(r"Error: [A-Za-z ]{1,80}", line):
-        return "exit %d, %s" % (rc, line)
+    code = error_code(text)
+    if code:
+        return "exit %d, %s" % (rc, code)
     return "exit %d, unreadable response (%d bytes)" % (rc, len(text.encode()))
 
 project = os.environ["VERCEL_PROJECT_ID"]
