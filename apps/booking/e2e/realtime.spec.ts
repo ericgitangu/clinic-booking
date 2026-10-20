@@ -236,8 +236,9 @@ test("(f) an unchanged poll renders the grid zero times, one event renders it on
   } catch (e) {
     // Say what the page believed when the event did not arrive (CI keeps no browser artifacts).
     const stream = await marker(a.page).getAttribute("data-stream");
+    const pushed = await marker(a.page).getAttribute("data-pushed");
     throw new Error(
-      `the pushed event was not applied; data-stream=${stream}, availability calls=${calls.length}\n${String(e)}`,
+      `the pushed event was not applied; data-stream=${stream}, data-pushed=${pushed} (events seen:last effect), availability calls=${calls.length}\n${String(e)}`,
     );
   }
   expect(await renders()).toBe(settled + 1);

@@ -823,7 +823,11 @@ jobs:
               pnpm -C apps/booking exec playwright test e2e/recaptcha-script.spec.ts
       - run:
           name: API logs
-          command: docker compose logs api | tail -80
+          command: |
+            # The last lines are mostly health checks; the relay's own lines (what it published, what
+            # it left unsent and why) are what say whether a pushed event ever left the API.
+            docker compose logs api | grep -F 'realtime relay' | tail -80 || true
+            docker compose logs api | tail -80
           when: on_fail
 
   api-check:
@@ -898,7 +902,11 @@ jobs:
           when: always
       - run:
           name: API logs
-          command: docker compose logs api | tail -80
+          command: |
+            # The last lines are mostly health checks; the relay's own lines (what it published, what
+            # it left unsent and why) are what say whether a pushed event ever left the API.
+            docker compose logs api | grep -F 'realtime relay' | tail -80 || true
+            docker compose logs api | tail -80
           when: on_fail
 
   verify-release:

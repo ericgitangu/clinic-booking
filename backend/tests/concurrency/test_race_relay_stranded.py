@@ -12,6 +12,7 @@ transaction is visible (the ``xmin`` guard).
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from collections import Counter
@@ -23,6 +24,7 @@ import pytest
 from fastapi import FastAPI
 
 from app.core.clock import FakeClock
+from app.core.logging import APP_LOGGER
 from app.db.session import get_sessionmaker
 from app.domain.realtime import OutboundMessage
 from app.services import relay as relay_module
@@ -262,11 +264,13 @@ async def test_a_token_mint_flushes_a_stranded_event_with_no_further_bookings(
 
 @pytest.mark.race
 async def test_nothing_is_published_while_an_older_transaction_is_open(
-    realtime_clean: None, owner_conn: asyncpg.Connection
+    realtime_clean: None, owner_conn: asyncpg.Connection, caplog: pytest.LogCaptureFixture
 ) -> None:
     """The xmin guard is unchanged: the drain never publishes early, and once the open transaction
     ends the next trigger sends everything, once. A transaction that never ends costs a booking at
-    most the bounded wait."""
+    most the bounded wait. The relay says so at the default log level: a trigger that left an event
+    unsent logs a warning with the reason, and the trigger that sends it logs what it published."""
+    caplog.set_level(logging.INFO, logger=APP_LOGGER)
     publisher = RecordingPublisher()
     patients = await _patients(owner_conn, 2)
     app = make_realtime_app(publisher)
@@ -282,8 +286,15 @@ async def test_nothing_is_published_while_an_older_transaction_is_open(
             # It waits for the open transaction only up to the relay's bound, never for good.
             assert took < relay_module.HORIZON_WAIT + 0.5
             assert publisher.messages == []  # not visible yet, so not published
+            left = [r for r in caplog.records if "left events unsent" in r.getMessage()]
+            assert [r.levelno for r in left] == [logging.WARNING], caplog.text
+            assert "held_back" in left[0].getMessage()
+            caplog.clear()
             await tx.commit()
             assert (await _book(client, patients[1], SLOTS[1]))[0].status_code == 201
+            sent = [r.getMessage() for r in caplog.records if "relay published" in r.getMessage()]
+            assert len(sent) == 1 and "published 4 messages" in sent[0], caplog.text
+            assert not any("left events unsent" in r.getMessage() for r in caplog.records)
     finally:
         if holder.is_in_transaction():
             await tx.rollback()

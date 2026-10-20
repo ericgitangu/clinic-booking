@@ -59,6 +59,7 @@ function LiveNotice({
   armed,
   stream,
   dropped,
+  pushed,
   failing,
   onResume,
 }: {
@@ -67,6 +68,7 @@ function LiveNotice({
   armed: boolean;
   stream: string;
   dropped: number;
+  pushed: string;
   failing: boolean;
   onResume: () => void;
 }) {
@@ -77,6 +79,7 @@ function LiveNotice({
         data-polling={armed ? "armed" : "pending"}
         data-stream={stream}
         data-dropped={dropped}
+        data-pushed={pushed}
       />
       <p
         data-testid="live-state"
@@ -197,6 +200,7 @@ export function SlotChooser(props: Props) {
       armed={live.armed}
       stream={live.stream}
       dropped={live.dropped}
+      pushed={live.pushed}
       failing={live.failing}
       onResume={live.resume}
     />
