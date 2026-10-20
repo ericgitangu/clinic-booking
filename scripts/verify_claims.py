@@ -12,6 +12,10 @@ admin views leave those out. CI passes --require-synthetic, so a pipeline withou
 instead of quietly writing unmarked rows. Without the key (a reviewer's laptop) it uses the public
 POST /patients and says so: those rows are ordinary patients. The key is read from the environment
 only, never from argv.
+
+The public smoke has no credentials, so it cannot sign: it runs with --read-only, which writes
+nothing. A run inside CI (CI=true) with neither the key nor --read-only is refused, so no pipeline
+step can add an ordinary patient to production again.
 """
 
 from __future__ import annotations
@@ -140,6 +144,17 @@ def _pick_slots(client: httpx.Client) -> tuple[str, str, str, str]:
     raise SystemExit("no doctor has >= 2 slots in the next 14 clinic-local days")
 
 
+def _check_openapi_title(client: httpx.Client) -> None:
+    # follow redirects: $PUBLIC_API/openapi.json 308s to the web root
+    r = client.get("/openapi.json", follow_redirects=True)
+    check(
+        r.status_code == 200
+        and jbody(r).get("info", {}).get("title")
+        in ("Idyllic Clinic API", "Clinic Booking API"),  # old name until the release carries the new
+        "/openapi.json title",
+    )
+
+
 def run(base_url: str, extra_headers: dict[str, str], smoke_key: str | None = None) -> None:
     with httpx.Client(base_url=base_url, headers=extra_headers, timeout=30) as client:
         booked_id: str | None = None
@@ -256,20 +271,30 @@ def run(base_url: str, extra_headers: dict[str, str], smoke_key: str | None = No
                 "unknown appointment -> 404 problem+json",
             )
 
-            # openapi title (follow redirects: $PUBLIC_API/openapi.json 308s to the web root)
-            r = client.get("/openapi.json", follow_redirects=True)
-            check(
-                r.status_code == 200
-                and jbody(r).get("info", {}).get("title")
-                in ("Idyllic Clinic API", "Clinic Booking API"),  # old name until the release carries the new
-                "/openapi.json title",
-            )
+            _check_openapi_title(client)
         finally:
             if booked_id:
                 cleanup = client.patch(
                     f"/appointments/{booked_id}/cancel", json={"reason": "verify-claims teardown"}
                 )
                 check(cleanup.status_code == 200, "cleanup cancel of a leftover booking -> 200")
+
+
+def run_read_only(base_url: str, extra_headers: dict[str, str]) -> None:
+    """The checks that need no patient: they send GETs only, so they leave no row behind."""
+    with httpx.Client(base_url=base_url, headers=extra_headers, timeout=30) as client:
+        r = client.get("/doctors")
+        items = jbody(r).get("items", [])
+        check(r.status_code == 200 and bool(items), "GET /doctors -> 200 with doctors")
+        did, day, s0, _s1 = _pick_slots(client)
+        check(bool(did and day and s0), "a doctor has at least two free slots")
+        r = client.get("/appointments/00000000-0000-0000-0000-000000000000")
+        check(
+            r.status_code == 404
+            and r.headers.get("content-type", "").startswith("application/problem+json"),
+            "unknown appointment -> 404 problem+json",
+        )
+        _check_openapi_title(client)
 
 
 def main() -> int:
@@ -281,10 +306,24 @@ def main() -> int:
         action="store_true",
         help=f"fail unless {SMOKE_ENV} is set, so no unmarked rows are written (CI)",
     )
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="send GETs only: create no patient or appointment (the credential-free public smoke)",
+    )
     args = parser.parse_args()
 
     smoke_key = os.environ.get(SMOKE_ENV) or None
+    if args.read_only:
+        run_read_only(args.base_url.rstrip("/"), _headers(args.header))
+        return _report()
     if smoke_key is None:
+        if os.environ.get("CI") == "true":
+            print(
+                f"FAIL  {SMOKE_ENV} is not set in CI; use --read-only or provide the key",
+                file=sys.stderr,
+            )
+            return 2
         if args.require_synthetic:
             print(f"FAIL  {SMOKE_ENV} is not set; refusing to write unmarked rows", file=sys.stderr)
             return 2
@@ -294,7 +333,10 @@ def main() -> int:
             file=sys.stderr,
         )
     run(args.base_url.rstrip("/"), _headers(args.header), smoke_key)
+    return _report()
 
+
+def _report() -> int:
     width = max(len(label) for _, label in RESULTS)
     failed = 0
     for ok, label in RESULTS:
