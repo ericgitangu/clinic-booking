@@ -9,7 +9,10 @@ import {
   localDate,
 } from "../src/lib/clinic-time";
 import { bookOneStraightThroughTheApi } from "./support/booking";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { internal, OWNER, publicApi } from "./support/stack";
 import { expect, seeded, settle, tap, test } from "./support/fixtures";
 import type { Page } from "@playwright/test";
@@ -58,8 +61,8 @@ test.describe("a click opens the detail", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await visitOnTheBoard(3);
     const page = await as("admin");
@@ -81,8 +84,8 @@ test.describe("a click opens the detail", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await visitOnTheBoard(2);
     const page = await as("viewer");

@@ -3,7 +3,10 @@
 // out of view, and the same toast passing axe in both themes. Two tabs of one browser context share
 // one stream (src/lib/live-share.ts), so this opens no second slot on the gateway.
 import AxeBuilder from "@axe-core/playwright";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { book, patientReschedules } from "./support/live-book";
 import { EMAIL } from "./support/stack";
 import { expect, settle, signIn, tap, test } from "./support/fixtures";
@@ -17,8 +20,8 @@ test.describe("live notifications", () => {
   }) => {
     test.setTimeout(60_000);
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const made = await book(`Toast Arrival ${Date.now()}`);
     moveToPastHalfHour(made.id, 1);

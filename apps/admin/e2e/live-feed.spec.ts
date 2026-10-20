@@ -5,7 +5,10 @@
 import type { Page } from "@playwright/test";
 import { holdSlot, opened } from "./support/gateway";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { book, patientReschedules } from "./support/live-book";
 import { expect, signIn, tap, test } from "./support/fixtures";
 
@@ -342,8 +345,8 @@ test.describe("live feed", () => {
     // 2 second assertions below are the ones that measure the feed.
     test.setTimeout(60_000);
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const made = await book(`Live Arrival ${Date.now()}`);
     moveToPastHalfHour(made.id, 1);

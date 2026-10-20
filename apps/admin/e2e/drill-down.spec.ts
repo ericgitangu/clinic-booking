@@ -3,7 +3,10 @@
 // rows in it. Nothing here is a hard-coded figure; each expected number is read from the API.
 import { lastDays, localDate } from "../src/lib/clinic-time";
 import { bookOneStraightThroughTheApi } from "./support/booking";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { EMAIL, internal, OWNER } from "./support/stack";
 import { expect, tap, test } from "./support/fixtures";
 import type { Page } from "@playwright/test";
@@ -170,8 +173,8 @@ test.describe("key number cards", () => {
 
   test("a row opens its appointment", async ({ as }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(8),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     // A visit of our own in the last hours, so the list is never empty whatever ran before.
     const own = await bookOneStraightThroughTheApi();
@@ -327,8 +330,8 @@ test.describe("the Today figures and the free slots", () => {
   }) => {
     // A visit of our own in the last hours, so there is something to count today.
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(8),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const own = await bookOneStraightThroughTheApi();
     moveToPastHalfHour(own, 6);

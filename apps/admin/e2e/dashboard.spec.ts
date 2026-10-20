@@ -5,7 +5,10 @@ import { addDays, lastDays, localDate } from "../src/lib/clinic-time";
 import { humanDate } from "../src/lib/clinic-time";
 import { formatLead, shareDelta } from "../src/lib/kpi-delta";
 import { bookOneStraightThroughTheApi } from "./support/booking";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
 import { expect, hydrated, seeded, tap, test } from "./support/fixtures";
 
@@ -742,8 +745,8 @@ test.describe("desk actions", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await bookOneStraightThroughTheApi();
     moveToPastHalfHour(id, 0);
@@ -826,8 +829,8 @@ test.describe("desk actions", () => {
 
   test("a viewer sees the visit but no way to mark it", async ({ as }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await bookOneStraightThroughTheApi();
     moveToPastHalfHour(id, 1);

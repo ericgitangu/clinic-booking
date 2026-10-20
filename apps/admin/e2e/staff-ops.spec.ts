@@ -9,7 +9,10 @@ import {
   localDate,
 } from "../src/lib/clinic-time";
 import { bookOneStraightThroughTheApi } from "./support/booking";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { EMAIL, internal, OWNER, publicApi } from "./support/stack";
 import { expect, settle, signIn, tap, test } from "./support/fixtures";
 
@@ -337,8 +340,8 @@ test.describe("marking attendance from the appointment page", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await bookOneStraightThroughTheApi();
     moveToPastHalfHour(id, 2);
@@ -378,8 +381,8 @@ test.describe("marking attendance from the appointment page", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const moved = await bookOneStraightThroughTheApi();
     const untouched = await bookOneStraightThroughTheApi();
@@ -418,8 +421,8 @@ test.describe("marking attendance from the appointment page", () => {
     as,
   }) => {
     test.skip(
-      inFirstHourOfClinicDay(),
-      "a past half hour falls on yesterday in the first hour of the clinic day",
+      pastHalfHourCanFallOnYesterday(),
+      "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await bookOneStraightThroughTheApi();
     moveToPastHalfHour(id, 3);
