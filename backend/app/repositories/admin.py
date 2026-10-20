@@ -20,7 +20,7 @@ import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, text, tuple_
+from sqlalchemy import column, func, null, select, table, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.appointment import Appointment
@@ -37,6 +37,8 @@ _LATEST_ATTENDANCE = (
     .limit(1)
     .scalar_subquery()
 )
+# patient_accounts has no ORM model; only the two columns the admin views read are named here.
+PatientAccountRow = table("patient_accounts", column("patient_id"), column("image_url"))
 
 _SERIES = text(
     """
@@ -136,9 +138,14 @@ _LINEAGE = text(
     """
 )
 
-_APPT_EXISTS = text(
+# The appointment's patient for the lineage header, with the Google picture only when allowed.
+_APPT_PATIENT = text(
     """
-    SELECT 1 FROM appointments a JOIN patients p ON p.id = a.patient_id
+    SELECT p.id AS patient_id, p.full_name AS patient_name,
+           CASE WHEN :show THEN pa.image_url END AS avatar_url
+    FROM appointments a
+    JOIN patients p ON p.id = a.patient_id
+    LEFT JOIN patient_accounts pa ON pa.patient_id = p.id
     WHERE NOT p.synthetic AND a.id = :id
     """
 )
@@ -195,8 +202,16 @@ async def capacity_by_doctor(
     return {r["doctor_id"]: int(r["capacity"]) for r in rows.mappings()}
 
 
-async def appointment_exists(session: AsyncSession, appointment_id: uuid.UUID) -> bool:
-    return (await session.execute(_APPT_EXISTS, {"id": appointment_id})).first() is not None
+async def appointment_patient(
+    session: AsyncSession, appointment_id: uuid.UUID, *, show_avatars: bool
+) -> dict[str, Any] | None:
+    """The patient of a non-synthetic appointment, or None when there is no such appointment."""
+    row = (
+        (await session.execute(_APPT_PATIENT, {"id": appointment_id, "show": show_avatars}))
+        .mappings()
+        .first()
+    )
+    return dict(row) if row is not None else None
 
 
 async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> list[dict[str, Any]]:
@@ -204,7 +219,9 @@ async def lineage(session: AsyncSession, appointment_id: uuid.UUID) -> list[dict
     return [dict(r) for r in rows.mappings()]
 
 
-def _appointment_select() -> Any:  # a Core Select whose column tuple is too long to spell
+def _appointment_select(
+    *, show_avatars: bool = False
+) -> Any:  # a Core Select whose column tuple is too long to spell
     """An admin appointment row: doctor, patient, clinic zone, lock and latest attendance.
     Synthetic patients are left out here, so the list and the single read share the filter."""
     return (
@@ -224,22 +241,21 @@ def _appointment_select() -> Any:  # a Core Select whose column tuple is too lon
             _LATEST_ATTENDANCE.label("attendance"),
             Appointment.created_at,
             Clinic.timezone.label("timezone"),
+            (PatientAccountRow.c.image_url if show_avatars else null()).label("avatar_url"),
         )
         .join(Doctor, Doctor.id == Appointment.doctor_id)
         .join(Clinic, Clinic.id == Doctor.clinic_id)
         .join(Patient, Patient.id == Appointment.patient_id)
+        .outerjoin(PatientAccountRow, PatientAccountRow.c.patient_id == Patient.id)
         .where(Patient.synthetic.is_(False))
     )
 
 
 async def appointment_row(
-    session: AsyncSession, appointment_id: uuid.UUID
+    session: AsyncSession, appointment_id: uuid.UUID, *, show_avatars: bool = False
 ) -> dict[str, Any] | None:
-    row = (
-        (await session.execute(_appointment_select().where(Appointment.id == appointment_id)))
-        .mappings()
-        .first()
-    )
+    stmt = _appointment_select(show_avatars=show_avatars).where(Appointment.id == appointment_id)
+    row = (await session.execute(stmt)).mappings().first()
     return dict(row) if row else None
 
 
@@ -252,10 +268,11 @@ async def appointments_page(
     to_day: date | None,
     after: tuple[datetime, uuid.UUID] | None,
     limit: int,
+    show_avatars: bool = False,
 ) -> list[dict[str, Any]]:
     """One page plus one extra row (the caller trims it and derives ``next_cursor``)."""
     stmt = (
-        _appointment_select()
+        _appointment_select(show_avatars=show_avatars)
         .order_by(Appointment.starts_at.desc(), Appointment.id.desc())
         .limit(limit + 1)
     )
