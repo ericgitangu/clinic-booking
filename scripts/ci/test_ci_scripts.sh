@@ -47,7 +47,18 @@ cat > "$WORK/bin/circleci-agent" <<'FAKE'
 #!/usr/bin/env bash
 echo "halt" >> "$FX/agent"
 FAKE
-chmod +x "$WORK/bin/gcloud" "$WORK/bin/circleci-agent"
+# git: only `ls-remote` is faked (prune.sh reads main's head from GitHub); everything else is the real git.
+REAL_GIT="$(command -v git)"
+cat > "$WORK/bin/git" <<FAKE
+#!/usr/bin/env bash
+if [ "\${1:-}" = "-c" ]; then while [ "\${1:-}" = "-c" ]; do shift 2; done; fi
+if [ "\${1:-}" = "ls-remote" ]; then
+  [ -f "\$FX/main_head" ] || { echo "fatal: unable to access" >&2; exit 128; }
+  printf '%s\trefs/heads/main\n' "\$(cat "\$FX/main_head")"; exit 0
+fi
+exec "$REAL_GIT" "\$@"
+FAKE
+chmod +x "$WORK/bin/gcloud" "$WORK/bin/circleci-agent" "$WORK/bin/git"
 export PATH="$WORK/bin:$PATH"
 
 # ---- a throwaway git repo with an "origin" ------------------------------------------------
@@ -306,12 +317,34 @@ expect "prune: an unresolvable sha tag is deleted along with the old image" \
 expect "prune: serving and rollback images are kept" "$(cnt 'images delete.*sha256:bbb')$(cnt 'images delete.*sha256:ppp')" 00
 expect "prune: every call names the project" "$(grep -vc -- '--project p' "$FX/calls.all")" 0
 
-# a pushed-but-not-deployed image from a newer pipeline (created after the serving image) is kept
+# a pushed-but-not-deployed image whose tag is main's current head is kept (a pipeline still running)
+HEAD_FULL=0abc1234def56789abc0123456789abcdef01234
+dels() { grep 'images delete' "$FX/calls" 2>/dev/null | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | sort | paste -sd, -; }
 prune_fx newer_inflight
 echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d),$(img sha256:nnn sha-0abc123 2026-01-03T00:00:00Z)]" > "$FX/images.json"
+echo "$HEAD_FULL" > "$FX/main_head"
 bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
-expect "prune: an image newer than the serving one is kept; the unresolvable older one is deleted" \
-  "$rc:$(grep 'images delete' "$FX/calls" | sed 's/.*clinic-api@\(sha256:[a-z]*\).*/\1/' | paste -sd, -)" "0:sha256:fff"
+expect "prune: a newer image tagged with main's head is kept; the unresolvable older one is deleted" "$rc:$(dels)" "0:sha256:fff"
+
+# a newer image whose tag is NOT main's head is a superseded pipeline's leftover: deleted
+prune_fx newer_junk
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:jjj sha-1b6b27c 2026-01-02T00:00:21Z),$(img sha256:nnn sha-0abc123 2026-01-03T00:00:00Z)]" > "$FX/images.json"
+echo "$HEAD_FULL" > "$FX/main_head"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a newer image with another tag is deleted, the head-tagged one stays" "$rc:$(dels)" "0:sha256:jjj"
+expect "prune: serving and rollback survive the newer-junk case" "$(cnt 'images delete.*sha256:bbb')$(cnt 'images delete.*sha256:ppp')" 00
+
+# main's head unreadable: fail closed, every newer image is kept
+prune_fx head_unreadable
+echo "[$(img sha256:bbb sha-b 2026-01-02T00:00:00Z),$(img sha256:ppp sha-p),$(img sha256:fff sha-f01cf5d),$(img sha256:jjj sha-1b6b27c 2026-01-02T00:00:21Z)]" > "$FX/images.json"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: unreadable main head keeps newer images; older junk is still deleted" "$rc:$(dels)" "0:sha256:fff"
+expect "prune: unreadable main head is said" "$(grep -c "cannot read main's head" "$FX/out")" 1
+echo "not-a-sha" > "$FX/main_head"
+rm -f "$FX/calls"
+bash "$HERE/prune.sh" >"$FX/out" 2>&1; rc=$?
+expect "prune: a malformed main head is treated as unreadable" "$rc:$(dels)" "0:sha256:fff"
+
 # no creation time for the serving image: fail closed
 prune_fx nocreate
 echo '[{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:bbb"},{"package":"us-east4-docker.pkg.dev/p/clinic/clinic-api","version":"sha256:fff"}]' > "$FX/images.json"

@@ -18,9 +18,13 @@
 # - The keep set is resolved from the revisions' own image digests, never from "newest two by
 #   update time" and never from age.
 # - Git history decides nothing: a sha-<commit> tag that does not resolve (after a history rewrite)
-#   is not a keep reason. Kept: the keep set, any serving digest, and any image created after the
-#   serving image (a newer pipeline's image that is pushed but not deployed yet). An image with no
-#   createTime is kept too, and no serving createTime stops the script with no change.
+#   is not a keep reason. Kept: the keep set, any serving digest, and a newer image (created after
+#   the serving image) only if its sha tag is main's current head, the commit a still-running
+#   pipeline would deploy next. A newer image with any other tag is junk (a superseded pipeline's
+#   leftover) and is deleted like an older one. Main's head is read with a read-only
+#   `git ls-remote` of the public repository; if it cannot be read, every newer image is kept.
+#   An image with no createTime is kept too, and no serving createTime stops the script with no
+#   change.
 # - Once the lookups have succeeded, a failed tag removal or image deletion is a WARNING and the
 #   script still exits 0, so the release stays green.
 # - Every gcloud call names --project; the region defaults to us-east4.
@@ -38,6 +42,7 @@ SERVICE="${SERVICE:-clinic-api}"
 OUT="${PROMOTE_DIR:-/tmp/promoted}"
 PROJECT="${GOOGLE_PROJECT_ID:?GOOGLE_PROJECT_ID is not set}"
 REPO="${AR_PACKAGE:-us-east4-docker.pkg.dev/${PROJECT}/clinic/clinic-api}"
+main_remote="https://github.com/ericgitangu/clinic-booking.git"   # public repository; read-only ls-remote, no credentials
 
 g() { gcloud "$@" --project "$PROJECT"; }
 die() { echo "prune: $* (nothing was changed)" >&2; exit 1; }
@@ -128,31 +133,47 @@ remove_tags="$(jq -r --argjson keep "$keep_revs_json" \
 
 images_json="$(g artifacts docker images list "$REPO" --include-tags --format=json)" || die "cannot list images in $REPO"
 
-# Candidates: every image whose digest is not in the keep set AND that is not newer than the image
-# now serving. Git history decides nothing (after a history rewrite old sha tags resolve to no
+# Candidates: every image whose digest is not in the keep set AND that is not an in-flight image.
+# Git history decides nothing about OLD images (after a history rewrite old sha tags resolve to no
 # commit); the digest a revision runs is the identity. An image created after the serving image
-# was pushed by a newer pipeline (build-scan-push is outside the deploy-prod serial group, so it
-# can push while this ship job prunes) and has not been deployed yet: it is never older junk.
+# is in flight only when its sha-<7 hex> tag is main's current head: build-scan-push is outside
+# the deploy-prod serial group, so the pipeline for main's head can push while this ship job
+# prunes. A newer image tagged with any other commit belongs to a superseded pipeline that will
+# never deploy it; keeping it would leave a third tagged version until the next release.
+# If main's head cannot be read, every newer image stays (never delete more than before).
+main_head="$(GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
+  ls-remote "$main_remote" refs/heads/main 2>/dev/null | awk 'NR==1{print $1}')" || main_head=""
+case "$main_head" in
+  *[!0-9a-f]*) main_head="" ;;
+esac
+[ "${#main_head}" -eq 40 ] || main_head=""
+[ -n "$main_head" ] || echo "prune: cannot read main's head; keeping every image newer than the serving one" >&2
+
 serving_json="$(printf '%s\n' "${serving_digests[@]:-}" | grep . | jq -R . | jq -sc .)"
 serving_created="$(jq -r --argjson s "$serving_json" \
   '[.[] | select(.version as $v | $s | index($v)) | .createTime // empty | tostring | .[0:19]] | max // empty' <<<"$images_json")"
 [ -n "$serving_created" ] || die "cannot read the creation time of the serving image; leaving all images in place"
 
+# jq: in_flight = created after the serving image (or no createTime) AND (head unknown OR a sha-<7+ hex>
+# tag of the image is a prefix of main's head).
+JQ_INFLIGHT='
+  def tagshas: (.tags // "") | (if type == "array" then . else tostring | split(",") end)
+    | map(select(startswith("sha-")) | .[4:]);
+  def newer: (.createTime // "" | tostring | .[0:19]) as $c | ($c == "" or $c > $since);
+  def head_tagged: (tagshas | map(. as $t | select(($t | length) >= 7 and ($head | startswith($t)))) | length) > 0;
+  def inflight: (.createTime // "") == "" or (newer and ($head == "" or head_tagged));
+'
 candidates=()
 while IFS= read -r version; do
   [ -z "$version" ] && continue
   candidates+=("${REPO}@${version}")
-done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" \
-  '.[] | select((.version as $v | $keep | index($v)) == null)
-       | select((.createTime // "" | tostring | .[0:19]) as $c | $c != "" and $c <= $since)
-       | .version' <<<"$images_json")
-while IFS=$'\t' read -r version; do
+done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" --arg head "$main_head" \
+  "$JQ_INFLIGHT"'.[] | select((.version as $v | $keep | index($v)) == null) | select(inflight | not) | .version' <<<"$images_json")
+while IFS= read -r version; do
   [ -z "$version" ] && continue
   echo "prune: keeping $version: newer than the serving image (a release not yet deployed)"
-done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" \
-  '.[] | select((.version as $v | $keep | index($v)) == null)
-       | select(((.createTime // "" | tostring | .[0:19]) as $c | $c == "" or $c > $since))
-       | .version' <<<"$images_json")
+done < <(jq -r --argjson keep "$keep_digests_json" --arg since "$serving_created" --arg head "$main_head" \
+  "$JQ_INFLIGHT"'.[] | select((.version as $v | $keep | index($v)) == null) | select(inflight) | .version' <<<"$images_json")
 
 # ---- every lookup succeeded: now change things ----------------------------------------------
 if [ -n "$remove_tags" ]; then
