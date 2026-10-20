@@ -4,7 +4,10 @@
 // notification row, the email the stand-in received, the toast and the appointment sheet are read.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { inFirstHourOfClinicDay, moveToPastHalfHour } from "./support/clock";
+import {
+  pastHalfHourCanFallOnYesterday,
+  moveToPastHalfHour,
+} from "./support/clock";
 import { book } from "./support/live-book";
 import { allowMailTo, mailTo, refuseMailTo } from "./support/mail";
 import { EMAIL, internal, OWNER } from "./support/stack";
@@ -86,8 +89,8 @@ async function onDashboard(page: Page) {
 
 test.describe("the arrival email to the doctor", () => {
   test.skip(
-    inFirstHourOfClinicDay(),
-    "a past half hour falls on yesterday in the first hour of the clinic day",
+    pastHalfHourCanFallOnYesterday(),
+    "a past half hour can fall on yesterday just after the clinic's midnight",
   );
 
   test("an arrival emails the doctor once, the row says sent, and both toasts say so", async ({

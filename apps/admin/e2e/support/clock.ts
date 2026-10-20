@@ -112,19 +112,26 @@ export function moveToNextHalfHour(id: string): void {
 }
 
 /**
- * A visit moved to a past half hour can fall on yesterday's clinic date in the first hour after
- * local midnight, where "today's" board would not show it. Specs that need it on the board skip
- * then, and say so, rather than flake.
+ * A visit moved to a past half hour can land on yesterday's clinic date shortly after local
+ * midnight, and "today's" board would not show it. moveToPastHalfHour may take any free half hour
+ * up to 3 back (or up to 8 when it is asked for more than 3), so the window is that deepest slot,
+ * not a fixed hour. Specs that need the visit on the board skip then, and say so, rather than flake.
  */
-export function inFirstHourOfClinicDay(now = new Date()): boolean {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: CLINIC_TZ,
-      hour: "2-digit",
-      hour12: false,
-    }).format(now),
-  );
-  return hour === 0;
+export function pastHalfHourCanFallOnYesterday(
+  back = 0,
+  now = new Date(),
+): boolean {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: CLINIC_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const at = (t: string) => Number(parts.find((x) => x.type === t)?.value);
+  const sinceMidnight = at("hour") * 60 + at("minute");
+  const halfHourStart = sinceMidnight - (sinceMidnight % 30);
+  const deepest = back <= 3 ? 3 : 8;
+  return halfHourStart - deepest * 30 < 0;
 }
 
 /** The next-half-hour move can roll into tomorrow in the last hour of the clinic day. */
