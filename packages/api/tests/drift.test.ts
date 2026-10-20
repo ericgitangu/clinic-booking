@@ -85,6 +85,7 @@ const oldPayload = {
   status: "cancelled",
   cancellation_reason: "x",
   cancelled_at: NOW,
+  locked: false,
   created_at: NOW,
   updated_at: NOW,
   timezone: "Africa/Nairobi",

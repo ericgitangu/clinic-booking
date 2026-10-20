@@ -60,3 +60,8 @@ class Appointment(Base):
     predecessor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=True
     )
+
+    @property
+    def locked(self) -> bool:
+        """What the API schema reads: a patient may not change a locked appointment."""
+        return self.staff_locked_at is not None

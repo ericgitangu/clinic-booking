@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const src = join(root, "packages", "ui", "assets", "doctors");
 const manifest = join(root, "packages", "ui", "src", "lib", "doctor-avatar-data.ts");
-// The admin app does not show doctors, so it does not ship their images; add it here if it starts to.
-const APPS = ["booking"];
+// Both apps show doctors: the booking site to patients, the admin app on the Today board and elsewhere.
+const APPS = ["booking", "admin"];
 const ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
 const FALLBACK = new RegExp(`^${ID}\\.(svg|webp|png|jpe?g|avif)$`);
 const PHOTO = new RegExp(`^${ID}-(128|256|512)\\.webp$`);
