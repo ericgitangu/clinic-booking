@@ -60,7 +60,7 @@ describe("the collection uses these helpers", () => {
     const script = readFileSync(
       fileURLToPath(
         new URL(
-          "../../../docs/api/clinic-booking.postman_collection.json",
+          "../../../collections/clinic-booking.postman_collection.json",
           import.meta.url,
         ),
       ),

@@ -18,7 +18,7 @@ from app.domain.errors import (
 )
 from app.schemas.problem import ProblemCode
 
-DOCS = pathlib.Path(__file__).resolve().parents[3] / "docs" / "api-errors.md"
+DOCS = pathlib.Path(__file__).resolve().parents[3] / "contracts" / "api-errors.md"
 
 DOMAIN_ERRORS: list[type[DomainError]] = [
     SlotInPast,
@@ -133,7 +133,7 @@ def test_every_domain_error_class_in_the_app_is_catalogued_and_documented() -> N
     assert len(classes) >= 25, "the walk should find the whole hierarchy"
     for cls in classes:
         assert cls.code in CATALOGUE_BY_CODE, f"{cls.__name__} raises uncatalogued {cls.code}"
-        assert cls.code in documented, f"{cls.code} missing from docs/api-errors.md"
+        assert cls.code in documented, f"{cls.code} missing from contracts/api-errors.md"
 
 
 def test_every_code_named_in_a_handler_is_catalogued_and_documented() -> None:

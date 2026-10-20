@@ -1097,7 +1097,7 @@ rt_run() { # <name> <mode> ; uses $RT
 RT="$WORK/rt1"; mkdir -p "$RT"
 echo '[]' > "$RT/versions.json"
 expect "realtime prereqs: no secret version -> fails" "$(rt_run x '')" 1
-expect "realtime prereqs: ...and names the runbook" "$(grep -c 'docs/runbooks/neon.md' "$RT/out")" 1
+expect "realtime prereqs: ...and names the runbook" "$(grep -c 'https://clinic.ericgitangu.com/architecture#neon' "$RT/out")" 1
 echo '[{"name":"v1"}]' > "$RT/versions.json"
 expect "realtime prereqs: one enabled version -> ok" "$(rt_run x '')" 0
 adm='"serviceAccount:clinic-admin@p.iam.gserviceaccount.com"'; smk='"serviceAccount:clinic-smoke@p.iam.gserviceaccount.com"'; web='"serviceAccount:clinic-web@p.iam.gserviceaccount.com"'
@@ -1149,9 +1149,9 @@ newman_pin="$(sed -n 's/^NEWMAN_IMAGE="\(.*\)"$/\1/p' "$HERE/../api_check.sh")"
 expect "api check: newman is pinned to a tag and a sha256 digest" \
   "$(printf '%s' "$newman_pin" | grep -cE '^postman/newman:[0-9.]+-alpine@sha256:[0-9a-f]{64}$')" 1
 expect "api check: no other tracked file names a newman image" \
-  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' | tr '\n' ' ')" "scripts/api_check.sh "
-expect "api check: docs/api is mounted read-only into the newman container" \
-  "$(grep -c 'docs/api:/etc/newman:ro' "$HERE/../api_check.sh")" 1
+  "$(git -C "$HERE/../.." grep -lE 'postman/newman[:@]' -- . ':!scripts/ci/test_ci_scripts.sh' ':!docs/' ':!collections/README.md' | tr '\n' ' ')" "scripts/api_check.sh "
+expect "api check: collections is mounted read-only into the newman container" \
+  "$(grep -c 'collections:/etc/newman:ro' "$HERE/../api_check.sh")" 1
 
 # =========================================================================================
 # realtime_live_check.sh: a gateway full of real streams is not a failed release; a broken one is.

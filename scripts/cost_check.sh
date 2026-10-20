@@ -34,9 +34,9 @@ fail() { printf 'FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 CI=.circleci/config.yml
 
 # C11 (evidence half): the API cannot say whether a budget has a spend cap, so the console value is
-# recorded in docs/evidence/spend-cap-2026-10-18.md and read here. It must exist, name the budget id
+# recorded in infra/evidence/spend-cap-2026-10-18.md and read here. It must exist, name the budget id
 # and record "Spend cap status: Configured"; anything else fails.
-SPEND_CAP_EVIDENCE=docs/evidence/spend-cap-2026-10-18.md
+SPEND_CAP_EVIDENCE=infra/evidence/spend-cap-2026-10-18.md
 SPEND_CAP_BUDGET_ID=bfd734ab-ef98-414a-8bb1-b6442c1dec94
 spend_cap_evidence() {
   local f=$SPEND_CAP_EVIDENCE

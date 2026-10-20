@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # One-time GCP bootstrap, run by the engineer from a laptop. It is split into modes so the
-# run order in docs/runbooks/bootstrap-gcp.md can interleave it with Terraform and CircleCI:
+# run order in https://clinic.ericgitangu.com/architecture#bootstrap can interleave it with Terraform and CircleCI:
 #
 #   project   create the project, link billing, enable the APIs Terraform itself needs
 #   state     create the Terraform state bucket (us-east1)

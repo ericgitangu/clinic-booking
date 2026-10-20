@@ -1,6 +1,6 @@
 # API collection
 
-A Postman v2.1 collection of the reviewer journey through the booking API, with two environments. The files are built from [`contracts/openapi.json`](../../contracts/openapi.json) by [`scripts/api_collection.mjs`](../../scripts/api_collection.mjs) (`make api-collection`); edit the script, not the JSON. CI fails when the committed files differ from a fresh build, and the build fails when a public operation in the contract is not in the journey. That check covers the contract to the collection only. Whether the contract matches the running API is the `backend-contract` job's check.
+A Postman v2.1 collection of the reviewer journey through the booking API, with two environments. The files are built from [`contracts/openapi.json`](../contracts/openapi.json) by [`scripts/api_collection.mjs`](../scripts/api_collection.mjs) (`make api-collection`); edit the script, not the JSON. CI fails when the committed files differ from a fresh build, and the build fails when a public operation in the contract is not in the journey. That check covers the contract to the collection only. Whether the contract matches the running API is the `backend-contract` job's check.
 
 | File | What it is |
 |---|---|
@@ -20,7 +20,7 @@ The lead time is the configured `BOOKING_MIN_LEAD_MINUTES` (default 60 minutes).
 make api-check
 ```
 
-This needs Docker only. It brings up its own compose project (`clinic-apicheck`, on its own host ports, so a running `make up` stack is left alone), plus a second API with a 100-day lead time for folder 08 ([`scripts/api_check.compose.yml`](../../scripts/api_check.compose.yml)). It runs every folder with newman and removes the stack.
+This needs Docker only. It brings up its own compose project (`clinic-apicheck`, on its own host ports, so a running `make up` stack is left alone), plus a second API with a 100-day lead time for folder 08 ([`scripts/api_check.compose.yml`](../scripts/api_check.compose.yml)). It runs every folder with newman and removes the stack.
 
 Each compose stack takes one Docker network, and Docker hands those out from a fixed set of address pools (about 30 networks by default). When stacks left on the machine have used them all, the script stops before `up` and says so. `docker network prune` frees the networks no container uses, and `docker compose -p <name> down -v` removes a stack you no longer need.
 
@@ -63,4 +63,4 @@ newman is the runner: `make api-check`, CI and the production read pass all use 
 Start the API first with `make up` (the local environment points at it, on port 8080; if you set `API_HOST_PORT`, change `baseUrl` and `writeBaseUrl` to match), or use the production environment.
 
 - **Postman**: Import, choose the three files, pick an environment, then run the collection or send requests one by one in folder order. No cloud workspace is used.
-- **newman** without make, against `make up`: `newman run docs/api/clinic-booking.postman_collection.json -e docs/api/local.postman_environment.json`.
+- **newman** without make, against `make up`: `newman run collections/clinic-booking.postman_collection.json -e collections/local.postman_environment.json`.

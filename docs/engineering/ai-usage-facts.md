@@ -50,7 +50,7 @@ This lane (documentation) ran on Sonnet.
 
 - **The $0 rule.** Halt if the shared billing account stops being $0 on compute, or anything billable appears. The recorded outcome is not $0 on the shared account: Artifact Registry and Secret Manager are over their free tiers there.
 - **Usage stop.** Autopilot stops at 68 percent of weekly usage. On 2026-10-18 the gatekeeper paused all lanes at 71 percent, and I then told it in chat to resume with every gate kept. Weekly usage resets 2026-10-19 05:00 UTC.
-- **Spend cap.** A $3 Cloud Run spend cap, managed in the cloud console. `docs/evidence/spend-cap-2026-10-18.md` records the console observation (status Configured, created in the console after the Terraform version proved to be alerts-only); `scripts/cost_check.sh` checks that the budgets exist.
+- **Spend cap.** A $3 Cloud Run spend cap, managed in the cloud console. `infra/evidence/spend-cap-2026-10-18.md` records the console observation (status Configured, created in the console after the Terraform version proved to be alerts-only); `scripts/cost_check.sh` checks that the budgets exist.
 - **Never touch** my other GCP projects; no `terraform apply`, no cloud mutation from a documentation or test lane.
 - **Commits.** Terse, human, no tooling references, no trailers. A pre-commit hook enforces lint, a commit-message hook enforces length, and gitleaks runs on staged files.
 - **Merge gate.** Verify every check green as its own step; verify `baseRefName == main` (PR 24 once merged into a feature branch).

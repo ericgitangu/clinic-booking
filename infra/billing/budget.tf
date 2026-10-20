@@ -36,5 +36,5 @@ resource "google_billing_budget" "alerts_1usd" {
 # the Budget API cannot express a spend cap, and an existing budget cannot be converted into one;
 # applying a budget of that name from code would recreate an alerts-only budget and collide with the
 # console one (the console refuses a second budget for the same project and service). It is
-# console-managed: see docs/evidence/spend-cap-2026-10-18.md. scripts/cost_check.sh (C11) checks that
+# console-managed: see infra/evidence/spend-cap-2026-10-18.md. scripts/cost_check.sh (C11) checks that
 # evidence. The cap is a backstop; the $0 mechanism is the free-tier arithmetic and the ticket budget.

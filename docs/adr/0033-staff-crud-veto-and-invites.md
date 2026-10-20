@@ -59,7 +59,7 @@ Option 1.
 
 ### New codes
 
-`ROLE_ESCALATION` (403), `APPOINTMENT_LOCKED` (409), `NOTHING_TO_VETO` (409) and `INVITE_INVALID` (404) are new. `ACCESS_EXISTS` (409) and `OWNER_PROTECTED` (409) are already in the catalogue from [ADR-0030](0030-staff-roles-and-access.md) and are reused. The meanings are in [the error catalogue](../api-errors.md).
+`ROLE_ESCALATION` (403), `APPOINTMENT_LOCKED` (409), `NOTHING_TO_VETO` (409) and `INVITE_INVALID` (404) are new. `ACCESS_EXISTS` (409) and `OWNER_PROTECTED` (409) are already in the catalogue from [ADR-0030](0030-staff-roles-and-access.md) and are reused. The meanings are in [the error catalogue](../../contracts/api-errors.md).
 
 ### Rollback
 
