@@ -42,3 +42,11 @@ minimumReleaseAgeExclude:
   - '@next/swc-win32-x64-msvc@16.4.2'
   - eslint-config-next@16.4.2
   - next@16.4.2
+# Dev and CI tooling only (markdownlint, openapi-ts, commitlint, eslintrc), none of it shipped.
+# Forced to the patched releases of GHSA-h67p-54hq-rp68, GHSA-52cp-r559-cp3m, GHSA-5p4m-2wfm-xmqj,
+# GHSA-2883-xcg3-v3hh (js-yaml), GHSA-6v5v-wf23-fmfq, GHSA-253c-mchw-3w2r (markdown-it) and
+# GHSA-238p-pmpm-9mq7 (katex). Drop an entry once its parent ships on a patched range.
+overrides:
+  js-yaml@^4: '>=4.3.2 <5'
+  markdown-it@^14: '>=14.3.1 <15'
+  katex@^0.16: '>=0.18.2 <0.19'
