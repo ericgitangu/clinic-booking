@@ -11,7 +11,10 @@ const section = readme.slice(
   readme.indexOf("\n## Architecture\n"),
   readme.indexOf("\n## 1. Live URLs"),
 );
-const mmd = readFileSync(root("docs/architecture/architecture.mmd"), "utf8");
+const mmd = readFileSync(
+  root("apps/booking/src/content/architecture.mmd"),
+  "utf8",
+);
 
 describe("the architecture section matches the landing page", () => {
   it("has the same table, row for row", () => {

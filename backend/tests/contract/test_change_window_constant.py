@@ -105,10 +105,11 @@ def test_assignment_matrix() -> None:
 # inside a 100-day lead), so the rule can be shown at any hour without writing to the database
 # outside the API. It is test-only: see test_the_test_only_lead_time_is_never_deployed.
 TEST_ONLY_LEAD = {"scripts/api_check.compose.yml": 144000}
-# Files that may name that file: the runner, the generator (its folder text), and the CI job that
-# runs the runner. Nothing that builds or deploys an image or infrastructure may.
+# Files that may name that file: the runner, the generator and its output (the folder text), and the
+# CI job that runs the runner. Nothing that builds or deploys an image or infrastructure may.
 TEST_ONLY_LEAD_USERS = {
     "scripts/api_check.sh",
+    "collections/clinic-booking.postman_collection.json",
     "scripts/api_collection.mjs",
     "scripts/ci/test_ci_scripts.sh",
     ".circleci/config.yml",

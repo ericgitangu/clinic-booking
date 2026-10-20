@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.execute("""
         DO $$ BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'clinic_app') THEN
-            RAISE EXCEPTION 'role clinic_app missing: see docs/runbooks/neon.md';
+            RAISE EXCEPTION 'role clinic_app missing: see https://clinic.ericgitangu.com/architecture#neon';
           END IF;
         END $$;
     """)

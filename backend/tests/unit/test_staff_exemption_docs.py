@@ -19,7 +19,7 @@ STALE = [
 ]
 DOCS = [
     "README.md",
-    "docs/api-errors.md",
+    "contracts/api-errors.md",
 ]
 
 
