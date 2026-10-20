@@ -72,7 +72,7 @@ Reading it:
 | Outbox relay publishing to Ably | Running (PR 39; Ably's 24 hour count went from 17 to 21 on one booking and one cancel) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
 | Browser subscription to the Ably channel, polling as the safety net | Running (PR 44) | [0031](../adr/0031-realtime-push-via-ably-sse.md) |
 | Self-hosted Swagger UI, ReDoc and fonts; production polish; production ZAP and Lighthouse; image prune | Running (PRs 36, 38, 32) | ADRs 0007, 0026, 0017 |
-| Go SSE gateway and the admin live feed | Descoped (PR 37 closed) | [ADR-0021](../adr/0021-go-realtime-gateway.md) |
+| Go gateway for the staff live feed (README 3.7) | Merged (PR 71) and deployed: `clinic-realtime` is Ready in Cloud Run (0.25 vCPU, at most 2 instances, concurrency 1, read on 2026-10-19); the cost per connected hour is not yet measured | [ADR-0021](../adr/0021-go-realtime-gateway.md) |
 
 ## 3. Booking, with an idempotency key and the unique index
 
@@ -135,7 +135,7 @@ sequenceDiagram
   end
 ```
 
-Push is an optimisation, not the source of truth. The relay runs synchronously after each committing write with a short timeout, because Cloud Run throttles CPU once the response is sent; an event stuck behind an open transaction waits for the next trigger, and the polling loop covers the gap. After three failed publishes the relay stops for a minute. A reload or a poll always shows the database's answer, and a stale click that loses the race still gets `409 SLOT_TAKEN`. Steps 1 to 5 (the relay) and 6 to 7 (the token endpoint) are running (`backend/app/services/relay.py`, `realtime_tokens.py`, `contracts/events/README.md`). The browser subscribing and applying messages, steps 8 to 10, shipped in PR 44. With the push host blocked the page shows `data-stream=polling` and converges within 15 s, and a refused token leaves polling running. The admin live feed is descoped: the relay can publish admin events, and no admin screen reads them.
+Push is an optimisation, not the source of truth. The relay runs synchronously after each committing write with a short timeout, because Cloud Run throttles CPU once the response is sent; an event stuck behind an open transaction waits for the next trigger, and the polling loop covers the gap. After three failed publishes the relay stops for a minute. A reload or a poll always shows the database's answer, and a stale click that loses the race still gets `409 SLOT_TAKEN`. Steps 1 to 5 (the relay) and 6 to 7 (the token endpoint) are running (`backend/app/services/relay.py`, `realtime_tokens.py`, `contracts/events/README.md`). The browser subscribing and applying messages, steps 8 to 10, shipped in PR 44. With the push host blocked the page shows `data-stream=polling` and converges within 15 s, and a refused token leaves polling running. The staff live feed does not use Ably: it is the Go service in README 3.7. The relay still publishes the PII-free admin events to Ably and no screen subscribes to them.
 
 ## 5. The release pipeline
 
@@ -179,4 +179,4 @@ Only `main` can deploy: the deploy contexts are restricted to the branch, and so
 | Slot events: doctor, local date, start time, `taken` or `freed`, a sequence id | Ably | Live slot lists | No appointment or patient identifier; contract in `contracts/events/`. Running |
 | Patient name, doctor and time, sent to the signed-in patient's own verified address | Resend | Acknowledgements and a reminder the evening before, from `reminders@mail.ericgitangu.com` (a verified subdomain) | Only linked, verified accounts are mailed; Resend keeps sent-mail records under its own retention ([ADR-0025](../adr/0025-email-with-resend.md)). Merged (PR 27); booking and cancellation emails verified live 2026-10-18 |
 
-The public REST API has no patient authentication, as the brief requires. Anyone holding an appointment or patient UUID can read or change it there ([ADR-0012](../adr/0012-identity-and-abuse-controls-deferred.md)); the README's section 10 states this.
+The public REST API has no patient authentication: the brief is silent on it and I kept the public API open so Swagger's Try it out works. Anyone holding an appointment or patient UUID can read or change it there ([ADR-0012](../adr/0012-identity-and-abuse-controls-deferred.md)); the README's section 10 states this.
