@@ -128,6 +128,9 @@ test("a card link opens its tab, loads it, opens the card and scrolls to it", as
     ["api-collection", "API and collections"],
     ["containers", "Architecture"],
   ] as const) {
+    // A full load each time: Next restores the address it hydrated with, so a hash changed while the
+    // page is still hydrating is undone. A link followed by a person has a hydrated page.
+    await page.goto("about:blank");
     await page.goto(`/decisions#${hash}`);
     await expect(page.getByRole("tab", { name: tab }), hash).toHaveAttribute(
       "aria-selected",
@@ -154,6 +157,7 @@ test("the ten decisions keep their anchors and select the first tab", async ({
     "time",
     "veto-and-lock",
   ]) {
+    await page.goto("about:blank"); // a full load each time, see the card-link test
     await page.goto(`/decisions#${id}`);
     await expect(
       page.getByRole("tab", { name: "Decisions", exact: true }),
@@ -268,19 +272,19 @@ for (const width of [360, 768, 1280]) {
   });
 }
 
+// One test per theme and tab, so each scan has its own time budget: seven scans with every card open
+// in one test ran past the 30 s limit on a CI runner.
 for (const scheme of ["light", "dark"] as const) {
-  test(`axe finds nothing serious in ${scheme}, on every tab with its cards open`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/decisions");
-    for (const name of TABS) {
+  for (const [index, name] of TABS.entries()) {
+    test(`axe finds nothing serious in ${scheme} on the ${name} tab, cards open`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto("/decisions");
       await page.getByRole("tab", { name, exact: true }).click();
-      if (name !== "Decisions") {
+      if (index > 0) {
         await expect(
-          page
-            .locator(`#${LAZY[TABS.indexOf(name) - 1]!} details[data-card]`)
-            .first(),
+          page.locator(`#${LAZY[index - 1]!} details[data-card]`).first(),
         ).toBeAttached();
         await page.getByRole("button", { name: "Open all cards" }).click();
       }
@@ -291,8 +295,8 @@ for (const scheme of ["light", "dark"] as const) {
         ),
         `${scheme} ${name}`,
       ).toEqual([]);
-    }
-  });
+    });
+  }
 }
 
 test("diagrams and screenshots load and have names", async ({ page }) => {
