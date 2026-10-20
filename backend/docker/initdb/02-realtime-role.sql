@@ -1,3 +1,3 @@
 -- Local and CI only. Creates the gateway's read-only login; migration 0014 grants its privileges.
--- In prod, https://clinic.ericgitangu.com/architecture#neon creates clinic_realtime. This file is never run against Neon.
+-- In prod, https://clinic.ericgitangu.com/decisions#neon creates clinic_realtime. This file is never run against Neon.
 CREATE ROLE clinic_realtime LOGIN PASSWORD 'clinic_realtime_local' NOSUPERUSER NOCREATEDB NOCREATEROLE;

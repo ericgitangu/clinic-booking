@@ -35,5 +35,5 @@ fi
 
 n="$(gcloud secrets versions list clinic-database-url-realtime --project "$PROJECT" --filter='state=ENABLED' --format=json | jq length)"
 [ "$n" -ge 1 ] || die "secret clinic-database-url-realtime has no enabled version.
-Create the clinic_realtime login on Neon and add the URL: https://clinic.ericgitangu.com/architecture#neon, section 'Optional realtime feature'."
+Create the clinic_realtime login on Neon and add the URL: https://clinic.ericgitangu.com/decisions#neon, section 'Optional realtime feature'."
 echo "secret clinic-database-url-realtime has $n enabled version(s)"
