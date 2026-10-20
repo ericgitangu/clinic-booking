@@ -5,6 +5,8 @@ import {
   DECISIONS_INTRO,
   type Decision,
 } from "@/content/decisions";
+import { TabBar } from "@/components/architecture/tab-bar";
+import { PAGE_INTRO, TABS, cardTabs } from "@/content/architecture";
 import { pageMetadata } from "@/lib/metadata";
 import { SITE } from "@/lib/site";
 
@@ -78,26 +80,70 @@ export default function DecisionsPage() {
         ) : null}
       </header>
 
-      <nav aria-label="Decisions on this page" className="mt-10">
-        <ul className="grid gap-x-8 sm:grid-cols-2">
-          {DECISIONS.map((d) => (
-            <li key={d.id}>
-              <a
-                href={`#${d.id}`}
-                className="inline-flex min-h-11 items-center rounded-sm text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {d.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <p className="mt-4 max-w-[65ch] text-base text-muted-foreground">
+        {PAGE_INTRO}
+      </p>
+      <noscript>
+        <style>{`[role="tabpanel"][data-off]{display:block}[role="tablist"],[data-tab-extra]{display:none}`}</style>
+      </noscript>
 
-      <div className="mt-10 space-y-8">
-        {DECISIONS.map((d) => (
-          <Entry key={d.id} d={d} />
-        ))}
+      <div className="mt-8">
+        <TabBar tabs={TABS} cardTabs={cardTabs()} />
       </div>
+
+      <section
+        id="decisions"
+        role="tabpanel"
+        aria-labelledby="tab-decisions"
+        tabIndex={-1}
+        className="scroll-mt-24 focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        <nav aria-label="Decisions on this page" className="mt-8">
+          <ul className="grid gap-x-8 sm:grid-cols-2">
+            {DECISIONS.map((d) => (
+              <li key={d.id}>
+                <a
+                  href={`#${d.id}`}
+                  className="inline-flex min-h-11 items-center rounded-sm text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {d.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="mt-10 space-y-8">
+          {DECISIONS.map((d) => (
+            <Entry key={d.id} d={d} />
+          ))}
+        </div>
+      </section>
+
+      {TABS.filter((t) => t.id !== "decisions").map((t) => (
+        <section
+          key={t.id}
+          id={t.id}
+          role="tabpanel"
+          aria-labelledby={`tab-${t.id}`}
+          tabIndex={-1}
+          data-off=""
+          data-src={`/decisions/panel/${t.id}`}
+          className="mt-8 scroll-mt-24 focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <p data-slot="" role="status" className="text-muted-foreground" />
+          <noscript>
+            <p>
+              <a
+                href={`/decisions/panel/${t.id}`}
+                className="text-primary underline underline-offset-4"
+              >
+                Read the {t.label} tab as a plain page
+              </a>
+            </p>
+          </noscript>
+        </section>
+      ))}
     </div>
   );
 }

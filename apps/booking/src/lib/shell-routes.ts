@@ -49,6 +49,7 @@ export const SHELL_ROUTES: ShellRoutes = {
     { pattern: "/privacy", label: "Privacy", parent: "/" },
     { pattern: "/terms", label: "Terms", parent: "/" },
     { pattern: "/data", label: "Data handling", parent: "/" },
+    { pattern: "/decisions", label: "Decisions", parent: "/" },
     { pattern: "/docs", label: "API docs", parent: "/" },
     { pattern: "/redoc", label: "ReDoc", parent: "/" },
   ],

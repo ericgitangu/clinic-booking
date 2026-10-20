@@ -255,3 +255,9 @@ a.slot-chip-label:active {
     animation: none;
   }
 }
+
+/* /architecture: the tab bar hides the panels that are not selected. It uses its own attribute, not
+   `hidden`, so a <noscript> rule on that page can show every panel when scripts are off. */
+[role="tabpanel"][data-off] {
+  display: none;
+}

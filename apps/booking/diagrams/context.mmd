@@ -1,0 +1,14 @@
+flowchart TB
+  P([Patient])
+  ST([Clinic staff: owner, admin, viewer])
+  SYS["Clinic booking<br/>REST API, booking app, admin app"]
+  GO["Google<br/>sign-in, reCAPTCHA Enterprise"]
+  RS["Resend<br/>booking emails and reminders"]
+  AB["Ably<br/>pushes slot events to open pages"]
+  CI["CircleCI<br/>builds, tests, deploys"]
+  P -->|HTTPS| SYS
+  ST -->|HTTPS| SYS
+  SYS -->|"identity and human check"| GO
+  SYS -->|"email"| RS
+  SYS -->|"slot events"| AB
+  CI -->|"deploys on merge to main"| SYS
