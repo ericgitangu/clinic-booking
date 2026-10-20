@@ -1,4 +1,4 @@
--- Re-apply the gateway role's privileges (https://clinic.ericgitangu.com/architecture#neon). Same statements as migration
+-- Re-apply the gateway role's privileges (https://clinic.ericgitangu.com/decisions#neon). Same statements as migration
 -- 0014_realtime_reader_role; a test keeps the two identical. Run as the database owner.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM clinic_realtime;
 GRANT USAGE ON SCHEMA public TO clinic_realtime;
