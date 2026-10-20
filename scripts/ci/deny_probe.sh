@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# IAM deny-proof probes (docs/adr/0016 "proof required", docs/adr/0023). Each mode attempts something that
+# IAM deny-proof probes (the rule is "proof required"; the IAM-only front door is /decisions#hosting-and-cost). Each mode attempts something that
 # MUST be refused and writes a redacted evidence record that CI stores as an artifact.
 #
 #   run-app  anonymous and junk-bearer requests to the direct run.app URL: 403 and 401 expected.

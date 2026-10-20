@@ -19,7 +19,6 @@ STALE = [
 ]
 DOCS = [
     "README.md",
-    "docs/adr/0033-staff-crud-veto-and-invites.md",
     "docs/api-errors.md",
 ]
 
@@ -29,8 +28,6 @@ def test_no_document_still_says_staff_follow_the_rule(name: str) -> None:
     text = (ROOT / name).read_text().replace("\n", " ")
     lowered = text.lower()
     for phrase in STALE:
-        if name.endswith("0033-staff-crud-veto-and-invites.md") and phrase == "Declared, not built":
-            continue  # the build-status line names its own history
         assert phrase.lower() not in lowered, f"{name} still says: {phrase}"
 
 
@@ -45,8 +42,6 @@ def test_the_staff_routes_state_the_exemption_in_the_contract() -> None:
         assert "SLOT_TAKEN" in description and "OUTSIDE_WORKING_HOURS" in description
 
 
-def test_the_readme_and_the_adrs_name_what_staff_are_exempt_from() -> None:
+def test_the_readme_names_what_staff_are_exempt_from() -> None:
     readme = (ROOT / "README.md").read_text()
     assert "Staff are exempt from this lead-time rule and from nothing else" in readme
-    adr = (ROOT / "docs/adr/0033-staff-crud-veto-and-invites.md").read_text()
-    assert "it is the only rule staff are exempt from" in adr

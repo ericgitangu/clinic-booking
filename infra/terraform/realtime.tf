@@ -14,7 +14,7 @@
 # instance is not billed). Concurrency 1 is not a choice: Cloud Run requires it below 1 vCPU
 # (docs.cloud.google.com/run/docs/configuring/services/cpu), and 1 vCPU would cost four times as
 # much per connected hour. If Cloud Run rejects 0.25 vCPU with 256 MiB, the fallback is --cpu 0.5,
-# which cost_check accepts; record the real error text in docs/adr/0021.
+# which cost_check accepts; record the real error text in docs/engineering/go-gateway-justification.md.
 
 resource "google_service_account" "realtime_runtime" {
   account_id   = "clinic-realtime-runtime"

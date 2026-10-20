@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalPage } from "@/components/layout/legal-page";
 import { pageMetadata } from "@/lib/metadata";
 import { CONTACT_EMAIL } from "@/lib/site";
@@ -123,14 +124,9 @@ export default function DataPage() {
         The site runs on Vercel, the booking service on Google Cloud Run in
         us-east4, and the database on Neon in aws-us-east-1. Appointment emails
         are sent through Resend. The reasons for the region are in{" "}
-        <a
-          className={LINK}
-          href="https://github.com/ericgitangu/clinic-booking/blob/main/docs/adr/0014-hosting-region-and-cost.md"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          the hosting decision record
-        </a>
+        <Link className={LINK} href="/decisions#hosting-and-cost">
+          the hosting decision
+        </Link>
         .
       </p>
 

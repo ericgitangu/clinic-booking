@@ -112,8 +112,8 @@ func (g *Gateway) methodNotAllowed(w http.ResponseWriter, r *http.Request, allow
 //
 // Both caps are per instance: byPerson lives in this process, so with two instances one person
 // can hold a stream on each, which is the whole service. The admin app opens one stream per
-// browser (docs/adr/0021, amendment of 2026-10-19), so that now takes two browsers, or a stream
-// Cloud Run never reported closed. The global cap is recorded as debt in docs/adr/0021.
+// browser (see /decisions#go), so that now takes two browsers, or a stream
+// Cloud Run never reported closed. The global cap is recorded as a known limit on /decisions#go.
 func (g *Gateway) admit(person string) (release func(), status int, code string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()

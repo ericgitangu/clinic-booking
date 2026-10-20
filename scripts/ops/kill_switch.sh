@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Egress kill switch (docs/adr/0023). Removes the web front doors' roles/run.invoker binding from
+# Egress kill switch (the IAM-only front door, /decisions#hosting-and-cost). Removes the web front doors' roles/run.invoker binding from
 # clinic-api and clinic-realtime so every request becomes an unbilled IAM denial, and puts the
 # exact previous state back on --restore.
 #
@@ -14,11 +14,11 @@
 # --project and --region exist only so a mistaken value is refused: this script acts on
 # sil-clinic-booking in us-east4 and nothing else, and every gcloud call names both explicitly.
 #
-# Removed identities: clinic-web (the booking proxy, the ADR text) and clinic-admin (the admin
+# Removed identities: clinic-web (the booking proxy) and clinic-admin (the admin
 # app, which C2 in cost_check.sh lists as an invoker too and which bills the same egress).
 # clinic-smoke is left alone: it is CI-only and cannot generate public traffic.
 #
-# There is deliberately no "scale clinic-api to max 0" mode. docs/adr/0023 specifies the IAM removal;
+# There is deliberately no "scale clinic-api to max 0" mode. the design is the IAM removal;
 # Cloud Run's accepted range for --max-instances is not verified to include 0 here, and a
 # max-instances outside 1..3 is a banned value in cost_check.sh (static and live C1). --mode scale
 # is rejected with exit 2 rather than shipped untested.
@@ -108,7 +108,7 @@ fi
 SNAP='{}'
 REMOVED='[]'
 for svc in "${SERVICES[@]}"; do
-  if ! service_exists "$svc"; then echo "skip: $svc does not exist (harmless, docs/adr/0023)"; continue; fi
+  if ! service_exists "$svc"; then echo "skip: $svc does not exist (harmless, nothing to remove)"; continue; fi
   pol="$(policy_of "$svc")"
   SNAP="$(jq -c --arg s "$svc" --argjson p "$pol" '. + {($s): $p}' <<<"$SNAP")"
   for id in "${IDENTITIES[@]}"; do

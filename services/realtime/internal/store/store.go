@@ -1,5 +1,5 @@
 // Package store reads the event stream (appointment_events and the streamed staff actions of
-// staff_action_audit) with the commit-safe cursor of docs/adr/0009. It is the only code that
+// staff_action_audit) with the commit-safe cursor (the live feed, /decisions#go). It is the only code that
 // touches the database, and it only ever issues SELECTs.
 //
 // The connection pool exists only while at least one stream holds a Lease: the first Acquire
