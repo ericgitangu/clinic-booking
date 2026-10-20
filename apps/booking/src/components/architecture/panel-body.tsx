@@ -1,7 +1,7 @@
 import {
-  ADRS,
-  ADR_INTRO,
-  ADR_STATUS_NOTE,
+  DECISION_CARDS,
+  DECISION_INTRO,
+  DECISION_STATUS_NOTE,
   CARD_TABS,
   RECORD_TAB,
 } from "@/content/architecture";
@@ -12,7 +12,9 @@ import { Inline } from "./inline";
 export function PanelBody({ tabId, label }: { tabId: string; label: string }) {
   const record = tabId === RECORD_TAB.id;
   const tab = CARD_TABS.find((t) => t.id === tabId);
-  const intro = record ? `${ADR_INTRO} ${ADR_STATUS_NOTE}` : (tab?.intro ?? "");
+  const intro = record
+    ? `${DECISION_INTRO} ${DECISION_STATUS_NOTE}`
+    : (tab?.intro ?? "");
   return (
     <>
       <h2 className="font-heading text-2xl font-semibold tracking-tight">
@@ -23,7 +25,7 @@ export function PanelBody({ tabId, label }: { tabId: string; label: string }) {
       </p>
       <div className="mt-6 space-y-3">
         {record
-          ? ADRS.map((a) => <RecordCard key={a.id} adr={a} />)
+          ? DECISION_CARDS.map((a) => <RecordCard key={a.id} card={a} />)
           : tab?.cards.map((c, n) => (
               <InfoCard key={c.id} card={c} open={n === 0} />
             ))}
