@@ -677,6 +677,33 @@ FROM staff_access_audit ORDER BY occurred_at DESC LIMIT 20;`,
     },
 
     {
+      id: "notifications",
+      title: "Notifications",
+      summary:
+        "How the dashboard tells staff something happened, and why doctors are told only there.",
+      blocks: [
+        {
+          t: "p",
+          text: "Arrivals, no-shows, bookings, changes and vetoes already reach the admin dashboard through the one live stream. The feed panel is easy to miss, so the same events now raise a toast, add to an unread count on the feed heading, and outline the doctor's card on the today board for two seconds.",
+        },
+        {
+          t: "ul",
+          items: [
+            "**Only what happens after the page opens.** When a connection resumes from a cursor, the gateway replays what was missed and sends no marker between the replay and live events. The client treats frames that follow the hello with less than 1.5 s between them as the replay (the gateway polls every second) and does not announce them. A real event inside that window is not toasted, though it still appears in the feed.",
+            "**One stream.** The toasts listen to the stream the browser already shares between tabs. They open no connection of their own, so the gateway's two-stream capacity is untouched.",
+            '**Bursts.** Up to three events in two seconds are three toasts; a fourth replaces them with one "4 updates" toast that keeps counting. Nothing is held back to decide.',
+            "**Viewers.** A viewer's events carry no patient or staff name, and a viewer's message that does carry one is refused whole. The toast text is built from that minimised shape, so there is nothing to leak.",
+            '**No sound, no colour-only cue.** The unread count is words in a polite live region with a fixed box, so the table does not move. The doctor card gets an outline and the word "Updated"; with reduced motion the outline stays still for the same two seconds.',
+          ],
+        },
+        {
+          t: "note",
+          text: "Doctors have no accounts and no email address on file, so they are notified only through the dashboard. The fix is a `doctors.email` column linked to `staff_access`, a Resend notification, and a morning digest, all inside the 100 a day cap the booking emails share.",
+        },
+      ],
+    },
+
+    {
       id: "demo-seed",
       title: "Demo seed",
       summary:

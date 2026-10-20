@@ -36,6 +36,14 @@ export const notify = {
     haptic("error");
     show((t) => t.error(message, data));
   },
+  // A toast the person did not cause (something that happened elsewhere): no buzz, no sound. Give
+  // it an `id` to replace it later or take it away with `dismiss`.
+  quiet: (message: string, data?: ExternalToast) => {
+    show((t) => t(message, data));
+  },
+  dismiss: (id: string) => {
+    show((t) => t.dismiss(id));
+  },
   critical: (message: string, data?: ExternalToast) => {
     haptic("critical");
     show((t) => t.error(message, { duration: Infinity, ...data }));

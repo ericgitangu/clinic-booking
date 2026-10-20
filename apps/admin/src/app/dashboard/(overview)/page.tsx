@@ -4,6 +4,7 @@ import { ActivityChart, type ActivityRow } from "@/components/activity-chart";
 import { AppointmentsList } from "@/components/appointments-list";
 import { DoctorUtilisation } from "@/components/doctor-utilisation";
 import { LiveFeed } from "@/components/live-feed";
+import { LiveNotifications } from "@/components/live-notifications";
 import { liveKey } from "@/lib/live-key";
 import { PeakHours } from "@/components/peak-hours";
 import { ReasonsChart } from "@/components/reasons-chart";
@@ -142,6 +143,15 @@ export default async function Dashboard({
         now={now}
         canAct={mayAct}
         canExport={mayAct}
+      />
+
+      <LiveNotifications
+        role={staff.role}
+        person={liveKey(staff.sub)}
+        doctors={dash.range.per_doctor.map((d) => ({
+          id: d.doctor_id,
+          name: d.name,
+        }))}
       />
 
       <LiveFeed

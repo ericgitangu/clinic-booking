@@ -1,0 +1,216 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  BURST_WINDOW_MS,
+  HIGHLIGHT_MS,
+  Highlights,
+  ToastBatcher,
+  cardKey,
+  cardsTouched,
+  nextUnread,
+  toastText,
+  unreadText,
+  type ToastSink,
+} from "@/lib/live-notices";
+import { parseLiveEvent } from "@/lib/live-events";
+
+const DOCTOR = "e52e9da0-f7f3-5a6a-93d3-d7f658947afa";
+const APPT = "0f1d2c3b-4a5e-6f70-8192-a3b4c5d6e7f8";
+
+const viewerShape = (over: Record<string, unknown> = {}) => ({
+  event_type: "arrived",
+  doctor_id: DOCTOR,
+  local_date: "2026-10-21",
+  from_local_date: null,
+  from_starts_at: null,
+  to_starts_at: "2026-10-21T07:30:00.000000Z",
+  seq: "845.17",
+  ...over,
+});
+const staffShape = (over: Record<string, unknown> = {}) =>
+  viewerShape({
+    appointment_id: APPT,
+    patient_name: "Wanjiru Kamau",
+    cancellation_reason: null,
+    actor_email: null,
+    actor_role: null,
+    staff_reason: null,
+    ...over,
+  });
+
+function sink() {
+  const calls: string[] = [];
+  let n = 0;
+  const s: ToastSink = {
+    show: (text) => {
+      const id = `t${(n += 1)}`;
+      calls.push(`show ${id} ${text}`);
+      return id;
+    },
+    dismiss: (id) => calls.push(`dismiss ${id}`),
+    summary: (id, text) => calls.push(`summary ${id} ${text}`),
+  };
+  return { s, calls };
+}
+
+describe("ToastBatcher", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("shows three events inside two seconds as three toasts", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    for (const t of ["a", "b", "c"]) {
+      b.push(t);
+      vi.advanceTimersByTime(500);
+    }
+    expect(calls).toEqual(["show t1 a", "show t2 b", "show t3 c"]);
+  });
+
+  it("turns a fourth inside two seconds into one '4 updates' toast and takes the three away", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    for (const t of ["a", "b", "c", "d"]) {
+      b.push(t);
+      vi.advanceTimersByTime(400);
+    }
+    expect(calls.slice(3)).toEqual([
+      "dismiss t1",
+      "dismiss t2",
+      "dismiss t3",
+      "summary live-updates-1 4 updates",
+    ]);
+  });
+
+  it("keeps counting in that one toast while events keep coming", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    for (let i = 0; i < 6; i++) {
+      b.push(String(i));
+      vi.advanceTimersByTime(300);
+    }
+    expect(calls.filter((c) => c.startsWith("summary"))).toEqual([
+      "summary live-updates-1 4 updates",
+      "summary live-updates-1 5 updates",
+      "summary live-updates-1 6 updates",
+    ]);
+    expect(calls.filter((c) => c.startsWith("show"))).toHaveLength(3);
+  });
+
+  it("does not count four events spread over more than two seconds", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    for (const t of ["a", "b", "c", "d"]) {
+      b.push(t);
+      vi.advanceTimersByTime(900);
+    }
+    expect(calls.every((c) => c.startsWith("show"))).toBe(true);
+    expect(calls).toHaveLength(4);
+  });
+
+  it("starts over after a quiet two seconds", () => {
+    const { s, calls } = sink();
+    const b = new ToastBatcher(s);
+    for (const t of ["a", "b", "c", "d"]) b.push(t);
+    vi.advanceTimersByTime(BURST_WINDOW_MS + 1);
+    b.push("e");
+    expect(calls.at(-1)).toBe("show t4 e");
+    for (const t of ["f", "g", "h"]) b.push(t);
+    expect(calls.at(-1)).toBe("summary live-updates-2 4 updates");
+  });
+});
+
+describe("what a toast says", () => {
+  it("names the patient, the time and the doctor for an owner", () => {
+    const ev = parseLiveEvent(JSON.stringify(staffShape()), "owner")!;
+    expect(toastText(ev, "Dr. Otieno", "owner")).toMatch(
+      /^Marked arrived: Wanjiru Kamau, .*10:30 with Dr\. Otieno/,
+    );
+  });
+
+  it("gives a viewer no patient and no staff name", () => {
+    const ev = parseLiveEvent(JSON.stringify(viewerShape()), "viewer")!;
+    const text = toastText(ev, "Dr. Otieno", "viewer");
+    expect(text).toMatch(/^Marked arrived: .*10:30 with Dr\. Otieno$/);
+    expect(text).not.toContain("Wanjiru");
+  });
+
+  it("never reaches a toast when a viewer's message carries a person", () => {
+    expect(parseLiveEvent(JSON.stringify(staffShape()), "viewer")).toBeNull();
+  });
+
+  it("does not add the staff member to a viewer's vetoed toast", () => {
+    const ev = parseLiveEvent(
+      JSON.stringify(viewerShape({ event_type: "vetoed" })),
+      "viewer",
+    )!;
+    expect(toastText(ev, undefined, "viewer")).toMatch(/^Vetoed\. /);
+  });
+});
+
+describe("cards and highlights", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("touches the doctor's card for the day of the visit and the day it moved from", () => {
+    const ev = parseLiveEvent(
+      JSON.stringify(
+        viewerShape({
+          event_type: "rescheduled",
+          from_local_date: "2026-10-20",
+        }),
+      ),
+      "viewer",
+    )!;
+    expect(cardsTouched(ev)).toEqual([
+      cardKey(DOCTOR, "2026-10-21"),
+      cardKey(DOCTOR, "2026-10-20"),
+    ]);
+  });
+
+  it("touches no card for a staff action that changes no visit", () => {
+    const ev = parseLiveEvent(
+      JSON.stringify({
+        kind: "reminder_now",
+        doctor_id: DOCTOR,
+        starts_at: "2026-10-21T06:30:00.000000Z",
+        delay_minutes: null,
+        seq: "860.31",
+      }),
+      "viewer",
+    )!;
+    expect(cardsTouched(ev)).toEqual([]);
+  });
+
+  it("marks a card for two seconds, renews it on another change, then lets go", () => {
+    const h = new Highlights();
+    const seen = vi.fn();
+    h.subscribe(seen);
+    h.mark("k");
+    expect(h.has("k")).toBe(true);
+    vi.advanceTimersByTime(HIGHLIGHT_MS - 100);
+    h.mark("k");
+    vi.advanceTimersByTime(HIGHLIGHT_MS - 100);
+    expect(h.has("k")).toBe(true);
+    vi.advanceTimersByTime(100);
+    expect(h.has("k")).toBe(false);
+    expect(seen).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("unread count", () => {
+  it("counts a live event while the panel is out of view", () => {
+    expect(nextUnread(0, { replay: false }, false)).toBe(1);
+    expect(nextUnread(4, { replay: false }, false)).toBe(5);
+  });
+
+  it("counts nothing while the panel is in view, and nothing for a replay", () => {
+    expect(nextUnread(0, { replay: false }, true)).toBe(0);
+    expect(nextUnread(2, { replay: true }, false)).toBe(2);
+  });
+
+  it("is said in words, and silent at zero", () => {
+    expect(unreadText(0)).toBe("");
+    expect(unreadText(3)).toBe("3 new");
+    expect(unreadText(150)).toBe("99+ new");
+  });
+});

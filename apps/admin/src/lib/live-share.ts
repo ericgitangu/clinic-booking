@@ -34,14 +34,15 @@ export const LINGER_MS = 15_000;
 export interface LiveListener {
   /** The role the page was rendered for. */
   role: string;
-  onEvent(id: string, event: string, data: string): void;
+  /** `replay`: part of the catch-up after a resume (see live-stream.ts), not a live event. */
+  onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
   /** Refresh the page's data by other means (the busy fallback, or a dropped cursor). */
   onRefresh(): void;
 }
 
 type Message =
-  | { t: "event"; id: string; event: string; data: string }
+  | { t: "event"; id: string; event: string; data: string; replay?: boolean }
   | { t: "hello"; id: string; role: string }
   | { t: "status"; status: LiveStatus }
   | { t: "refresh" }
@@ -104,7 +105,8 @@ function parse(raw: unknown): Message | null {
       return str("id") &&
         SEQ.test(m.id as string) &&
         str("event") &&
-        str("data")
+        str("data") &&
+        (m.replay === undefined || typeof m.replay === "boolean")
         ? (m as Message)
         : null;
     case "hello":
@@ -280,9 +282,9 @@ export class SharedStream {
         if (this.role) this.post({ t: "hello", id, role: this.role });
         this.setStatus(this.status);
       },
-      onEvent: (id, event, data) => {
-        this.post({ t: "event", id, event, data });
-        this.deliver(id, event, data);
+      onEvent: (id, event, data, replay) => {
+        this.post({ t: "event", id, event, data, replay: replay === true });
+        this.deliver(id, event, data, replay === true);
       },
       onStatus: (status) => {
         this.post({ t: "status", status });
@@ -350,7 +352,7 @@ export class SharedStream {
   private receive(m: Message) {
     switch (m.t) {
       case "event":
-        this.deliver(m.id, m.event, m.data);
+        this.deliver(m.id, m.event, m.data, m.replay === true);
         return;
       case "hello":
         this.lastId = latest(this.lastId, m.id);
@@ -376,13 +378,13 @@ export class SharedStream {
     }
   }
 
-  private deliver(id: string, event: string, data: string) {
+  private deliver(id: string, event: string, data: string, replay: boolean) {
     if (!SEQ.test(id)) return;
     if (this.lastId && !after(id, this.lastId)) return; // already delivered
     this.lastId = id;
     if (this.role === null) return; // no hello yet: nothing says which shape this is
     for (const l of this.listeners) {
-      if (l.role === this.role) l.onEvent(id, event, data);
+      if (l.role === this.role) l.onEvent(id, event, data, replay);
     }
   }
 

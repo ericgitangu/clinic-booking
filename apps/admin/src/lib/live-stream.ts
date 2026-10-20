@@ -29,10 +29,22 @@ export const HIDDEN_CLOSE_MS = 5 * 60_000;
 export const BUSY_REFRESH_MS = 30_000;
 export const BUSY_RETRY_BASE_MS = 30_000;
 export const BUSY_RETRY_MAX_MS = 4 * 60_000;
+/**
+ * The gateway sends no marker between the events it replays on a resume and the ones that follow
+ * as they happen. It replays straight after the hello frame, batch after batch, one batch per poll
+ * (1 s by default). A frame that arrives more than this after the one before it (or after the
+ * hello) is therefore not part of the replay. Longer than the poll interval, shorter than any
+ * pause a person would notice.
+ */
+export const CATCHUP_QUIET_MS = 1500;
 
 export interface LiveStreamOptions {
-  /** Called with each event frame's SSE id, event name and data. */
-  onEvent(id: string, event: string, data: string): void;
+  /**
+   * Called with each event frame's SSE id, event name and data. `replay` is true for a frame that
+   * is part of the catch-up after a resume (see CATCHUP_QUIET_MS): it happened while this client
+   * was away, not just now.
+   */
+  onEvent(id: string, event: string, data: string, replay?: boolean): void;
   onStatus(status: LiveStatus): void;
   /** Refresh the page's numbers by other means (the fallback while the stream is unavailable). */
   onRefresh(): void;
@@ -46,6 +58,8 @@ export interface LiveStreamOptions {
   random?: () => number;
   fetchImpl?: typeof fetch;
   isHidden?: () => boolean;
+  /** Milliseconds, for the catch-up rule; Date.now by default. */
+  now?: () => number;
   timers?: {
     setTimeout: (f: () => void, ms: number) => Handle;
     clearTimeout: (h: Handle) => void;
@@ -187,6 +201,7 @@ export class LiveStream {
     const doFetch = this.o.fetchImpl ?? fetch;
     const base = this.o.url ?? "/live/stream";
     const query = new URLSearchParams();
+    const resuming = this.lastId !== null;
     if (this.lastId) query.set("cursor", this.lastId);
     const qs = query.toString();
     const url = qs ? `${base}?${qs}` : base;
@@ -238,9 +253,16 @@ export class LiveStream {
     this.set("live");
 
     let closeReason: string | null = null;
+    // Only a connection that sent a cursor is replayed anything: without one the gateway starts at
+    // its horizon.
+    let catchingUp = resuming;
+    let lastFrameAt = (this.o.now ?? Date.now)();
     const parser = createSseParser((f) => {
       if (f.kind !== "event") return;
       if (f.id) this.lastId = f.id;
+      const at = (this.o.now ?? Date.now)();
+      const quiet = at - lastFrameAt > CATCHUP_QUIET_MS;
+      lastFrameAt = at;
       if (f.event === "hello") {
         this.o.onHello?.(f.id ?? "", f.data);
         return;
@@ -249,7 +271,8 @@ export class LiveStream {
         closeReason = f.event === "idle" ? "idle" : this.reason(f.data);
         return;
       }
-      this.o.onEvent(f.id ?? "", f.event, f.data);
+      if (catchingUp && quiet) catchingUp = false;
+      this.o.onEvent(f.id ?? "", f.event, f.data, catchingUp);
     });
     const reader = res.body.getReader();
     try {

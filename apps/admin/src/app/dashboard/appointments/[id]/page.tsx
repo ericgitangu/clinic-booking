@@ -8,6 +8,7 @@ import { LockedNote, StaffControls } from "@/components/staff-controls";
 import { AttendanceActions } from "@/components/attendance-actions";
 import { AppointmentActions } from "@/components/appointment-actions";
 import { AppointmentLive } from "@/components/appointment-live";
+import { LiveNotifications } from "@/components/live-notifications";
 import { LineageTimeline } from "@/components/lineage-timeline";
 import { StatusBadge } from "@/components/status-badge";
 import { formatSlot, localDate } from "@/lib/clinic-time";
@@ -90,6 +91,13 @@ export default async function AppointmentPage({
           <p className="text-muted-foreground">
             Reason: {row.cancellation_reason}
           </p>
+        )}
+        {staff.role && (
+          <LiveNotifications
+            role={staff.role}
+            person={liveKey(staff.sub)}
+            doctors={[{ id: appt.doctor_id, name: row.doctor_name }]}
+          />
         )}
         {staff.role && (
           <AppointmentLive

@@ -60,7 +60,8 @@ function setup(
   const refresh = vi.fn();
   const live = new LiveStream({
     fetchImpl: fetchImpl as unknown as typeof fetch,
-    onEvent: (id, event) => events.push(`${id}:${event}`),
+    onEvent: (id, event, _data, replay) =>
+      events.push(`${id}:${event}${replay ? ":replay" : ""}`),
     onHello: (id, data) => hellos.push(`${id}:${data}`),
     onStatus: (s) => statuses.push(s),
     onRefresh: refresh,
@@ -319,7 +320,7 @@ describe("LiveStream", () => {
     await tick();
     expect(t.urls).toEqual(["/live/stream?cursor=7.3"]);
     expect(t.hellos).toEqual(['7.3:{"role":"owner"}']);
-    expect(t.events).toEqual(["7.4:booked"]);
+    expect(t.events).toEqual(["7.4:booked:replay"]);
     expect(t.live.cursor).toBe("7.4");
     t.live.stop();
   });
@@ -355,5 +356,55 @@ describe("LiveStream", () => {
     await tick(10 * 60_000);
     expect(t.urls).toHaveLength(1);
     expect(t.live.current).toBe("denied");
+  });
+});
+
+describe("LiveStream: replay after a resume", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("marks what follows the hello of a resumed connection as replay until the stream goes quiet, and nothing on a fresh one", async () => {
+    const a = sse();
+    const t = setup([a.response], { cursor: "5.0" });
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push("id: 5.0\nevent: hello\ndata: {}\n\n");
+    a.push('id: 5.1\nevent: booked\ndata: {"x":1}\n\n');
+    await tick(900); // the next batch of the same catch-up, one poll later
+    a.push('id: 5.2\nevent: arrived\ndata: {"x":2}\n\n');
+    await tick(2000); // quiet longer than the catch-up gap: what comes now is live
+    a.push('id: 6.1\nevent: arrived\ndata: {"x":3}\n\n');
+    await tick();
+    expect(t.events).toEqual([
+      "5.1:booked:replay",
+      "5.2:arrived:replay",
+      "6.1:arrived",
+    ]);
+  });
+
+  it("marks nothing as replay on a connection that sent no cursor", async () => {
+    const a = sse();
+    const t = setup([a.response]);
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push("id: 9.0\nevent: hello\ndata: {}\n\n");
+    a.push('id: 9.1\nevent: booked\ndata: {"x":1}\n\n');
+    await tick();
+    expect(t.events).toEqual(["9.1:booked"]);
+  });
+
+  it("a resumed connection with an empty catch-up treats the first later event as live", async () => {
+    const a = sse();
+    const t = setup([a.response], { cursor: "5.0" });
+    t.streams.push(a);
+    t.live.start();
+    await tick();
+    a.push("id: 5.0\nevent: hello\ndata: {}\n\n");
+    await tick(5000);
+    a.push('id: 5.3\nevent: booked\ndata: {"x":1}\n\n');
+    await tick();
+    expect(t.events).toEqual(["5.3:booked"]);
   });
 });
