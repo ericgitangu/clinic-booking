@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 
 TEXT_FILES = [
     "README.md",
+    "contracts/api-errors.md",
     "apps/booking/src/lib/evidence.ts",
     "apps/booking/src/lib/problems.ts",
     "apps/booking/src/lib/change-window.ts",
@@ -190,7 +191,7 @@ def test_the_rule_is_stated_the_same_way_where_it_is_described() -> None:
         "`409 CHANGE_TOO_LATE` for changing or cancelling a visit that starts within the hour"
         in readme
     )
-    api_errors = (ROOT / "docs/api-errors.md").read_text()
+    api_errors = (ROOT / "contracts/api-errors.md").read_text()
     assert "422 BOOKING_TOO_SOON" in api_errors and "409 CHANGE_TOO_LATE" in api_errors
 
 
@@ -207,7 +208,10 @@ def test_the_checker_catches_the_old_wording() -> None:
             "Refused with 409 CHANGE_TOO_LATE when the appointment (both "
             "its current start and the new start) begins less than 60 minutes from now.",
         ),
-        ("docs/api-errors.md", "Cancel, or reschedule from or to, a time under 60 minutes away."),
+        (
+            "contracts/api-errors.md",
+            "Cancel, or reschedule from or to, a time under 60 minutes away.",
+        ),
         ("docs/engineering/x.md", "The contract in one line is **422 on book, 409 on change**."),
     ]
     for name, text in old:
@@ -240,7 +244,7 @@ def test_every_surface_catches_a_planted_paraphrase() -> None:
     names = {name for name, _ in surfaces}
     for must in (
         "README.md",
-        "docs/api-errors.md",
+        "contracts/api-errors.md",
         "apps/booking/src/lib/change-window.ts",
         "apps/booking/src/components/booking/appointment-actions.tsx",
         "apps/admin/src/components/appointment-actions.tsx",

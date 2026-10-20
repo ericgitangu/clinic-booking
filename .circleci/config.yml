@@ -1069,7 +1069,7 @@ jobs:
       - run:
           name: IAM deny-proof, direct run.app (403 anonymous, 401 junk bearer; no credentials)
           command: |
-            # Written as a redacted record and kept as an artifact (the saved WIF-deny and context-deny logs the keyless deploy rule asks for, see docs/evidence).
+            # Written as a redacted record and kept as an artifact (the saved WIF-deny and context-deny logs the keyless deploy rule asks for, see infra/evidence).
             mkdir -p /tmp/evidence
             bash scripts/ci/deny_probe.sh run-app /tmp/evidence/iam-deny-run-app.txt
       - store_artifacts:
