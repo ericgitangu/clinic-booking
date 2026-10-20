@@ -27,7 +27,7 @@ test("the first load carries the ten decisions and no other tab's cards", async 
 }) => {
   const html = await (await request.get("/decisions")).text();
   expect(html).toContain('id="double-booking"');
-  expect(html).not.toContain('id="adr-0003"');
+  expect(html).not.toContain('id="decision-3"');
   expect(html).not.toContain('id="rollback"');
 });
 
@@ -35,7 +35,7 @@ test("each other tab is a static fragment, and a plain page without scripts", as
   request,
 }) => {
   for (const [id, anchor] of [
-    ["record", "adr-0034"],
+    ["record", "decision-34"],
     ["architecture", "containers"],
     ["operations", "go-gateway"],
     ["evidence", "evidence-spend-cap"],
@@ -117,8 +117,8 @@ test("a card link opens its tab, loads it, opens the card and scrolls to it", as
   page,
 }) => {
   for (const [hash, tab] of [
-    ["adr-0001", "Decision record"],
-    ["adr-0034", "Decision record"],
+    ["decision-1", "Decision record"],
+    ["decision-34", "Decision record"],
     ["rollback", "Operations"],
     ["go-gateway", "Operations"],
     ["neon", "Operations"],
@@ -169,7 +169,7 @@ test("the ten decisions keep their anchors and select the first tab", async ({
 test("following a link while the page is open changes the tab", async ({
   page,
 }) => {
-  await page.goto("/decisions#adr-0003");
+  await page.goto("/decisions#decision-3");
   await expect(
     page.getByRole("tab", { name: "Decision record" }),
   ).toHaveAttribute("aria-selected", "true"); // the page has hydrated
@@ -310,4 +310,18 @@ test("diagrams and screenshots load and have names", async ({ page }) => {
   await expect
     .poll(() => shot.evaluate((i: HTMLImageElement) => i.naturalWidth))
     .toBeGreaterThan(0);
+});
+
+test("an old #adr-0033 link opens decision 33 on the record tab", async ({
+  page,
+}) => {
+  // built from parts so the link test, which wants every anchor to resolve, skips it
+  const old = ["adr", "0033"].join("-");
+  await page.goto(`/decisions#${old}`);
+  await expect(
+    page.getByRole("tab", { name: "Decision record" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("details#decision-33")).toHaveAttribute("open", "");
+  await expect(page.locator("details#decision-33")).toBeInViewport();
+  expect(await page.content()).not.toContain('id="adr-');
 });

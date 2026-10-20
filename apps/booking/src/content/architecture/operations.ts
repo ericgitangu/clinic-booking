@@ -1031,7 +1031,7 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
               "A longer hop for Kenyan users (estimated, not measured), and about $0.35 a month on the shared billing account.",
             ],
             [
-              "Two database roles: an owner for migrations, an app role with no DDL rights ([ADR 0015](#adr-0015))",
+              "Two database roles: an owner for migrations, an app role with no DDL rights ([decision 15](#decision-15))",
               "One role for everything",
               "A compromised service cannot change the schema.",
               "Two secrets and two service accounts.",

@@ -4,7 +4,7 @@ import DecisionsPage from "@/app/decisions/page";
 import { GET, generateStaticParams } from "@/app/decisions/panel/[id]/route";
 import { highlight } from "@/components/architecture/highlight";
 import { Inline, parseInline } from "@/components/architecture/inline";
-import { ADRS, TABS } from "@/content/architecture";
+import { DECISION_CARDS, TABS } from "@/content/architecture";
 import { DECISIONS } from "@/content/decisions";
 
 const html = renderToStaticMarkup(<DecisionsPage />);
@@ -30,7 +30,7 @@ describe("the decisions page as served", () => {
   it("carries the ten decisions on the first load and nothing from the other tabs", () => {
     expect(html.match(/<article /g)).toHaveLength(DECISIONS.length);
     for (const d of DECISIONS) expect(html).toContain(`id="${d.id}"`);
-    expect(html).not.toContain('id="adr-0003"');
+    expect(html).not.toContain('id="decision-3"');
     expect(html).not.toContain('id="rollback"');
   });
 
@@ -71,11 +71,15 @@ describe("the tab fragments", () => {
     expect(res.headers.get("content-type")).toContain("text/html");
     expect(doc).toContain("noindex");
     expect(doc).toContain("data-fragment");
-    for (const a of ADRS) expect(doc).toContain(`id="${a.id}"`);
-    expect(doc.match(/<dt[^>]*>What I decided/g)).toHaveLength(ADRS.length);
-    expect(doc.match(/<dt[^>]*>What it cost/g)).toHaveLength(ADRS.length);
+    for (const a of DECISION_CARDS) expect(doc).toContain(`id="${a.id}"`);
+    expect(doc.match(/<dt[^>]*>What I decided/g)).toHaveLength(
+      DECISION_CARDS.length,
+    );
+    expect(doc.match(/<dt[^>]*>What it cost/g)).toHaveLength(
+      DECISION_CARDS.length,
+    );
     expect(doc.match(/<dt[^>]*>When I would revisit it/g)).toHaveLength(
-      ADRS.length,
+      DECISION_CARDS.length,
     );
     expect(doc).not.toContain("<script");
   });

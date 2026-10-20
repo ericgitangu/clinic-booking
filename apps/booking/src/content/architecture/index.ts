@@ -1,19 +1,27 @@
-import { ADRS_1 } from "./adrs-1";
-import { ADRS_2 } from "./adrs-2";
-import { ADRS_3, ADR_INTRO, ADR_STATUS_NOTE } from "./adrs-3";
+import { DECISION_CARDS_1 } from "./decision-cards-1";
+import { DECISION_CARDS_2 } from "./decision-cards-2";
+import {
+  DECISION_CARDS_3,
+  DECISION_INTRO,
+  DECISION_STATUS_NOTE,
+} from "./decision-cards-3";
 import { API } from "./api";
 import { EVIDENCE } from "./evidence";
 import { OPERATIONS } from "./operations";
 import { OVERVIEW } from "./overview";
 import { SCREENSHOTS } from "./screenshots";
-import type { AdrCard, Card, TabContent } from "./types";
+import type { DecisionCard, Card, TabContent } from "./types";
 
-export { ADR_INTRO, ADR_STATUS_NOTE };
+export { DECISION_INTRO, DECISION_STATUS_NOTE };
 
 export const PAGE_INTRO =
-  "The other tabs hold the rest of the working: the full decision record, how the system fits together, how it is run, what I observed on the live stack, and how to call the API.";
+  "The other tabs hold the rest of the working: the full set of 34 numbered decisions, how the system fits together, how it is run, what I observed on the live stack, and how to call the API.";
 
-export const ADRS: readonly AdrCard[] = [...ADRS_1, ...ADRS_2, ...ADRS_3];
+export const DECISION_CARDS: readonly DecisionCard[] = [
+  ...DECISION_CARDS_1,
+  ...DECISION_CARDS_2,
+  ...DECISION_CARDS_3,
+];
 
 export const SCREENSHOTS_TAB: TabContent = {
   id: "screenshots",
@@ -66,7 +74,7 @@ export const CARD_TABS: readonly TabContent[] = [
 export function cardTabs(): Record<string, string> {
   const map: Record<string, string> = {};
   for (const t of CARD_TABS) for (const c of t.cards) map[c.id] = t.id;
-  for (const a of ADRS) map[a.id] = RECORD_TAB.id;
+  for (const a of DECISION_CARDS) map[a.id] = RECORD_TAB.id;
   return map;
 }
 
@@ -75,6 +83,6 @@ export function allAnchors(): string[] {
   return [
     ...TABS.map((t) => t.id),
     ...CARD_TABS.flatMap((t) => t.cards.map((c) => c.id)),
-    ...ADRS.map((a) => a.id),
+    ...DECISION_CARDS.map((a) => a.id),
   ];
 }

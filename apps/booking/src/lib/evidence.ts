@@ -155,7 +155,7 @@ export const TILES = [
     title: "Cloud Run is IAM-only, behind a Vercel proxy",
     body: "Nothing public reaches the API directly. Only named service identities may call it (the web apps and a smoke-test account), and /api forwards requests with a short-lived token.",
     extra: {
-      href: "/decisions#adr-0023",
+      href: "/decisions#decision-23",
       label: "Read the front-door decision",
     },
   },
