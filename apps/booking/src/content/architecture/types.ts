@@ -43,10 +43,10 @@ export type Card = {
 };
 
 /** A decision record card. All four parts are required. */
-export type AdrCard = {
-  /** "adr-0003": the anchor. */
+export type DecisionCard = {
+  /** "decision-3": the anchor. */
   id: string;
-  /** "0003". */
+  /** "3". */
   number: string;
   title: string;
   /** Accepted, or what replaced or narrowed it. Plain words. */
@@ -59,7 +59,7 @@ export type AdrCard = {
   revisit: string;
   /** Ids on the /decisions page that cover the same choice, if any. */
   decisionsPage?: string[];
-  /** Other cards on this page worth reading with it, as card ids ("adr-0031"). */
+  /** Other cards on this page worth reading with it, as card ids ("decision-31"). */
   related?: string[];
 };
 

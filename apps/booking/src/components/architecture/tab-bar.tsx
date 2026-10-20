@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { currentDecisionAnchor } from "@/lib/legacy-decision-anchor";
 
 type Tab = { id: string; label: string };
 
@@ -92,6 +93,7 @@ export function TabBar({
     } catch {
       hash = "";
     }
+    hash = currentDecisionAnchor(hash) ?? hash;
     const ids = new Set(tabs.map((t) => t.id));
     let tab: string | null = null;
     if (hash && ids.has(hash)) tab = hash;

@@ -1,23 +1,23 @@
-import type { AdrCard } from "./types";
+import type { DecisionCard } from "./types";
 
 // Decision cards for records 0013 to 0024. Each fact was checked against main.
 
-export const ADRS_2: readonly AdrCard[] = [
+export const DECISION_CARDS_2: readonly DecisionCard[] = [
   {
-    id: "adr-0013",
-    number: "0013",
+    id: "decision-13",
+    number: "13",
     title: "Idempotency keys on booking",
     status: "Accepted, built",
     decision:
       "A booking request can carry an `Idempotency-Key`. I store the key and a hash of the request (doctor and start time) as two columns on the appointment row, with a unique index on patient and key. A retry with the same key and the same request returns the current appointment with `Idempotent-Replayed: true`.",
     cost: "There is no stored response body, so a replay shows the appointment as it is now, not as it was when first created. If the booking has since been cancelled the retry gets 409 `IDEMPOTENCY_KEY_CONSUMED`, and a different request under the same key gets 422 `IDEMPOTENCY_KEY_REUSED`. Rescheduling has no key.",
     revisit:
-      "When another endpoint needs keys. Then a generic keys table that stores responses is worth its extra table.",
-    related: ["adr-0003"],
+      "When another endpoint needs keys. Then a keys table that stores responses earns its place.",
+    related: ["decision-3"],
   },
   {
-    id: "adr-0014",
-    number: "0014",
+    id: "decision-14",
+    number: "14",
     title: "Hosting, region and the cost rules",
     status:
       "Accepted, built. The hosting split was re-decided on 2026-10-16 after a cost audit.",
@@ -27,11 +27,11 @@ export const ADRS_2: readonly AdrCard[] = [
     revisit:
       "Real Kenyan patient data would need an African-region database. Any billing line above the ceiling, or a free tier changing, means re-running the cost check before the next deploy.",
     decisionsPage: ["hosting-and-cost"],
-    related: ["adr-0023", "adr-0027", "adr-0021"],
+    related: ["decision-23", "decision-27", "decision-21"],
   },
   {
-    id: "adr-0015",
-    number: "0015",
+    id: "decision-15",
+    number: "15",
     title: "Separate database roles, expand-only migrations",
     status: "Accepted, built",
     decision:
@@ -39,11 +39,11 @@ export const ADRS_2: readonly AdrCard[] = [
     cost: "The lint reads one line at a time, so a destructive statement built in a helper or at runtime gets past it and needs a human reviewer. There is no automated test that the old release still works on the new schema. Two database secrets to rotate instead of one, and a third for the read-only live-feed role.",
     revisit:
       "At the first destructive migration. Before merging it I would adopt the expand, migrate, contract sequence and add the old-release compatibility test.",
-    related: ["adr-0021"],
+    related: ["decision-21"],
   },
   {
-    id: "adr-0016",
-    number: "0016",
+    id: "decision-16",
+    number: "16",
     title: "CircleCI with a keyless deploy",
     status: "Accepted, built",
     decision:
@@ -52,11 +52,11 @@ export const ADRS_2: readonly AdrCard[] = [
     revisit:
       "If I add a staging environment. That needs an approval job, a second identity condition and its own context.",
     decisionsPage: ["hosting-and-cost"],
-    related: ["adr-0014", "adr-0017"],
+    related: ["decision-14", "decision-17"],
   },
   {
-    id: "adr-0017",
-    number: "0017",
+    id: "decision-17",
+    number: "17",
     title: "One security tool per concern, all blocking",
     status: "Accepted, built",
     decision:
@@ -64,11 +64,11 @@ export const ADRS_2: readonly AdrCard[] = [
     cost: "The ZAP job needs the larger machine executor, which uses more CI credits than any other job. It scans the API's OpenAPI surface only, so the live stream is covered by its own tests and not by ZAP. Production gets a passive ZAP baseline after each release, and no active scan.",
     revisit:
       "When the system holds real personal data. Then I would want an authenticated scan against a preview environment.",
-    related: ["adr-0016"],
+    related: ["decision-16"],
   },
   {
-    id: "adr-0018",
-    number: "0018",
+    id: "decision-18",
+    number: "18",
     title: "Tests on real Postgres, with a race that has to prove it raced",
     status: "Accepted, built",
     decision:
@@ -77,11 +77,11 @@ export const ADRS_2: readonly AdrCard[] = [
     revisit:
       "If UI regressions start slipping through. Playwright already runs against the real API in CI, but not against the production URL.",
     decisionsPage: ["double-booking"],
-    related: ["adr-0003", "adr-0021"],
+    related: ["decision-3", "decision-21"],
   },
   {
-    id: "adr-0019",
-    number: "0019",
+    id: "decision-19",
+    number: "19",
     title: "Logs and request ids, no tracing stack",
     status: "Accepted, built",
     decision:
@@ -89,11 +89,11 @@ export const ADRS_2: readonly AdrCard[] = [
     cost: "No distributed traces and no metrics dashboards. When a problem crosses services I follow it by hand through the logs.",
     revisit:
       "When one service calls another, or an async worker appears. Then OpenTelemetry to Cloud Trace stops being optional.",
-    related: ["adr-0006"],
+    related: ["decision-6"],
   },
   {
-    id: "adr-0020",
-    number: "0020",
+    id: "decision-20",
+    number: "20",
     title: "Clean git history, disclosure in one place",
     status:
       "Accepted, partly done. The `v1.0.0` tag exists; the README disclosure section is still mine to finish.",
@@ -104,36 +104,36 @@ export const ADRS_2: readonly AdrCard[] = [
       "Nothing is planned. I finish the README section before submission.",
   },
   {
-    id: "adr-0021",
-    number: "0021",
+    id: "decision-21",
+    number: "21",
     title: "A small Go service for the staff live feed",
     status:
-      "Accepted, built. [ADR 0031](#adr-0031) briefly replaced it, and I reinstated it because staff events carry patient names.",
+      "Accepted, built. [decision 31](#decision-31) briefly replaced it, and I reinstated it because staff events carry patient names.",
     decision:
       "The staff live feed is a separate Go service, `clinic-realtime`, that polls the event table and streams it over SSE. It reads only: its database role has column-level `SELECT` and no write rights. The admin app's `/live/stream` route is the only way in, and it signs each request the way the API expects.",
     cost: "A second language, image, CI job and deploy job. Below 1 vCPU Cloud Run allows one stream per instance, and I cap the service at 2 instances, so two people can watch live at once. Cloud Run did not notice abandoned streams, which made one browser hold both instances, so all tabs in a browser now share one stream. Viewer-level redaction lives in the gateway's query and not in a second database role, which I accepted as debt.",
     revisit:
       "More than 5 gateway instances, 500 concurrent streams, a slow cursor query, or Neon connection errors. Then one relay (Redis pub/sub or Pub/Sub) replaces per-instance polling. If the feed is ever dropped, I delete the service rather than keep a second runtime for nothing.",
     decisionsPage: ["go"],
-    related: ["adr-0031", "adr-0014", "adr-0015"],
+    related: ["decision-31", "decision-14", "decision-15"],
   },
   {
-    id: "adr-0022",
-    number: "0022",
+    id: "decision-22",
+    number: "22",
     title: "Google sign-in and a bot check on booking forms",
     status:
-      "Accepted in part. Sign-in moved to [ADR 0024](#adr-0024), and the bot check uses reCAPTCHA instead of Turnstile. The Auth.js and stream-ticket design was not built.",
+      "Accepted in part. Sign-in moved to [decision 24](#decision-24), and the bot check uses reCAPTCHA instead of Turnstile. The Auth.js and stream-ticket design was not built.",
     decision:
       "The bot check is reCAPTCHA through Google Cloud. The booking server actions for book, reschedule and cancel verify a score of at least 0.5 (configurable) and the expected action name. There is no secret to hold: the server uses its existing Vercel identity to call the API through a service account that has one role.",
     cost: "Scripted clients of the web app fail by design. The public REST API is not protected by this check, because the brief asks for an open API. reCAPTCHA is free only up to a monthly allowance, so a flood of form submissions could cost money, and the per-IP limit in the proxy is the bound.",
     revisit:
       "Real patient data or an authenticated patient flow. Then bot enforcement moves into the API itself.",
     decisionsPage: ["thin-web-layer"],
-    related: ["adr-0024", "adr-0030"],
+    related: ["decision-24", "decision-30"],
   },
   {
-    id: "adr-0023",
-    number: "0023",
+    id: "decision-23",
+    number: "23",
     title: "Cloud Run behind a Vercel front door",
     status: "Accepted, built for the API",
     decision:
@@ -142,20 +142,20 @@ export const ADRS_2: readonly AdrCard[] = [
     revisit:
       "Users outside North America, a custom domain, or traffic near the free egress limit. Then a regional load balancer or a host with free egress to Africa.",
     decisionsPage: ["hosting-and-cost", "thin-web-layer"],
-    related: ["adr-0014", "adr-0027"],
+    related: ["decision-14", "decision-27"],
   },
   {
-    id: "adr-0024",
-    number: "0024",
+    id: "decision-24",
+    number: "24",
     title: "Google sign-in with Better Auth",
     status:
-      "Accepted, built. Roles later moved from an email allowlist to the staff table in [ADR 0030](#adr-0030).",
+      "Accepted, built. Roles later moved from an email allowlist to the staff table in [decision 30](#decision-30).",
     decision:
       "Patients and staff sign in with Google through Better Auth, mounted under `/auth` in each Next.js app. Sessions are stateless encrypted cookies that last 7 days, so there is no auth database. Every call from the web layer to the API carries a signed assertion with a 60 second lifetime that binds the method, the path and the body hash. A patient reaches only their own appointments, through `/internal/me` routes.",
     cost: "A session cannot be revoked early. The public REST API stays open by design, so the ownership check exists in the web layer and not in the API. Each assertion has a unique id, and staff writes record it, so a replay is refused with 401 `ASSERTION_REPLAYED`. Reads and patient routes can still repeat an assertion.",
     revisit:
       "A need to revoke one session at once. Then sessions move to a database.",
     decisionsPage: ["thin-web-layer"],
-    related: ["adr-0030", "adr-0027", "adr-0033"],
+    related: ["decision-30", "decision-27", "decision-33"],
   },
 ];

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DECISIONS } from "@/content/decisions";
 import {
-  ADRS,
+  DECISION_CARDS,
   CARD_TABS,
   RECORD_TAB,
   TABS,
   allAnchors,
 } from "@/content/architecture";
-import { ADR_INTRO, ADR_STATUS_NOTE } from "@/content/architecture";
+import { DECISION_INTRO, DECISION_STATUS_NOTE } from "@/content/architecture";
 import { linkTargets } from "@/components/architecture/inline";
 import type { Block } from "@/content/architecture/types";
 
@@ -15,7 +15,7 @@ const SITE_PATHS = new Set(["/docs", "/redoc", "/openapi.json", "/decisions"]);
 
 /** Every string in the content that may carry inline marks. */
 function strings(): string[] {
-  const out: string[] = [ADR_INTRO, ADR_STATUS_NOTE];
+  const out: string[] = [DECISION_INTRO, DECISION_STATUS_NOTE];
   const block = (b: Block) => {
     switch (b.t) {
       case "p":
@@ -38,7 +38,7 @@ function strings(): string[] {
       default:
     }
   };
-  for (const a of ADRS)
+  for (const a of DECISION_CARDS)
     out.push(a.title, a.status, a.decision, a.cost, a.revisit);
   for (const t of CARD_TABS) {
     out.push(t.intro, t.label);
@@ -51,16 +51,23 @@ function strings(): string[] {
 }
 
 describe("decision record cards", () => {
-  it("has one card for every decision, 0001 to 0034, in order", () => {
-    expect(ADRS).toHaveLength(34);
-    expect(ADRS.map((a) => a.number)).toEqual(
-      Array.from({ length: 34 }, (_, i) => String(i + 1).padStart(4, "0")),
+  it("never says ADR to the reader", () => {
+    const text = JSON.stringify([strings(), DECISION_CARDS]);
+    expect(text).not.toMatch(/\bADRs?\b|adr-\d/i);
+  });
+
+  it("has one card for every decision, 1 to 34, in order", () => {
+    expect(DECISION_CARDS).toHaveLength(34);
+    expect(DECISION_CARDS.map((a) => a.number)).toEqual(
+      Array.from({ length: 34 }, (_, i) => String(i + 1)),
     );
-    expect(ADRS.map((a) => a.id)).toEqual(ADRS.map((a) => `adr-${a.number}`));
+    expect(DECISION_CARDS.map((a) => a.id)).toEqual(
+      DECISION_CARDS.map((a) => `decision-${a.number}`),
+    );
   });
 
   it("gives every card its title, status, decision, cost and revisit trigger", () => {
-    for (const a of ADRS) {
+    for (const a of DECISION_CARDS) {
       for (const f of [
         "title",
         "status",
@@ -75,7 +82,7 @@ describe("decision record cards", () => {
   it("only points at decisions-page entries and cards that exist", () => {
     const decisionIds = new Set(DECISIONS.map((d) => d.id));
     const anchors = new Set(allAnchors());
-    for (const a of ADRS) {
+    for (const a of DECISION_CARDS) {
       for (const id of a.decisionsPage ?? [])
         expect(decisionIds.has(id), `${a.id} -> /decisions#${id}`).toBe(true);
       for (const id of a.related ?? [])

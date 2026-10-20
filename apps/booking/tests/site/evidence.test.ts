@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { zProblemCode } from "@clinic/api/generated/zod.gen";
 import { DECISIONS } from "@/content/decisions";
-import { ADRS } from "@/content/architecture";
+import { DECISION_CARDS } from "@/content/architecture";
 import {
   BONUS,
   REQUIRED,
@@ -90,9 +90,11 @@ describe("the verification steps and the architecture tiles", () => {
       (t) => "extra" in t && t.extra.label === "Read the front-door decision",
     );
     expect(door && "extra" in door && door.extra.href).toBe(
-      "/decisions#adr-0023",
+      "/decisions#decision-23",
     );
-    expect(ADRS.find((a) => a.id === "adr-0023")?.title).toMatch(/front door/);
+    expect(DECISION_CARDS.find((a) => a.id === "decision-23")?.title).toMatch(
+      /front door/,
+    );
     const cost = TILES.find((t) => t.title.startsWith("$0"));
     expect(cost?.body).toContain("about $0.35 a month against a $0.50 ceiling");
   });
