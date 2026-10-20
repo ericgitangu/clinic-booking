@@ -103,7 +103,7 @@ export default function Home() {
               variant="outline"
               className="h-12 px-5 text-base"
             >
-              <a href={`${GITHUB}/blob/main/collections/README.md#run-it`}>
+              <a href="/decisions#api-collection">
                 <Terminal aria-hidden />
                 Run the API collection
               </a>

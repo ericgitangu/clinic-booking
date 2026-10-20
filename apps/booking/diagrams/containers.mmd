@@ -1,0 +1,29 @@
+flowchart LR
+  B([Browser: patient or staff])
+  subgraph V[Vercel]
+    BK["Booking app (clinic-web)<br/>pages, server actions, /api proxy, /docs"]
+    AD["Admin app (clinic-admin)<br/>dashboard, access page"]
+  end
+  subgraph GC["Google Cloud us-east4"]
+    API["clinic-api: FastAPI on Cloud Run<br/>IAM-only, min 0, max 3<br/>every rule, outbox relay"]
+    MIG["clinic-migrate: Cloud Run Job<br/>alembic as clinic_owner"]
+  end
+  DB[("PostgreSQL 17, Neon aws-us-east-1")]
+  GO["Google: sign-in, reCAPTCHA Enterprise,<br/>STS and IAM for ID tokens"]
+  RS[Resend]
+  AB[Ably]
+  CI[CircleCI]
+  B -->|HTTPS| BK
+  B -->|HTTPS| AD
+  B -.->|"SSE, 5 min subscribe-only token"| AB
+  BK -->|"Vercel OIDC to ID token"| GO
+  AD -->|"same exchange"| GO
+  BK -->|"ID token + signed assertion"| API
+  AD -->|"ID token + signed assertion"| API
+  API -->|"asyncpg, role clinic_app"| DB
+  MIG -->|"role clinic_owner"| DB
+  API -->|"publish slot events"| AB
+  BK -->|"email, server side"| RS
+  CI -->|"OIDC to WIF, deploy by digest"| API
+  CI -->|"vercel deploy --prebuilt"| BK
+  CI -->|"vercel deploy --prebuilt"| AD

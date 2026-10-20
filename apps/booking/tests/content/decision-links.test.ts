@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { allAnchors } from "@/content/architecture";
 import { DECISIONS } from "@/content/decisions";
 
 // Every in-repo pointer to a decision goes to /decisions#<id>. These checks read the tracked tree,
@@ -35,8 +36,8 @@ describe("decision links", () => {
     expect(hits).toEqual([]);
   });
 
-  it("every decisions-page anchor link in the repo names an entry in decisions.ts", () => {
-    const ids = new Set(DECISIONS.map((d) => d.id));
+  it("every decisions-page anchor link in the repo names an entry in decisions.ts or a tab, card or record on the page", () => {
+    const ids = new Set([...DECISIONS.map((d) => d.id), ...allAnchors()]);
     const link = new RegExp("/decisions#([a-z0-9-]+)", "g");
     const found: { file: string; id: string }[] = [];
     for (const [file, body] of text)
