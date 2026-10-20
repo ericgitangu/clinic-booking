@@ -23,6 +23,7 @@ from app.api.deps import (
     get_settings,
     require_identity,
 )
+from app.api.guards import guard_staff_write
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -38,7 +39,7 @@ from app.schemas.access import (
 )
 from app.schemas.admin import AdminAppointment, AdminAppointmentPage, Bucket, Lineage, Metrics
 from app.schemas.appointment import CancelRequest
-from app.schemas.problem import change_too_late_responses, problem_responses
+from app.schemas.problem import change_too_late_responses, problem_responses, with_throttle
 from app.schemas.staff import StaffAppointmentChange, StaffRescheduleRequest
 from app.services import access as access_service
 from app.services import admin as service
@@ -196,7 +197,10 @@ async def list_access(
 
 
 @access_router.post(
-    "", response_model=AccessEntry, status_code=201, responses=problem_responses(409, 422)
+    "",
+    response_model=AccessEntry,
+    status_code=201,
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def grant_access(
     body: GrantRequest,
@@ -205,6 +209,7 @@ async def grant_access(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await access_service.grant(
@@ -218,7 +223,9 @@ async def grant_access(
 
 
 @access_router.patch(
-    "/{email}", response_model=AccessEntry, responses=problem_responses(404, 409, 422)
+    "/{email}",
+    response_model=AccessEntry,
+    responses=with_throttle(problem_responses(404, 409, 422)),
 )
 async def change_access_role(
     email: Annotated[Email, Path()],
@@ -228,6 +235,7 @@ async def change_access_role(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await access_service.change_role(
@@ -242,7 +250,9 @@ async def change_access_role(
 
 
 @access_router.delete(
-    "/{email}", response_model=AccessEntry, responses=problem_responses(404, 409, 422)
+    "/{email}",
+    response_model=AccessEntry,
+    responses=with_throttle(problem_responses(404, 409, 422)),
 )
 async def revoke_access(
     email: Annotated[Email, Path()],
@@ -251,6 +261,7 @@ async def revoke_access(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await access_service.revoke(
@@ -267,7 +278,7 @@ async def revoke_access(
     "/{appointment_id}/cancel",
     response_model=StaffAppointmentChange,
     description=RULE_CANCEL + STAFF_EXEMPT,
-    responses=change_too_late_responses(),
+    responses=with_throttle(change_too_late_responses()),
 )
 async def cancel_for_patient(
     appointment_id: uuid.UUID,
@@ -278,6 +289,7 @@ async def cancel_for_patient(
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     change = await staff_actions.cancel(
@@ -291,7 +303,7 @@ async def cancel_for_patient(
     "/{appointment_id}/reschedule",
     response_model=StaffAppointmentChange,
     description=RULE_RESCHEDULE + STAFF_EXEMPT,
-    responses=change_too_late_responses(new_start=True),
+    responses=with_throttle(change_too_late_responses(new_start=True)),
 )
 async def reschedule_for_patient(
     appointment_id: uuid.UUID,
@@ -302,6 +314,7 @@ async def reschedule_for_patient(
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     change = await staff_actions.reschedule(

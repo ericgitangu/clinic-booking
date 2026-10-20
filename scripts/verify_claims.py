@@ -25,6 +25,7 @@ import os
 import random
 import sys
 import time
+import uuid
 from datetime import datetime
 from typing import Any
 from urllib.parse import urljoin, urlsplit
@@ -96,6 +97,7 @@ def smoke_assertion(key: str, *, path: str, body: bytes, now: int | None = None)
         "m": "POST",
         "p": path,
         "bh": hashlib.sha256(body).hexdigest(),
+        "jti": uuid.uuid4().hex,
     }
     canonical = json.dumps(claims, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     payload = _b64(canonical.encode("utf-8"))

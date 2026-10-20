@@ -62,6 +62,7 @@ def _headers(
         "m": method,
         "p": path,
         "bh": body_hash(body),
+        "jti": uuid.uuid4().hex,
     }
     if verified is not None:
         claims["ev"] = verified

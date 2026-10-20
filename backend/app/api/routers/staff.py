@@ -26,6 +26,7 @@ from app.api.deps import (
     require_identity,
     staff_crud_enabled,
 )
+from app.api.guards import guard_replay_only, guard_staff_write
 from app.core.assertion import Principal
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -33,7 +34,7 @@ from app.domain.emailnorm import normalize_email
 from app.domain.errors import NotFoundRoute
 from app.repositories import staff as repo
 from app.schemas.access import AccessEntry
-from app.schemas.problem import problem_responses
+from app.schemas.problem import problem_responses, with_throttle
 from app.schemas.staff import (
     AcceptRequest,
     AttendanceRequest,
@@ -93,7 +94,7 @@ audit_router = APIRouter(
         "are exempt from the lead-time rule; the slot, working-hours and double-booking rules "
         "still apply. A reason is required and is recorded in the audit trail."
     ),
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def create_appointment(
     body: StaffCreateAppointment,
@@ -103,6 +104,7 @@ async def create_appointment(
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     change = await staff_actions.create(session, clock, settings, actor=actor, body=body)
@@ -120,7 +122,7 @@ async def create_appointment(
         "locked. 409 NOTHING_TO_VETO when the latest change is not the patient's or is already "
         "undone."
     ),
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def veto_appointment(
     appointment_id: uuid.UUID,
@@ -131,6 +133,7 @@ async def veto_appointment(
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     relay: Relay = Depends(get_relay),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     change = await staff_actions.veto(
@@ -144,7 +147,7 @@ async def veto_appointment(
     "/{appointment_id}/unlock",
     response_model=StaffAppointmentChange,
     description="Lift the lock so the patient can change the appointment again.",
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def unlock_appointment(
     appointment_id: uuid.UUID,
@@ -153,6 +156,7 @@ async def unlock_appointment(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     return await staff_actions.unlock(
@@ -172,7 +176,7 @@ _ATTENDANCE_DOC = (
     "/{appointment_id}/arrived",
     response_model=StaffAppointmentChange,
     description="Record that the patient arrived. " + _ATTENDANCE_DOC,
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def mark_arrived(
     appointment_id: uuid.UUID,
@@ -181,6 +185,7 @@ async def mark_arrived(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     return await staff_actions.attendance(
@@ -197,7 +202,7 @@ async def mark_arrived(
     "/{appointment_id}/no-show",
     response_model=StaffAppointmentChange,
     description="Record that the patient did not turn up. " + _ATTENDANCE_DOC,
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def mark_no_show(
     appointment_id: uuid.UUID,
@@ -206,6 +211,7 @@ async def mark_no_show(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> StaffAppointmentChange:
     response.headers.update(_NO_STORE)
     return await staff_actions.attendance(
@@ -230,7 +236,7 @@ _NOTIFY_DOC = (
     "/{appointment_id}/remind",
     response_model=NotifyResult,
     description="Remind the patient of this appointment now." + _NOTIFY_DOC,
-    responses=problem_responses(409, 422),
+    responses=with_throttle(problem_responses(409, 422)),
 )
 async def remind_now(
     appointment_id: uuid.UUID,
@@ -239,6 +245,7 @@ async def remind_now(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> NotifyResult:
     response.headers.update(_NO_STORE)
     return await notify.remind_now(
@@ -257,7 +264,7 @@ async def remind_now(
         "Tell the doctor's remaining patients of today (booked, not yet marked, not synthetic; at "
         "most 50) that the doctor is running late." + _NOTIFY_DOC + " One audit row per patient."
     ),
-    responses=problem_responses(422),
+    responses=with_throttle(problem_responses(422)),
 )
 async def doctor_running_late(
     doctor_id: uuid.UUID,
@@ -266,6 +273,7 @@ async def doctor_running_late(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> NotifyResult:
     response.headers.update(_NO_STORE)
     return await notify.running_late(
@@ -292,7 +300,7 @@ async def doctor_running_late(
         "(`audit_id`) is written; when `deliver` is true the web app emails the link and then "
         "marks that row notified."
     ),
-    responses={**problem_responses(403, 409, 422, 429)},
+    responses=with_throttle({**problem_responses(403, 409, 422, 429)}),
 )
 async def create_invite(
     body: InviteRequest,
@@ -301,6 +309,7 @@ async def create_invite(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    _guard: None = Depends(guard_staff_write),
 ) -> InviteCreated:
     response.headers.update(_NO_STORE)
     return await invites.create(
@@ -326,7 +335,7 @@ async def list_invites(
 @invites_router.delete(
     "/{invite_id}",
     response_model=InviteRevoked,
-    responses=problem_responses(403, 404),
+    responses=with_throttle(problem_responses(403, 404)),
 )
 async def revoke_invite(
     invite_id: uuid.UUID,
@@ -334,6 +343,7 @@ async def revoke_invite(
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
 ) -> InviteRevoked:
     response.headers.update(_NO_STORE)
     return await invites.revoke(session, clock, actor=actor, invite_id=invite_id)
@@ -357,6 +367,7 @@ async def accept_invite(
     session: AsyncSession = Depends(get_session),
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    _guard: None = Depends(guard_replay_only),
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await invites.accept(session, clock, settings, who=who, token=body.token)
@@ -417,13 +428,14 @@ async def list_audit(
         "true (marking twice is fine); nothing else in the audit row can change. Anything else "
         "is the same 404 as an unknown id."
     ),
-    responses=problem_responses(404),
+    responses=with_throttle(problem_responses(404)),
 )
 async def mark_notified(
     audit_id: uuid.UUID,
     response: Response,
     actor: Principal = Depends(CAN_MANAGE),
     session: AsyncSession = Depends(get_session),
+    _guard: None = Depends(guard_staff_write),
 ) -> Notified:
     response.headers.update(_NO_STORE)
     me = normalize_email(actor.email)

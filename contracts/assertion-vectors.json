@@ -3,7 +3,7 @@
     {
       "body": "",
       "expect": "ok",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.HuzP9I4nRuCu-o0-v8iZ_SVI72w4YI2nMvr-FEVwE2c",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.4w0koIq8QnN1-E6iIde4_OY_o7S7PKNJ8OLwzjIvTgk",
       "method": "GET",
       "name": "valid",
       "now": 1792382400,
@@ -18,7 +18,7 @@
     {
       "body": "",
       "expect": "ok",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV2Ijp0cnVlLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.dXh8q9ccCVTRCVJUblNQKFXcEiUh539BLDrQUpKdpRM",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV2Ijp0cnVlLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwianRpIjoidmVjdG9yLWp0aS0wMTIzNDU2Nzg5YWJjZGVmIiwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.h_OWjt6AScofbFCJQ0EnC9hZyrpijvvNpQlkkZukas8",
       "method": "GET",
       "name": "valid, email verified",
       "now": 1792382400,
@@ -33,7 +33,7 @@
     {
       "body": "",
       "expect": "ok",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6InZpZXdlciIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.rqLixlqxmTeb7y-5m57u21IrWexoK3_ioczypKqcnC0",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6InZpZXdlciIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.z52fGkZF5HtpuPIpAr29iZoiQ9gr7zPENOHJ1bLnnFI",
       "method": "GET",
       "name": "valid, viewer",
       "now": 1792382400,
@@ -48,7 +48,7 @@
     {
       "body": "",
       "expect": "ok",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2NSwiaWF0IjoxNzkyMzgyNDA1LCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.l-ukmjpgbalw61cnWdnLWa0WN9rqR6oXEzqa06hQDo0",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2NSwiaWF0IjoxNzkyMzgyNDA1LCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.2DKZmTQJcTjOfcJpP0Xw9rWtNUEY5edWZCgKbZoq5pE",
       "method": "GET",
       "name": "valid, issued 5 s ahead (inside the skew)",
       "now": 1792382400,
@@ -63,7 +63,7 @@
     {
       "body": "",
       "expect": "expired",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjM0MCwiaWF0IjoxNzkyMzgyMjgwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.Bqpai76cCow1Zg5f9o2S4IfkxMx5U5G-7PPgIxTUAD8",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjM0MCwiaWF0IjoxNzkyMzgyMjgwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.fYWLfXJUtbsFlZ8YY93Y0YYeM9nw2wNyklOGQspi1Uw",
       "method": "GET",
       "name": "expired beyond skew",
       "now": 1792382400,
@@ -73,7 +73,7 @@
     {
       "body": "",
       "expect": "issued in the future",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ5MCwiaWF0IjoxNzkyMzgyNDMwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.zH4ex9ueraXxdHxN2kQqwF2vn16L8akzEIEj2t4_FxQ",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ5MCwiaWF0IjoxNzkyMzgyNDMwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.wORCR47rR4Eqo8BPr59QRzYUvl-oJBg2YiiM5a-7ACY",
       "method": "GET",
       "name": "issued in the future",
       "now": 1792382400,
@@ -83,7 +83,7 @@
     {
       "body": "",
       "expect": "lifetime too long",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MSwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.Aoo6sWcVEn_FZDpPGa3kSNwjxhofGWy1Q8DpbU0_-lw",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MSwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.WgECimM0x_i8QRsyAruYiohDfFTKxJP2CN6yD_JTwAE",
       "method": "GET",
       "name": "lifetime over 60 s",
       "now": 1792382400,
@@ -93,7 +93,7 @@
     {
       "body": "",
       "expect": "wrong audience",
-      "header": "v1.eyJhdWQiOiJvdGhlciIsImJoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImVtYWlsIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.UU0BfrHK-Pvp8OJhbGoZK2HZo6qX6isgamOptHT-PBg",
+      "header": "v1.eyJhdWQiOiJvdGhlciIsImJoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImVtYWlsIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJleHAiOjE3OTIzODI0NjAsImlhdCI6MTc5MjM4MjQwMCwianRpIjoidmVjdG9yLWp0aS0wMTIzNDU2Nzg5YWJjZGVmIiwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.Y_hiCXoQc13VGoe3_2I7a5HZc5Lz5MwN8oY7SmOrqGs",
       "method": "GET",
       "name": "wrong audience",
       "now": 1792382400,
@@ -103,7 +103,7 @@
     {
       "body": "",
       "expect": "method mismatch",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.HuzP9I4nRuCu-o0-v8iZ_SVI72w4YI2nMvr-FEVwE2c",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.4w0koIq8QnN1-E6iIde4_OY_o7S7PKNJ8OLwzjIvTgk",
       "method": "POST",
       "name": "method mismatch",
       "now": 1792382400,
@@ -113,7 +113,7 @@
     {
       "body": "",
       "expect": "path mismatch",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.HuzP9I4nRuCu-o0-v8iZ_SVI72w4YI2nMvr-FEVwE2c",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.4w0koIq8QnN1-E6iIde4_OY_o7S7PKNJ8OLwzjIvTgk",
       "method": "GET",
       "name": "path mismatch",
       "now": 1792382400,
@@ -123,7 +123,7 @@
     {
       "body": "x",
       "expect": "body mismatch",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.HuzP9I4nRuCu-o0-v8iZ_SVI72w4YI2nMvr-FEVwE2c",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.4w0koIq8QnN1-E6iIde4_OY_o7S7PKNJ8OLwzjIvTgk",
       "method": "GET",
       "name": "body mismatch",
       "now": 1792382400,
@@ -133,7 +133,7 @@
     {
       "body": "",
       "expect": "bad times",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MC4wLCJpYXQiOjE3OTIzODI0MDAuMCwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.mkixU3dgMQbS7l51Qpd3xJ6OWYQ2MVL1rLjuslqaHso",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MC4wLCJpYXQiOjE3OTIzODI0MDAuMCwianRpIjoidmVjdG9yLWp0aS0wMTIzNDU2Nzg5YWJjZGVmIiwibSI6IkdFVCIsInAiOiIvc3RyZWFtP2N1cnNvcj0xMi4zNCIsInJvbGUiOiJhZG1pbiIsInN1YiI6Imdvb2dsZS1zdWItMSJ9.l4X731sk0XSBGU4vahWXL1m6gpam_kAHwyMai-cZHSg",
       "method": "GET",
       "name": "float times",
       "now": 1792382400,
@@ -143,7 +143,7 @@
     {
       "body": "",
       "expect": "bad times",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0Ijp0cnVlLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.rBJuJlxLGDY1z9T8MK2nq8AjR8LDZqYpkQaSjANJwHQ",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0Ijp0cnVlLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.p-qlUKueQAMCyhM02gp3cwrpjCwSYYds-OHjnFuxvX0",
       "method": "GET",
       "name": "boolean times",
       "now": 1792382400,
@@ -153,7 +153,7 @@
     {
       "body": "",
       "expect": "missing identity",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.b4jRe_gT3Gil1H-SVps-R9l0OXn-NcfuLxq4L7AJ6Y4",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.Cp0NFBzubmYOzgkG8g83P5PoCjmIbFvzV_9tOWTUXRs",
       "method": "GET",
       "name": "missing identity",
       "now": 1792382400,
@@ -163,7 +163,7 @@
     {
       "body": "",
       "expect": "bad times",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6LTQ2MTE2ODYwMTg0MjczODc4OTQsImlhdCI6LTQ2MTE2ODYwMTg0MjczODc5MDQsIm0iOiJHRVQiLCJwIjoiL3N0cmVhbT9jdXJzb3I9MTIuMzQiLCJyb2xlIjoiYWRtaW4iLCJzdWIiOiJnb29nbGUtc3ViLTEifQ.w2VmyRWvHtPLlQyQTNi-c4Ox0AL0EPKEmNbN_PUGReA",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6LTQ2MTE2ODYwMTg0MjczODc4OTQsImlhdCI6LTQ2MTE2ODYwMTg0MjczODc5MDQsImp0aSI6InZlY3Rvci1qdGktMDEyMzQ1Njc4OWFiY2RlZiIsIm0iOiJHRVQiLCJwIjoiL3N0cmVhbT9jdXJzb3I9MTIuMzQiLCJyb2xlIjoiYWRtaW4iLCJzdWIiOiJnb29nbGUtc3ViLTEifQ.joWphoIV874wn3Zy3eOS29fQGInQbBoNEv5Ioa3ETJE",
       "method": "GET",
       "name": "times beyond 2^40",
       "now": 1792382400,
@@ -173,7 +173,7 @@
     {
       "body": "",
       "expect": "bad times",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6OTIyMzM3MjAzNjg1NDc3NTgwNywiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.v6HD3JXdbE977rJBADTG_tjjqzRbUFuKLwt8m9-KXwU",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6OTIyMzM3MjAzNjg1NDc3NTgwNywiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.fTNXgUtZZ5FMStadGT6051DiyfJ2DvyZ2XatPWppz9M",
       "method": "GET",
       "name": "exp beyond 2^40",
       "now": 1792382400,
@@ -183,7 +183,7 @@
     {
       "body": "",
       "expect": "bad payload",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0ge30.HU6uFoSLxIwKOsvTmC7y1xuYaEBdv9YvCZkNoZOS89o",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6ImFkbWluIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0ge30.AkkIcnZJ94_csvd65YpEPNFCMd_Ry5SjrzPLJc8ibPo",
       "method": "GET",
       "name": "trailing bytes after the claims",
       "now": 1792382400,
@@ -193,7 +193,7 @@
     {
       "body": "",
       "expect": "bad signature",
-      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6Im93bmVyIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.leO1Rna_e39bJcX_SzZN8khL2D8yNxaRuBKPA12mUmc",
+      "header": "v1.eyJhdWQiOiJjbGluaWMtYXBpL2ludGVybmFsIiwiYmgiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImV4cCI6MTc5MjM4MjQ2MCwiaWF0IjoxNzkyMzgyNDAwLCJqdGkiOiJ2ZWN0b3ItanRpLTAxMjM0NTY3ODlhYmNkZWYiLCJtIjoiR0VUIiwicCI6Ii9zdHJlYW0_Y3Vyc29yPTEyLjM0Iiwicm9sZSI6Im93bmVyIiwic3ViIjoiZ29vZ2xlLXN1Yi0xIn0.I1RzhZJl8Ehxdda2CZUFWo9yKUaunkpN5xNBWG1IplQ",
       "method": "GET",
       "name": "signed with another key",
       "now": 1792382400,

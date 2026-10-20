@@ -60,3 +60,7 @@ Option 2, Better Auth.
 ## Review trigger
 
 A need to revoke a single session immediately, or per-clinic staff roles. Either moves sessions to a database and the admin allowlist to a role table.
+
+## Amendment (2026-10-19): the assertion now has a unique id and the staff writes a replay store
+
+The sentence above, "There is no replay store", is out of date. Every assertion now also carries `jti`, a random id of 16 to 64 characters that the MAC binds, and the API refuses an assertion without one. The staff write routes and the invitation accept keep each assertion's `jti` in a unique-keyed table until the assertion can no longer verify (`exp` plus the 5 seconds of skew, plus a margin), and a second use is `401 ASSERTION_REPLAYED`. Reads may still repeat an assertion, and the patient routes still rely on their idempotency keys. Staff writes are also throttled per person. The details and the reasons are in [ADR-0033](0033-staff-crud-veto-and-invites.md), "Write guard".

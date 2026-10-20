@@ -29,6 +29,7 @@ const COPY: Record<string, string> = {
   OUTSIDE_WORKING_HOURS: "The doctor does not work at that time.",
   PATIENT_DOUBLE_BOOKED: "The patient already has an appointment then.",
   FORBIDDEN: "Your account is not allowed to do this.",
+  ASSERTION_REPLAYED: "That request was already sent. Try again.",
 };
 
 // `invalid` is what to say when the generated request schema refused the input, before anything
@@ -37,7 +38,14 @@ export function describeFailure(f: ApiFailure, invalid: string): ActionResult {
   if (f.kind === "invalid_request") return { ok: false, message: invalid };
   // Too many writes in a short time, from the per-person throttle on staff actions (or the
   // invitation limit): the same plain words whichever code the API names, and the way out.
-  if (f.status === 429) return { ok: false, message: COPY.RATE_LIMITED! };
+  if (f.status === 429) {
+    if (f.kind === "problem" && f.retryAfter)
+      return {
+        ok: false,
+        message: `Too many changes just now. Try again in ${f.retryAfter} s.`,
+      };
+    return { ok: false, message: COPY.RATE_LIMITED! };
+  }
   const known = COPY[f.code];
   if (known) return { ok: false, message: known };
   if (f.status >= 500)

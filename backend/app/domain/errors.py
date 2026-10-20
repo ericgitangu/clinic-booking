@@ -49,6 +49,12 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "and nobody changes their own access.",
     ),
     ErrorSpec(
+        "ASSERTION_REPLAYED",
+        401,
+        "Assertion replayed",
+        "This signed request was already used once. Sign a new one for each write.",
+    ),
+    ErrorSpec(
         "CLIENT_ADDRESS_UNKNOWN",
         400,
         "Client address unknown",
@@ -159,7 +165,8 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "RATE_LIMITED",
         429,
         "Rate limited",
-        "Too many requests from this address. Wait for Retry-After seconds and try again.",
+        "Too many requests from this address, or too many staff changes by this person in the "
+        "current window. Wait for Retry-After seconds and try again.",
     ),
     ErrorSpec(
         "IDEMPOTENCY_KEY_CONSUMED",
@@ -264,6 +271,10 @@ class Unauthenticated(DomainError):
 
 class Forbidden(DomainError):
     code = "FORBIDDEN"
+
+
+class AssertionReplayed(DomainError):
+    code = "ASSERTION_REPLAYED"
 
 
 # Domain-raised errors (slots / booking rules). Repository/service layers raise the rest.

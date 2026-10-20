@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 import asyncpg
 import pytest_asyncio
 
+from tests.conftest import owner_dsn
 from tests.integration.staff_support import env  # noqa: F401  # shared fixture
 
 
@@ -41,3 +42,18 @@ async def other_clinic(zone: str, owner_conn: asyncpg.Connection) -> AsyncIterat
         await owner_conn.execute("DELETE FROM working_hours WHERE doctor_id = $1", doctor_id)
         await owner_conn.execute("DELETE FROM doctors WHERE id = $1", doctor_id)
         await owner_conn.execute("DELETE FROM clinics WHERE id = $1", clinic_id)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _fresh_write_guard() -> None:
+    """Every test starts with an empty throttle and replay store: the tests run on one fake clock,
+    so without this each would share one throttle window. A run with no database (the push-service
+    job, which never touches one) has nothing to clear."""
+    try:
+        conn = await asyncpg.connect(owner_dsn())
+    except OSError:
+        return
+    try:
+        await conn.execute("TRUNCATE staff_write_throttle, assertion_replay")
+    finally:
+        await conn.close()
