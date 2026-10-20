@@ -30,9 +30,28 @@ export async function signIn(context: BrowserContext, email: string) {
 // a slow CI runner. Unset, nothing changes.
 const THROTTLE = Number(process.env.ADMIN_E2E_CPU_THROTTLE ?? 1);
 
+// A page that breaks its own Content-Security-Policy says so in the console. Every scenario runs with
+// the policy on, and any such message, in any page of the scenario's context, fails it.
+const CSP_MESSAGE =
+  /Content[- ]Security[- ]Policy|violates the following|Refused to (?:load|connect|execute|apply|frame)/i;
+
 export const test = base.extend<{
   as: (who: Persona | string) => Promise<Page>;
+  cspGuard: void;
 }>({
+  cspGuard: [
+    async ({ context }, use, testInfo) => {
+      const hits: string[] = [];
+      context.on("console", (m) => {
+        if (CSP_MESSAGE.test(m.text())) hits.push(m.text());
+      });
+      await use();
+      // A scenario that breaks the policy on purpose (to prove it blocks) says so with this annotation.
+      if (testInfo.annotations.some((a) => a.type === "csp-expected")) return;
+      expect(hits, "Content-Security-Policy violations").toEqual([]);
+    },
+    { auto: true },
+  ],
   page: async ({ page, context }, use) => {
     // The pages stream in and hydrate after the load event, and a click before that does nothing.
     // (Not "networkidle": the live feed keeps a stream open for as long as a page is.) After a
@@ -80,6 +99,12 @@ export { expect } from "@playwright/test";
  * comes. React marks every hydrated element with an internal props key; wait for it.
  */
 export async function tap(locator: Locator): Promise<void> {
+  await hydrated(locator);
+  await locator.click();
+}
+
+/** Waits until React has attached to this element, so a click on it reaches its handler. */
+export async function hydrated(locator: Locator): Promise<void> {
   await expect
     .poll(() =>
       locator.evaluate((el) =>
@@ -87,7 +112,6 @@ export async function tap(locator: Locator): Promise<void> {
       ),
     )
     .toBe(true);
-  await locator.click();
 }
 
 /**

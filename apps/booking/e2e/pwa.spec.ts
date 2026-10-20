@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 import { newPerson, sessionCookies } from "./support/auth";
 
 // Real production build, real browser, real service worker. Only the static shell may ever be in

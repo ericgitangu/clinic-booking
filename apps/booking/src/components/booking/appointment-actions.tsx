@@ -31,6 +31,7 @@ import {
   insideChangeWindow,
 } from "@/lib/change-window";
 import { forgetBooked } from "@/lib/own-bookings";
+import { STAFF_LOCK_NOTE, STAFF_LOCK_TITLE } from "@/lib/staff-lock";
 import { useActionFeedback } from "@/components/booking/use-action-feedback";
 import { useRecaptcha } from "@/components/booking/use-recaptcha";
 
@@ -39,12 +40,15 @@ export function AppointmentActions({
   when,
   startsAt,
   serverNow,
+  staffLocked = false,
 }: {
   id: string;
   when: string;
   startsAt: string;
   /** The server's clock when the page was drawn: the screen reads time from it, not from the device. */
   serverNow: string;
+  /** Staff vetoed and locked this visit: no change buttons at all, only the reason it is fixed. */
+  staffLocked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [offset] = useState(() => clockOffset(serverNow, Date.now()));
@@ -95,6 +99,17 @@ export function AppointmentActions({
   }, [state, router]);
   const reasonError =
     state.status === "error" ? state.fieldErrors?.reason : undefined;
+
+  if (staffLocked) {
+    return (
+      <div className="mt-4" data-testid="staff-lock">
+        <p className="text-base font-medium">{STAFF_LOCK_TITLE}</p>
+        <p className="mt-1 text-base text-muted-foreground">
+          {STAFF_LOCK_NOTE}
+        </p>
+      </div>
+    );
+  }
 
   if (locked) {
     const note = `change-note-${id}`;

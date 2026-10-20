@@ -51,6 +51,9 @@ class Appointment(ClinicZoned):
     status: Literal["booked", "cancelled"]
     cancellation_reason: str | None
     cancelled_at: datetime | None
+    # True once staff vetoed a change of the patient's: the patient can no longer cancel or move it
+    # (APPOINTMENT_LOCKED). Only the flag, never the staff reason.
+    locked: bool
     created_at: datetime
     updated_at: datetime
 

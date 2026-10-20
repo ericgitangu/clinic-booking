@@ -27,16 +27,18 @@ picked up by the next pass. A failed publish ends the loop (the breaker handles 
 starts from the cursor, which only moves in the transaction that publishes, so an event goes out
 once however many passes there are; the publish budget is debited in that same transaction
 (``debited_through`` guards a repeat), and the ``xmin`` guard is untouched: nothing is published
-before its transaction is visible. An event held back by an older open transaction is sent by the
-trigger that follows that transaction's commit. The token mints run the same relay (holder or
-loser the same way), so an open page asking for a new token also flushes what is stranded; the
-clients' poll stays as the last safety net.
+before its transaction is visible. An event held back by an older open transaction is waited for
+by the holder for at most ``HORIZON_WAIT``: that transaction may end in a rollback (a lost booking
+race), which triggers no relay, so nothing else would send the event. The token mints run the same
+relay (holder or loser the same way), so an open page asking for a new token also flushes what is
+stranded; the clients' poll stays as the last safety net.
 
 It is called synchronously right after each committing write, with a short timeout, before the
 response is sent. It is never a background task: Cloud Run throttles CPU once the response is out.
-There is no always-on worker, so an event stuck behind a concurrent open transaction waits for
-the next trigger; the clients' safety-net poll covers that gap. After three failed publishes in a
-row the relay stops trying for a minute (a circuit breaker, logged once when it opens).
+There is no always-on worker, so an event stuck behind a transaction that stays open past
+``HORIZON_WAIT`` waits for the next trigger; the clients' safety-net poll covers that gap. After
+three failed publishes in a row the relay stops trying for a minute (a circuit breaker, logged
+once when it opens).
 """
 
 from __future__ import annotations
@@ -109,6 +111,23 @@ _PENDING = text(
     )
     """
 )
+# Committed events past the cursor that the ``xmin`` guard still hides (an OLDER transaction is
+# open).
+_HELD_BACK = text(
+    """
+    SELECT EXISTS (
+        SELECT 1 FROM appointment_events e, event_relay_cursor c
+        WHERE c.singleton
+          AND e.txid >= pg_snapshot_xmin(pg_current_snapshot())
+          AND (e.txid, e.id) > (c.txid, c.id)
+    )
+    """
+)
+# How long a holder waits for an older open transaction to end, when a committed event is owed.
+# A lost booking race ends in a rollback and triggers no relay, so without this the event waits for
+# some later trigger. Short on purpose: transactions here last milliseconds.
+HORIZON_WAIT = 0.25
+HORIZON_STEP = 0.025
 _HORIZON = text("SELECT pg_snapshot_xmin(pg_current_snapshot())::text")
 # A holder starts another pass only when the time left covers the slowest pass so far with this
 # margin, and never less than the floor. A pass is never started to be cancelled mid-publish.
@@ -311,6 +330,11 @@ class Relay:
         async with self.sessionmaker() as session:
             return bool((await session.execute(_PENDING)).scalar_one())
 
+    async def _held_back(self) -> bool:
+        """A committed event is owed but an older open transaction hides it (see ``_HELD_BACK``)."""
+        async with self.sessionmaker() as session:
+            return bool((await session.execute(_HELD_BACK)).scalar_one())
+
     async def _drain(self, clock: Clock, progress: _Progress) -> None:
         """One trigger. A loser returns at once. A holder passes again from a fresh snapshot after
         every pass that moved the cursor, until a pass finds nothing, ``MAX_PASSES``, or too little
@@ -321,6 +345,7 @@ class Relay:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._timeout
         slowest = 0.0
+        waited = 0.0
         for attempt in range(MAX_PASSES):
             begun = loop.time()
             if attempt > 0 and deadline - begun < max(slowest * PASS_MARGIN, PASS_FLOOR):
@@ -344,4 +369,10 @@ class Relay:
             if result.contended:
                 return
             if result.consumed == 0 and not await self._pending_after_release():
-                return
+                # Nothing visible. An older open transaction may still be hiding a committed event;
+                # that transaction can end without triggering any relay, so wait for it, bounded.
+                if waited >= HORIZON_WAIT or not await self._held_back():
+                    return
+                while waited < HORIZON_WAIT and await self._held_back():
+                    await asyncio.sleep(HORIZON_STEP)
+                    waited += HORIZON_STEP

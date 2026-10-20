@@ -1,6 +1,6 @@
 // The vercel.app alias redirect against the real production build, sent over real HTTP with a Host
 // header (the unit tests cover the matching rules; this proves the built app does it).
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/fixtures";
 import { BASE_URL } from "./support/stack";
 
 const CANONICAL = "https://clinic-admin.ericgitangu.com";

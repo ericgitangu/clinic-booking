@@ -258,7 +258,8 @@ def run(base_url: str, extra_headers: dict[str, str], smoke_key: str | None = No
             r = client.get("/openapi.json", follow_redirects=True)
             check(
                 r.status_code == 200
-                and jbody(r).get("info", {}).get("title") == "Clinic Booking API",
+                and jbody(r).get("info", {}).get("title")
+                in ("Idyllic Clinic API", "Clinic Booking API"),  # old name until the release carries the new
                 "/openapi.json title",
             )
         finally:

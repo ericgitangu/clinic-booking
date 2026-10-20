@@ -82,6 +82,14 @@ class AdminAppointment(ClinicZoned):
     # The latest attendance mark: arrived, no_show, or null (not marked).
     attendance: Literal["arrived", "no_show"] | None = None
     created_at: _dt.datetime
+    avatar_url: str | None = Field(
+        default=None,
+        description=(
+            "The patient's Google profile picture (https on lh3.googleusercontent.com), only for "
+            "owners and admins; null for viewers, for patients who never signed in with Google "
+            "or have no picture, and for every demo patient. Show initials when null."
+        ),
+    )
 
 
 class AdminAppointmentPage(BaseModel):
@@ -103,4 +111,9 @@ class LineageEvent(BaseModel):
 
 class Lineage(BaseModel):
     appointment_id: uuid.UUID
+    patient_id: uuid.UUID
+    patient_name: str
+    avatar_url: str | None = Field(
+        default=None, description="As on the appointment list: owners and admins only, else null."
+    )
     events: list[LineageEvent]

@@ -26,6 +26,25 @@ async function audit(page: Page) {
   );
 }
 
+/** The same rules, on the live feed panel alone (its scrolling event area included). */
+async function auditFeed(page: Page) {
+  await settle(page);
+  const { violations } = await new AxeBuilder({ page })
+    .include('[data-testid="live-feed"]')
+    .withTags([
+      "wcag2a",
+      "wcag2aa",
+      "wcag21a",
+      "wcag21aa",
+      "wcag22aa",
+      "best-practice",
+    ])
+    .analyze();
+  return violations.filter(
+    (v) => v.impact === "serious" || v.impact === "critical",
+  );
+}
+
 // axe reads colours as drawn at that instant, so every scan first waits for the page to rest.
 async function settled(page: Page) {
   await settle(page);
@@ -57,6 +76,33 @@ for (const scheme of SCHEMES) {
       await expect(
         page.getByRole("img", { name: /Line chart of bookings/ }),
       ).toBeVisible();
+      expect(report(await audit(page))).toBe("");
+    });
+
+    test("the live feed panel has none either", async ({ as }) => {
+      const page = await as("owner");
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto("/dashboard");
+      await expect(page.getByTestId("live-feed")).toBeVisible();
+      await expect(page.getByTestId("live-scroll")).toBeVisible();
+      expect(report(await auditFeed(page))).toBe("");
+    });
+
+    test("the dashboard with its doctor portraits loaded has none either", async ({
+      as,
+    }) => {
+      const page = await as("owner");
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto("/dashboard");
+      const portrait = page
+        .locator('[data-testid="today-board"] img[src*="/doctors/"]')
+        .first();
+      await expect(portrait).toBeVisible();
+      await expect
+        .poll(() =>
+          portrait.evaluate((el: HTMLImageElement) => el.naturalWidth),
+        )
+        .toBeGreaterThan(0);
       expect(report(await audit(page))).toBe("");
     });
 

@@ -29,6 +29,7 @@ _DOCTORS = text(
 _BOARD = text(
     """
     SELECT a.id, a.doctor_id, a.starts_at, a.ends_at, a.status, p.full_name, p.phone,
+           pa.image_url,
            (a.staff_locked_at IS NOT NULL) AS locked,
            (SELECT t.kind FROM appointment_attendance t
              WHERE t.appointment_id = a.id ORDER BY t.id DESC LIMIT 1) AS attendance,
@@ -39,6 +40,7 @@ _BOARD = text(
       SELECT e.event_type, e.actor FROM appointment_events e
       WHERE e.appointment_id = a.id ORDER BY e.id DESC LIMIT 1
     ) le ON true
+    LEFT JOIN patient_accounts pa ON pa.patient_id = p.id
     WHERE NOT p.synthetic AND a.starts_at >= :lo AND a.starts_at < :hi
     ORDER BY a.starts_at, a.id
     """

@@ -7,6 +7,8 @@ export interface Identity {
   email: string;
   /** What to call them on screen. */
   name: string;
+  /** Google's profile picture URL, if any. The API keeps it only when it is on Google's own host. */
+  image?: string | null;
 }
 
 interface SessionLike {
@@ -14,6 +16,7 @@ interface SessionLike {
     email?: string | null;
     emailVerified?: boolean;
     name?: string | null;
+    image?: string | null;
   } | null;
   googleSub?: string | null;
 }
@@ -27,7 +30,12 @@ export function identityFrom(
   const sub = session?.googleSub;
   if (!sub || !user?.email || !user.emailVerified) return null;
   const email = user.email.toLowerCase();
-  return { sub, email, name: user.name?.trim() || email };
+  return {
+    sub,
+    email,
+    name: user.name?.trim() || email,
+    image: user.image?.trim() || null,
+  };
 }
 
 const MIN_NAME = 2;

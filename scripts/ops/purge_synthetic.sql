@@ -1,4 +1,6 @@
--- One-off, audited removal of the release smoke's old test rows from the patient database.
+-- A tool for an operator, not a pending step: an audited removal of the release smoke's old test
+-- rows from the patient database. The rows are already excluded from every admin view
+-- (patients.synthetic) and are kept; nothing in a release or review needs this to run.
 --
 -- Run it through scripts/ops/purge_synthetic.sh (it supplies :apply and the owner connection).
 --

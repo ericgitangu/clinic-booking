@@ -1,7 +1,7 @@
 // The self-hosted font covers the letters in Kenyan names (ĩ, ũ) as well as ASCII, and the second
 // (latin-ext) file is fetched only when a page shows a letter that needs it. Real browser, real
 // production build.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./support/csp-guard";
 
 const NAME = "Wanjirũ Kĩmani";
 // Ę and Ł are only in the latin-ext file (checked against its cmap), so drawing them needs that file.

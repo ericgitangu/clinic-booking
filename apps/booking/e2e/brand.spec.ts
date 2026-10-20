@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/csp-guard";
 
 // The name is "Idyllic Clinic" everywhere a person or a crawler can read it. Every public page, the
 // manifest, the sitemap and the API's doctor list are fetched from the running stack and must contain
