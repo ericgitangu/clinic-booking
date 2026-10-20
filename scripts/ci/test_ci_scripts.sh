@@ -1097,7 +1097,7 @@ rt_run() { # <name> <mode> ; uses $RT
 RT="$WORK/rt1"; mkdir -p "$RT"
 echo '[]' > "$RT/versions.json"
 expect "realtime prereqs: no secret version -> fails" "$(rt_run x '')" 1
-expect "realtime prereqs: ...and names the runbook" "$(grep -c 'https://clinic.ericgitangu.com/decisions#neon' "$RT/out")" 1
+expect "realtime prereqs: ...and names the runbook" "$(grep -c 'https://clinic.ericgitangu.com/architecture#neon' "$RT/out")" 1
 echo '[{"name":"v1"}]' > "$RT/versions.json"
 expect "realtime prereqs: one enabled version -> ok" "$(rt_run x '')" 0
 adm='"serviceAccount:clinic-admin@p.iam.gserviceaccount.com"'; smk='"serviceAccount:clinic-smoke@p.iam.gserviceaccount.com"'; web='"serviceAccount:clinic-web@p.iam.gserviceaccount.com"'
