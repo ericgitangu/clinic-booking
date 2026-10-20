@@ -17,7 +17,8 @@ export type FooterLink = {
     | "globe"
     | "scale"
     | "database"
-    | "list";
+    | "list"
+    | "terminal";
 };
 
 export type FooterColumn = { title: string; links: readonly FooterLink[] };

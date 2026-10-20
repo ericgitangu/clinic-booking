@@ -12,6 +12,7 @@ import {
   PenLine,
   Scale,
   ShieldCheck,
+  Terminal,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const ICONS: Record<FooterLink["icon"], LucideIcon> = {
   scale: Scale,
   database: Database,
   list: ListChecks,
+  terminal: Terminal,
 };
 
 // Policy links sit inside a sentence: padding makes the touch target 44px tall without moving the text.

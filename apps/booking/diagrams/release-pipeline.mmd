@@ -1,0 +1,25 @@
+sequenceDiagram
+  autonumber
+  participant G as GitHub main
+  participant C as CircleCI
+  participant R as Cloud Run
+  participant V as Vercel
+  G->>C: push to main
+  C->>C: verify jobs (lint, tests, gitleaks, semgrep, pip-audit, trivy, ZAP, e2e-real, cost-static)
+  C->>C: build-scan-push (image by digest)
+  C->>R: ship-api: OIDC to workload identity federation, run clinic-migrate by digest
+  C->>R: deploy clinic-api --no-traffic --tag sha-<7>
+  C->>R: scripts/verify_claims.py against the tagged URL
+  alt commit is still the head of main
+    C->>R: promote: update-traffic to the tag
+  else a newer commit exists
+    C-->>C: skip promotion
+  end
+  C->>V: ship-booking and ship-admin (prebuilt deploy)
+  C->>V: verify-release: public smoke and /ready, no credentials
+  alt public check fails
+    C->>R: rollback-api: traffic back to the previous revision
+    C->>V: rollback-booking and rollback-admin: alias to the previous deployment
+    C-->>G: release stays red
+  end
+  C->>V: smoke-public, then cost-check
