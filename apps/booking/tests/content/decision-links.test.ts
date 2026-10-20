@@ -5,20 +5,25 @@ import { allAnchors } from "@/content/architecture";
 import { DECISIONS } from "@/content/decisions";
 
 // Every in-repo pointer to a decision goes to /decisions#<id>. These checks read the tracked tree,
-// so a link to an entry that was renamed, or a path into the removed decision-record folder, fails.
+// so a link to an entry that was renamed, or a path into the docs/ folder (not in the repository), fails.
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf8",
 }).trim();
 
-const FOLDER = ["docs", "adr"].join("/"); // built from parts so this file does not contain it
-const RECORDS = `${FOLDER}/`;
+// Paths a reviewer cannot open: files under docs/ are not in the repository. The hygiene self-test
+// and the hygiene rule name such paths on purpose, as fixtures and as a pattern for its detectors.
+const NOT_IN_REPO = /(?<![\w./:@-])docs\/[\w-]+(\/|\.md)/;
+const FIXTURES = new Set([
+  "scripts/repo_hygiene.sh",
+  "scripts/repo_hygiene_selftest.sh",
+]);
 
 const tracked = execFileSync("git", ["ls-files", "-z"], {
   cwd: root,
   encoding: "utf8",
 })
   .split("\0")
-  .filter((f) => f !== "" && !f.startsWith(RECORDS))
+  .filter((f) => f !== "")
   .filter((f) => existsSync(`${root}/${f}`)) // listed but deleted in the working tree
   .filter((f) => !/\.(png|webp|ico|jpg|jpeg|gif|woff2?|pdf)$/.test(f));
 
@@ -27,11 +32,9 @@ const text = new Map<string, string>(
 );
 
 describe("decision links", () => {
-  it("no tracked file outside the record folder points into it", () => {
-    // the folder path, or a relative link to a numbered record file ("adr/0003-...md")
-    const relative = new RegExp(`(^|[^a-z])adr/\\d{4}-[a-z0-9-]+\\.md`);
+  it("no tracked file points into the docs folder, which is not in the repository", () => {
     const hits = [...text]
-      .filter(([, body]) => body.includes(FOLDER) || relative.test(body))
+      .filter(([f, body]) => !FIXTURES.has(f) && NOT_IN_REPO.test(body))
       .map(([f]) => f);
     expect(hits).toEqual([]);
   });
