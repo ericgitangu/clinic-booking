@@ -21,7 +21,7 @@ owner or admin the ones on the right:
 | Source | Events | Viewer | Owner, admin |
 |---|---|---|---|
 | `appointment_events` | the seven event types above | `admin-event.v1.schema.json` | `staff-event.v1.schema.json` (adds the appointment, patient, cancellation reason and, for a staff change, `actor_email`, `actor_role`, `staff_reason`) |
-| `staff_action_audit` | `reminder_now`, `running_late`, `invite_created`, `invite_revoked`, `invite_accepted` | `admin-action.v1.schema.json` | `staff-action.v1.schema.json` (adds who, why, the patient and the invited address) |
+| `staff_action_audit` | `reminder_now`, `running_late`, `invite_created`, `invite_revoked`, `invite_accepted`, `pass_created`, `pass_revoked`, `pass_accepted` | `admin-action.v1.schema.json` | `staff-action.v1.schema.json` (adds who, why, the patient and the invited address) |
 
 Both sources share one cursor, `<txid>.<id>` (migration 0014). `examples.v1.json` and
 `action-examples.v1.json` pin the Python models and the Go encoder to the same messages.

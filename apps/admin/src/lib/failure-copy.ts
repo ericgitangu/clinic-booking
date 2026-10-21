@@ -22,6 +22,7 @@ const COPY: Record<string, string> = {
     "The patient has not changed this appointment, so there is nothing to undo.",
   ROLE_ESCALATION: "Only the owner can change an admin's access.",
   INVITE_INVALID: "That invitation is not valid.",
+  PASS_INVALID: "That reviewer pass is not valid.",
   RATE_LIMITED:
     "You have made a lot of changes in a short time. Wait a minute, then try again.",
   APPOINTMENT_NOT_FOUND: "That appointment could not be found.",

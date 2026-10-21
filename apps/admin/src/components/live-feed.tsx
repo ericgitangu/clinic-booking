@@ -13,6 +13,9 @@ import {
   MailIcon,
   MailXIcon,
   RadioIcon,
+  TicketCheckIcon,
+  TicketIcon,
+  TicketXIcon,
   UserCheckIcon,
   UserXIcon,
 } from "lucide-react";
@@ -52,6 +55,9 @@ const ICON: Record<LiveKind, typeof RadioIcon> = {
   invite_created: MailIcon,
   invite_revoked: MailXIcon,
   invite_accepted: MailCheckIcon,
+  pass_created: TicketIcon,
+  pass_revoked: TicketXIcon,
+  pass_accepted: TicketCheckIcon,
 };
 
 const STATUS_TEXT: Record<LiveStatus, string> = {

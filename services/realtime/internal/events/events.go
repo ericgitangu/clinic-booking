@@ -8,7 +8,7 @@
 //     carries; staff shape (owner, admin) = staff-event.v1.schema.json, which adds the appointment,
 //     the patient's name, a cancellation reason and, for a staff change, who made it and why.
 //   - staff_action_audit: staff actions that change no appointment (a reminder sent now, "running
-//     late", invitations created, revoked and accepted). Viewer shape = admin-action.v1.schema.json
+//     late", invitations and reviewer passes created, revoked and accepted). Viewer shape = admin-action.v1.schema.json
 //     (what happened, the doctor and visit time for the two patient notifications, nothing that
 //     names a person); staff shape = staff-action.v1.schema.json (who, why, the patient, the
 //     invited address).
@@ -125,12 +125,18 @@ var actionKinds = map[string]string{
 	"invite_create": "invite_created",
 	"invite_revoke": "invite_revoked",
 	"invite_accept": "invite_accepted",
+	"pass_create":   "pass_created",
+	"pass_revoke":   "pass_revoked",
+	"pass_accept":   "pass_accepted",
 }
 
 // StreamedActions are the staff_action_audit actions the stream carries on their own. The other
 // actions (book, veto, attendance...) are carried by the lifecycle event of the same transaction.
 func StreamedActions() []string {
-	return []string{"reminder_now", "running_late", "invite_create", "invite_revoke", "invite_accept"}
+	return []string{
+		"reminder_now", "running_late", "invite_create", "invite_revoke", "invite_accept",
+		"pass_create", "pass_revoke", "pass_accept",
+	}
 }
 
 // Known reports whether this version understands the appointment event type.

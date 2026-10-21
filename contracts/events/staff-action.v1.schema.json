@@ -84,7 +84,10 @@
         "running_late",
         "invite_created",
         "invite_revoked",
-        "invite_accepted"
+        "invite_accepted",
+        "pass_created",
+        "pass_revoked",
+        "pass_accepted"
       ],
       "title": "Kind",
       "type": "string"
