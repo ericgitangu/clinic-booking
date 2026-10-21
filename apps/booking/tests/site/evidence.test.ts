@@ -96,7 +96,7 @@ describe("the verification steps and the architecture tiles", () => {
       /front door/,
     );
     const cost = TILES.find((t) => t.title.startsWith("$0"));
-    expect(cost?.body).toContain("about $0.35 a month against a $0.50 ceiling");
+    expect(cost?.body).toContain("about $0.41 a month against a $0.50 ceiling");
   });
 
   it("has three steps that target the live API", () => {
