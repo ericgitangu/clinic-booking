@@ -34,9 +34,10 @@ function runPast(
   window: boolean,
   anyStatus: boolean,
 ): void {
-  // Two back at most: the visit has then begun 60 to 90 minutes ago, so at least half an hour of the
-  // two-hour desk window is left when the marks are checked.
-  const hi = window ? 2 : 8;
+  // Three back at most keeps the visit inside the two-hour desk window. Searching only two back left
+  // too few free doctor and half-hour pairs once earlier specs had taken theirs; specs that check the
+  // marks ask for two back or less themselves, so the window does not close while they look.
+  const hi = window ? 3 : 8;
   const base = `(date_trunc('hour', now())
         + CASE WHEN extract(minute FROM now()) >= 30 THEN interval '30 minutes' ELSE interval '0' END)`;
   const sql = `
@@ -88,7 +89,7 @@ function execute(
 
 /**
  * Moves a booked visit to a half hour that began in the last few hours, on the first free doctor and
- * slot. `back` (0 to 8) is the preferred number of half hours before the latest one; a value of 2 or
+ * slot. `back` (0 to 8) is the preferred number of half hours before the latest one; a value of 3 or
  * less keeps the visit inside the desk window (begun within two hours), and the search then stays
  * inside it.
  */
@@ -100,7 +101,7 @@ export function moveToPastHalfHour(
   if (!Number.isInteger(back) || back < 0 || back > 8) {
     throw new Error("back must be 0 to 8");
   }
-  runPast(id, back, back <= 2, anyStatus);
+  runPast(id, back, back <= 3, anyStatus);
 }
 
 /**
@@ -116,7 +117,7 @@ export function moveToNextHalfHour(id: string): void {
 /**
  * A visit moved to a past half hour can land on yesterday's clinic date shortly after local
  * midnight, and "today's" board would not show it. moveToPastHalfHour may take any free half hour
- * up to 2 back (or up to 8 when it is asked for more than 2), so the window is that deepest slot,
+ * up to 3 back (or up to 8 when it is asked for more than 3), so the window is that deepest slot,
  * not a fixed hour. Specs that need the visit on the board skip then, and say so, rather than flake.
  */
 export function pastHalfHourCanFallOnYesterday(
@@ -132,7 +133,7 @@ export function pastHalfHourCanFallOnYesterday(
   const at = (t: string) => Number(parts.find((x) => x.type === t)?.value);
   const sinceMidnight = at("hour") * 60 + at("minute");
   const halfHourStart = sinceMidnight - (sinceMidnight % 30);
-  const deepest = back <= 2 ? 2 : 8;
+  const deepest = back <= 3 ? 3 : 8;
   return halfHourStart - deepest * 30 < 0;
 }
 
