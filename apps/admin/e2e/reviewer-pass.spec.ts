@@ -92,7 +92,7 @@ test("the owner makes a pass, a new person joins with it, and a revoked pass is 
   await lp.goto(path);
   await lp.getByRole("button", { name: "Accept" }).click();
   await expect(lp.locator("main p[role=alert]")).toHaveText(
-    "That reviewer pass is not valid.",
+    "That reviewer pass is not valid. Ask the person who sent it for a new one.",
   );
   await lctx.close();
 
@@ -139,5 +139,14 @@ test("a malformed link says so and offers no button", async ({ as }) => {
   await expect(
     page.getByText("That reviewer pass link is not valid."),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Accept" })).toHaveCount(0);
+});
+
+test("the owner opening a pass link is told it is for the people they send it to", async ({
+  as,
+}) => {
+  const page = await as("owner");
+  await page.goto("/pass/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+  await expect(page.getByText("You are the owner")).toBeVisible();
   await expect(page.getByRole("button", { name: "Accept" })).toHaveCount(0);
 });

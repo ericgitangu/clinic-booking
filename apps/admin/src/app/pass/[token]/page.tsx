@@ -32,6 +32,15 @@ export default async function PassPage({
           That reviewer pass link is not valid. Ask the person who sent it for a
           new one.
         </p>
+      ) : staff?.role === "owner" ? (
+        <p className="mt-4 text-lg leading-8 text-muted-foreground">
+          You are the owner, so this link is not for you: it is for the people
+          you send it to. Open the{" "}
+          <Link href="/access" className="underline underline-offset-4">
+            Access page
+          </Link>{" "}
+          to see who has used it.
+        </p>
       ) : staff ? (
         <>
           <p className="mt-4 text-lg leading-8 text-muted-foreground">

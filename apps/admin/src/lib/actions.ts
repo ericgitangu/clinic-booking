@@ -392,6 +392,9 @@ export async function revokePass(id: string): Promise<ActionResult> {
   };
 }
 
+const PASS_NOT_VALID =
+  "That reviewer pass is not valid. Ask the person who sent it for a new one.";
+
 // Accepting a pass needs a signed-in Google account, not a role. Every failure is the same 404, so
 // the message is the same too. Someone who already has access gets their entry back (`joined` is
 // false) and nothing is sent; a new joiner emails the owner, best effort, after the response.
@@ -399,19 +402,24 @@ export async function acceptPass(token: string): Promise<ActionResult> {
   const who = await getStaff();
   if (!who) return { ok: false, message: "Sign in with Google first." };
   if (token.length < 8 || token.length > 200)
-    return { ok: false, message: "That reviewer pass is not valid." };
+    return { ok: false, message: PASS_NOT_VALID };
   const caller = callerFor(who, "none");
   const res = await passAccept(caller, token);
   if (!res.ok) {
     return res.status === 429
       ? { ok: false, message: "Too many tries. Wait a little and try again." }
-      : { ok: false, message: "That reviewer pass is not valid." };
+      : { ok: false, message: PASS_NOT_VALID };
   }
   const joined = res.data;
   if (joined.joined)
     after(() => noticeOfPassAccepted(caller, joined, ownerEmails()));
   revalidatePath("/", "layout");
-  return { ok: true, message: `You now have access as ${joined.role}.` };
+  return {
+    ok: true,
+    message: joined.joined
+      ? `You now have access as ${joined.role}.`
+      : `You already have access as ${joined.role}.`,
+  };
 }
 
 // Send the arrival email again after it failed. Anyone who may mark attendance may ask; the API only

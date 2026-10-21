@@ -152,7 +152,10 @@ describe("the owner's email when someone joins with a pass", () => {
       }) as never,
     );
     const r = await acceptPass("a-valid-looking-token");
-    expect(r.ok).toBe(true);
+    expect(r).toEqual({
+      ok: true,
+      message: "You already have access as admin.",
+    });
     expect(sent.pass).toHaveLength(0);
   });
 
@@ -173,7 +176,8 @@ describe("the owner's email when someone joins with a pass", () => {
     } as never);
     expect(await acceptPass("a-valid-looking-token")).toEqual({
       ok: false,
-      message: "That reviewer pass is not valid.",
+      message:
+        "That reviewer pass is not valid. Ask the person who sent it for a new one.",
     });
     expect(sent.pass).toHaveLength(0);
   });
