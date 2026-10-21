@@ -109,7 +109,7 @@ export const OVERVIEW: TabContent = {
     {
       id: "slot-push",
       title: "A booked slot reaching other open pages",
-      summary: "Outbox, relay, Ably, and a 15 second poll underneath it all.",
+      summary: "Outbox, relay, Ably, and a poll underneath it all.",
       blocks: [
         { t: "diagram", id: "slot-push" },
         {
@@ -155,7 +155,7 @@ export const OVERVIEW: TabContent = {
         },
         {
           t: "note",
-          text: "The admin half of the web deploy, its rollback and the public checks after it need a project-scoped `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context. The README on main still lists that as outstanding, and I cannot read the CircleCI context from the repository, so I do not claim those jobs have run on a release.",
+          text: "The admin half of the web deploy, its rollback and the public checks after it need a project-scoped `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context. On the `v1.1.0` release (152cff5) `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` all reported success.",
         },
       ],
     },

@@ -51,10 +51,10 @@ export const DECISION_CARDS_3: readonly DecisionCard[] = [
     id: "decision-28",
     number: "28",
     title: "Public hostnames on my own domain",
-    status: "Accepted, mostly shipped",
+    status: "Accepted, shipped",
     decision:
       "Patients use `clinic.ericgitangu.com` and staff use `clinic-admin.ericgitangu.com`, one subdomain per app. The change was additive: I added the new hosts everywhere the old one was named, then switched, and kept the old `vercel.app` alias for a while before turning it into a redirect.",
-    cost: "The DNS records are added by hand at a provider the repository cannot reach, and sign-in and bot-check settings take a few minutes to propagate. Many places name the host. The cookies are host-only, so the two apps never share a session. When I wrote this, demoting the old alias to a redirect was still to do.",
+    cost: "The DNS records are added by hand at a provider the repository cannot reach, and sign-in and bot-check settings take a few minutes to propagate. Many places name the host. The cookies are host-only, so the two apps never share a session. The old alias now answers its pages with a 308 redirect to the new host; its `/api` paths are still answered directly.",
     revisit:
       "Moving the DNS to Vercel so the CLI can manage the records, or adding a third hostname.",
     related: ["decision-27", "decision-29"],

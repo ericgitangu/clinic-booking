@@ -427,7 +427,7 @@ trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 clinic-api:c
       blocks: [
         {
           t: "p",
-          text: "`ship-api` deploys with `--no-traffic --tag sha-<7>`, smokes the tag URL, then moves 100% of traffic to it. The previous revision keeps its tag, and the registry keeps the newest two images, so going back is a traffic move and not a rebuild. I list the tags, send traffic to the previous one and check.",
+          text: "`ship-api` deploys with `--no-traffic --tag sha-<7>`, smokes the tag URL, then moves 100% of traffic to it. The previous revision keeps its tag, and the registry keeps the serving image and the one before it, so going back is a traffic move and not a rebuild. I list the tags, send traffic to the previous one and check.",
         },
         {
           t: "code",
@@ -1040,7 +1040,7 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
               "CircleCI, keyless OIDC to workload identity federation, promote by tag after a smoke test, roll back automatically ([rollback](#rollback))",
               "Cloud Build; a long-lived service-account key",
               "No long-lived GCP credential exists, and only a smoke-tested revision gets traffic.",
-              "`VERCEL_TOKEN` is long-lived. A main pipeline takes roughly 10 to 12 minutes (an estimate).",
+              "`VERCEL_TOKEN` is long-lived. A release on `main` takes about 28 minutes (measured on 2026-10-20).",
             ],
             [
               "Real Postgres in every test, a race harness that must fail without the index",
@@ -1126,7 +1126,7 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
               "Shipped",
             ],
             [
-              "Shell-only PWA and 15 second slot polling ([polling then push](/decisions#polling-then-push))",
+              "Shell-only PWA and slot polling, every 15 seconds or 60 while push is live ([polling then push](/decisions#polling-then-push))",
               "A stale slot list is the UX failure of the race the brief names.",
               "Shipped",
             ],
@@ -1159,6 +1159,21 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
               "Go gateway and staff live feed ([the Go decision](/decisions#go), [the Go card](#go-gateway))",
               "Staff events carry patient names, which should stay inside Google Cloud.",
               "Shipped and deployed. The cost measurement is pending.",
+            ],
+            [
+              "Live notifications on the staff dashboard: toasts, an unread count and a highlight on the doctor's card ([doctor notifications](#notifications))",
+              "The feed panel is easy to miss when a patient arrives or a booking changes.",
+              "Shipped. It uses the existing stream and opens no new connection.",
+            ],
+            [
+              "An arrival email to the doctor ([doctor notifications](#notifications))",
+              "A doctor learns a patient is waiting without watching the dashboard.",
+              "Shipped. Sent only when staff have set the doctor's address; seeded doctors have none.",
+            ],
+            [
+              "Attendance: arrived and no-show recorded by staff",
+              "A clinic needs to know who came, without adding appointment states.",
+              "Shipped, as an append-only record. The appointment status stays booked or cancelled.",
             ],
           ],
         },

@@ -76,7 +76,7 @@ export const DECISIONS: readonly Decision[] = [
   {
     component: "Images",
     choice:
-      "Artifact Registry, with CircleCI pushing each image by digest and only the two newest versions kept",
+      "Artifact Registry, with CircleCI pushing each image by digest and only the serving image and the one before it kept",
     why: "A rollback needs the previous image, and the registry's free tier is small.",
   },
   {

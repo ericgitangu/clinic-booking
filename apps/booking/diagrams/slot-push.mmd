@@ -14,7 +14,7 @@ sequenceDiagram
   B->>L: subscribe (SSE)
   L-->>B: slot_taken
   B->>B: apply if seq is newer than the last and after the availability cursor
-  loop every 15 s while the tab is visible, and after every reconnect
+  loop every 60 s while the stream is live, and after every reconnect
     B->>A: GET availability
     A-->>B: slots and cursor
   end
