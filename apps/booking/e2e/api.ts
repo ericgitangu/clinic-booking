@@ -1,3 +1,5 @@
+import { ANCHOR_DAY } from "./support/anchor";
+
 // Finds bookable times through the real API (docker compose), so scenarios never hard-code a date:
 // weekends and closed days simply have no slots and are skipped.
 export const API = process.env.E2E_API_URL ?? "http://127.0.0.1:8080";
@@ -41,16 +43,8 @@ export function firstDoctor(): Promise<string> {
 // whatever else has been booked: the Tuesday n weeks after the first Tuesday that is at least ten
 // days out (the landing page's copy-paste steps book within the first week). If that Tuesday has
 // fewer than four free times, the next three days of the same week are tried.
-const isTuesday = (day: string) =>
-  new Date(`${day}T12:00:00Z`).getUTCDay() === 2;
-let firstTuesday: number | null = null;
 function weekStart(n: number): string {
-  if (firstTuesday === null) {
-    let d = 10;
-    while (!isTuesday(addDays(today(), d))) d++;
-    firstTuesday = d;
-  }
-  return addDays(today(), firstTuesday + 7 * n);
+  return addDays(ANCHOR_DAY, 7 * n);
 }
 
 // A doctor by position in the API's list. Specs use different doctors where they can, so what one

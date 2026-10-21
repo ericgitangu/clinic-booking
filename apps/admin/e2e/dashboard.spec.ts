@@ -1,7 +1,12 @@
 // The dashboard against the real API and database. Expected numbers are read from the real API
 // with a real signed assertion and compared with what the page shows; histories are the ones the
 // seeding really produced by booking, rescheduling and cancelling.
-import { addDays, lastDays, localDate } from "../src/lib/clinic-time";
+import {
+  addDays,
+  formatSlot,
+  lastDays,
+  localDate,
+} from "../src/lib/clinic-time";
 import { humanDate } from "../src/lib/clinic-time";
 import { formatLead, shareDelta } from "../src/lib/kpi-delta";
 import { bookOneStraightThroughTheApi } from "./support/booking";
@@ -437,6 +442,8 @@ test.describe("owner dashboard", () => {
   }) => {
     const page = await as("admin");
     await page.setViewportSize({ width: 1280, height: 900 });
+    // Taken before the page loads, and compared with no margin, the way the board decides.
+    const now = Date.now();
     await page.goto("/dashboard");
     await expect(page.getByRole("link", { name: /Day sheet/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Print" })).toBeVisible();
@@ -449,9 +456,7 @@ test.describe("owner dashboard", () => {
       `/internal/admin/appointments?status=booked&from=${today}&to=${addDays(today, 1)}&limit=100`,
       owner,
     );
-    const ahead = list.body.items.filter(
-      (a) => Date.parse(a.starts_at) > Date.now() + 60_000,
-    );
+    const ahead = list.body.items.filter((a) => Date.parse(a.starts_at) > now);
     const board = page.getByTestId("today-board");
     if (ahead.length > 0) {
       await expect(
@@ -848,23 +853,40 @@ test.describe("desk actions", () => {
   test("an admin books a patient into a free gap; the booking is real and audited", async ({
     as,
   }) => {
-    const gaps = await internal<{ items: unknown[] }>(
-      "GET",
-      "/internal/admin/ops/gaps?hours=48",
-      owner,
+    const gaps = await internal<{
+      items: {
+        doctor_id: string;
+        doctor_name: string;
+        starts_at: string;
+        ends_at: string;
+      }[];
+    }>("GET", "/internal/admin/ops/gaps?hours=48", owner);
+    // The soonest gap can start seconds from now and be in the past by the time the form is sent,
+    // so book the first gap that starts more than five minutes ahead. A gap is a run of
+    // back-to-back slots for one doctor, and the board shows each run by where it starts.
+    const cutoff = Date.now() + 5 * 60_000;
+    const target = gaps.body.items.find(
+      (g) =>
+        Date.parse(g.starts_at) > cutoff &&
+        !gaps.body.items.some(
+          (o) => o.doctor_id === g.doctor_id && o.ends_at === g.starts_at,
+        ),
     );
     test.skip(
-      gaps.body.items.length === 0,
-      "no free slot in the next 48 hours at this time of day",
+      target === undefined,
+      "no free slot more than five minutes ahead in the next 48 hours",
     );
     const name = `E2E Walk-in ${Date.now()}`;
     const page = await as("admin");
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/dashboard");
     await tap(
-      page.getByTestId("gap").first().getByRole("button", {
-        name: "Book on behalf",
-      }),
+      page
+        .getByTestId("gap")
+        .filter({ hasText: target!.doctor_name })
+        .filter({ hasText: formatSlot(target!.starts_at) })
+        .first()
+        .getByRole("button", { name: "Book on behalf" }),
     );
     const dialog = page.getByRole("dialog", { name: "Book for a patient" });
     const submit = dialog.getByRole("button", { name: "Book appointment" });

@@ -1,5 +1,6 @@
 // Books one more appointment straight through the public API, the way a patient's booking does.
 // It does not touch the admin app, so the admin app's cached metrics do not know about it.
+import { addDays } from "../../src/lib/clinic-time";
 import { publicApi } from "./stack";
 
 interface Slot {
@@ -39,4 +40,25 @@ export async function bookOneStraightThroughTheApi(
     if (booked.status === 201) return booked.body.id;
   }
   throw new Error("no free time to book");
+}
+
+/**
+ * A free time on the first day after `afterDate` that has at least `minSlots` of them, looking up
+ * to a week ahead. The doctor booked above works Monday to Friday, so the day after a Friday has
+ * nothing; a week always reaches a working day. Returns the second slot of that day, or undefined
+ * when the week is empty.
+ */
+export async function nextDayWithFreeTime(
+  doctorId: string,
+  afterDate: string,
+  minSlots = 2,
+): Promise<Slot | undefined> {
+  for (let n = 1; n <= 7; n++) {
+    const avail = await publicApi<{ slots: Slot[] }>(
+      "GET",
+      `/doctors/${doctorId}/availability?date=${addDays(afterDate, n)}`,
+    );
+    if (avail.body.slots.length >= minSlots) return avail.body.slots[1];
+  }
+  return undefined;
 }

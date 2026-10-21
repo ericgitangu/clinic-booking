@@ -387,22 +387,28 @@ test.describe("the Today figures and the free slots", () => {
     const page = await as("owner");
     await openDashboard(page);
     await tap(page.getByTestId("slots-open"));
-    await expect(page.getByTestId("slots-count")).toHaveAttribute(
-      "data-count",
-      String(gaps.body.items.length),
-    );
-    await expect(page.getByTestId("slots-list").locator("li")).toHaveCount(
-      gaps.body.items.length,
-    );
+    await expect(page.getByTestId("slots-count")).toBeVisible();
+    // The gap set shifts at every :00 and :30, so each try reads the API again and compares it
+    // with what the sheet shows at that moment.
+    const diff = async (doctor?: string) => {
+      const api = await internal<{ items: { doctor_id: string }[] }>(
+        "GET",
+        "/internal/admin/ops/gaps?hours=48",
+        owner,
+      );
+      const want = doctor
+        ? api.body.items.filter((g) => g.doctor_id === doctor).length
+        : api.body.items.length;
+      const count = await page
+        .getByTestId("slots-count")
+        .getAttribute("data-count");
+      const rows = await page.getByTestId("slots-list").locator("li").count();
+      return { count: Number(count) - want, rows: rows - want };
+    };
+    await expect.poll(() => diff()).toEqual({ count: 0, rows: 0 });
     const first = gaps.body.items[0]!.doctor_id;
     await page.getByLabel("Doctor").selectOption(first);
-    const expected = gaps.body.items.filter(
-      (g) => g.doctor_id === first,
-    ).length;
-    await expect(page.getByTestId("slots-count")).toHaveAttribute(
-      "data-count",
-      String(expected),
-    );
+    await expect.poll(() => diff(first)).toEqual({ count: 0, rows: 0 });
     await page.keyboard.press("Escape");
   });
 });

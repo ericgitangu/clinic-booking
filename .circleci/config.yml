@@ -155,15 +155,19 @@ jobs:
           name: unit + integration + migrations + race + control
           command: |
             cd backend
+            # All four runs happen whatever the others do, so one red run does not hide the rest;
+            # the step still fails at the end if any of them failed.
+            rc=0
             uv run pytest tests/unit tests/integration tests/migrations \
               -m "not race and not control" \
               --junitxml=test-results/pytest/results.xml \
-              --cov=app --cov-report=xml --cov-fail-under=85
+              --cov=app --cov-report=xml --cov-fail-under=85 || rc=1
             # the pure domain is held to 95% by its own unit tests alone (two decimals: see pyproject), so
             # integration coverage cannot stand in for them
-            uv run pytest tests/unit --cov=app/domain --cov-report=term --cov-fail-under=95
-            uv run pytest -m race -rA
-            uv run pytest -m control -rA
+            uv run pytest tests/unit --cov=app/domain --cov-report=term --cov-fail-under=95 || rc=1
+            uv run pytest -m race -rA --junitxml=test-results/pytest/race.xml || rc=1
+            uv run pytest -m control -rA --junitxml=test-results/pytest/control.xml || rc=1
+            exit $rc
       - store_test_results:
           path: backend/test-results
       - store_artifacts:
@@ -219,8 +223,11 @@ jobs:
           name: gosec and govulncheck (any finding fails)
           command: |
             cd services/realtime
-            "$(go env GOPATH)/bin/gosec" -quiet ./...
-            "$(go env GOPATH)/bin/govulncheck" ./...
+            # both run whatever the other says, then the step fails if either did
+            rc=0
+            "$(go env GOPATH)/bin/gosec" -quiet ./... || rc=1
+            "$(go env GOPATH)/bin/govulncheck" ./... || rc=1
+            exit $rc
       - run:
           name: go test -race against the real database and API
           command: |
@@ -754,7 +761,7 @@ jobs:
             # the pinned Lighthouse CI runner has its own lockfile and so its own audit
             pnpm --dir scripts/ci/lighthouse install --frozen-lockfile --ignore-scripts
             pnpm --dir scripts/ci/lighthouse audit --audit-level high
-            pnpm -r --if-present test
+            pnpm -r --no-bail --if-present test
             pnpm -r --if-present build
             # Both built apps, started with no sign-in settings, must answer 503, never 500.
             bash scripts/ci/not_configured_smoke.sh
@@ -909,7 +916,10 @@ jobs:
             # SHELL_E2E=1 adds the test-only error page that the shell specs open; real builds do not have it
             SHELL_E2E=1 pnpm -C apps/admin build
             pnpm -C apps/admin exec playwright install --with-deps chromium
-            E2E_API_URL=http://127.0.0.1:8080 E2E_REALTIME_URL=http://127.0.0.1:8090 PW_BUNDLED=1 pnpm -C apps/admin test:e2e
+            # --no-deps: a failed project must not stop the ones after it, so one run lists every failure.
+            # The order the dependency chain gives is kept by the check below, which fails if it differs.
+            bash scripts/ci/check_project_order.sh
+            E2E_API_URL=http://127.0.0.1:8080 E2E_REALTIME_URL=http://127.0.0.1:8090 PW_BUNDLED=1 pnpm -C apps/admin test:e2e --no-deps
       # Stored right after the scenarios and whatever their result: a failed step skips every later
       # step that is not `when: always`. Traces are kept for failed scenarios only (playwright.config.ts).
       - store_artifacts:

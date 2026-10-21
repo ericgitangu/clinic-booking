@@ -34,6 +34,9 @@ function runPast(
   window: boolean,
   anyStatus: boolean,
 ): void {
+  // Three back at most keeps the visit inside the two-hour desk window. Searching only two back left
+  // too few free doctor and half-hour pairs once earlier specs had taken theirs; specs that check the
+  // marks ask for two back or less themselves, so the window does not close while they look.
   const hi = window ? 3 : 8;
   const base = `(date_trunc('hour', now())
         + CASE WHEN extract(minute FROM now()) >= 30 THEN interval '30 minutes' ELSE interval '0' END)`;

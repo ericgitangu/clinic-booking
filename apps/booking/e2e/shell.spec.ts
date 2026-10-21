@@ -335,6 +335,11 @@ test.describe("the skip link", () => {
       browser,
     }) => {
       const { page, context } = await open(browser, c, DESKTOP);
+      // The error screen is drawn on the server and the client then re-renders it as it recovers from
+      // the throw; a Tab pressed before that settles can land on a node that is replaced. Wait for the
+      // load event and the content landmark. Not networkidle: pages that poll never go idle.
+      await page.waitForLoadState("load");
+      await expect(page.locator("#main")).toBeVisible();
       await page.keyboard.press("Tab");
       const skip = page.getByRole("link", { name: "Skip to content" });
       await expect(skip).toBeFocused();
