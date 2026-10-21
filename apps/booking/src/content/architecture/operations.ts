@@ -786,7 +786,7 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
       blocks: [
         {
           t: "p",
-          text: "Everything runs on free plans with no card on file except Google Cloud, which sits on a shared billing account. The limits below are the ones the code or config enforces, not the vendor's marketing page. The total bill is about $0.35 a month on the shared account, under a $0.50 ceiling I set.",
+          text: "Everything runs on free plans with no card on file except Google Cloud, which sits on a shared billing account. The limits below are the ones the code or config enforces, not the vendor's marketing page. The total bill is about $0.41 a month on the shared account, under a $0.50 ceiling I set.",
         },
         {
           t: "table",
@@ -1028,7 +1028,7 @@ DATABASE_URL=... uv run python -m app.scripts.seed_demo [--today YYYY-MM-DD]`,
               "Cloud Run IAM-only behind a Vercel proxy, in `us-east4` beside Neon in `aws-us-east-1` ([hosting and cost](/decisions#hosting-and-cost))",
               "Cloud Run in `africa-south1` or `europe-west3` with Neon in Frankfurt; Cloud SQL",
               "My $0 rule: egress to Kenya is billed from byte 0 outside North America, and each booking makes several database round trips.",
-              "A longer hop for Kenyan users (estimated, not measured), and about $0.35 a month on the shared billing account.",
+              "A longer hop for Kenyan users (estimated, not measured), and about $0.41 a month on the shared billing account.",
             ],
             [
               "Two database roles: an owner for migrations, an app role with no DDL rights ([decision 15](#decision-15))",

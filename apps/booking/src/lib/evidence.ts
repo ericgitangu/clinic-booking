@@ -169,7 +169,7 @@ export const TILES = [
   },
   {
     title: "$0, with one stated exception",
-    body: "Everything runs inside free tiers. The project shares a billing account whose other projects already used up two free tiers, so it bills about $0.35 a month against a $0.50 ceiling. The README says so.",
+    body: "Everything runs inside free tiers. The project shares a billing account whose other projects already used up two free tiers, so it bills about $0.41 a month against a $0.50 ceiling. The README says so.",
     decision: "hosting-and-cost",
     label: "Read the hosting and cost decision",
     extra: {
