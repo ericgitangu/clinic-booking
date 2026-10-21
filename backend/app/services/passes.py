@@ -177,6 +177,7 @@ async def accept(
         midnight = datetime.combine(now.date() + timedelta(days=1), time.min, tzinfo=UTC)
         raise RateLimited(max(int((midnight - now).total_seconds()), 1), "Too many attempts today.")
     async with session.begin():
+        await repo.lock_address(session, address)
         # The row lock queues concurrent accepts of one pass, so the last seat goes to one only.
         row = await repo.get_by_hash(session, hash_token(token))
         if row is None or row["revoked_at"] is not None or row["expires_at"] <= now:
@@ -191,6 +192,9 @@ async def accept(
             # A pass never undoes a revoke: only the owner can, from the Access page.
             raise PassInvalid()
         used = await repo.count_uses(session, row["id"])
+        if used >= row["max_uses"]:
+            # Checked before the already-staff shortcut: a used-up pass answers everyone alike.
+            raise PassInvalid()
         if existing is not None:
             # Already staff: opening the link twice is harmless. No seat, nothing written.
             return PassAccepted(
@@ -200,8 +204,6 @@ async def accept(
                 use=used,
                 of=row["max_uses"],
             )
-        if used >= row["max_uses"]:
-            raise PassInvalid()
         granted = await access_repo.upsert(
             session, email=address, role=row["role"], actor=row["created_by"], now=now
         )

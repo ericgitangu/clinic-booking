@@ -224,6 +224,14 @@ async def test_existing_staff_on_a_dead_pass_get_the_404(env: Env) -> None:
     assert resp.status_code == 404 and resp.json()["code"] == "PASS_INVALID"
 
 
+async def test_existing_staff_on_a_used_up_pass_get_the_404(env: Env) -> None:
+    made = await make_pass(env, max_uses=1)
+    assert (await accept(env, made["token"], NEW)).status_code == 200
+    # NEW now holds the last seat, and is already staff: the used-up pass still answers 404.
+    resp = await accept(env, made["token"], NEW)
+    assert resp.status_code == 404 and resp.json()["code"] == "PASS_INVALID"
+
+
 async def test_a_pass_with_no_seats_left_is_refused(env: Env) -> None:
     made = await make_pass(env, max_uses=1)
     assert (await accept(env, made["token"], NEW)).status_code == 200

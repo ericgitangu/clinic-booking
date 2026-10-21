@@ -23,7 +23,7 @@ PEOPLE = 12
 
 
 @pytest_asyncio.fixture
-async def other_instances(env: Env) -> AsyncIterator[list[Env]]:  # noqa: F811
+async def other_instances(env: Env) -> AsyncIterator[list[Env]]:  # noqa: F811  # shared fixture
     """Two more API instances over the same database, each with its own connection pool."""
     clients: list[httpx.AsyncClient] = []
     out: list[Env] = []
@@ -55,7 +55,7 @@ async def _accept(env: Env, token: str, email: str) -> int:
 
 @pytest.mark.parametrize("seats", [1, 3])
 async def test_concurrent_accepts_never_take_more_seats_than_there_are(
-    env: Env,  # noqa: F811
+    env: Env,  # noqa: F811  # shared fixture
     other_instances: list[Env],
     owner_conn: asyncpg.Connection,
     seats: int,
@@ -75,7 +75,7 @@ async def test_concurrent_accepts_never_take_more_seats_than_there_are(
 
 
 async def test_the_same_person_racing_themselves_takes_one_seat(
-    env: Env,  # noqa: F811
+    env: Env,  # noqa: F811  # shared fixture
     other_instances: list[Env],
     owner_conn: asyncpg.Connection,
 ) -> None:
@@ -87,3 +87,22 @@ async def test_the_same_person_racing_themselves_takes_one_seat(
     )
     assert set(codes) == {200}
     assert await owner_conn.fetchval("SELECT count(*) FROM staff_pass_uses") == 1
+
+
+async def test_one_person_on_two_passes_at_once_takes_one_seat_in_all(
+    env: Env,  # noqa: F811  # shared fixture
+    other_instances: list[Env],
+    owner_conn: asyncpg.Connection,
+) -> None:
+    first = (await env.req("POST", "/internal/admin/passes", body={"max_uses": 3})).json()["token"]
+    second = (await env.req("POST", "/internal/admin/passes", body={"max_uses": 3})).json()["token"]
+    for n in range(5):
+        who = f"both{n}@example.org"
+        codes = await asyncio.gather(
+            _accept(env, first, who), _accept(other_instances[0], second, who)
+        )
+        assert set(codes) == {200}, codes
+        uses = await owner_conn.fetchval(
+            "SELECT count(*) FROM staff_pass_uses WHERE email = $1", who
+        )
+        assert uses == 1, who

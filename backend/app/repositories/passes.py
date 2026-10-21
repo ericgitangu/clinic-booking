@@ -83,6 +83,13 @@ async def lock_creator(session: AsyncSession, actor: str) -> None:
     await session.execute(_LOCK_CREATOR, {"k": f"pass:{actor}"})
 
 
+async def lock_address(session: AsyncSession, address: str) -> None:
+    """Serialises accepts by one address across passes: the staff_access row may not exist yet,
+    so there is nothing else to lock, and two passes could otherwise both seat the same person
+    or one could clear a revoke the other raced past."""
+    await session.execute(_LOCK_CREATOR, {"k": f"access:{address}"})
+
+
 async def recent_passes(
     session: AsyncSession, *, actor: str, since: datetime
 ) -> tuple[int, datetime | None]:
