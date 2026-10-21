@@ -48,7 +48,7 @@ export const DIAGRAMS: Record<DiagramId, Diagram> = {
     width: 1359,
     height: 784,
     label:
-      "Sequence of a booked slot reaching other open pages. The API writes the appointment and its event in one transaction, relays the event to Ably, and advances its cursor after Ably accepts it. Another patient's browser gets a short-lived subscribe-only token, subscribes over server-sent events and applies slot_taken messages. It also polls availability every 15 seconds while the tab is visible.",
+      "Sequence of a booked slot reaching other open pages. The API writes the appointment and its event in one transaction, relays the event to Ably, and advances its cursor after Ably accepts it. Another patient's browser gets a short-lived subscribe-only token, subscribes over server-sent events and applies slot_taken messages. It also polls availability every 60 seconds while the stream is live, and every 15 seconds without it, while the tab is visible.",
   },
   "release-pipeline": {
     id: "release-pipeline",

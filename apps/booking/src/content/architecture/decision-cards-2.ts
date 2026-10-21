@@ -1,6 +1,6 @@
 import type { DecisionCard } from "./types";
 
-// Decision cards for records 0013 to 0024. Each fact was checked against main.
+// Decision cards for decisions 13 to 24. Each fact was checked against main.
 
 export const DECISION_CARDS_2: readonly DecisionCard[] = [
   {
@@ -48,7 +48,7 @@ export const DECISION_CARDS_2: readonly DecisionCard[] = [
     status: "Accepted, built",
     decision:
       "CI runs on CircleCI and signs in to Google Cloud with a short-lived OIDC token, so no service account key exists anywhere. A merge to `main` runs migrations, deploys the API as a no-traffic revision, smoke tests it, and only then moves traffic. If the smoke fails, traffic never moves.",
-    cost: "The deploy job is tied to CircleCI contexts that I have to keep restricted to `main`, because anyone who can push a branch can edit the config file. Releases take about ten minutes, which is an estimate. The Vercel token is long-lived, though scoped to one project.",
+    cost: "The deploy job is tied to CircleCI contexts that I have to keep restricted to `main`, because anyone who can push a branch can edit the config file. A release on `main` takes about 28 minutes, measured on 2026-10-20. The Vercel token is long-lived, though scoped to one project.",
     revisit:
       "If I add a staging environment. That needs an approval job, a second identity condition and its own context.",
     decisionsPage: ["hosting-and-cost"],
@@ -96,12 +96,11 @@ export const DECISION_CARDS_2: readonly DecisionCard[] = [
     number: "20",
     title: "Clean git history, disclosure in one place",
     status:
-      "Accepted, partly done. The `v1.0.0` tag exists; the README disclosure section is still mine to finish.",
+      "Accepted, done. `v1.1.0` is the submission tag (`v1.0.0` is an earlier one), and the README disclosure section is written.",
     decision:
       "Commits follow Conventional Commits, one pull request per change, squash-merged, with no tooling trailers on commits I write. How the work was made is disclosed in a single README section, not scattered through commit messages. Local tooling files stay out of the repository through a local exclude file.",
     cost: "Keeping that disclosure current while I work is a discipline cost. Dependabot's own commits keep their bot lines; I left them. I rewrote commit messages once, only to replace an old numbering scheme with decision numbers, and no file changed. The `v1.0.0` tag points at c9e1119, the same tree it pointed at before.",
-    revisit:
-      "Nothing is planned. I finish the README section before submission.",
+    revisit: "Nothing is planned.",
   },
   {
     id: "decision-21",

@@ -99,7 +99,7 @@ export const DECISIONS: readonly Decision[] = [
     decision:
       "The API runs on Cloud Run in us-east4, next to the Neon database. Only the web apps' Google identities can call it. I stay inside free tiers wherever I can, and a script checks the limits on every release.",
     gaveUp:
-      "I estimate 100 to 150 ms more per warm request for people in Kenya than a Frankfurt layout would add. I have not measured that. The shared billing account's free tiers were already used up, so this project costs about $0.35 a month, under a $0.50 ceiling I set.",
+      "I estimate 100 to 150 ms more per warm request for people in Kenya than a Frankfurt layout would add. I have not measured that. The shared billing account's free tiers were already used up, so this project costs about $0.41 a month, under a $0.50 ceiling I set.",
     why: "The API and the database should be close, because each booking makes several queries. With no public address on Cloud Run, there is one front door to watch.",
     revisit:
       "When latency is a real complaint, or real traffic puts the free tiers at risk.",
