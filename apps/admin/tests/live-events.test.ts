@@ -313,6 +313,69 @@ describe("staff annotations and actions", () => {
     expect(sentence(v, undefined, "viewer")).toBe("Invite sent");
   });
 
+  it("describes reviewer passes by who acted, for owners and admins only", () => {
+    const base = {
+      doctor_id: null,
+      starts_at: null,
+      delay_minutes: null,
+    };
+    const staffPass = (
+      kind: string,
+      seq: string,
+      actor: string,
+      role: string,
+    ) =>
+      parseLiveEvent(
+        JSON.stringify({
+          ...base,
+          kind,
+          seq,
+          appointment_id: null,
+          patient_name: null,
+          actor_email: actor,
+          actor_role: role,
+          reason: "Reviewer pass",
+          invite_email: null,
+          invite_role: null,
+        }),
+        "admin",
+      )!;
+    const made = staffPass(
+      "pass_created",
+      "865.36",
+      "owner@clinic.example",
+      "owner",
+    );
+    const revoked = staffPass(
+      "pass_revoked",
+      "866.37",
+      "owner@clinic.example",
+      "owner",
+    );
+    const used = staffPass(
+      "pass_accepted",
+      "867.38",
+      "rev@example.org",
+      "admin",
+    );
+    expect(sentence(made, undefined, "admin")).toBe(
+      "Reviewer pass made by owner@clinic.example",
+    );
+    expect(sentence(revoked, undefined, "admin")).toBe(
+      "Reviewer pass revoked by owner@clinic.example",
+    );
+    expect(sentence(used, undefined, "admin")).toBe(
+      "Reviewer pass used by rev@example.org (admin)",
+    );
+    for (const ev of [made, revoked, used])
+      expect(isAboutAppointment(ev)).toBe(false);
+    const v = parseLiveEvent(
+      JSON.stringify({ ...base, kind: "pass_accepted", seq: "867.38" }),
+      "viewer",
+    )!;
+    expect(sentence(v, undefined, "viewer")).toBe("Reviewer pass used");
+  });
+
   it("refuses a viewer action carrying any staff field, and a staff action missing them", () => {
     for (const k of ["reason", "actor_email", "invite_email", "patient_name"]) {
       expect(

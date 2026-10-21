@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   isDemoRecipient,
   sendInviteEmail,
+  sendPassNotice,
   sendStaffEmail,
   staffBooked,
   STAFF_FROM,
@@ -611,5 +612,47 @@ describe("sendInviteEmail", () => {
     expect(out).not.toContain(TOKEN_LIKE);
     expect(out).not.toContain("/invite/");
     expect(out).not.toContain("new.admin");
+  });
+});
+
+describe("sendPassNotice", () => {
+  const PASS = "5d2f7e1a-3c4b-4f60-9a8e-1b7c0d9e2f33";
+  const notice = (
+    over: Partial<Parameters<typeof sendPassNotice>[0]> = {},
+  ): Parameters<typeof sendPassNotice>[0] => ({
+    caller,
+    passId: PASS,
+    recipient: 0,
+    to: "owner@clinic.co.ke",
+    email: "reviewer@mailbox.co.ke",
+    role: "admin",
+    use: 2,
+    of: 5,
+    ...over,
+  });
+
+  it("reserves and sends keyed on the pass, the seat and the recipient, and marks nothing", async () => {
+    const r = await sendPassNotice(notice());
+    expect(r).toEqual({
+      auditId: PASS,
+      outcome: "sent",
+      sent: true,
+      notified: false,
+    });
+    expect(resendHits).toHaveLength(1);
+    expect(resendHits[0]!.headers["idempotency-key"]).toBe(`pass/${PASS}/2/0`);
+    expect(apiHits.map((h) => h.url)).toEqual([
+      "/internal/emails/reserve?purpose=other",
+    ]);
+    const body = JSON.parse(resendHits[0]!.body);
+    expect(body.to).toBe("owner@clinic.co.ke");
+    expect(body.text).toContain("reviewer@mailbox.co.ke");
+  });
+
+  it("a demo owner address is refused and nothing is reserved", async () => {
+    const r = await sendPassNotice(notice({ to: "owner@a.example.org" }));
+    expect(r.outcome).toBe("demo-recipient");
+    expect(resendHits).toHaveLength(0);
+    expect(apiHits).toHaveLength(0);
   });
 });

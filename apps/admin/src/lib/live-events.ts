@@ -30,7 +30,10 @@ export type ActionKind =
   | "running_late"
   | "invite_created"
   | "invite_revoked"
-  | "invite_accepted";
+  | "invite_accepted"
+  | "pass_created"
+  | "pass_revoked"
+  | "pass_accepted";
 export type LiveKind = AppointmentKind | ActionKind;
 
 export interface LiveEvent {
@@ -229,6 +232,9 @@ const VERB: Record<LiveKind, string> = {
   invite_created: "Invite sent",
   invite_revoked: "Invite revoked",
   invite_accepted: "Invite accepted",
+  pass_created: "Reviewer pass made",
+  pass_revoked: "Reviewer pass revoked",
+  pass_accepted: "Reviewer pass used",
 };
 
 export function verb(kind: LiveKind): string {
@@ -247,9 +253,15 @@ const INVITES: readonly LiveKind[] = [
   "invite_accepted",
 ];
 
+const PASSES: readonly LiveKind[] = [
+  "pass_created",
+  "pass_revoked",
+  "pass_accepted",
+];
+
 /** Whether the event is about one appointment (and so belongs on that appointment's page). */
 export function isAboutAppointment(ev: LiveEvent): boolean {
-  return !INVITES.includes(ev.kind);
+  return !INVITES.includes(ev.kind) && !PASSES.includes(ev.kind);
 }
 
 /**
@@ -283,6 +295,20 @@ function inviteLine(ev: LiveEvent, people: boolean): string {
   }
 }
 
+// A pass is not tied to an address: the actor is the owner who made or revoked it, or the person
+// who used it (the gateway puts the address of whoever joined in actor_email).
+function passLine(ev: LiveEvent, people: boolean): string {
+  if (!people || !ev.actorEmail) return verb(ev.kind);
+  switch (ev.kind) {
+    case "pass_created":
+      return `Reviewer pass made by ${ev.actorEmail}`;
+    case "pass_revoked":
+      return `Reviewer pass revoked by ${ev.actorEmail}`;
+    default:
+      return `Reviewer pass used by ${ev.actorEmail}${ev.actorRole ? ` (${ev.actorRole})` : ""}`;
+  }
+}
+
 /**
  * For a screen reader and the list: what happened, who (if the role may know) and when. Owners
  * and admins read "Vetoed by <actor>: <reason>"; a viewer reads "Vetoed" and the time.
@@ -294,6 +320,7 @@ export function describe(
 ): string {
   const people = canSeePeople(role);
   if (INVITES.includes(ev.kind)) return inviteLine(ev, people);
+  if (PASSES.includes(ev.kind)) return passLine(ev, people);
 
   const patient = people && ev.patientName ? `${ev.patientName}, ` : "";
   const doc = doctorName ? ` with ${doctorName}` : "";

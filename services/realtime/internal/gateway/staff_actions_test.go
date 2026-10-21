@@ -22,6 +22,10 @@ import (
 
 var apiAdmin = testenv.Staffer{Email: "api-admin@gateway-tests.org", Role: "admin"}
 
+// apiOwner is an owner address of the API under test: the one ADMIN_EMAILS holds in the compose
+// stack and in CI. Owners are configuration, so no row grants it.
+var apiOwner = testenv.Staffer{Email: "owner@clinic.example", Role: "owner"}
+
 // untilWithin bounds each wait for an event: the gateway polls every 100 ms in these tests.
 const untilWithin = 5 * time.Second
 
@@ -372,6 +376,58 @@ func TestInvitationsStreamTheAddressToStaffOnly(t *testing.T) {
 	vf, _ = viewer.until(t, "invite_accepted", nil)
 	valid(t, viewerSchema, vf.Data)
 	noneOf(t, vf, invitee, apiAdmin.Email)
+}
+
+// Reviewer passes made, used and revoked through the API: the owner sees who made it and who
+// joined; a viewer sees that it happened and no address.
+func TestReviewerPassesStreamTheAddressToStaffOnly(t *testing.T) {
+	h := start(t, twoStreams)
+	staffSchema := compile(t, "staff-action.v1.schema.json")
+	viewerSchema := compile(t, "admin-action.v1.schema.json")
+	api := h.env.NewAPI(t)
+	joiner := fmt.Sprintf("joiner-%d@gateway-tests.org", time.Now().UnixNano())
+	t.Cleanup(func() {
+		testenv.Exec(t, h.env, `UPDATE staff_access SET revoked_at = now() WHERE email = $1`, joiner)
+	})
+
+	owner := h.hello(asOwner, q())
+	viewer := h.hello(asView, q())
+	h.grant(asView)
+	byMaker := func(m map[string]any) bool { return m["actor_email"] == apiOwner.Email }
+	byJoiner := func(m map[string]any) bool { return m["actor_email"] == joiner }
+
+	var made struct {
+		ID    string `json:"id"`
+		Token string `json:"token"`
+	}
+	api.Staff(apiOwner, http.MethodPost, "/internal/admin/passes",
+		map[string]any{"role": "viewer", "max_uses": 2}, http.StatusCreated, &made)
+	f, m := owner.until(t, "pass_created", byMaker)
+	valid(t, staffSchema, f.Data)
+	if str(m, "actor_role") != "owner" || m["appointment_id"] != nil {
+		t.Fatalf("pass_created staff shape = %s", f.Data)
+	}
+	vf, _ := viewer.until(t, "pass_created", nil)
+	valid(t, viewerSchema, vf.Data)
+	noneOf(t, vf, apiOwner.Email)
+
+	api.Staff(testenv.Staffer{Email: joiner, Role: "none"}, http.MethodPost, "/internal/admin/passes/accept",
+		map[string]any{"token": made.Token}, http.StatusOK, nil)
+	f, m = owner.until(t, "pass_accepted", byJoiner)
+	valid(t, staffSchema, f.Data)
+	if str(m, "actor_role") != "viewer" {
+		t.Fatalf("pass_accepted staff shape = %s", f.Data)
+	}
+	vf, _ = viewer.until(t, "pass_accepted", nil)
+	valid(t, viewerSchema, vf.Data)
+	noneOf(t, vf, joiner, apiOwner.Email)
+
+	api.Staff(apiOwner, http.MethodDelete, "/internal/admin/passes/"+made.ID, nil, http.StatusOK, nil)
+	f, _ = owner.until(t, "pass_revoked", byMaker)
+	valid(t, staffSchema, f.Data)
+	vf, _ = viewer.until(t, "pass_revoked", nil)
+	valid(t, viewerSchema, vf.Data)
+	noneOf(t, vf, joiner, apiOwner.Email)
 }
 
 // The appointment filter: only that appointment's events, a strict UUID, and the same assertion

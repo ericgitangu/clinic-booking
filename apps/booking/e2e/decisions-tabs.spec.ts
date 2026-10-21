@@ -191,16 +191,16 @@ test("the decision record has a card for every decision with four parts", async 
 }) => {
   await page.goto("/decisions#record");
   const cards = page.locator("#record details");
-  await expect(cards).toHaveCount(34);
+  await expect(cards).toHaveCount(35);
   await page.getByRole("button", { name: "Open all cards" }).click();
-  await expect(page.locator("#record details[open]")).toHaveCount(34);
+  await expect(page.locator("#record details[open]")).toHaveCount(35);
   for (const label of [
     "What I decided",
     "What it cost",
     "When I would revisit it",
   ])
     await expect(page.locator("#record dt", { hasText: label })).toHaveCount(
-      34,
+      35,
     );
   await page.getByRole("button", { name: "Close all cards" }).click();
   await expect(page.locator("#record details[open]")).toHaveCount(0);

@@ -83,6 +83,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(staff.appointments_router)
     app.include_router(staff.doctors_router)
     app.include_router(staff.invites_router)
+    app.include_router(staff.passes_router)
     app.include_router(staff.audit_router)
     app.include_router(doctor_notice.router)
     app.include_router(me.router)

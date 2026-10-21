@@ -1,10 +1,10 @@
-// The cards for decisions 25 to 34. Every concrete figure here was checked against the code
+// The cards for decisions 25 to 35. Every concrete figure here was checked against the code
 // on main (config defaults, the CI config, the migrations, the apps). Where a card describes more
 // than main has, the card says what main has.
 import type { DecisionCard } from "./types";
 
 export const DECISION_INTRO =
-  "Decisions are numbered 1 to 34 in the order I made them.";
+  "Decisions are numbered 1 to 35 in the order I made them.";
 
 export const DECISION_STATUS_NOTE =
   "Some were later changed by a newer one; the status line on each card says which, and says what main actually has.";
@@ -140,6 +140,18 @@ export const DECISION_CARDS_3: readonly DecisionCard[] = [
     cost: "The earlier test patients are still in the database, only excluded from every admin figure, so a raw count of patients will not match the dashboard. The backfills match on names, which is a heuristic: a real patient who typed a smoke-style name through the open API could be marked by a future backfill of that shape. Slot availability still counts synthetic bookings, on purpose. The public smoke no longer exercises the write path on the public URL. I do not purge: the runtime role cannot delete, and I did not want a pipeline able to.",
     revisit:
       "Any real patient data, since the name-based backfills must not run again then. Also a second writer to production that needs the same door, which gets its own identity, or a decision to purge, which means a dry run first.",
+    related: ["decision-33"],
+  },
+  {
+    id: "decision-35",
+    number: "35",
+    title: "A reviewer pass: one link that makes any Google account an admin",
+    status: "Accepted, built for the review",
+    decision:
+      "The owner can make a pass: a link that any verified Google account can accept to become admin, or viewer, for a set number of people and days (5 and 14 by default, at most 10 and 30). I added it so the people reviewing this can open the dashboard from the submission email with one click, instead of waiting for me to invite their address. Only a hash of the link's token is stored. The page needs a Google sign-in and a press of Accept, so a mail scanner that opens the link uses nothing. Every acceptance writes an audit row and emails me, and revoking the pass stops it at once.",
+    cost: "Unlike an invite, the link is not tied to an address: whoever holds it gets in, up to the limit, so a forwarded email is a forwarded key. An admin sees patients' full names, phones and emails and can change bookings. People who joined keep their access after the pass ends or is revoked, until I revoke them one by one. A pass never reopens access I revoked.",
+    revisit:
+      "Real patient data, a second clinic, or a pass used by someone I did not send it to. Then passes go and access is by invite only.",
     related: ["decision-33"],
   },
 ];

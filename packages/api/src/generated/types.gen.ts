@@ -106,7 +106,7 @@ export type AdminActionEvent = {
     /**
      * Kind
      */
-    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted';
+    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted' | 'pass_created' | 'pass_revoked' | 'pass_accepted';
     /**
      * Seq
      *
@@ -395,7 +395,7 @@ export type AuditEntry = {
     /**
      * Action
      */
-    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke' | 'invite_accept' | 'doctor_email';
+    action: 'book' | 'reschedule' | 'cancel' | 'veto' | 'unlock' | 'arrived' | 'no_show' | 'reminder_now' | 'running_late' | 'invite_create' | 'invite_revoke' | 'invite_accept' | 'doctor_email' | 'pass_create' | 'pass_revoke' | 'pass_accept';
     /**
      * Actor Email
      */
@@ -1648,6 +1648,256 @@ export type NotifyResult = {
 };
 
 /**
+ * Pass
+ *
+ * Never carries the token or its hash.
+ */
+export type Pass = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Max Uses
+     */
+    max_uses: number;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'active' | 'expired' | 'used_up' | 'revoked';
+    /**
+     * Used
+     */
+    used: number;
+    /**
+     * Uses
+     */
+    uses: Array<PassUse>;
+};
+
+/**
+ * PassAccepted
+ *
+ * The caller's access entry, and what the accept did. ``joined`` is false for someone who
+ * already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+ * after this call, so the owner's notice can say which person of how many this was.
+ */
+export type PassAccepted = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Granted At
+     */
+    granted_at: string | null;
+    /**
+     * Granted By
+     */
+    granted_by: string;
+    /**
+     * Joined
+     */
+    joined: boolean;
+    /**
+     * Of
+     */
+    of: number;
+    /**
+     * Pass Id
+     */
+    pass_id: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'owner' | 'admin' | 'viewer';
+    /**
+     * Source
+     */
+    source: 'env' | 'db';
+    /**
+     * Use
+     */
+    use: number;
+};
+
+/**
+ * PassCreated
+ *
+ * Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it
+ * is not stored (only its SHA-256 is), not logged and cannot be read again. Anyone who holds
+ * the link can take the role, until it expires or ``max_uses`` people have.
+ */
+export type PassCreated = {
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Max Uses
+     */
+    max_uses: number;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'active' | 'expired' | 'used_up' | 'revoked';
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Used
+     */
+    used: number;
+    /**
+     * Uses
+     */
+    uses: Array<PassUse>;
+};
+
+/**
+ * PassList
+ */
+export type PassList = {
+    /**
+     * Items
+     */
+    items: Array<Pass>;
+};
+
+/**
+ * PassRequest
+ *
+ * A reviewer pass: ``max_uses`` people may take ``role`` with it, for ``days`` days.
+ */
+export type PassRequest = {
+    /**
+     * Days
+     */
+    days?: number;
+    /**
+     * Max Uses
+     */
+    max_uses?: number;
+    /**
+     * Role
+     */
+    role?: 'admin' | 'viewer';
+};
+
+/**
+ * PassRevoked
+ */
+export type PassRevoked = {
+    /**
+     * Audit Id
+     */
+    audit_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Created By
+     */
+    created_by: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Max Uses
+     */
+    max_uses: number;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'admin' | 'viewer';
+    /**
+     * Status
+     */
+    status: 'active' | 'expired' | 'used_up' | 'revoked';
+    /**
+     * Used
+     */
+    used: number;
+    /**
+     * Uses
+     */
+    uses: Array<PassUse>;
+};
+
+/**
+ * PassUse
+ */
+export type PassUse = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Used At
+     */
+    used_at: string;
+};
+
+/**
  * Patient
  */
 export type Patient = {
@@ -1757,7 +2007,7 @@ export type Problem = {
 /**
  * ProblemCode
  */
-export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'ASSERTION_REPLAYED' | 'ROLE_ESCALATION' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'APPOINTMENT_LOCKED' | 'ATTENDANCE_WINDOW_CLOSED' | 'NOTHING_TO_VETO' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'INVITE_INVALID' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
+export type ProblemCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'ASSERTION_REPLAYED' | 'ROLE_ESCALATION' | 'CLIENT_ADDRESS_UNKNOWN' | 'VALIDATION_ERROR' | 'TIMEZONE_REQUIRED' | 'UNKNOWN_DOCTOR' | 'UNKNOWN_PATIENT' | 'SLOT_IN_PAST' | 'BOOKING_TOO_SOON' | 'DATE_OUT_OF_RANGE' | 'SLOT_MISALIGNED' | 'OUTSIDE_WORKING_HOURS' | 'IDEMPOTENCY_KEY_REUSED' | 'SLOT_TAKEN' | 'PATIENT_DOUBLE_BOOKED' | 'APPOINTMENT_ALREADY_CANCELLED' | 'CHANGE_TOO_LATE' | 'APPOINTMENT_ALREADY_STARTED' | 'PATIENT_PHONE_EXISTS' | 'CONCURRENT_UPDATE' | 'RATE_LIMITED' | 'IDEMPOTENCY_KEY_CONSUMED' | 'APPOINTMENT_LOCKED' | 'ATTENDANCE_WINDOW_CLOSED' | 'NOTHING_TO_VETO' | 'ACCESS_EXISTS' | 'OWNER_PROTECTED' | 'INVITE_INVALID' | 'PASS_INVALID' | 'ACCESS_NOT_FOUND' | 'DOCTOR_NOT_FOUND' | 'PATIENT_NOT_FOUND' | 'APPOINTMENT_NOT_FOUND' | 'PROBLEM_NOT_FOUND' | 'NOT_FOUND' | 'METHOD_NOT_ALLOWED' | 'REALTIME_UNAVAILABLE' | 'DB_UNAVAILABLE' | 'INTERNAL_ERROR';
 
 /**
  * ProblemEntry
@@ -2082,7 +2332,7 @@ export type StaffActionEvent = {
     /**
      * Kind
      */
-    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted';
+    kind: 'reminder_now' | 'running_late' | 'invite_created' | 'invite_revoked' | 'invite_accepted' | 'pass_created' | 'pass_revoked' | 'pass_accepted';
     /**
      * Patient Name
      */
@@ -4130,6 +4380,147 @@ export type TodayInternalAdminOpsTodayGetResponses = {
 };
 
 export type TodayInternalAdminOpsTodayGetResponse = TodayInternalAdminOpsTodayGetResponses[keyof TodayInternalAdminOpsTodayGetResponses];
+
+export type ListPassesInternalAdminPassesGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/passes';
+};
+
+export type ListPassesInternalAdminPassesGetErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+};
+
+export type ListPassesInternalAdminPassesGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: PassList;
+};
+
+export type ListPassesInternalAdminPassesGetResponse = ListPassesInternalAdminPassesGetResponses[keyof ListPassesInternalAdminPassesGetResponses];
+
+export type CreatePassInternalAdminPassesPostData = {
+    body: PassRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/passes';
+};
+
+export type CreatePassInternalAdminPassesPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
+};
+
+export type CreatePassInternalAdminPassesPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: PassCreated;
+};
+
+export type CreatePassInternalAdminPassesPostResponse = CreatePassInternalAdminPassesPostResponses[keyof CreatePassInternalAdminPassesPostResponses];
+
+export type AcceptPassInternalAdminPassesAcceptPostData = {
+    body: AcceptRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/admin/passes/accept';
+};
+
+export type AcceptPassInternalAdminPassesAcceptPostErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
+};
+
+export type AcceptPassInternalAdminPassesAcceptPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: PassAccepted;
+};
+
+export type AcceptPassInternalAdminPassesAcceptPostResponse = AcceptPassInternalAdminPassesAcceptPostResponses[keyof AcceptPassInternalAdminPassesAcceptPostResponses];
+
+export type RevokePassInternalAdminPassesPassIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Pass Id
+         */
+        pass_id: string;
+    };
+    query?: never;
+    url: '/internal/admin/passes/{pass_id}';
+};
+
+export type RevokePassInternalAdminPassesPassIdDeleteErrors = {
+    /**
+     * Problem (RFC 9457)
+     */
+    401: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    403: unknown;
+    /**
+     * Problem (RFC 9457)
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: unknown;
+    /**
+     * RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.
+     */
+    429: unknown;
+};
+
+export type RevokePassInternalAdminPassesPassIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: PassRevoked;
+};
+
+export type RevokePassInternalAdminPassesPassIdDeleteResponse = RevokePassInternalAdminPassesPassIdDeleteResponses[keyof RevokePassInternalAdminPassesPassIdDeleteResponses];
 
 export type GetSessionInfoInternalAdminSessionGetData = {
     body?: never;

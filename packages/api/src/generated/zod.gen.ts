@@ -66,7 +66,10 @@ export const zAdminActionEvent = z.object({
         'running_late',
         'invite_created',
         'invite_revoked',
-        'invite_accepted'
+        'invite_accepted',
+        'pass_created',
+        'pass_revoked',
+        'pass_accepted'
     ]),
     seq: z.string().regex(/^(0|[1-9][0-9]{0,19})\.(0|[1-9][0-9]{0,19})$/),
     starts_at: z.iso.datetime({ offset: true }).nullable()
@@ -181,7 +184,10 @@ export const zAuditEntry = z.object({
         'invite_create',
         'invite_revoke',
         'invite_accept',
-        'doctor_email'
+        'doctor_email',
+        'pass_create',
+        'pass_revoke',
+        'pass_accept'
     ]),
     actor_email: z.string(),
     actor_role: z.enum([
@@ -796,6 +802,128 @@ export const zNotifyResult = z.object({
 });
 
 /**
+ * PassAccepted
+ *
+ * The caller's access entry, and what the accept did. ``joined`` is false for someone who
+ * already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+ * after this call, so the owner's notice can say which person of how many this was.
+ */
+export const zPassAccepted = z.object({
+    email: z.string(),
+    granted_at: z.iso.datetime({ offset: true }).nullable(),
+    granted_by: z.string(),
+    joined: z.boolean(),
+    of: z.int(),
+    pass_id: z.uuid(),
+    revoked_at: z.iso.datetime({ offset: true }).nullable(),
+    role: z.enum([
+        'owner',
+        'admin',
+        'viewer'
+    ]),
+    source: z.enum(['env', 'db']),
+    use: z.int()
+});
+
+/**
+ * PassRequest
+ *
+ * A reviewer pass: ``max_uses`` people may take ``role`` with it, for ``days`` days.
+ */
+export const zPassRequest = z.object({
+    days: z.int().gte(1).lte(30).optional().default(14),
+    max_uses: z.int().gte(1).lte(10).optional().default(5),
+    role: z.enum(['admin', 'viewer']).optional().default('admin')
+});
+
+/**
+ * PassUse
+ */
+export const zPassUse = z.object({
+    email: z.string(),
+    used_at: z.iso.datetime({ offset: true })
+});
+
+/**
+ * Pass
+ *
+ * Never carries the token or its hash.
+ */
+export const zPass = z.object({
+    created_at: z.iso.datetime({ offset: true }),
+    created_by: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    max_uses: z.int(),
+    revoked_at: z.iso.datetime({ offset: true }).nullable(),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'active',
+        'expired',
+        'used_up',
+        'revoked'
+    ]),
+    used: z.int(),
+    uses: z.array(zPassUse)
+});
+
+/**
+ * PassCreated
+ *
+ * Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it
+ * is not stored (only its SHA-256 is), not logged and cannot be read again. Anyone who holds
+ * the link can take the role, until it expires or ``max_uses`` people have.
+ */
+export const zPassCreated = z.object({
+    audit_id: z.uuid(),
+    created_at: z.iso.datetime({ offset: true }),
+    created_by: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    max_uses: z.int(),
+    revoked_at: z.iso.datetime({ offset: true }).nullable(),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'active',
+        'expired',
+        'used_up',
+        'revoked'
+    ]),
+    token: z.string(),
+    used: z.int(),
+    uses: z.array(zPassUse)
+});
+
+/**
+ * PassList
+ */
+export const zPassList = z.object({
+    items: z.array(zPass)
+});
+
+/**
+ * PassRevoked
+ */
+export const zPassRevoked = z.object({
+    audit_id: z.uuid(),
+    created_at: z.iso.datetime({ offset: true }),
+    created_by: z.string(),
+    expires_at: z.iso.datetime({ offset: true }),
+    id: z.uuid(),
+    max_uses: z.int(),
+    revoked_at: z.iso.datetime({ offset: true }).nullable(),
+    role: z.enum(['admin', 'viewer']),
+    status: z.enum([
+        'active',
+        'expired',
+        'used_up',
+        'revoked'
+    ]),
+    used: z.int(),
+    uses: z.array(zPassUse)
+});
+
+/**
  * Patient
  */
 export const zPatient = z.object({
@@ -865,6 +993,7 @@ export const zProblemCode = z.enum([
     'ACCESS_EXISTS',
     'OWNER_PROTECTED',
     'INVITE_INVALID',
+    'PASS_INVALID',
     'ACCESS_NOT_FOUND',
     'DOCTOR_NOT_FOUND',
     'PATIENT_NOT_FOUND',
@@ -1103,7 +1232,10 @@ export const zStaffActionEvent = z.object({
         'running_late',
         'invite_created',
         'invite_revoked',
-        'invite_accepted'
+        'invite_accepted',
+        'pass_created',
+        'pass_revoked',
+        'pass_accepted'
     ]),
     patient_name: z.string().nullable(),
     reason: z.string(),
@@ -1715,6 +1847,34 @@ export const zTodayInternalAdminOpsTodayGetQuery = z.object({
  * Successful Response
  */
 export const zTodayInternalAdminOpsTodayGetResponse = zTodayBoard;
+
+/**
+ * Successful Response
+ */
+export const zListPassesInternalAdminPassesGetResponse = zPassList;
+
+export const zCreatePassInternalAdminPassesPostBody = zPassRequest;
+
+/**
+ * Successful Response
+ */
+export const zCreatePassInternalAdminPassesPostResponse = zPassCreated;
+
+export const zAcceptPassInternalAdminPassesAcceptPostBody = zAcceptRequest;
+
+/**
+ * Successful Response
+ */
+export const zAcceptPassInternalAdminPassesAcceptPostResponse = zPassAccepted;
+
+export const zRevokePassInternalAdminPassesPassIdDeletePath = z.object({
+    pass_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRevokePassInternalAdminPassesPassIdDeleteResponse = zPassRevoked;
 
 /**
  * Successful Response

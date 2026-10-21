@@ -109,6 +109,7 @@ export function LiveNotifications({
   return null;
 }
 
-function isToastKind(kind: string): boolean {
-  return !kind.startsWith("invite_");
+// Invitations and passes are access changes, not clinic activity: they go to the feed, not a toast.
+export function isToastKind(kind: string): boolean {
+  return !kind.startsWith("invite_") && !kind.startsWith("pass_");
 }

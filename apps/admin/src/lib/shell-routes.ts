@@ -13,6 +13,7 @@ export const SHELL_ROUTES: ShellRoutes = {
     { pattern: "/audit", label: "Audit", parent: "/dashboard" },
     { pattern: "/dashboard/print", label: "Print view", parent: "/dashboard" },
     { pattern: "/invite/:token", label: "Invitation", parent: "/" },
+    { pattern: "/pass/:token", label: "Reviewer pass", parent: "/" },
     {
       pattern: "/dashboard/appointments/:id",
       label: "Appointment history",

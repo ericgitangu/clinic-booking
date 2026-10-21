@@ -136,6 +136,10 @@ const COPY: Record<string, { message: string; severity: Severity }> = {
     message: "This invitation is not valid. Ask for a new one.",
     severity: "warning",
   },
+  PASS_INVALID: {
+    message: "This reviewer pass is not valid. Ask for a new one.",
+    severity: "warning",
+  },
   ACCESS_NOT_FOUND: {
     message: "We could not find that access entry.",
     severity: "error",

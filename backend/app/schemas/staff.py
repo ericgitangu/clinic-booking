@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.staff import StaffActionName
-from app.schemas.access import Email, GrantableRole
+from app.schemas.access import AccessEntry, Email, GrantableRole
 from app.schemas.appointment import Appointment, _strip
 from app.schemas.common import ClinicDatetime, StrAwareDatetime
 from app.schemas.doctor_notice import DoctorNoticeState
@@ -163,9 +163,69 @@ class InviteList(BaseModel):
     items: list[Invite]
 
 
+PassStatus = Literal["active", "expired", "used_up", "revoked"]
+
+
+class PassRequest(BaseModel):
+    """A reviewer pass: ``max_uses`` people may take ``role`` with it, for ``days`` days."""
+
+    model_config = ConfigDict(extra="forbid")
+    role: GrantableRole = "admin"
+    max_uses: Annotated[int, Field(ge=1, le=10)] = 5
+    days: Annotated[int, Field(ge=1, le=30)] = 14
+
+
+class PassUse(BaseModel):
+    email: str
+    used_at: ClinicDatetime
+
+
+class Pass(BaseModel):
+    """Never carries the token or its hash."""
+
+    id: uuid.UUID
+    role: GrantableRole
+    max_uses: int
+    used: int
+    created_by: str
+    created_at: ClinicDatetime
+    expires_at: ClinicDatetime
+    revoked_at: ClinicDatetime | None
+    status: PassStatus
+    uses: list[PassUse]
+
+
+class PassCreated(Pass):
+    """Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it
+    is not stored (only its SHA-256 is), not logged and cannot be read again. Anyone who holds
+    the link can take the role, until it expires or ``max_uses`` people have."""
+
+    token: str
+    audit_id: uuid.UUID
+
+
+class PassRevoked(Pass):
+    audit_id: uuid.UUID
+
+
+class PassList(BaseModel):
+    items: list[Pass]
+
+
 class AcceptRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     token: Annotated[str, Field(min_length=20, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class PassAccepted(AccessEntry):
+    """The caller's access entry, and what the accept did. ``joined`` is false for someone who
+    already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+    after this call, so the owner's notice can say which person of how many this was."""
+
+    joined: bool
+    pass_id: uuid.UUID
+    use: int
+    of: int
 
 
 class AttendanceRequest(BaseModel):

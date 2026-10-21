@@ -40,6 +40,7 @@ current state; may succeed later or in another state.
 | ACCESS_EXISTS | 409 | access-exists | Access exists | This email already has active access; change its role instead. |
 | OWNER_PROTECTED | 409 | owner-protected | Owner protected | The owner's access is fixed by configuration and cannot be granted, changed or revoked. |
 | INVITE_INVALID | 404 | invite-invalid | Invite invalid | The invitation does not exist, was used, revoked or expired, or was sent to another email. Every reason returns the same body. |
+| PASS_INVALID | 404 | pass-invalid | Pass invalid | The reviewer pass does not exist, was revoked, expired or used up, or cannot be used by this account. Every reason returns the same body. |
 | ACCESS_NOT_FOUND | 404 | access-not-found | Access not found | No active access for this email. |
 | DOCTOR_NOT_FOUND | 404 | doctor-not-found | Doctor not found | No such doctor (including inactive). |
 | PATIENT_NOT_FOUND | 404 | patient-not-found | Patient not found | No such patient. |

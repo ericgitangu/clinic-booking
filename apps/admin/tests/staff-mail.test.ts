@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   noticeOfInvite,
+  noticeOfPassAccepted,
   noticeToPatient,
   type Senders,
 } from "@/lib/staff-mail";
@@ -30,9 +31,11 @@ const done = {
 function senders() {
   const staff = vi.fn(async () => done);
   const invite = vi.fn(async () => done);
-  return { staff, invite } as unknown as Senders & {
+  const pass = vi.fn(async () => done);
+  return { staff, invite, pass } as unknown as Senders & {
     staff: ReturnType<typeof vi.fn>;
     invite: ReturnType<typeof vi.fn>;
+    pass: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -115,5 +118,43 @@ describe("the invitation email", () => {
       expiresAt: "2026-11-05T00:00:00Z",
       token: "fake-invite",
     });
+  });
+});
+
+describe("the owner's pass notice", () => {
+  const joined = {
+    pass_id: "pass-1",
+    email: "reviewer@mailbox.co.ke",
+    role: "admin" as const,
+    use: 2,
+    of: 5,
+  };
+
+  it("sends one email to each owner, each with a recipient number of its own", async () => {
+    const s = senders();
+    await noticeOfPassAccepted(
+      caller,
+      joined,
+      ["a@owner.test", "b@owner.test"],
+      s,
+    );
+    expect(s.pass.mock.calls.map((c) => [c[0].to, c[0].recipient])).toEqual([
+      ["a@owner.test", 0],
+      ["b@owner.test", 1],
+    ]);
+    expect(s.pass.mock.calls[0]![0]).toMatchObject({
+      caller,
+      passId: "pass-1",
+      email: "reviewer@mailbox.co.ke",
+      role: "admin",
+      use: 2,
+      of: 5,
+    });
+  });
+
+  it("sends nothing when there is no owner address", async () => {
+    const s = senders();
+    await noticeOfPassAccepted(caller, joined, [], s);
+    expect(s.pass).not.toHaveBeenCalled();
   });
 });

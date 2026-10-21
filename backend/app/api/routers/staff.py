@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
     CAN_MANAGE,
+    OWNER_ONLY,
     get_clock,
     get_relay,
     get_session,
@@ -46,13 +47,18 @@ from app.schemas.staff import (
     InviteRevoked,
     Notified,
     NotifyResult,
+    PassAccepted,
+    PassCreated,
+    PassList,
+    PassRequest,
+    PassRevoked,
     ReminderRequest,
     RunningLateRequest,
     StaffAppointmentChange,
     StaffCreateAppointment,
     StaffReasonRequest,
 )
-from app.services import invites, notify, staff_actions
+from app.services import invites, notify, passes, staff_actions
 from app.services.admin import InvalidAdminQuery
 from app.services.relay import Relay
 
@@ -67,6 +73,12 @@ appointments_router = APIRouter(
 )
 invites_router = APIRouter(
     prefix="/internal/admin/invites",
+    tags=["admin"],
+    dependencies=_GATE,
+    responses=problem_responses(401),
+)
+passes_router = APIRouter(
+    prefix="/internal/admin/passes",
     tags=["admin"],
     dependencies=_GATE,
     responses=problem_responses(401),
@@ -371,6 +383,102 @@ async def accept_invite(
 ) -> AccessEntry:
     response.headers.update(_NO_STORE)
     return await invites.accept(session, clock, settings, who=who, token=body.token)
+
+
+# --- reviewer passes -------------------------------------------------------------------------
+
+
+@passes_router.post(
+    "",
+    response_model=PassCreated,
+    status_code=201,
+    description=(
+        "Owner only. Make a pass: a link that any verified Google account can accept to become "
+        "`admin` (the default) or `viewer`, for `max_uses` people (1 to 10, default 5) and `days` "
+        "days (1 to 30, default 14). The raw `token` is in this response only (the link is "
+        "`/pass/<token>`): the API keeps its hash. At most 5 a day (429 RATE_LIMITED). An audit "
+        "row (`audit_id`) is written."
+    ),
+    responses=with_throttle({**problem_responses(403, 422, 429)}),
+)
+async def create_pass(
+    body: PassRequest,
+    response: Response,
+    actor: Principal = Depends(OWNER_ONLY),
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
+) -> PassCreated:
+    response.headers.update(_NO_STORE)
+    return await passes.create(
+        session, clock, actor=actor, role=body.role, max_uses=body.max_uses, days=body.days
+    )
+
+
+@passes_router.get(
+    "",
+    response_model=PassList,
+    dependencies=[Depends(OWNER_ONLY)],
+    description=(
+        "Owner only. Every pass with its status (`active`, `expired`, `used_up`, `revoked`), how "
+        "many seats are taken and who took them. Never the token or its hash."
+    ),
+    responses=problem_responses(403),
+)
+async def list_passes(
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+) -> PassList:
+    response.headers.update(_NO_STORE)
+    return await passes.list_all(session, clock)
+
+
+@passes_router.delete(
+    "/{pass_id}",
+    response_model=PassRevoked,
+    description=(
+        "Owner only. Stop new sign-ins with the pass. People who already joined keep their "
+        "access; revoke them one by one on the Access page. An unknown or already revoked pass "
+        "is 404 PASS_INVALID."
+    ),
+    responses=with_throttle(problem_responses(403, 404)),
+)
+async def revoke_pass(
+    pass_id: uuid.UUID,
+    response: Response,
+    actor: Principal = Depends(OWNER_ONLY),
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+    _guard: None = Depends(guard_staff_write),
+) -> PassRevoked:
+    response.headers.update(_NO_STORE)
+    return await passes.revoke(session, clock, actor=actor, pass_id=pass_id)
+
+
+@passes_router.post(
+    "/accept",
+    response_model=PassAccepted,
+    description=(
+        "Accept a reviewer pass. The caller is whoever the web app signed in with Google; any "
+        "verified account may, and gets the pass's role (someone who already has access gets "
+        "their entry back and uses no seat). Every failure (unknown, revoked, expired, used up, "
+        "unverified email, an owner address, an address whose access was revoked, a pass whose "
+        "owner is no longer the owner) is the same 404 PASS_INVALID with the same body."
+    ),
+    responses=with_throttle(problem_responses(404, 422, 429)),
+)
+async def accept_pass(
+    body: AcceptRequest,
+    response: Response,
+    who: Principal = Depends(require_identity),
+    session: AsyncSession = Depends(get_session),
+    clock: Clock = Depends(get_clock),
+    settings: Settings = Depends(get_settings),
+    _guard: None = Depends(guard_replay_only),
+) -> PassAccepted:
+    response.headers.update(_NO_STORE)
+    return await passes.accept(session, clock, settings, who=who, token=body.token)
 
 
 # --- audit -----------------------------------------------------------------------------------

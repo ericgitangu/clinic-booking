@@ -525,6 +525,7 @@
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
           "INVITE_INVALID",
+          "PASS_INVALID",
           "ACCESS_NOT_FOUND",
           "DOCTOR_NOT_FOUND",
           "PATIENT_NOT_FOUND",

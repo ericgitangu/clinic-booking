@@ -2,27 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@clinic/ui/components/ui/button";
 import { auditList } from "@/lib/api";
+import { AUDIT_ACTION } from "@/lib/audit-labels";
 import { formatSlot } from "@/lib/clinic-time";
 import { callerFor, requireStaff } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Audit trail" };
 export const dynamic = "force-dynamic";
-
-const ACTION: Record<string, string> = {
-  book: "Booked for a patient",
-  reschedule: "Moved",
-  cancel: "Cancelled",
-  veto: "Undid a patient change and locked",
-  unlock: "Unlocked",
-  arrived: "Marked arrived",
-  no_show: "Marked no-show",
-  reminder_now: "Sent a reminder",
-  running_late: "Told patients the doctor is running late",
-  invite_create: "Invited a staff member",
-  invite_revoke: "Revoked an invitation",
-  invite_accept: "Accepted an invitation",
-  doctor_email: "Changed a doctor's arrival email",
-};
 
 // Every change staff made, newest first: who, what, why and whether the patient was told. Owner
 // and admin only. The trail holds no patient names or contact details; the API never returns them.
@@ -66,7 +51,7 @@ export default async function AuditPage({
             <li key={a.id} className="space-y-1 px-4 py-3">
               <p className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="font-medium">
-                  {ACTION[a.action] ?? a.action}
+                  {AUDIT_ACTION[a.action] ?? a.action}
                 </span>
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {formatSlot(a.occurred_at)}

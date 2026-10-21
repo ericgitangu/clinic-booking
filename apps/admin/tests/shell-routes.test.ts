@@ -16,6 +16,7 @@ describe("admin route list", () => {
     ["/audit", "/dashboard"],
     ["/dashboard/print", "/dashboard"],
     ["/invite/abc123", "/"],
+    ["/pass/abc123", "/"],
     [`/dashboard/appointments/${ID}`, "/dashboard"],
     ["/no/such/page", "/dashboard"],
   ];

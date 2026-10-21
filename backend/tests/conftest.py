@@ -77,7 +77,8 @@ async def _remove_test_rows() -> None:
     try:
         await conn.execute("TRUNCATE appointment_events, appointments RESTART IDENTITY CASCADE")
         await conn.execute(
-            "TRUNCATE staff_access, staff_access_audit, staff_invites RESTART IDENTITY"
+            "TRUNCATE staff_access, staff_access_audit, staff_invites, staff_passes, "
+            "staff_pass_uses RESTART IDENTITY"
         )
         await conn.execute("TRUNCATE patient_accounts")
         await conn.execute("TRUNCATE realtime_publish_budget, realtime_token_cap")

@@ -73,7 +73,14 @@ class StaffEvent(AdminEvent):
 
 
 ActionKind = Literal[
-    "reminder_now", "running_late", "invite_created", "invite_revoked", "invite_accepted"
+    "reminder_now",
+    "running_late",
+    "invite_created",
+    "invite_revoked",
+    "invite_accepted",
+    "pass_created",
+    "pass_revoked",
+    "pass_accepted",
 ]
 
 

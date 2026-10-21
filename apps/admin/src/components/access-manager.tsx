@@ -24,9 +24,10 @@ import {
 import { changeAccessRole, grantAccess, revokeAccess } from "@/lib/actions";
 import { ConfirmAction } from "@/components/confirm-action";
 import { InvitesPanel } from "@/components/invites-panel";
+import { PassesPanel } from "@/components/passes-panel";
 import { formatSlot } from "@/lib/clinic-time";
 import { ROLE_HELP, ROLE_LABEL, type GrantableRole } from "@/lib/roles";
-import type { AccessEntry, Invite } from "@clinic/api/generated";
+import type { AccessEntry, Invite, Pass } from "@clinic/api/generated";
 
 const GRANTABLE: readonly GrantableRole[] = ["admin", "viewer"];
 
@@ -35,10 +36,13 @@ const GRANTABLE: readonly GrantableRole[] = ["admin", "viewer"];
 export function AccessManager({
   entries,
   invites,
+  passes,
   actor,
 }: {
   entries: AccessEntry[];
   invites: Invite[];
+  /** The owner's passes; null for an admin, who does not see or make them. */
+  passes: Pass[] | null;
   /** Who is looking. An admin can invite, and change or revoke viewers; the owner can do it all. */
   actor: "owner" | "admin";
 }) {
@@ -116,6 +120,7 @@ export function AccessManager({
       </ul>
 
       <InvitesPanel invites={invites} />
+      {passes !== null && <PassesPanel passes={passes} />}
 
       {revoked.length > 0 && (
         <section aria-labelledby="revoked" className="space-y-2">

@@ -338,6 +338,32 @@ export function staffInvite(f: {
   });
 }
 
+/**
+ * The owner's notice that someone took a seat on a reviewer pass. Sent to the owner, never to the
+ * person who joined. `email` is the address that accepted; `use` of `of` is the seat it took.
+ */
+export function passAccepted(f: {
+  email: string;
+  role: "admin" | "viewer";
+  use: number;
+  of: number;
+}): Composed {
+  return compose(`${f.email} joined with your reviewer pass`, {
+    preview: `${f.email} is now ${f.role}, seat ${f.use} of ${f.of}`,
+    heading: "Someone used your reviewer pass",
+    lead: `${f.email} signed in with Google and accepted your reviewer pass.`,
+    box: [
+      { text: `Role: ${f.role}`, strong: true },
+      { text: `Seat ${f.use} of ${f.of}`, muted: true },
+    ],
+    extra: [
+      "If you did not expect this person, revoke the pass and remove their access on the Access page. Revoking the pass does not remove people who already joined.",
+    ],
+    button: { label: "Open the Access page", href: `${SITE.url}/access` },
+    why: "You are getting this because you are the owner of the Idyllic Clinic admin, a demonstration made for an assessment and not a real clinic.",
+  });
+}
+
 /** A name token without punctuation other than the hyphen and apostrophe inside a name. */
 const word = (t: string) =>
   t.replace(/[^\p{L}\p{M}'’-]/gu, "").replace(/^['’-]+|['’-]+$/gu, "");

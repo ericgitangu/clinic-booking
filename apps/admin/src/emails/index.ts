@@ -2,6 +2,7 @@
 export {
   doctorArrived,
   firstNameAndInitial,
+  passAccepted,
   staffBooked,
   staffCancelled,
   staffInvite,
@@ -18,8 +19,10 @@ export {
 export {
   isDemoRecipient,
   sendInviteEmail,
+  sendPassNotice,
   sendStaffEmail,
   type InviteEmailInput,
+  type PassNoticeInput,
   type StaffEmailInput,
   type StaffEmailOutcome,
   type StaffEmailResult,

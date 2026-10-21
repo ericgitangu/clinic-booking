@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   doctorArrived,
   escapeHtml,
+  passAccepted,
   staffBooked,
   staffCancelled,
   staffInvite,
@@ -62,6 +63,13 @@ const all = {
       role: "viewer",
       token: TOKEN,
       expiresAt: "2026-10-21T18:00:00+03:00",
+    }),
+  passAccepted: () =>
+    passAccepted({
+      email: "reviewer@mailbox.co.ke",
+      role: "admin",
+      use: 2,
+      of: 5,
     }),
 } as const;
 
@@ -203,7 +211,8 @@ describe("escaping", () => {
 
   it.each(
     Object.keys(all).filter(
-      (n) => n !== "staffInvite" && n !== "doctorArrived",
+      (n) =>
+        n !== "staffInvite" && n !== "doctorArrived" && n !== "passAccepted",
     ),
   )("%s escapes a reason full of markup", (n) => {
     const make = {
@@ -299,5 +308,39 @@ describe("the invite", () => {
       expiresAt: "2026-10-21T18:00:00+03:00",
     });
     expect(v.text).toContain("viewer");
+  });
+});
+
+describe("the pass notice", () => {
+  const m = passAccepted({
+    email: "reviewer@mailbox.co.ke",
+    role: "viewer",
+    use: 3,
+    of: 10,
+  });
+
+  it("says who joined, as what, and which seat", () => {
+    expect(m.subject).toBe(
+      "reviewer@mailbox.co.ke joined with your reviewer pass",
+    );
+    expect(m.text).toContain("Role: viewer");
+    expect(m.text).toContain("Seat 3 of 10");
+  });
+
+  it("links to the Access page and carries no token", () => {
+    expect(m.html).toContain(`href="${SITE.url}/access"`);
+    expect(m.text).toContain(`${SITE.url}/access`);
+    expect(m.text).not.toMatch(/\/pass\//);
+  });
+
+  it("escapes an address full of markup", () => {
+    const odd = passAccepted({
+      email: `<script>alert(1)</script>@x.test`,
+      role: "admin",
+      use: 1,
+      of: 1,
+    });
+    expect(odd.html).not.toContain("<script");
+    expect(odd.html).toContain("&lt;script&gt;");
   });
 });

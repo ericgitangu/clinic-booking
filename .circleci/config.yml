@@ -196,7 +196,10 @@ jobs:
             export DATABASE_URL=postgresql+asyncpg://clinic:clinic@localhost:5432/clinic
             uv run alembic upgrade head
             uv run python -m app.scripts.seed
+            # owner@clinic.example is the owner the gateway tests sign as (apiOwner); owner-only
+            # endpoints such as /internal/admin/passes refuse everyone without it
             DATABASE_URL=postgresql+asyncpg://clinic_app:clinic_app_local@localhost:5432/clinic \
+              ADMIN_EMAILS=owner@clinic.example \
               nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8080 > /tmp/api.log 2>&1 &
             for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
             curl -fsS http://127.0.0.1:8080/health

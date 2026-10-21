@@ -40,6 +40,47 @@ You are getting this because the clinic's reception marked a patient of yours as
 How your data is handled: https://clinic.ericgitangu.com/privacy"
 `;
 
+exports[`staff email templates > passAccepted: subject, html and text > html 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Someone used your reviewer pass</title></head>
+<body style="background-color:#f4f8fc;margin:0;padding:24px 12px;font-family:Helvetica,Arial,sans-serif;color:#14204f;">
+<div style="display:none;max-height:0;overflow:hidden;">reviewer@mailbox.co.ke is now admin, seat 2 of 5</div>
+<div style="max-width:520px;margin:0 auto;">
+<div style="padding:0 0 16px;"><img src="https://clinic-admin.ericgitangu.com/brand/idyllic-mark.png" width="44" height="44" alt="Idyllic">
+<p style="margin:8px 0 0;font-size:14px;color:#4a5878;">Idyllic Clinic</p>
+</div>
+<div style="background-color:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e3eef9;">
+<h1 style="margin:0 0 12px;font-size:24px;line-height:30px;color:#14204f;">Someone used your reviewer pass</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:24px;">reviewer@mailbox.co.ke signed in with Google and accepted your reviewer pass.</p>
+<div style="background-color:#e3eef9;border-radius:8px;padding:14px 16px;"><p style="margin:4px 0 0;font-size:18px;font-weight:700;">Role: admin</p><p style="margin:4px 0 0;font-size:13px;color:#4a5878;">Seat 2 of 5</p></div>
+
+<p style="margin:14px 0 0;font-size:15px;line-height:22px;">If you did not expect this person, revoke the pass and remove their access on the Access page. Revoking the pass does not remove people who already joined.</p>
+<div style="padding:24px 0 4px;"><a href="https://clinic-admin.ericgitangu.com/access" style="background-color:#243a8c;color:#ffffff;border-radius:8px;padding:12px 20px;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">Open the Access page</a></div>
+</div>
+<hr style="border:0;border-top:1px solid #e3eef9;margin:24px 0 12px;">
+<p style="margin:0;font-size:12px;line-height:18px;color:#4a5878;">You are getting this because you are the owner of the Idyllic Clinic admin, a demonstration made for an assessment and not a real clinic. Replies go to the engineer who built it. See <a href="https://clinic.ericgitangu.com/privacy" style="color:#243a8c;">how your data is handled</a>.</p>
+</div></body></html>"
+`;
+
+exports[`staff email templates > passAccepted: subject, html and text > subject 1`] = `"reviewer@mailbox.co.ke joined with your reviewer pass"`;
+
+exports[`staff email templates > passAccepted: subject, html and text > text 1`] = `
+"SOMEONE USED YOUR REVIEWER PASS
+
+reviewer@mailbox.co.ke signed in with Google and accepted your reviewer pass.
+
+Role: admin
+Seat 2 of 5
+
+If you did not expect this person, revoke the pass and remove their access on the Access page. Revoking the pass does not remove people who already joined.
+
+Open the Access page: https://clinic-admin.ericgitangu.com/access
+
+--
+You are getting this because you are the owner of the Idyllic Clinic admin, a demonstration made for an assessment and not a real clinic. Replies go to the engineer who built it.
+How your data is handled: https://clinic.ericgitangu.com/privacy"
+`;
+
 exports[`staff email templates > staffBooked: subject, html and text > html 1`] = `
 "<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You have been booked</title></head>

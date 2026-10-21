@@ -26,6 +26,9 @@ StaffActionName = Literal[
     "invite_revoke",
     "invite_accept",
     "doctor_email",
+    "pass_create",
+    "pass_revoke",
+    "pass_accept",
 ]
 
 

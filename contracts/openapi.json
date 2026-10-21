@@ -179,7 +179,10 @@
               "running_late",
               "invite_created",
               "invite_revoked",
-              "invite_accepted"
+              "invite_accepted",
+              "pass_created",
+              "pass_revoked",
+              "pass_accepted"
             ],
             "title": "Kind",
             "type": "string"
@@ -725,7 +728,10 @@
               "invite_create",
               "invite_revoke",
               "invite_accept",
-              "doctor_email"
+              "doctor_email",
+              "pass_create",
+              "pass_revoke",
+              "pass_accept"
             ],
             "title": "Action",
             "type": "string"
@@ -2836,6 +2842,422 @@
         "title": "NotifyResult",
         "type": "object"
       },
+      "Pass": {
+        "description": "Never carries the token or its hash.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "max_uses": {
+            "title": "Max Uses",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "expired",
+              "used_up",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "uses": {
+            "items": {
+              "$ref": "#/components/schemas/PassUse"
+            },
+            "title": "Uses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "max_uses",
+          "used",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "status",
+          "uses"
+        ],
+        "title": "Pass",
+        "type": "object"
+      },
+      "PassAccepted": {
+        "description": "The caller's access entry, and what the accept did. ``joined`` is false for someone who\nalready had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken\nafter this call, so the owner's notice can say which person of how many this was.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "granted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted At"
+          },
+          "granted_by": {
+            "title": "Granted By",
+            "type": "string"
+          },
+          "joined": {
+            "title": "Joined",
+            "type": "boolean"
+          },
+          "of": {
+            "title": "Of",
+            "type": "integer"
+          },
+          "pass_id": {
+            "format": "uuid",
+            "title": "Pass Id",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "env",
+              "db"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "use": {
+            "title": "Use",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "granted_by",
+          "granted_at",
+          "revoked_at",
+          "source",
+          "joined",
+          "pass_id",
+          "use",
+          "of"
+        ],
+        "title": "PassAccepted",
+        "type": "object"
+      },
+      "PassCreated": {
+        "description": "Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it\nis not stored (only its SHA-256 is), not logged and cannot be read again. Anyone who holds\nthe link can take the role, until it expires or ``max_uses`` people have.",
+        "properties": {
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "max_uses": {
+            "title": "Max Uses",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "expired",
+              "used_up",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "uses": {
+            "items": {
+              "$ref": "#/components/schemas/PassUse"
+            },
+            "title": "Uses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "max_uses",
+          "used",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "status",
+          "uses",
+          "token",
+          "audit_id"
+        ],
+        "title": "PassCreated",
+        "type": "object"
+      },
+      "PassList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Pass"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PassList",
+        "type": "object"
+      },
+      "PassRequest": {
+        "additionalProperties": false,
+        "description": "A reviewer pass: ``max_uses`` people may take ``role`` with it, for ``days`` days.",
+        "properties": {
+          "days": {
+            "default": 14,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "type": "integer"
+          },
+          "max_uses": {
+            "default": 5,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Uses",
+            "type": "integer"
+          },
+          "role": {
+            "default": "admin",
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "title": "PassRequest",
+        "type": "object"
+      },
+      "PassRevoked": {
+        "properties": {
+          "audit_id": {
+            "format": "uuid",
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "max_uses": {
+            "title": "Max Uses",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "expired",
+              "used_up",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "uses": {
+            "items": {
+              "$ref": "#/components/schemas/PassUse"
+            },
+            "title": "Uses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "max_uses",
+          "used",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "status",
+          "uses",
+          "audit_id"
+        ],
+        "title": "PassRevoked",
+        "type": "object"
+      },
+      "PassUse": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "used_at": {
+            "format": "date-time",
+            "title": "Used At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "used_at"
+        ],
+        "title": "PassUse",
+        "type": "object"
+      },
       "Patient": {
         "properties": {
           "created_at": {
@@ -3055,6 +3477,7 @@
           "ACCESS_EXISTS",
           "OWNER_PROTECTED",
           "INVITE_INVALID",
+          "PASS_INVALID",
           "ACCESS_NOT_FOUND",
           "DOCTOR_NOT_FOUND",
           "PATIENT_NOT_FOUND",
@@ -3576,7 +3999,10 @@
               "running_late",
               "invite_created",
               "invite_revoked",
-              "invite_accepted"
+              "invite_accepted",
+              "pass_created",
+              "pass_revoked",
+              "pass_accepted"
             ],
             "title": "Kind",
             "type": "string"
@@ -7306,6 +7732,238 @@
           }
         },
         "summary": "Today",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/passes": {
+      "get": {
+        "description": "Owner only. Every pass with its status (`active`, `expired`, `used_up`, `revoked`), how many seats are taken and who took them. Never the token or its hash.",
+        "operationId": "list_passes_internal_admin_passes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          }
+        },
+        "summary": "List Passes",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Owner only. Make a pass: a link that any verified Google account can accept to become `admin` (the default) or `viewer`, for `max_uses` people (1 to 10, default 5) and `days` days (1 to 30, default 14). The raw `token` is in this response only (the link is `/pass/<token>`): the API keeps its hash. At most 5 a day (429 RATE_LIMITED). An audit row (`audit_id`) is written.",
+        "operationId": "create_pass_internal_admin_passes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PassRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Pass",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/passes/accept": {
+      "post": {
+        "description": "Accept a reviewer pass. The caller is whoever the web app signed in with Google; any verified account may, and gets the pass's role (someone who already has access gets their entry back and uses no seat). Every failure (unknown, revoked, expired, used up, unverified email, an owner address, an address whose access was revoked, a pass whose owner is no longer the owner) is the same 404 PASS_INVALID with the same body.",
+        "operationId": "accept_pass_internal_admin_passes_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept Pass",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/internal/admin/passes/{pass_id}": {
+      "delete": {
+        "description": "Owner only. Stop new sign-ins with the pass. People who already joined keep their access; revoke them one by one on the Access page. An unknown or already revoked pass is 404 PASS_INVALID.",
+        "operationId": "revoke_pass_internal_admin_passes__pass_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pass_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pass Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassRevoked"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "Problem (RFC 9457)"
+          },
+          "422": {
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {}
+            },
+            "description": "RATE_LIMITED: this person has made too many staff changes in the current window (Problem, RFC 9457). Wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the window ends and writes are accepted again.",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke Pass",
         "tags": [
           "admin"
         ]

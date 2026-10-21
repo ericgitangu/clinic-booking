@@ -199,6 +199,126 @@
         "invite_email": "new.viewer@clinic.example",
         "invite_role": "viewer"
       }
+    },
+    {
+      "name": "reviewer pass created",
+      "row": {
+        "txid": 865,
+        "id": 36,
+        "action": "pass_create",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Reviewer pass for admin, 5 people, 14 days",
+        "invite_email": null,
+        "invite_role": null,
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "pass_created",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "865.36"
+      },
+      "staff": {
+        "kind": "pass_created",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "865.36",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Reviewer pass for admin, 5 people, 14 days",
+        "invite_email": null,
+        "invite_role": null
+      }
+    },
+    {
+      "name": "reviewer pass revoked",
+      "row": {
+        "txid": 866,
+        "id": 37,
+        "action": "pass_revoke",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Reviewer pass revoked",
+        "invite_email": null,
+        "invite_role": null,
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "pass_revoked",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "866.37"
+      },
+      "staff": {
+        "kind": "pass_revoked",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "866.37",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "owner@clinic.example",
+        "actor_role": "owner",
+        "reason": "Reviewer pass revoked",
+        "invite_email": null,
+        "invite_role": null
+      }
+    },
+    {
+      "name": "reviewer pass accepted",
+      "row": {
+        "txid": 867,
+        "id": 38,
+        "action": "pass_accept",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "reviewer@example.org",
+        "actor_role": "admin",
+        "reason": "Reviewer pass accepted",
+        "invite_email": null,
+        "invite_role": null,
+        "synthetic": false
+      },
+      "viewer": {
+        "kind": "pass_accepted",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "867.38"
+      },
+      "staff": {
+        "kind": "pass_accepted",
+        "doctor_id": null,
+        "starts_at": null,
+        "delay_minutes": null,
+        "seq": "867.38",
+        "appointment_id": null,
+        "patient_name": null,
+        "actor_email": "reviewer@example.org",
+        "actor_role": "admin",
+        "reason": "Reviewer pass accepted",
+        "invite_email": null,
+        "invite_role": null
+      }
     }
   ]
 }

@@ -10,6 +10,10 @@ import {
   cancelForPatientInternalAdminAppointmentsAppointmentIdCancelPatch,
   changeAccessRoleInternalAdminAccessEmailPatch,
   acceptInviteInternalAdminInvitesAcceptPost,
+  acceptPassInternalAdminPassesAcceptPost,
+  createPassInternalAdminPassesPost,
+  listPassesInternalAdminPassesGet,
+  revokePassInternalAdminPassesPassIdDelete,
   cancellationReasonsInternalAdminOpsCancellationReasonsGet,
   changesInternalAdminOpsChangesGet,
   getAppointmentInternalAdminAppointmentsAppointmentIdGet,
@@ -401,6 +405,44 @@ export const inviteAccept = (caller: Caller, token: string) =>
     "inviteAccept",
     (client) =>
       acceptInviteInternalAdminInvitesAcceptPost({ client, body: { token } }),
+    { caller },
+  );
+
+export const passesList = (caller: Caller) =>
+  memo(readKey("passesList", caller, []), () =>
+    callApi(
+      "passesList",
+      (client) => listPassesInternalAdminPassesGet({ client }),
+      { caller },
+    ),
+  );
+
+export const passCreate = (
+  caller: Caller,
+  body: { role: "admin" | "viewer"; max_uses: number; days: number },
+) =>
+  callApi(
+    "passCreate",
+    (client) => createPassInternalAdminPassesPost({ client, body }),
+    { caller },
+  );
+
+export const passRevoke = (caller: Caller, id: string) =>
+  callApi(
+    "passRevoke",
+    (client) =>
+      revokePassInternalAdminPassesPassIdDelete({
+        client,
+        path: { pass_id: id },
+      }),
+    { caller },
+  );
+
+export const passAccept = (caller: Caller, token: string) =>
+  callApi(
+    "passAccept",
+    (client) =>
+      acceptPassInternalAdminPassesAcceptPost({ client, body: { token } }),
     { caller },
   );
 
