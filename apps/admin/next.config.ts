@@ -35,21 +35,21 @@ const nextConfig: NextConfig = {
   },
   // The Content-Security-Policy is set per request in proxy.ts (every page here is rendered per
   // request, so each can carry a nonce). These go on pages, not on _next/* or anything with a file
-  // extension (a header on every asset costs bytes). The invite link carries a secret in its path:
-  // it keeps its own Referrer-Policy (none at all), stays out of every cache and out of search.
+  // extension (a header on every asset costs bytes). The invite and pass links carry a secret in its path:
+  // they keep their own Referrer-Policy (none at all), stay out of every cache and out of search.
   async headers() {
     return [
       {
-        source: "/((?!_next(?:/|$)|invite(?:/|$)|.*\\.).*)",
+        source: "/((?!_next(?:/|$)|invite(?:/|$)|pass(?:/|$)|.*\\.).*)",
         headers: [...SECURITY_HEADERS],
       },
-      {
-        source: "/invite/:token",
+      ...["/invite/:token", "/pass/:token"].map((source) => ({
+        source,
         headers: [
           ...INVITE_HEADERS,
           ...SECURITY_HEADERS.filter((h) => h.key !== "Referrer-Policy"),
         ],
-      },
+      })),
     ];
   },
 };

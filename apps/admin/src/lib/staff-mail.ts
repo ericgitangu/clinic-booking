@@ -2,10 +2,12 @@ import "server-only";
 import type { Caller } from "@clinic/api/call";
 import type {
   InviteCreated,
+  PassAccepted,
   StaffAppointmentChange,
 } from "@clinic/api/generated";
 import {
   sendInviteEmail,
+  sendPassNotice,
   sendStaffEmail,
   staffBooked,
   staffCancelled,
@@ -24,9 +26,14 @@ export type PatientNotice = "booked" | "rescheduled" | "cancelled" | "vetoed";
 export interface Senders {
   staff: typeof sendStaffEmail;
   invite: typeof sendInviteEmail;
+  pass: typeof sendPassNotice;
 }
 
-const live: Senders = { staff: sendStaffEmail, invite: sendInviteEmail };
+const live: Senders = {
+  staff: sendStaffEmail,
+  invite: sendInviteEmail,
+  pass: sendPassNotice,
+};
 
 type Change = Pick<
   StaffAppointmentChange,
@@ -102,4 +109,31 @@ export async function noticeOfInvite(
     expiresAt: invite.expires_at,
     token: invite.token,
   });
+}
+
+/**
+ * The owner's email when someone joins with a reviewer pass: one to each owner address, best
+ * effort. Only for a new joiner; someone who already had access takes no seat and sends nothing.
+ */
+export async function noticeOfPassAccepted(
+  caller: Caller,
+  joined: Pick<PassAccepted, "pass_id" | "email" | "role" | "use" | "of">,
+  owners: Iterable<string>,
+  send: Senders = live,
+): Promise<StaffEmailResult[]> {
+  const role = joined.role === "admin" ? "admin" : "viewer";
+  return Promise.all(
+    [...owners].map((to, recipient) =>
+      send.pass({
+        caller,
+        passId: joined.pass_id,
+        recipient,
+        to,
+        email: joined.email,
+        role,
+        use: joined.use,
+        of: joined.of,
+      }),
+    ),
+  );
 }

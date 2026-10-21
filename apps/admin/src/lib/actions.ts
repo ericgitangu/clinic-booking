@@ -11,6 +11,9 @@ import {
   inviteCreate,
   inviteRevoke,
   markAttendance as mark,
+  passAccept,
+  passCreate,
+  passRevoke,
   setDoctorEmail as setEmail,
   unlockAppointment as unlock,
   vetoAppointment as veto,
@@ -21,10 +24,14 @@ import {
 import { doctorPorts, sendDoctorArrival } from "@/emails/doctor-arrival";
 import { arrivalMessage } from "@/lib/doctor-notice-words";
 import { SITE } from "@/lib/site";
-import { noticeOfInvite, noticeToPatient } from "@/lib/staff-mail";
+import {
+  noticeOfInvite,
+  noticeOfPassAccepted,
+  noticeToPatient,
+} from "@/lib/staff-mail";
 import { describeFailure as describe } from "@/lib/failure-copy";
 import { METRICS_TAG } from "@/lib/metrics-cache";
-import { authorise, callerFor, getStaff } from "@/lib/session";
+import { authorise, callerFor, getStaff, ownerEmails } from "@/lib/session";
 
 import type { ActionResult } from "@/lib/failure-copy";
 export type { ActionResult } from "@/lib/failure-copy";
@@ -335,6 +342,76 @@ export async function acceptInvite(token: string): Promise<ActionResult> {
   }
   revalidatePath("/", "layout");
   return { ok: true, message: `You now have access as ${res.data.role}.` };
+}
+
+// Reviewer passes. Owner only, here and in the API. Like an invite the raw token exists only in the
+// response to creating one; it is shown once as a link and this app does not store it.
+export type PassResult =
+  { ok: true; message: string; link: string } | { ok: false; message: string };
+
+export async function createPass(
+  role: string,
+  people: number,
+  days: number,
+): Promise<PassResult> {
+  const staff = await authorise("manage-access");
+  if (!staff || staff.role !== "owner")
+    return { ok: false, message: DENIED.message };
+  if (!grantable(role)) return { ok: false, message: "Pick admin or viewer." };
+  if (!Number.isInteger(people) || people < 1 || people > 10)
+    return { ok: false, message: "Pick from 1 to 10 people." };
+  if (!Number.isInteger(days) || days < 1 || days > 30)
+    return { ok: false, message: "Pick from 1 to 30 days." };
+  const res = await passCreate(callerFor(staff, staff.role), {
+    role,
+    max_uses: people,
+    days,
+  });
+  if (!res.ok)
+    return {
+      ok: false,
+      message: describe(res, "That pass could not be made.").message,
+    };
+  revalidatePath("/access");
+  return {
+    ok: true,
+    message: "Reviewer pass made.",
+    link: `${SITE.url}/pass/${encodeURIComponent(res.data.token)}`,
+  };
+}
+
+export async function revokePass(id: string): Promise<ActionResult> {
+  const staff = await authorise("manage-access");
+  if (!staff || staff.role !== "owner") return DENIED;
+  const res = await passRevoke(callerFor(staff, staff.role), id);
+  if (!res.ok) return describe(res, "That pass could not be found.");
+  revalidatePath("/access");
+  return {
+    ok: true,
+    message: "Pass revoked. People who already joined keep their access.",
+  };
+}
+
+// Accepting a pass needs a signed-in Google account, not a role. Every failure is the same 404, so
+// the message is the same too. Someone who already has access gets their entry back (`joined` is
+// false) and nothing is sent; a new joiner emails the owner, best effort, after the response.
+export async function acceptPass(token: string): Promise<ActionResult> {
+  const who = await getStaff();
+  if (!who) return { ok: false, message: "Sign in with Google first." };
+  if (token.length < 8 || token.length > 200)
+    return { ok: false, message: "That reviewer pass is not valid." };
+  const caller = callerFor(who, "none");
+  const res = await passAccept(caller, token);
+  if (!res.ok) {
+    return res.status === 429
+      ? { ok: false, message: "Too many tries. Wait a little and try again." }
+      : { ok: false, message: "That reviewer pass is not valid." };
+  }
+  const joined = res.data;
+  if (joined.joined)
+    after(() => noticeOfPassAccepted(caller, joined, ownerEmails()));
+  revalidatePath("/", "layout");
+  return { ok: true, message: `You now have access as ${joined.role}.` };
 }
 
 // Send the arrival email again after it failed. Anyone who may mark attendance may ask; the API only

@@ -70,7 +70,7 @@ import {
   type Reservation,
   type StaffEmailPorts,
 } from "@/emails/ports";
-import { staffInvite } from "@/emails/templates";
+import { passAccepted, staffInvite } from "@/emails/templates";
 
 // RFC 2606 / 6761 names that can never reach a person: the three example domains, and the reserved
 // top-level names test, example, invalid and localhost. A name matches when it is one of these or
@@ -139,6 +139,21 @@ export interface InviteEmailInput {
   expiresAt: string;
   /** The raw token from the create response. Goes into the link path only. */
   token: string;
+}
+
+export interface PassNoticeInput {
+  caller: Caller;
+  /** `pass_id` of the accept reply. Keys the send with the seat; the token is never used. */
+  passId: string;
+  /** Which of the owner addresses this is, so each recipient has a key of its own. */
+  recipient: number;
+  /** An owner address. */
+  to: string;
+  /** The address that accepted, its role, and the seat it took. */
+  email: string;
+  role: "admin" | "viewer";
+  use: number;
+  of: number;
 }
 
 const result = (
@@ -284,6 +299,33 @@ export const sendInviteEmail = (
         expiresAt: input.expiresAt,
       }),
       mark: true,
+    },
+    ports,
+  );
+
+/**
+ * The owner's notice that someone joined with a reviewer pass. There is no audit row to mark (the
+ * caller is the person who joined, not the row's owner), so nothing is marked; the key is the pass,
+ * the seat and the recipient, so a repeat of the same seat sends once.
+ */
+export const sendPassNotice = (
+  input: PassNoticeInput,
+  ports: StaffEmailPorts = defaultPorts,
+): Promise<StaffEmailResult> =>
+  run(
+    {
+      caller: input.caller,
+      key: `pass/${input.passId}/${input.use}/${input.recipient}`,
+      id: input.passId,
+      to: input.to,
+      deliver: true,
+      mail: passAccepted({
+        email: input.email,
+        role: input.role,
+        use: input.use,
+        of: input.of,
+      }),
+      mark: false,
     },
     ports,
   );
