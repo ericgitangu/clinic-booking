@@ -10,9 +10,10 @@ const POINTS = [
 ];
 
 // The two screenshots are of the admin app on a local stack with the demo seed, signed in as the
-// owner. Patients are the seed's invented people, and the only address shown is on the reserved
-// .example domain. Each is three crops of one page, joined top to bottom: the Today board, the live
-// feed, the KPI row. Only the one for the current colour scheme is displayed.
+// owner. Patients are the seed's invented people, and the only addresses shown are on the reserved
+// .example domain. Each is three crops of one page, taken at twice the size for sharp screens and
+// joined top to bottom: the Today board, the live feed, the KPI row. Only the one for the current
+// colour scheme is displayed.
 export function StaffDashboard() {
   return (
     <section aria-labelledby="staff" className="py-12">
@@ -33,7 +34,7 @@ export function StaffDashboard() {
       <figure className="mt-6 max-w-4xl">
         <Image
           src="/screenshots/staff-dashboard-light.webp"
-          alt="The staff dashboard in the light theme, in three cropped parts. The Today board shows two doctors with portraits and their visits, one marked Arrived and one locked with an Unlock button. The live feed lists a new booking, a reschedule and a staff veto with its reason. Below it are KPI cards for visits today, upcoming booked, cancelled visits and fill rate. All names are invented."
+          alt="The staff dashboard in the light theme, in three cropped parts. The Today board shows two doctors with portraits and their visits: most marked Arrived or No-show, two cancelled and one still booked with Reschedule and Cancel buttons, and one doctor's arrival email. The live feed, with a count of five new events, lists a new booking, a reschedule, the owner's veto with its reason and the move back to the original time, and an arrival. Below it are KPI cards for visits today, upcoming booked, cancelled visits and fill rate. All names are invented."
           width={1280}
           height={1576}
           sizes="(min-width: 960px) 896px, calc(100vw - 32px)"
@@ -41,7 +42,7 @@ export function StaffDashboard() {
         />
         <Image
           src="/screenshots/staff-dashboard-dark.webp"
-          alt="The staff dashboard in the dark theme, in three cropped parts. The Today board shows two doctors with portraits and their visits, one marked Arrived and one locked with an Unlock button. The live feed lists a new booking, a reschedule and a staff veto with its reason. Below it are KPI cards for visits today, upcoming booked, cancelled visits and fill rate. All names are invented."
+          alt="The staff dashboard in the dark theme, in three cropped parts. The Today board shows two doctors with portraits and their visits: most marked Arrived or No-show, two cancelled and one still booked with Reschedule and Cancel buttons, and one doctor's arrival email. The live feed, with a count of five new events, lists a new booking, a reschedule, the owner's veto with its reason and the move back to the original time, and an arrival. Below it are KPI cards for visits today, upcoming booked, cancelled visits and fill rate. All names are invented."
           width={1280}
           height={1576}
           sizes="(min-width: 960px) 896px, calc(100vw - 32px)"

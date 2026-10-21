@@ -20,9 +20,9 @@ export const SCREENSHOTS: readonly Screenshot[] = [
     dark: "/screenshots/staff-dashboard-dark.webp",
     width: 1280,
     height: 1576,
-    alt: "The staff dashboard for the owner role. Today's visits are listed per doctor with their times, patient names, status and actions to reschedule, cancel, veto and lock. Under them sit the live feed of bookings and staff actions and four figures: visits today, upcoming booked, cancelled visits and fill rate.",
+    alt: "The staff dashboard for the owner role. Today's visits are listed per doctor with their times, patient names, status (arrived, no-show, cancelled, booked) and actions to mark, reschedule and cancel, and one doctor's arrival email set. Under them sit the live feed of bookings and staff actions, with a count of new events, and four figures: visits today, upcoming booked, cancelled visits and fill rate.",
     caption:
       "The admin app's dashboard as the owner sees it, at 1280 px wide. It shows today's visits per doctor, the live feed and the fill rate.",
-    taken: "2026-10-20",
+    taken: "2026-10-21",
   },
 ];
