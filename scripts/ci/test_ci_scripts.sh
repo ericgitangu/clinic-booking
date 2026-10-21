@@ -1528,6 +1528,26 @@ sed '/^          name: ship-admin$/,/^      - verify-release:$/ s/^            -
 expect "ci graph: the guard sees ship-realtime if it is re-added to ship-admin's requires" \
   "$(release_graph "$WORK/graph-readded.yml")" "admin-direct:1 verify-reaches:1"
 
+# ---- check_project_order.sh ---------------------------------------------------------------
+listing() { # listing <declared names, space separated> <listed names, space separated> -> json on stdout
+  jq -n --arg d "$1" --arg l "$2" '{
+    config: {projects: ($d | split(" ") | map({name: .}))},
+    suites: [{file: "a.spec.ts", specs: ($l | split(" ") | map(select(. != "") | {tests: [{projectName: .}]}))}],
+    errors: []}'
+}
+listing "a b c" "a b c" > "$WORK/order-same.json"
+listing "a b c" "a c b" > "$WORK/order-swapped.json"
+listing "a b c" "" > "$WORK/order-empty.json"
+jq -n '{config: {projects: [{name: "a"}]}, suites: [], errors: [{message: "boom"}]}' > "$WORK/order-error.json"
+rc=0; bash "$HERE/check_project_order.sh" "$WORK/order-same.json" >/dev/null 2>&1 || rc=$?
+expect "project order: identical order passes" "$rc" "0"
+rc=0; bash "$HERE/check_project_order.sh" "$WORK/order-swapped.json" >/dev/null 2>&1 || rc=$?
+expect "project order: a different order fails" "$rc" "1"
+rc=0; bash "$HERE/check_project_order.sh" "$WORK/order-empty.json" >/dev/null 2>&1 || rc=$?
+expect "project order: a listing with no tests fails" "$rc" "1"
+rc=0; bash "$HERE/check_project_order.sh" "$WORK/order-error.json" >/dev/null 2>&1 || rc=$?
+expect "project order: a listing with errors fails" "$rc" "1"
+
 echo
 echo "ci scripts: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

@@ -21,7 +21,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   expect: { timeout: 15_000 },
-  reporter: "list",
+  // The json file carries each skip and its reason, which the list reporter does not print.
+  reporter: [["list"], ["json", { outputFile: "test-results/results.json" }]],
   // Specs that read or change the clinic-wide numbers (the dashboard and its cached metrics) cannot
   // overlap with anything else that changes them, so with more than one worker they run after the
   // rest, one project at a time. The others never touch those numbers and run side by side.
