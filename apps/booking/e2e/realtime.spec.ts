@@ -78,16 +78,103 @@ const isAvailability = (url: string) =>
 // `seen` counts availability requests; `settled()` waits until every one of them has finished. A
 // reply that lands after the driven clock has jumped re-arms the poll timer at the later time, so
 // the scenarios that drive the clock wait for in-flight requests first.
+//
+// `report()` says what happened, for an assertion message: CI keeps no browser artifacts, so a
+// failure has to name its own trigger. Inside the page, a wrapper around fetch records every
+// availability request, push-stream request and token request with the time, what the marker
+// ([data-stream], [data-pushed]) showed at that moment and the call stack that made the request,
+// plus visibility and focus changes. From the test side it adds the same requests as the browser
+// reported them, and the page's console messages.
+const isPushOrToken = (url: string) =>
+  /\/event-stream|localhost:3199|ably\.net|\/api\/realtime\//.test(url);
+
+const TRACE_SCRIPT = () => {
+  type Entry = Record<string, unknown>;
+  const log: Entry[] = [];
+  (window as unknown as { __trace: Entry[] }).__trace = log;
+  const t0 = performance.now();
+  const stamp = (): Entry => {
+    const m = document.querySelector("[data-stream]");
+    return {
+      t: Math.round(performance.now() - t0),
+      stream: m?.getAttribute("data-stream") ?? null,
+      pushed: m?.getAttribute("data-pushed") ?? null,
+      visibility: document.visibilityState,
+      focused: document.hasFocus(),
+    };
+  };
+  const real = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const kind =
+      url.includes("/api/doctors/") && url.includes("/availability")
+        ? "availability"
+        : /\/event-stream|localhost:3199|ably\.net/.test(url)
+          ? "stream"
+          : url.includes("/api/realtime/")
+            ? "token"
+            : null;
+    if (kind)
+      log.push({
+        ...stamp(),
+        kind,
+        url,
+        stack: String(new Error().stack).split("\n").slice(2, 9).join(" | "),
+      });
+    return real(input, init);
+  };
+  for (const name of ["visibilitychange", "focus", "blur"] as const)
+    (name === "visibilitychange" ? document : window).addEventListener(
+      name,
+      () => log.push({ ...stamp(), kind: name }),
+      true,
+    );
+};
+
 const availabilityCalls = (page: Page) => {
   const seen: string[] = [];
   const done: string[] = [];
-  page.on("request", (r) => isAvailability(r.url()) && seen.push(r.url()));
+  const started = Date.now();
+  const outside: string[] = [];
+  const consoleLines: string[] = [];
+  void page.addInitScript(TRACE_SCRIPT);
+  page.on("console", (m) =>
+    consoleLines.push(`${Date.now() - started}ms [${m.type()}] ${m.text()}`),
+  );
+  page.on("request", (r) => {
+    const at = Date.now() - started;
+    if (isAvailability(r.url())) seen.push(r.url());
+    if (isAvailability(r.url()) || isPushOrToken(r.url()))
+      outside.push(`${at}ms ${r.method()} ${r.url()}`);
+  });
   const finished = (r: { url(): string }) =>
     isAvailability(r.url()) && done.push(r.url());
   page.on("requestfinished", finished);
   page.on("requestfailed", finished);
+  const report = async () => {
+    const inPage = await page
+      .evaluate(
+        () => (window as unknown as { __trace?: unknown[] }).__trace ?? [],
+      )
+      .catch((e: unknown) => [`(page trace unreadable: ${String(e)})`]);
+    return [
+      `availability requests=${seen.length}`,
+      "in the page (t = ms since the page started, stack = what made the request):",
+      ...inPage.map((e) => `  ${JSON.stringify(e)}`),
+      "as the browser reported them (ms since this page was set up):",
+      ...outside.map((l) => `  ${l}`),
+      "console:",
+      ...consoleLines.map((l) => `  ${l}`),
+    ].join("\n");
+  };
   return Object.assign(seen, {
     settled: () => expect.poll(() => seen.length - done.length).toBe(0),
+    report,
   });
 };
 
@@ -139,7 +226,9 @@ test("(b) a cancellation frees the time after one refetch", async ({
   await expectFree(a.page, slots[1], {
     timeout: 3000,
   });
-  expect(calls.length - before).toBe(1); // one refetch, not a poll
+  // One refetch, not a poll. If not, the message names what asked for the second one.
+  const extra = calls.length - before;
+  expect(extra, extra === 1 ? undefined : await calls.report()).toBe(1);
   await closeAll(a.context, b.context);
 });
 
