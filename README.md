@@ -15,7 +15,7 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Architecture.** One diagram and a table with the choice and the reason for each component, including the Go service: [Architecture](#architecture).
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and, for the headline choices, an entry on the [decisions page](https://clinic.ericgitangu.com/decisions) that names what it costs. [The Architecture tab](https://clinic.ericgitangu.com/decisions#architecture) has the diagrams (context, containers, booking, push, release, data handling), [the engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions) the long decisions index, and [the verification card](https://clinic.ericgitangu.com/decisions#verification) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **Demo data.** A demo seed (`python -m app.scripts.seed_demo`, run after the core seed; on the local stack `docker compose exec -T api python -m app.scripts.seed_demo`) fills a database with about 100 invented patients and four weeks of bookings so the admin dashboard can be reviewed ([the demo data runbook](https://clinic.ericgitangu.com/decisions#demo-seed)). They are AI-generated, fictional and Nairobi-local, created to make the clinic reviewable; no real people. Production does not hold them: it holds only the rows from the release checks, which the admin views exclude (they are not deleted). The demo is for a local or staging stack.
-- **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](https://clinic.ericgitangu.com/decisions#admin-access)), so a reviewer cannot sign in. I can grant access if you want to see it.
+- **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](https://clinic.ericgitangu.com/decisions#admin-access)), so a reviewer needs an invitation or the reviewer pass link I send with the submission (see Reviewer access below).
 - **Reviewer access.** Staff invitations are live (#63 and #68 are merged). The owner invites the reviewer as admin through `/access`; the invitation expires in 72 hours and must be accepted with the same Google email it was sent to. The owner can also make a reviewer pass on the same page: one link that any verified Google account can accept to become admin (or viewer), for up to 5 people and 14 days by default, and at most 10 and 30. Accepting needs a Google sign-in and a press of Accept, every use is audited and emailed to the owner, and revoking the pass stops new sign-ins but does not remove people who already joined. The trade-off is in [Decision 35](https://clinic.ericgitangu.com/decisions#decision-35).
 - **AI use** is described by me in [section 11](#11-ai-reflection). The records it draws on (what I decided, what agents did, the stop rules) are in [the usage facts](https://clinic.ericgitangu.com/decisions#ai-usage).
 - **Live versus declared.** What runs in production and what is only designed is stated in [the architecture overview](https://clinic.ericgitangu.com/decisions#containers) and in the status column of [the engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions).
@@ -70,22 +70,22 @@ flowchart LR
   CI --> V
 ```
 
-| Component | Choice | Why |
-| --- | --- | --- |
-| Browser | Next.js pages with a shell-only service worker; polling as the fallback | A stale slot list is the UX failure of the race the brief names. Push is an optimisation and polling is the floor. |
-| Booking and admin apps | Two Next.js apps on Vercel in one pnpm workspace | Separate auth surfaces and deploys without publishing shared packages. |
-| Sign-in and roles | Better Auth with Google and stateless cookies; staff roles looked up on every request | Maintained, no auth database, and a revoke applies on the next request. |
-| Calls to the API | Server-side BFF: Vercel's OIDC token exchanged at Google STS (workload identity federation) for a Cloud Run ID token, plus an HMAC-signed assertion of who is calling on /internal | No credential in the browser and no stored key; the API checks the role again. |
-| API | FastAPI on Cloud Run, IAM-only, 0 to 3 instances | One system of record for every rule; a direct request gets a 403. |
-| Database | Neon Postgres 17; a partial unique index decides double booking | The engine enforces it across instances, with no application lock. |
-| Live updates | Outbox rows relayed to Ably right after each commit; the patient booking page subscribes over SSE with a 5 minute token (staff get their own feed from the Go service below) | Ably's free package needs no card, and no server of ours holds streams open. |
-| Staff live feed | clinic-realtime, a small Go service on Cloud Run: read-only database role, 0 to 2 instances, one stream per instance, IAM-only, streaming to the admin app over SSE | Staff events carry patient names, so they stay inside Google Cloud instead of going to a third-party pub/sub. |
-| Email | Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders; the admin app also emails a doctor when a patient is marked arrived, only if staff have set that doctor's address | A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send. |
-| Human check | The browser gets a reCAPTCHA token; the booking server creates a reCAPTCHA Enterprise assessment for each booking, cancel and reschedule, with an access token it gets through the same Vercel OIDC federation | It runs on the server for every screen flow, and no secret is stored because the call uses the Vercel identity. |
-| Migrations | clinic-migrate, a Cloud Run Job that runs alembic as the clinic_owner role with its own database secret, before each deploy | The running service has no DDL rights, and migrations are expand-only so the previous revision keeps working. |
-| Images | Artifact Registry, with CircleCI pushing each image by digest and only the serving image and the one before it kept | A rollback needs the previous image, and the registry's free tier is small. |
-| Delivery | CircleCI with keyless OIDC to workload identity federation for Cloud Run and a per-project token for Vercel; a tagged no-traffic deploy, a smoke test, promotion and automatic rollback | No long-lived GCP credential exists, and only a smoke-tested revision gets traffic. |
-| Secrets | Secret Manager, mounted into Cloud Run and the migration job at deploy (database URLs, signing key, Ably key); the web apps keep theirs in Vercel environment variables | Nothing secret is in an image or in the repository; Cloud Run reads them through its runtime service account. |
+| Component              | Choice                                                                                                                                                                                                                                                                                                        | Why                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Browser                | Next.js pages with a shell-only service worker; polling as the fallback                                                                                                                                                                                                                                       | A stale slot list is the UX failure of the race the brief names. Push is an optimisation and polling is the floor.                   |
+| Booking and admin apps | Two Next.js apps on Vercel in one pnpm workspace                                                                                                                                                                                                                                                              | Separate auth surfaces and deploys without publishing shared packages.                                                               |
+| Sign-in and roles      | Better Auth with Google and stateless cookies; staff roles looked up on every request                                                                                                                                                                                                                         | Maintained, no auth database, and a revoke applies on the next request.                                                              |
+| Calls to the API       | Server-side BFF: Vercel's OIDC token exchanged at Google STS (workload identity federation) for a Cloud Run ID token, plus an HMAC-signed assertion of who is calling on /internal                                                                                                                            | No credential in the browser and no stored key; the API checks the role again.                                                       |
+| API                    | FastAPI on Cloud Run, IAM-only, 0 to 3 instances                                                                                                                                                                                                                                                              | One system of record for every rule; a direct request gets a 403.                                                                    |
+| Database               | Neon Postgres 17; a partial unique index decides double booking                                                                                                                                                                                                                                               | The engine enforces it across instances, with no application lock.                                                                   |
+| Live updates           | Outbox rows relayed to Ably right after each commit; the patient booking page subscribes over SSE with a 5 minute token (staff get their own feed from the Go service below)                                                                                                                                  | Ably's free package needs no card, and no server of ours holds streams open.                                                         |
+| Staff live feed        | clinic-realtime, a small Go service on Cloud Run: read-only database role, 0 to 2 instances, one stream per instance, IAM-only, streaming to the admin app over SSE                                                                                                                                           | Staff events carry patient names, so they stay inside Google Cloud instead of going to a third-party pub/sub.                        |
+| Email                  | Resend, called from the booking app with a 5 second abort: after the response for booking, moving and cancelling (after()), and inline in the daily Vercel cron at 15:00 UTC for reminders; the admin app also emails a doctor when a patient is marked arrived, only if staff have set that doctor's address | A slow or failed email never fails a booking; the day (100) and month (3,000) allowances are reserved in the database before a send. |
+| Human check            | The browser gets a reCAPTCHA token; the booking server creates a reCAPTCHA Enterprise assessment for each booking, cancel and reschedule, with an access token it gets through the same Vercel OIDC federation                                                                                                | It runs on the server for every screen flow, and no secret is stored because the call uses the Vercel identity.                      |
+| Migrations             | clinic-migrate, a Cloud Run Job that runs alembic as the clinic_owner role with its own database secret, before each deploy                                                                                                                                                                                   | The running service has no DDL rights, and migrations are expand-only so the previous revision keeps working.                        |
+| Images                 | Artifact Registry, with CircleCI pushing each image by digest and only the serving image and the one before it kept                                                                                                                                                                                           | A rollback needs the previous image, and the registry's free tier is small.                                                          |
+| Delivery               | CircleCI with keyless OIDC to workload identity federation for Cloud Run and a per-project token for Vercel; a tagged no-traffic deploy, a smoke test, promotion and automatic rollback                                                                                                                       | No long-lived GCP credential exists, and only a smoke-tested revision gets traffic.                                                  |
+| Secrets                | Secret Manager, mounted into Cloud Run and the migration job at deploy (database URLs, signing key, Ably key); the web apps keep theirs in Vercel environment variables                                                                                                                                       | Nothing secret is in an image or in the repository; Cloud Run reads them through its runtime service account.                        |
 
 Go: the staff live feed runs on a small read-only Go service, clinic-realtime on Cloud Run, which README section 3.7 describes. I first closed PR 37 without merging and reversed that on 2026-10-19. The cost reasoning is unchanged. The closing comment on PR 37 says: "The Cloud Run gateway billed about 900 vCPU-s per connected hour against roughly 21,619 vCPU-s of shared free-tier headroom, and capped the system at 2 concurrent streams." I read the 900 as per instance (0.25 vCPU for 3,600 seconds), and the service is built to that shape: 0.25 vCPU and at most 2 instances. The measured figure is still pending.
 
@@ -103,16 +103,16 @@ Four runtimes is a cost for an app this size, so each one has to earn its place:
 
 ## 1. Live URLs
 
-| What | Where |
-| --- | --- |
-| Landing page | <https://clinic.ericgitangu.com> |
-| Booking app | <https://clinic.ericgitangu.com/book> |
-| API (a base path: `/api` itself is a 404, try `/api/doctors`) | <https://clinic.ericgitangu.com/api/doctors> |
-| Swagger UI | <https://clinic.ericgitangu.com/docs> |
-| ReDoc | <https://clinic.ericgitangu.com/redoc> |
-| OpenAPI spec | <https://clinic.ericgitangu.com/openapi.json> |
-| Admin app (allowlisted) | <https://clinic-admin.ericgitangu.com> |
-| Pipelines | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
+| What                                                          | Where                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Landing page                                                  | <https://clinic.ericgitangu.com>                                                                                                                                                                                                                              |
+| Booking app                                                   | <https://clinic.ericgitangu.com/book>                                                                                                                                                                                                                         |
+| API (a base path: `/api` itself is a 404, try `/api/doctors`) | <https://clinic.ericgitangu.com/api/doctors>                                                                                                                                                                                                                  |
+| Swagger UI                                                    | <https://clinic.ericgitangu.com/docs>                                                                                                                                                                                                                         |
+| ReDoc                                                         | <https://clinic.ericgitangu.com/redoc>                                                                                                                                                                                                                        |
+| OpenAPI spec                                                  | <https://clinic.ericgitangu.com/openapi.json>                                                                                                                                                                                                                 |
+| Admin app (allowlisted)                                       | <https://clinic-admin.ericgitangu.com>                                                                                                                                                                                                                        |
+| Pipelines                                                     | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
 
 The earlier address, <https://sil-clinic-booking.vercel.app>, answers its pages (`/`, `/book`, `/docs`) with a 308 redirect to the host above. Its `/api/...` paths are not redirected: they are answered directly (`/api/doctors` returns 200 there too). I checked both with plain GET requests on 2026-10-20. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
@@ -143,14 +143,14 @@ done
 curl -s -o /dev/null -w 'direct Cloud Run: %{http_code}\n' https://clinic-api-2shno7sa7q-uk.a.run.app/ready
 ```
 
-| Path | Observed |
-| --- | --- |
-| `/` | `200 text/html` |
-| `/docs` (Swagger UI) | `200 text/html` |
-| `/openapi.json` | `200 application/json` |
-| `$API/doctors` | `200 application/json`, 5 doctors seeded, the first is "Dr. Achieng Otieno" |
-| `$API/ready` | `200 application/json` (in production the proxy reaches Cloud Run) |
-| Cloud Run directly, `/ready` | `403`: it is IAM-only |
+| Path                         | Observed                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| `/`                          | `200 text/html`                                                             |
+| `/docs` (Swagger UI)         | `200 text/html`                                                             |
+| `/openapi.json`              | `200 application/json`                                                      |
+| `$API/doctors`               | `200 application/json`, 5 doctors seeded, the first is "Dr. Achieng Otieno" |
+| `$API/ready`                 | `200 application/json` (in production the proxy reaches Cloud Run)          |
+| Cloud Run directly, `/ready` | `403`: it is IAM-only                                                       |
 
 **Step 0: your own patient and a free slot.** Use a patient of your own, not mine. The loop looks for the first day in the next week on which the first doctor has a free slot.
 
@@ -299,18 +299,18 @@ flowchart LR
 
 Each row is the decision, what it costs me, and the entry on the [decisions page](https://clinic.ericgitangu.com/decisions) that weighs it where there is one. [The engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions) adds the alternative I rejected on each row.
 
-| Decision | What it costs | Decisions page |
-| --- | --- | --- |
-| A partial unique index on `(doctor_id, starts_at) WHERE status = 'booked'` decides double booking, with no application lock | Correct only for fixed, aligned 30-minute slots; variable lengths mean migrating to an `EXCLUDE USING gist` constraint | [double booking](https://clinic.ericgitangu.com/decisions#double-booking) |
-| Slots are computed from working hours, never stored | No slot row to lock, so uniqueness lives on the appointment | [double booking](https://clinic.ericgitangu.com/decisions#double-booking) |
-| FastAPI is the single system of record; Go serves only the read-only staff live feed (3.7) | Python cold starts are slower than Go's; I mitigate with `--cpu-boost` and have not measured it | [one API](https://clinic.ericgitangu.com/decisions#one-api), [the Go decision](https://clinic.ericgitangu.com/decisions#go) |
-| UTC `timestamptz`, the clinic zone as data, naive datetimes rejected, an injected clock | One extra join to read the zone; no DST zone is in the seed data | [time model](https://clinic.ericgitangu.com/decisions#time) |
-| REST with OpenAPI 3.1, RFC 9457 errors with a closed code catalogue, and a TypeScript client generated from the contract | Type safety comes from codegen and a CI drift gate instead of inference; the generator is 0.x and pinned; no `/v1` prefix | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors) |
-| Reschedule is an in-place update under a row lock with one deadlock retry; a booking retry replays through an idempotency key stored on the appointment | A slot swap can end with both requests rejected; a key is bound to one doctor and time | [3.5](#35-appointment-state-machine) |
-| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.41 a month against a $0.50 ceiling on the shared billing account | [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost) |
-| CircleCI, keyless OIDC to workload identity federation, promote by tag after a smoke test, roll back automatically | `VERCEL_TOKEN` is long-lived; a release on `main` takes about 28 minutes (measured, section 9) | [section 9](#9-deployment--cicd) |
-| The brief is silent on authentication; I kept the public API unauthenticated so Swagger's Try it out works, while patients and staff sign in with Google in the web apps, with one reCAPTCHA check per action and roles checked on every request | Anyone holding an appointment id can change it through the public API (an IDOR I disclose in section 10) | [the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer) |
-| Real Postgres in every test, a race harness that fails if it stops being concurrent, and a control that proves the index is what holds | Slower suites and a compose database in CI; no mocks to hide behind | [3.4](#34-the-concurrency-guarantee) |
+| Decision                                                                                                                                                                                                                                         | What it costs                                                                                                                                                                           | Decisions page                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| A partial unique index on `(doctor_id, starts_at) WHERE status = 'booked'` decides double booking, with no application lock                                                                                                                      | Correct only for fixed, aligned 30-minute slots; variable lengths mean migrating to an `EXCLUDE USING gist` constraint                                                                  | [double booking](https://clinic.ericgitangu.com/decisions#double-booking)                                                   |
+| Slots are computed from working hours, never stored                                                                                                                                                                                              | No slot row to lock, so uniqueness lives on the appointment                                                                                                                             | [double booking](https://clinic.ericgitangu.com/decisions#double-booking)                                                   |
+| FastAPI is the single system of record; Go serves only the read-only staff live feed (3.7)                                                                                                                                                       | Python cold starts are slower than Go's; I mitigate with `--cpu-boost` and have not measured it                                                                                         | [one API](https://clinic.ericgitangu.com/decisions#one-api), [the Go decision](https://clinic.ericgitangu.com/decisions#go) |
+| UTC `timestamptz`, the clinic zone as data, naive datetimes rejected, an injected clock                                                                                                                                                          | One extra join to read the zone; no DST zone is in the seed data                                                                                                                        | [time model](https://clinic.ericgitangu.com/decisions#time)                                                                 |
+| REST with OpenAPI 3.1, RFC 9457 errors with a closed code catalogue, and a TypeScript client generated from the contract                                                                                                                         | Type safety comes from codegen and a CI drift gate instead of inference; the generator is 0.x and pinned; no `/v1` prefix                                                               | [REST contract](https://clinic.ericgitangu.com/decisions#rest-and-errors)                                                   |
+| Reschedule is an in-place update under a row lock with one deadlock retry; a booking retry replays through an idempotency key stored on the appointment                                                                                          | A slot swap can end with both requests rejected; a key is bound to one doctor and time                                                                                                  | [3.5](#35-appointment-state-machine)                                                                                        |
+| Cloud Run is IAM-only behind a Vercel proxy, in `us-east4` beside Neon                                                                                                                                                                           | An estimated 100 to 150 ms more per warm request for Kenyan users than a Frankfurt layout (not measured), and about $0.41 a month against a $0.50 ceiling on the shared billing account | [hosting and cost](https://clinic.ericgitangu.com/decisions#hosting-and-cost)                                               |
+| CircleCI, keyless OIDC to workload identity federation, promote by tag after a smoke test, roll back automatically                                                                                                                               | `VERCEL_TOKEN` is long-lived; a release on `main` takes about 28 minutes (measured, section 9)                                                                                          | [section 9](#9-deployment--cicd)                                                                                            |
+| The brief is silent on authentication; I kept the public API unauthenticated so Swagger's Try it out works, while patients and staff sign in with Google in the web apps, with one reCAPTCHA check per action and roles checked on every request | Anyone holding an appointment id can change it through the public API (an IDOR I disclose in section 10)                                                                                | [the thin web layer decision](https://clinic.ericgitangu.com/decisions#thin-web-layer)                                      |
+| Real Postgres in every test, a race harness that fails if it stops being concurrent, and a control that proves the index is what holds                                                                                                           | Slower suites and a compose database in CI; no mocks to hide behind                                                                                                                     | [3.4](#34-the-concurrency-guarantee)                                                                                        |
 
 **What breaks at 10x and 100x.** These are deductions from the configuration, not load tests. Connections go first: each instance holds a pool of 5 against Neon's direct endpoint, with at most 3 instances, so 15 connections. More instances multiply that against a 0.25 CU compute; the fix would be Neon's pooler, which needs asyncpg's statement cache turned off (unverified here). Cold starts are second: scale-to-zero is a cost choice, and `min-instances 1` is the knob when latency matters more than the free tier. At 100x one Postgres primary is the ceiling. The unique index contends only per doctor and slot, so it does not serialize unrelated bookings, and a read replica for availability comes before any sharding. Multi-clinic needs `clinic_id` scoping and tenant isolation, not new time logic.
 
@@ -355,15 +355,15 @@ The status of each item (shipped, declared, descoped) and what it costs is in [t
 
 The live, interactive reference is [Swagger UI](https://clinic.ericgitangu.com/docs); the contract is committed at `contracts/openapi.json`. The public base is `/api` (`https://clinic.ericgitangu.com/api`), and the brief's paths sit under it unchanged: `POST /api/appointments` is the brief's `POST /appointments`. The public endpoints:
 
-| Method and path | Purpose | Success |
-| --- | --- | --- |
-| `GET /doctors`, `GET /doctors/{id}` | Doctors with clinic and working hours | 200 |
-| `GET /doctors/{id}/availability?date=` | Free 30-minute slots on a clinic-local day | 200 |
-| `POST /patients` | Create a patient | 201 |
-| `POST /appointments` | Book a slot | 201 |
-| `GET /appointments/{id}`, `GET /patients/{id}/appointments` | Read one, or a patient's list | 200 |
-| `PATCH /appointments/{id}/cancel`, `/reschedule` | Change state | 200 |
-| `GET /health`, `GET /ready`, `GET /problems/{slug}` | Liveness, readiness (`SELECT 1`), error type documents | 200 |
+| Method and path                                             | Purpose                                                | Success |
+| ----------------------------------------------------------- | ------------------------------------------------------ | ------- |
+| `GET /doctors`, `GET /doctors/{id}`                         | Doctors with clinic and working hours                  | 200     |
+| `GET /doctors/{id}/availability?date=`                      | Free 30-minute slots on a clinic-local day             | 200     |
+| `POST /patients`                                            | Create a patient                                       | 201     |
+| `POST /appointments`                                        | Book a slot                                            | 201     |
+| `GET /appointments/{id}`, `GET /patients/{id}/appointments` | Read one, or a patient's list                          | 200     |
+| `PATCH /appointments/{id}/cancel`, `/reschedule`            | Change state                                           | 200     |
+| `GET /health`, `GET /ready`, `GET /problems/{slug}`         | Liveness, readiness (`SELECT 1`), error type documents | 200     |
 
 The one-hour rule uses two codes: `422 BOOKING_TOO_SOON` for a too-soon slot (a booking, or a reschedule's new time) and `409 CHANGE_TOO_LATE` for changing or cancelling a visit that starts within the hour ([section 8](#8-ambiguities--decisions)).
 
@@ -371,16 +371,16 @@ The `/internal/*` endpoints serve the web apps and need a signed assertion; they
 
 ## 6. Code structure
 
-| Path | What is in it |
-| --- | --- |
-| `backend/app/` | FastAPI service: `api/`, `services/`, `domain/` (pure rules), `repositories/`, `models/`, `schemas/`, `core/` |
-| `backend/migrations/`, `backend/tests/` | Alembic (expand-only, linted by `scripts/migration_lint.sh`); unit, integration, concurrency, contract, migration tests |
-| `apps/booking/`, `apps/admin/` | The two Next.js apps |
-| `packages/api/`, `packages/ui/` | Generated client and the `/api` proxy; shared UI |
-| `services/realtime/` | The Go service behind the staff live feed ([3.7](#37-the-live-feed-a-go-service-beside-fastapi)) |
-| `collections/` | The Postman collection and its two environments, run by `make api-check` ([Try the API](#try-the-api)) |
-| `contracts/` | The committed contract: the OpenAPI spec, the error catalogue ([`api-errors.md`](contracts/api-errors.md)) and the event schemas in `events/` |
-| `infra/`, `.circleci/`, `scripts/` | Terraform and bootstrap, the pipelines, verification and cost scripts |
+| Path                                    | What is in it                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/app/`                          | FastAPI service: `api/`, `services/`, `domain/` (pure rules), `repositories/`, `models/`, `schemas/`, `core/`                                 |
+| `backend/migrations/`, `backend/tests/` | Alembic (expand-only, linted by `scripts/migration_lint.sh`); unit, integration, concurrency, contract, migration tests                       |
+| `apps/booking/`, `apps/admin/`          | The two Next.js apps                                                                                                                          |
+| `packages/api/`, `packages/ui/`         | Generated client and the `/api` proxy; shared UI                                                                                              |
+| `services/realtime/`                    | The Go service behind the staff live feed ([3.7](#37-the-live-feed-a-go-service-beside-fastapi))                                              |
+| `collections/`                          | The Postman collection and its two environments, run by `make api-check` ([Try the API](#try-the-api))                                        |
+| `contracts/`                            | The committed contract: the OpenAPI spec, the error catalogue ([`api-errors.md`](contracts/api-errors.md)) and the event schemas in `events/` |
+| `infra/`, `.circleci/`, `scripts/`      | Terraform and bootstrap, the pipelines, verification and cost scripts                                                                         |
 
 `make help` lists every task.
 
@@ -392,13 +392,13 @@ These are **AI-generated portraits of fictional doctors**: the five seeded docto
 - **Licence.** Apache License 2.0. The model card (`Tongyi-MAI/Z-Image-Turbo`, revision `f332072aa78be7aecdf3ee76d5c247082da564a6`) declares `license: apache-2.0` ([model card](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)), confirmed with the Hugging Face CLI on 2026-10-19; the Space listed as running that model is `mcp-tools/Z-Image-Turbo`; the card is not gated and adds no terms about generated images. Apache 2.0 allows commercial use and does not restrict outputs.
 - **Prompt template** (verbatim): "Professional corporate headshot photograph, {who}, wearing a crisp white doctor's coat over {wear}, stethoscope around neck, warm genuine smile, looking at camera, soft even studio lighting, plain light grey background, head and shoulders, centered, sharp focus, photorealistic, 85mm lens"
 
-| Doctor | {who} | {wear} |
-| --- | --- | --- |
-| Dr. Achieng Otieno | a Kenyan Black woman in her late 30s, general practitioner, short natural hair, small gold stud earrings | navy blouse |
-| Dr. Brian Kamau | a Kenyan Black man in his mid 30s, paediatrician, short cropped hair, friendly expression | light blue shirt |
-| Dr. Chebet Rotich | a Kenyan Black woman in her early 30s, dermatologist, neat braids tied back, clear radiant skin | teal scrubs |
-| Dr. David Mwangi | a Kenyan Black man in his late 40s, obstetrician gynaecologist, short greying hair, trimmed beard, reassuring expression | white shirt and dark tie |
-| Dr. Esther Njeri | a Kenyan Black woman in her early 40s, dentist, shoulder-length relaxed hair, bright smile | lilac scrubs |
+| Doctor             | {who}                                                                                                                    | {wear}                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| Dr. Achieng Otieno | a Kenyan Black woman in her late 30s, general practitioner, short natural hair, small gold stud earrings                 | navy blouse              |
+| Dr. Brian Kamau    | a Kenyan Black man in his mid 30s, paediatrician, short cropped hair, friendly expression                                | light blue shirt         |
+| Dr. Chebet Rotich  | a Kenyan Black woman in her early 30s, dermatologist, neat braids tied back, clear radiant skin                          | teal scrubs              |
+| Dr. David Mwangi   | a Kenyan Black man in his late 40s, obstetrician gynaecologist, short greying hair, trimmed beard, reassuring expression | white shirt and dark tie |
+| Dr. Esther Njeri   | a Kenyan Black woman in her early 40s, dentist, shoulder-length relaxed hair, bright smile                               | lilac scrubs             |
 
 Fallbacks if a portrait fails to load: the CC0 illustration, then initials. Regenerate with `make avatars` ([`scripts/avatars/portraits.py`](scripts/avatars/portraits.py)); details and sources in [`packages/ui/assets/doctors/README.md`](packages/ui/assets/doctors/README.md) and [the third-party card](https://clinic.ericgitangu.com/decisions#third-party).
 
@@ -437,11 +437,11 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 **How long it takes, and what you can skip.** Measured on 2026-10-21 from the last ten finished CircleCI workflows (eight pull request runs, two releases): a pull request pipeline takes 18 to 19 minutes from push to the last check, and a release on `main` 28 to 29, because the jobs run in parallel and the slowest sets the pace. The three long ones are the end-to-end suites, and I keep them on every pull request because they are the ones that run the real thing:
 
-| Job | Typical time | What it proves |
-| --- | --- | --- |
-| `e2e-real` | 18 to 19 min | The booking app in a real browser against the real API and Postgres, including the double booking and the one-hour rule |
-| `admin-e2e` | 11 to 13 min | The admin dashboard against the same stack, roles and the live feed included |
-| `backend-test` | 8 to 10 min | The full backend suite on real Postgres, with the race test and its control |
+| Job            | Typical time | What it proves                                                                                                          |
+| -------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `e2e-real`     | 18 to 19 min | The booking app in a real browser against the real API and Postgres, including the double booking and the one-hour rule |
+| `admin-e2e`    | 11 to 13 min | The admin dashboard against the same stack, roles and the live feed included                                            |
+| `backend-test` | 8 to 10 min  | The full backend suite on real Postgres, with the race test and its control                                             |
 
 Everything else finishes in under 5 minutes. If you rerun the checks yourself and want a quick answer, `make test` (about 2.5 minutes on my machine), `make api-check` and `make verify` cover the booking rules and the API contract without a browser; `make e2e` and `make e2e-admin` are the slow ones, and the latest release on `main` passed all three in CI. I have not turned any of them off or made them optional, and I would not: `backend-test`, for example, failed 19 tests on a migration that would have broken staff invitations, and stopped it before it merged.
 
@@ -469,14 +469,14 @@ Much of the code in this repository was generated by AI. I directed it, reviewed
 
 I did not keep a running count of agent-written against hand-written lines, and git cannot tell them apart, so I will not put a percentage on it. By area:
 
-| Area | Who wrote it | How it was checked before merge |
-| --- | --- | --- |
-| Plan and decision records | AI drafts from my constraints; I cut, reversed and signed off | My sign-off on each record before any code |
-| Backend: FastAPI, migrations, tests | AI | Real Postgres in every test, the race test with its naive control, a review round per pull request |
-| Booking and admin apps | AI | Browser tests against the real API and database, accessibility checks |
-| Go live-feed service | AI | `go-quality`, race-enabled tests against a real database |
-| CI, Terraform, cost guards | AI | `cost-check` live after each deploy; anything that creates or changes a cloud resource waited for my approval |
-| README and the decisions page | AI drafts from my notes; I edited them | Every claim tied to a command, a test or a live check |
+| Area                                | Who wrote it                                                  | How it was checked before merge                                                                               |
+| ----------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Plan and decision records           | AI drafts from my constraints; I cut, reversed and signed off | My sign-off on each record before any code                                                                    |
+| Backend: FastAPI, migrations, tests | AI                                                            | Real Postgres in every test, the race test with its naive control, a review round per pull request            |
+| Booking and admin apps              | AI                                                            | Browser tests against the real API and database, accessibility checks                                         |
+| Go live-feed service                | AI                                                            | `go-quality`, race-enabled tests against a real database                                                      |
+| CI, Terraform, cost guards          | AI                                                            | `cost-check` live after each deploy; anything that creates or changes a cloud resource waited for my approval |
+| README and the decisions page       | AI drafts from my notes; I edited them                        | Every claim tied to a command, a test or a live check                                                         |
 
 ### An example where AI improved my work
 
@@ -511,14 +511,14 @@ The design came before the code: the design and decision records were committed 
 
 ### What you need
 
-| Tool | Version | Needed for |
-| --- | --- | --- |
-| Docker with Compose v2 | any recent release (I used Docker 29 and Compose v5) | `make up`, `make api-check`, `make e2e` |
-| `uv` | any recent release (0.11 here); it installs Python 3.12 from `backend/pyproject.toml` | `make test`, `make verify` |
-| Node | 24 (CircleCI runs 24.14) | the web apps |
-| `pnpm` | 12.5.1, the version CircleCI installs | `pnpm install` for the web apps and shared packages |
-| Go | 1.26 (`services/realtime/go.mod`) | only to build or test the gateway outside Docker |
-| Chrome | the installed Chrome; Playwright uses `channel: "chrome"` | `make e2e` and `make e2e-admin` |
+| Tool                   | Version                                                                               | Needed for                                          |
+| ---------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Docker with Compose v2 | any recent release (I used Docker 29 and Compose v5)                                  | `make up`, `make api-check`, `make e2e`             |
+| `uv`                   | any recent release (0.11 here); it installs Python 3.12 from `backend/pyproject.toml` | `make test`, `make verify`                          |
+| Node                   | 24 (CircleCI runs 24.14)                                                              | the web apps                                        |
+| `pnpm`                 | 12.5.1, the version CircleCI installs                                                 | `pnpm install` for the web apps and shared packages |
+| Go                     | 1.26 (`services/realtime/go.mod`)                                                     | only to build or test the gateway outside Docker    |
+| Chrome                 | the installed Chrome; Playwright uses `channel: "chrome"`                             | `make e2e` and `make e2e-admin`                     |
 
 newman needs no install: `make api-check` runs it from a pinned Docker image.
 
