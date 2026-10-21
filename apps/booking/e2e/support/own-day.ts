@@ -8,18 +8,14 @@
 // person who booked it, and lets the day go, so the same days serve any number of runs.
 import { callApi } from "@clinic/api/call";
 import { cancelMineInternalMeAppointmentsAppointmentIdCancelPatch } from "@clinic/api/generated";
-import { addDays, API, today } from "./../api";
+import { addDays, API } from "./../api";
+import { ANCHOR_DAY } from "./anchor";
 import { withDb } from "./db";
 import { Client as PgClient } from "pg";
 
-const isTuesday = (day: string) =>
-  new Date(`${day}T12:00:00Z`).getUTCDay() === 2;
-
 // The pool: Monday to Friday of the week `pick(9)` uses (its Tuesday to Friday are the same dates).
 function poolDays(): string[] {
-  let d = 10;
-  while (!isTuesday(addDays(today(), d))) d++;
-  const tuesday = addDays(today(), d + 7 * 9);
+  const tuesday = addDays(ANCHOR_DAY, 7 * 9);
   return [-1, 0, 1, 2, 3].map((i) => addDays(tuesday, i));
 }
 

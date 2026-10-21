@@ -335,6 +335,10 @@ test.describe("the skip link", () => {
       browser,
     }) => {
       const { page, context } = await open(browser, c, DESKTOP);
+      // The error screen is drawn on the server and the client then re-renders it as it recovers from
+      // the throw; a Tab pressed before that settles can land on a node that is replaced. Let the
+      // page finish loading first.
+      await page.waitForLoadState("networkidle");
       await page.keyboard.press("Tab");
       const skip = page.getByRole("link", { name: "Skip to content" });
       await expect(skip).toBeFocused();

@@ -1,4 +1,5 @@
-import { API, addDays, today, type Picked } from "../api";
+import { API, addDays, type Picked } from "../api";
+import { ANCHOR_DAY } from "./anchor";
 
 // A calendar cell owned by one test instance: a doctor on a working day of week 9 after the first
 // Tuesday that is at least ten days out (the shared helpers use weeks 0 to 8, so nothing else
@@ -9,14 +10,6 @@ import { API, addDays, today, type Picked } from "../api";
 // more cells than the week has fails loudly instead of colliding.
 const CELL_WEEK = 9;
 const MIN_HOURS = 2;
-
-const isTuesday = (day: string) =>
-  new Date(`${day}T12:00:00Z`).getUTCDay() === 2;
-function firstTuesdayOffset(): number {
-  let d = 10;
-  while (!isTuesday(addDays(today(), d))) d++;
-  return d;
-}
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API}${path}`);
@@ -36,7 +29,7 @@ export async function ownCell(i: number): Promise<Picked> {
   const doctors = await Promise.all(
     items.map((d) => getJson<Doctor>(`/doctors/${d.id}`)),
   );
-  const monday = addDays(today(), firstTuesdayOffset() + 7 * CELL_WEEK - 1);
+  const monday = addDays(ANCHOR_DAY, 7 * CELL_WEEK - 1);
   const cells: { doctorId: string; day: string }[] = [];
   for (let offset = 0; offset < 5; offset++) {
     const day = addDays(monday, offset);
@@ -76,11 +69,10 @@ export async function farCell(i: number): Promise<Picked> {
   const doctors = await Promise.all(
     items.slice(1).map((d) => getJson<Doctor>(`/doctors/${d.id}`)),
   );
-  const first = firstTuesdayOffset();
   const cells: { doctorId: string; day: string }[] = [];
   for (let week = 0; week < CELL_WEEK; week++) {
     for (let offset = 0; offset < 5; offset++) {
-      const day = addDays(today(), first + 7 * week - 1 + offset);
+      const day = addDays(ANCHOR_DAY, 7 * week - 1 + offset);
       for (const d of doctors) {
         if (
           d.working_hours.some(
