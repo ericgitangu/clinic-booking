@@ -150,6 +150,139 @@ def test_ordinary_defaults_and_notes_pass(line: str) -> None:
     assert errors(line + "\n") == []
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        f"export ABLY_API_KEY={HEX_KEY}",
+        f"ABLY_API_KEY = {HEX_KEY}",
+        f"export ABLY_API_KEY = '{HEX_KEY}'",
+        f'ABLY_API_KEY="{HEX_KEY}"',
+        f"ABLY_API_KEY='{HEX_KEY}'",
+        f"ABLY_API_KEY={HEX_KEY} # trailing note",
+        f"# ABLY_API_KEY={HEX_KEY}",
+        "export BETTER_AUTH_SECRET=changeme",
+        'API_TOKEN = "x"',
+    ],
+    ids=[
+        "export",
+        "spaces",
+        "export-spaces-quoted",
+        "double-quoted",
+        "single-quoted",
+        "trailing",
+        "commented-out",
+        "export-short",
+        "spaces-quoted-short",
+    ],
+)
+def test_other_assignment_forms_with_a_secret_fail(line: str) -> None:
+    found = errors(line + "\n")
+    assert len(found) == 1, found
+    assert HEX_KEY not in found[0]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "export WEB_ORIGIN=http://localhost:3000",
+        "WEB_ORIGIN = 'http://localhost:3000'",
+        "# E2E_DB_URL=",
+        "# TEST_DB_PORT=5432",
+    ],
+)
+def test_other_assignment_forms_without_a_secret_pass(line: str) -> None:
+    assert errors(line + "\n") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "WEB_ORIGIN=a\nWEB_ORIGIN=b\n",
+        "export WEB_ORIGIN=a\nWEB_ORIGIN = b\n",
+        "WEB_ORIGIN=a\n# WEB_ORIGIN=b\n",
+        "# WEB_ORIGIN=a\n# WEB_ORIGIN=a\n",
+        "DATABASE_URL=\nDATABASE_URL=\n",
+    ],
+    ids=["plain", "export-and-spaces", "active-and-commented", "both-commented", "empty-secret"],
+)
+def test_a_name_listed_twice_fails(text: str) -> None:
+    found = errors(text)
+    assert len(found) == 1, found
+    assert "is listed twice" in found[0]
+    assert ":2:" in found[0]
+
+
+def test_a_commented_out_line_counts_as_listed(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / ".env.example"
+    path.write_text(
+        "# E2E_DB_URL=\n# comment about NOT_A_NAME=1\n"
+        "export WEB_ORIGIN=x\nTEST_DB_HOST = h\n# Note: a=b\n"
+    )
+    assert check.listed(path) == {"E2E_DB_URL", "WEB_ORIGIN", "TEST_DB_HOST"}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "GCP_PROJECT_NUMBER",
+        "GCP_SERVICE_ACCOUNT_EMAIL",
+        "RECAPTCHA_SERVICE_ACCOUNT_EMAIL",
+        "GOOGLE_PROJECT_NUMBER",
+        "DEPLOYER_SA",
+        "TF_VAR_project_number",
+        "ADMIN_EMAILS",
+        "TF_VAR_project_id",
+    ],
+)
+def test_account_identifiers_the_files_keep_empty_fail_when_filled(name: str) -> None:
+    value = "123456789012" if name.endswith(("NUMBER", "number")) else "someone@example.com"
+    found = errors(f"{name}={value}\n")
+    assert len(found) == 1, found
+    assert "is a secret and must be empty" in found[0]
+    assert errors(f"{name}=\n") == []
+    assert errors(f"# {name}=\n") == []
+
+
+def test_a_filled_gcp_project_number_fails() -> None:
+    found = errors("GCP_PROJECT_NUMBER=123456789012\n")
+    assert len(found) == 1 and "GCP_PROJECT_NUMBER is a secret" in found[0]
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        f"# e.g. {HEX_KEY}",
+        f"# the key looks like {HEX_KEY[:30]} here",
+        f"# token: {FAKE_AIZA}",
+        f"# set it to {FAKE_GHP} first",
+        "# e.g. redis://default:s3cr3tvalue@localhost:6379",
+        "# connect with postgresql://clinic:HUNTER_TWO@db.example.com/clinic",
+    ],
+    ids=["hex64", "hex30", "aiza", "ghp", "redis-userinfo", "caps-password"],
+)
+def test_a_comment_with_a_realistic_secret_fails(comment: str) -> None:
+    found = errors(comment + "\nNAME=\n")
+    assert len(found) == 1, found
+    assert "comment holds" in found[0]
+    assert HEX_KEY not in found[0]
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# Generate one with: openssl rand -hex 32",
+        "# Generate: openssl rand -base64 32 (the code only checks it is not empty).",
+        "# See apps/admin/e2e/global-setup.ts and backend/docker/initdb/01-roles.sql",
+        "# CircleCI supplies CIRCLE_OIDC_TOKEN_V2 itself.",
+        "# Format: postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DB",
+        "# Format: redis://default:${REDIS_PASSWORD}@host:6379",
+        "WEB_ORIGIN=http://localhost:3000 # the dev server",
+    ],
+)
+def test_documented_placeholders_and_paths_in_comments_pass(comment: str) -> None:
+    assert errors(comment + "\n") == []
+
+
 def test_main_fails_when_an_example_file_gains_a_secret(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -163,8 +296,11 @@ def test_main_fails_when_an_example_file_gains_a_secret(
         copy.parent.mkdir()
         copy.write_text(path.read_text())
         copies[label] = copy
-    with copies["backend"].open("a") as f:
-        f.write(f"INTERNAL_SIGNING_KEY={HEX_KEY}\n")
+    text = copies["backend"].read_text()
+    assert "\nINTERNAL_SIGNING_KEY=\n" in text
+    copies["backend"].write_text(
+        text.replace("\nINTERNAL_SIGNING_KEY=\n", f"\nINTERNAL_SIGNING_KEY={HEX_KEY}\n")
+    )
     monkeypatch.setattr(check, "ENV_FILES", copies)
 
     assert check.main() == 1
