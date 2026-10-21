@@ -56,10 +56,10 @@ describe("decision record cards", () => {
     expect(text).not.toMatch(/\bADRs?\b|adr-\d/i);
   });
 
-  it("has one card for every decision, 1 to 34, in order", () => {
-    expect(DECISION_CARDS).toHaveLength(34);
+  it("has one card for every decision, 1 to 35, in order", () => {
+    expect(DECISION_CARDS).toHaveLength(35);
     expect(DECISION_CARDS.map((a) => a.number)).toEqual(
-      Array.from({ length: 34 }, (_, i) => String(i + 1)),
+      Array.from({ length: 35 }, (_, i) => String(i + 1)),
     );
     expect(DECISION_CARDS.map((a) => a.id)).toEqual(
       DECISION_CARDS.map((a) => `decision-${a.number}`),

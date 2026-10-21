@@ -15,7 +15,7 @@ import type { DecisionCard, Card, TabContent } from "./types";
 export { DECISION_INTRO, DECISION_STATUS_NOTE };
 
 export const PAGE_INTRO =
-  "The other tabs hold the rest of the working: the full set of 34 numbered decisions, how the system fits together, how it is run, what I observed on the live stack, and how to call the API.";
+  "The other tabs hold the rest of the working: the full set of 35 numbered decisions, how the system fits together, how it is run, what I observed on the live stack, and how to call the API.";
 
 export const DECISION_CARDS: readonly DecisionCard[] = [
   ...DECISION_CARDS_1,
