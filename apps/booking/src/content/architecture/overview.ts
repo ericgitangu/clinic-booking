@@ -53,7 +53,7 @@ export const OVERVIEW: TabContent = {
             ],
             [
               "Idempotency keys, shell-only PWA, polling",
-              "In the code. Availability polls every 15 s while the tab is visible and stops after 10 minutes without input",
+              "In the code. Availability polls every 60 s while live push is healthy and every 15 s when it is not, and stops after 10 minutes without input",
               "[thin web layer](/decisions#thin-web-layer), [polling then push](/decisions#polling-then-push)",
             ],
             [
@@ -155,7 +155,7 @@ export const OVERVIEW: TabContent = {
         },
         {
           t: "note",
-          text: "The admin half of the web deploy, its rollback and the public checks after it need a project-scoped `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context. On the `v1.1.0` release (152cff5) `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` all reported success.",
+          text: "The admin half of the web deploy, its rollback and the public checks after it need a project-scoped `VERCEL_ADMIN_TOKEN` in the `vercel-prod` context. On the `v1.1.1` release, the submission tag, `ship-admin`, `verify-release`, `smoke-public` and `zap-prod` all reported success.",
         },
       ],
     },

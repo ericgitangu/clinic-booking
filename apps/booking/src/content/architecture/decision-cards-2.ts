@@ -96,7 +96,7 @@ export const DECISION_CARDS_2: readonly DecisionCard[] = [
     number: "20",
     title: "Clean git history, disclosure in one place",
     status:
-      "Accepted, done. `v1.1.0` is the submission tag (`v1.0.0` is an earlier one), and the README disclosure section is written.",
+      "Accepted, done. `v1.1.1` is the submission tag (`v1.0.0` and `v1.1.0` are earlier ones), and the README disclosure section is written.",
     decision:
       "Commits follow Conventional Commits, one pull request per change, squash-merged, with no tooling trailers on commits I write. How the work was made is disclosed in a single README section, not scattered through commit messages. Local tooling files stay out of the repository through a local exclude file.",
     cost: "Keeping that disclosure current while I work is a discipline cost. Dependabot's own commits keep their bot lines; I left them. I rewrote commit messages once, only to replace an old numbering scheme with decision numbers, and no file changed. The `v1.0.0` tag points at c9e1119, the same tree it pointed at before.",
@@ -124,7 +124,7 @@ export const DECISION_CARDS_2: readonly DecisionCard[] = [
       "Accepted in part. Sign-in moved to [decision 24](#decision-24), and the bot check uses reCAPTCHA instead of Turnstile. The Auth.js and stream-ticket design was not built.",
     decision:
       "The bot check is reCAPTCHA through Google Cloud. The booking server actions for book, reschedule and cancel verify a score of at least 0.5 (configurable) and the expected action name. There is no secret to hold: the server uses its existing Vercel identity to call the API through a service account that has one role.",
-    cost: "Scripted clients of the web app fail by design. The public REST API is not protected by this check, because the brief asks for an open API. reCAPTCHA is free only up to a monthly allowance, so a flood of form submissions could cost money, and the per-IP limit in the proxy is the bound.",
+    cost: "Scripted clients of the web app fail by design. The public REST API is not protected by this check, because I kept the API open (the brief is silent on authentication) so Swagger's Try it out works. reCAPTCHA is free only up to a monthly allowance, so a flood of form submissions could cost money, and the per-IP limit in the proxy is the bound.",
     revisit:
       "Real patient data or an authenticated patient flow. Then bot enforcement moves into the API itself.",
     decisionsPage: ["thin-web-layer"],

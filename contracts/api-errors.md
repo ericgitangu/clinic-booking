@@ -16,7 +16,7 @@ current state; may succeed later or in another state.
 | ROLE_ESCALATION | 403 | role-escalation | Role escalation | The caller's role may not change this access: an admin cannot change or revoke an admin, and nobody changes their own access. |
 | CLIENT_ADDRESS_UNKNOWN | 400 | client-address-unknown | Client address unknown | The request carries no usable client address, so it cannot be rate limited. Retry. |
 | VALIDATION_ERROR | 422 | validation-error | Validation error | Schema or type errors, extra fields, bad UUID/date, non-string datetime. |
-| TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | The datetime is naive (and nothing else is wrong). |
+| TIMEZONE_REQUIRED | 422 | timezone-required | Timezone required | A datetime has no UTC offset; send RFC 3339 with an offset, for example 2026-10-26T09:00:00+03:00. |
 | UNKNOWN_DOCTOR | 422 | unknown-doctor | Unknown doctor | The body references a non-existent or inactive doctor. |
 | UNKNOWN_PATIENT | 422 | unknown-patient | Unknown patient | The body references a non-existent patient. |
 | SLOT_IN_PAST | 422 | slot-in-past | Slot in the past | starts_at is at or before now. |

@@ -88,7 +88,7 @@ export const DECISIONS: readonly Decision[] = [
     decision:
       "The browser only talks to the Next.js server code. That code signs each request to the API with a short-lived signed assertion. People sign in with Google, and staff roles are checked in the API on every request.",
     gaveUp:
-      "The public API is still open, as the brief says. Anyone who holds an appointment id can change that appointment through it. I say so in the README. Sessions are stateless cookies, so I cannot revoke one early.",
+      "The public API is still open: the brief is silent on authentication, and I kept it open so Swagger's Try it out works. Anyone who holds an appointment id can change that appointment through it. I say so in the README. Sessions are stateless cookies, so I cannot revoke one early.",
     why: "I can close the gap in the web layer without changing the contract the brief asked for. Server code means little JavaScript in the browser and nothing secret in it.",
     revisit:
       "Before any real patient data. Then the API itself has to know who is calling.",
