@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HydrationSignal } from "@clinic/ui/components/app-shell/hydration-signal";
 import { ShellHeader } from "@clinic/ui/components/app-shell/shell-header";
 import { ShellTrail } from "@clinic/ui/components/app-shell/shell-trail";
 import { SiteFooter } from "@clinic/ui/components/layout/site-footer";
@@ -28,6 +29,7 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
+      <HydrationSignal />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-[calc(env(safe-area-inset-top)+0.5rem)] focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

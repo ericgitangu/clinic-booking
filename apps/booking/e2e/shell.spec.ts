@@ -337,16 +337,22 @@ test.describe("the skip link", () => {
       const { page, context } = await open(browser, c, DESKTOP);
       // The error screen is drawn on the server and the client then re-renders it as it recovers from
       // the throw; a Tab pressed before that settles can land on a node that is replaced. Wait for the
-      // load event and the content landmark. Not networkidle: pages that poll never go idle.
-      await page.waitForLoadState("load");
-      await expect(page.locator("#main")).toBeVisible();
+      // shell's hydration mark. Not networkidle: pages that poll never go idle. The docs viewers are
+      // plain HTML from a route handler with no React on them, so there is nothing to hydrate: the
+      // load event and the landmark are all there is to wait for.
+      const docs = ["/docs", "/redoc"].includes(c.path(ids));
+      if (docs) {
+        await page.waitForLoadState("load");
+        await expect(page.locator("#main")).toBeVisible();
+      } else {
+        await expect(page.locator("html[data-hydrated]")).toBeAttached();
+      }
       await page.keyboard.press("Tab");
       const skip = page.getByRole("link", { name: "Skip to content" });
       await expect(skip).toBeFocused();
       await expect(skip).toBeVisible();
       await page.keyboard.press("Enter");
       // The docs viewers draw their own main landmark, so there the target is the wrapper around it.
-      const docs = ["/docs", "/redoc"].includes(c.path(ids));
       await expect(
         docs ? page.locator("#main") : page.getByRole("main"),
       ).toBeFocused();
@@ -361,7 +367,7 @@ test.describe("anchors clear the sticky header", () => {
     const page = await context.newPage();
     await page.goto("/privacy");
     // Let the page finish hydrating first, or React replaces what is added below.
-    await page.waitForLoadState("networkidle");
+    await expect(page.locator("html[data-hydrated]")).toBeAttached();
     // Add a target far down the page, so the jump needs a real scroll whatever the page holds.
     await page.evaluate(() => {
       const spacer = document.createElement("div");
