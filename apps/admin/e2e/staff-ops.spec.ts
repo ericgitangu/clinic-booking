@@ -2,13 +2,11 @@
 // invitations and who may manage whom, the audit trail, and the analytic views. Every figure
 // is compared with the API's own answer; nothing here is a hard-coded number.
 import AxeBuilder from "@axe-core/playwright";
+import { humanDate, lastDays, localDate } from "../src/lib/clinic-time";
 import {
-  humanDate,
-  addDays,
-  lastDays,
-  localDate,
-} from "../src/lib/clinic-time";
-import { bookOneStraightThroughTheApi } from "./support/booking";
+  bookOneStraightThroughTheApi,
+  nextDayWithFreeTime,
+} from "./support/booking";
 import {
   pastHalfHourCanFallOnYesterday,
   moveToPastHalfHour,
@@ -33,13 +31,14 @@ test.describe("veto and lock", () => {
     const id = await bookOneStraightThroughTheApi();
     const original = await publicApi<Appt>("GET", `/appointments/${id}`);
     // The patient moves it to another free time the next day.
-    const day = addDays(original.body.starts_at.slice(0, 10), 1);
-    const avail = await publicApi<{ slots: { starts_at: string }[] }>(
-      "GET",
-      `/doctors/${original.body.doctor_id}/availability?date=${day}`,
+    const target = await nextDayWithFreeTime(
+      original.body.doctor_id,
+      original.body.starts_at.slice(0, 10),
     );
-    const target = avail.body.slots[1];
-    test.skip(!target, "no free time the next day to move to");
+    expect(
+      target,
+      "no free time within a week after the booked day",
+    ).toBeDefined();
     // Before the patient has changed anything there is nothing to veto, so the button is not there.
     const page = await as("admin");
     await page.goto(`/dashboard/appointments/${id}`);
@@ -387,19 +386,20 @@ test.describe("marking attendance from the appointment page", () => {
     const moved = await bookOneStraightThroughTheApi();
     const untouched = await bookOneStraightThroughTheApi();
     const original = await publicApi<Appt>("GET", `/appointments/${moved}`);
-    const day = addDays(original.body.starts_at.slice(0, 10), 1);
-    const avail = await publicApi<{ slots: { starts_at: string }[] }>(
-      "GET",
-      `/doctors/${original.body.doctor_id}/availability?date=${day}`,
+    const target = await nextDayWithFreeTime(
+      original.body.doctor_id,
+      original.body.starts_at.slice(0, 10),
     );
-    const target = avail.body.slots[1];
-    test.skip(!target, "no free time the next day to move to");
+    expect(
+      target,
+      "no free time within a week after the booked day",
+    ).toBeDefined();
     const done = await publicApi("PATCH", `/appointments/${moved}/reschedule`, {
       starts_at: target!.starts_at,
     });
     expect(done.status).toBe(200);
     moveToPastHalfHour(moved, 2);
-    moveToPastHalfHour(untouched, 3);
+    moveToPastHalfHour(untouched, 1);
 
     const page = await as("admin");
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -425,7 +425,7 @@ test.describe("marking attendance from the appointment page", () => {
       "a past half hour can fall on yesterday just after the clinic's midnight",
     );
     const id = await bookOneStraightThroughTheApi();
-    moveToPastHalfHour(id, 3);
+    moveToPastHalfHour(id, 2);
     const page = await as("viewer");
     await page.goto(`/dashboard/appointments/${id}`);
     await expect(page.getByTestId("lineage")).toBeVisible();

@@ -2,13 +2,11 @@
 // of that person: a viewer sees initials, no actions, and "hidden for your role" where a reason is
 // on record; an owner or admin sees the reasons and the actions, each of which asks for a reason.
 import AxeBuilder from "@axe-core/playwright";
+import { formatBucket, lastDays, localDate } from "../src/lib/clinic-time";
 import {
-  addDays,
-  formatBucket,
-  lastDays,
-  localDate,
-} from "../src/lib/clinic-time";
-import { bookOneStraightThroughTheApi } from "./support/booking";
+  bookOneStraightThroughTheApi,
+  nextDayWithFreeTime,
+} from "./support/booking";
 import {
   pastHalfHourCanFallOnYesterday,
   moveToPastHalfHour,
@@ -28,7 +26,7 @@ async function openDashboard(page: Page, size = { width: 1280, height: 900 }) {
 /** A visit of our own in the last hours, on the doctor no other spec books, so it is on the board. */
 async function visitOnTheBoard(back: number): Promise<string> {
   const id = await bookOneStraightThroughTheApi();
-  // Each caller asks for its own half hour; a free one is found, inside the desk window when back is 3 or less.
+  // Each caller asks for its own half hour; a free one is found, inside the desk window when back is 2 or less.
   moveToPastHalfHour(id, back);
   return id;
 }
@@ -64,7 +62,7 @@ test.describe("a click opens the detail", () => {
       pastHalfHourCanFallOnYesterday(),
       "a past half hour can fall on yesterday just after the clinic's midnight",
     );
-    const id = await visitOnTheBoard(3);
+    const id = await visitOnTheBoard(2);
     const page = await as("admin");
     await openDashboard(page);
     const row = page
@@ -161,13 +159,14 @@ test.describe("a click opens the detail", () => {
       "GET",
       `/appointments/${id}`,
     );
-    const day = addDays(original.body.starts_at.slice(0, 10), 1);
-    const avail = await publicApi<{ slots: { starts_at: string }[] }>(
-      "GET",
-      `/doctors/${original.body.doctor_id}/availability?date=${day}`,
+    const target = await nextDayWithFreeTime(
+      original.body.doctor_id,
+      original.body.starts_at.slice(0, 10),
     );
-    const target = avail.body.slots[1];
-    test.skip(!target, "no free time the next day to move to");
+    expect(
+      target,
+      "no free time within a week after the booked day",
+    ).toBeDefined();
     await publicApi("PATCH", `/appointments/${id}/reschedule`, {
       starts_at: target!.starts_at,
     });

@@ -29,6 +29,12 @@ interface Notice {
 /** A booked visit inside the desk window, and the doctor it ended up with. */
 async function visitAtTheDesk(label: string) {
   const made = await book(`${label} ${Date.now()}`);
+  // Checked here, right before the move: a guard read once at file load goes stale if the clinic's
+  // midnight passes while the earlier tests run.
+  test.skip(
+    pastHalfHourCanFallOnYesterday(1),
+    "a past half hour can fall on yesterday just after the clinic's midnight",
+  );
   moveToPastHalfHour(made.id, 1);
   const row = await internal<{ doctor_id: string; patient_name: string }>(
     "GET",
@@ -88,11 +94,6 @@ async function onDashboard(page: Page) {
 }
 
 test.describe("the arrival email to the doctor", () => {
-  test.skip(
-    pastHalfHourCanFallOnYesterday(),
-    "a past half hour can fall on yesterday just after the clinic's midnight",
-  );
-
   test("an arrival emails the doctor once, the row says sent, and both toasts say so", async ({
     as,
     browser,
