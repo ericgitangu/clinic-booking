@@ -212,6 +212,12 @@ export const API: TabContent = {
               "Ask for a new invitation.",
             ],
             [
+              "`PASS_INVALID`",
+              "404",
+              "The reviewer pass does not exist, was revoked, expired or used up, or cannot be used by this account. Every reason returns the same body.",
+              "Ask for a new pass.",
+            ],
+            [
               "`ACCESS_NOT_FOUND`",
               "404",
               "No active access for this email.",
