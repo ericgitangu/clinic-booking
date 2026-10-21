@@ -47,6 +47,7 @@ from app.schemas.staff import (
     InviteRevoked,
     Notified,
     NotifyResult,
+    PassAccepted,
     PassCreated,
     PassList,
     PassRequest,
@@ -457,7 +458,7 @@ async def revoke_pass(
 
 @passes_router.post(
     "/accept",
-    response_model=AccessEntry,
+    response_model=PassAccepted,
     description=(
         "Accept a reviewer pass. The caller is whoever the web app signed in with Google; any "
         "verified account may, and gets the pass's role (someone who already has access gets "
@@ -475,7 +476,7 @@ async def accept_pass(
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     _guard: None = Depends(guard_replay_only),
-) -> AccessEntry:
+) -> PassAccepted:
     response.headers.update(_NO_STORE)
     return await passes.accept(session, clock, settings, who=who, token=body.token)
 

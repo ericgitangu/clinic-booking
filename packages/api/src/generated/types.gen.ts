@@ -1696,6 +1696,56 @@ export type Pass = {
 };
 
 /**
+ * PassAccepted
+ *
+ * The caller's access entry, and what the accept did. ``joined`` is false for someone who
+ * already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+ * after this call, so the owner's notice can say which person of how many this was.
+ */
+export type PassAccepted = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Granted At
+     */
+    granted_at: string | null;
+    /**
+     * Granted By
+     */
+    granted_by: string;
+    /**
+     * Joined
+     */
+    joined: boolean;
+    /**
+     * Of
+     */
+    of: number;
+    /**
+     * Pass Id
+     */
+    pass_id: string;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+    /**
+     * Role
+     */
+    role: 'owner' | 'admin' | 'viewer';
+    /**
+     * Source
+     */
+    source: 'env' | 'db';
+    /**
+     * Use
+     */
+    use: number;
+};
+
+/**
  * PassCreated
  *
  * Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it
@@ -4423,7 +4473,7 @@ export type AcceptPassInternalAdminPassesAcceptPostResponses = {
     /**
      * Successful Response
      */
-    200: AccessEntry;
+    200: PassAccepted;
 };
 
 export type AcceptPassInternalAdminPassesAcceptPostResponse = AcceptPassInternalAdminPassesAcceptPostResponses[keyof AcceptPassInternalAdminPassesAcceptPostResponses];

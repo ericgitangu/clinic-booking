@@ -2925,6 +2925,91 @@
         "title": "Pass",
         "type": "object"
       },
+      "PassAccepted": {
+        "description": "The caller's access entry, and what the accept did. ``joined`` is false for someone who\nalready had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken\nafter this call, so the owner's notice can say which person of how many this was.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "granted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted At"
+          },
+          "granted_by": {
+            "title": "Granted By",
+            "type": "string"
+          },
+          "joined": {
+            "title": "Joined",
+            "type": "boolean"
+          },
+          "of": {
+            "title": "Of",
+            "type": "integer"
+          },
+          "pass_id": {
+            "format": "uuid",
+            "title": "Pass Id",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "env",
+              "db"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "use": {
+            "title": "Use",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "granted_by",
+          "granted_at",
+          "revoked_at",
+          "source",
+          "joined",
+          "pass_id",
+          "use",
+          "of"
+        ],
+        "title": "PassAccepted",
+        "type": "object"
+      },
       "PassCreated": {
         "description": "Returned once, on creation. ``token`` is the raw secret for the link ``/pass/<token>``: it\nis not stored (only its SHA-256 is), not logged and cannot be read again. Anyone who holds\nthe link can take the role, until it expires or ``max_uses`` people have.",
         "properties": {
@@ -7768,7 +7853,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccessEntry"
+                  "$ref": "#/components/schemas/PassAccepted"
                 }
               }
             },

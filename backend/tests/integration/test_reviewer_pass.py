@@ -141,6 +141,8 @@ async def test_accept_grants_the_role_and_writes_the_trail(
         "admin",
         OWNER,
     )
+    assert (resp.json()["joined"], resp.json()["use"], resp.json()["of"]) == (True, 1, 5)
+    assert resp.json()["pass_id"] == made["id"]
     me = await env.req("GET", "/internal/admin/session", role="admin", email=NEW)
     assert me.json()["role"] == "admin"
     grant = await owner_conn.fetchrow(
@@ -194,7 +196,12 @@ async def test_the_same_person_twice_uses_one_seat(
     rows_after_first = len(await audit_rows(owner_conn))
     again = await accept(env, made["token"], NEW)
     assert first.status_code == again.status_code == 200
-    assert again.json() == first.json()
+    # The same entry; only the account of what the call did differs.
+    assert first.json()["joined"] is True and again.json()["joined"] is False
+    assert (first.json()["use"], again.json()["use"], again.json()["of"]) == (1, 1, 2)
+    assert {k: v for k, v in again.json().items() if k != "joined"} == {
+        k: v for k, v in first.json().items() if k != "joined"
+    }
     assert len(await audit_rows(owner_conn)) == rows_after_first
     assert await owner_conn.fetchval("SELECT count(*) FROM staff_pass_uses") == 1
     assert await owner_conn.fetchval("SELECT count(*) FROM staff_access_audit") == 1

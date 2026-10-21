@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.staff import StaffActionName
-from app.schemas.access import Email, GrantableRole
+from app.schemas.access import AccessEntry, Email, GrantableRole
 from app.schemas.appointment import Appointment, _strip
 from app.schemas.common import ClinicDatetime, StrAwareDatetime
 from app.schemas.doctor_notice import DoctorNoticeState
@@ -215,6 +215,17 @@ class PassList(BaseModel):
 class AcceptRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     token: Annotated[str, Field(min_length=20, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class PassAccepted(AccessEntry):
+    """The caller's access entry, and what the accept did. ``joined`` is false for someone who
+    already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+    after this call, so the owner's notice can say which person of how many this was."""
+
+    joined: bool
+    pass_id: uuid.UUID
+    use: int
+    of: int
 
 
 class AttendanceRequest(BaseModel):

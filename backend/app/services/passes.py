@@ -26,7 +26,7 @@ from app.repositories import access as access_repo
 from app.repositories import passes as repo
 from app.repositories import staff as staff_repo
 from app.schemas.access import AccessEntry
-from app.schemas.staff import Pass, PassCreated, PassList, PassRevoked, PassStatus
+from app.schemas.staff import Pass, PassAccepted, PassCreated, PassList, PassRevoked, PassStatus
 from app.services import access as access_service
 from app.services.invites import ACCEPT_DAILY_LIMIT, WINDOW, email_hash, hash_token
 
@@ -157,7 +157,7 @@ async def accept(
     *,
     who: Principal,
     token: str,
-) -> AccessEntry:
+) -> PassAccepted:
     now = clock.now()
     address = normalize_email(who.email)
     if not who.email_verified:
@@ -190,10 +190,16 @@ async def accept(
         if existing is not None and existing["revoked_at"] is not None:
             # A pass never undoes a revoke: only the owner can, from the Access page.
             raise PassInvalid()
+        used = await repo.count_uses(session, row["id"])
         if existing is not None:
             # Already staff: opening the link twice is harmless. No seat, nothing written.
-            return AccessEntry(**existing, source="db")
-        used = await repo.count_uses(session, row["id"])
+            return PassAccepted(
+                **AccessEntry(**existing, source="db").model_dump(),
+                joined=False,
+                pass_id=row["id"],
+                use=used,
+                of=row["max_uses"],
+            )
         if used >= row["max_uses"]:
             raise PassInvalid()
         granted = await access_repo.upsert(
@@ -227,4 +233,10 @@ async def accept(
                 "of": row["max_uses"],
             },
         )
-    return AccessEntry(**granted, source="db")
+    return PassAccepted(
+        **AccessEntry(**granted, source="db").model_dump(),
+        joined=True,
+        pass_id=row["id"],
+        use=used + 1,
+        of=row["max_uses"],
+    )

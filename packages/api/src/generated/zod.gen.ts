@@ -802,6 +802,30 @@ export const zNotifyResult = z.object({
 });
 
 /**
+ * PassAccepted
+ *
+ * The caller's access entry, and what the accept did. ``joined`` is false for someone who
+ * already had access (nothing was written, no seat used); ``use`` of ``of`` is the seats taken
+ * after this call, so the owner's notice can say which person of how many this was.
+ */
+export const zPassAccepted = z.object({
+    email: z.string(),
+    granted_at: z.iso.datetime({ offset: true }).nullable(),
+    granted_by: z.string(),
+    joined: z.boolean(),
+    of: z.int(),
+    pass_id: z.uuid(),
+    revoked_at: z.iso.datetime({ offset: true }).nullable(),
+    role: z.enum([
+        'owner',
+        'admin',
+        'viewer'
+    ]),
+    source: z.enum(['env', 'db']),
+    use: z.int()
+});
+
+/**
  * PassRequest
  *
  * A reviewer pass: ``max_uses`` people may take ``role`` with it, for ``days`` days.
@@ -1841,7 +1865,7 @@ export const zAcceptPassInternalAdminPassesAcceptPostBody = zAcceptRequest;
 /**
  * Successful Response
  */
-export const zAcceptPassInternalAdminPassesAcceptPostResponse = zAccessEntry;
+export const zAcceptPassInternalAdminPassesAcceptPostResponse = zPassAccepted;
 
 export const zRevokePassInternalAdminPassesPassIdDeletePath = z.object({
     pass_id: z.uuid()
