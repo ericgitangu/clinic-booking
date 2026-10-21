@@ -94,8 +94,11 @@ async def test_one_person_on_two_passes_at_once_takes_one_seat_in_all(
     other_instances: list[Env],
     owner_conn: asyncpg.Connection,
 ) -> None:
-    first = (await env.req("POST", "/internal/admin/passes", body={"max_uses": 3})).json()["token"]
-    second = (await env.req("POST", "/internal/admin/passes", body={"max_uses": 3})).json()["token"]
+    # More seats on each pass than people, so neither can run out: a used-up pass answers 404 to
+    # everyone, staff included, which would be the right answer but not the one this test is about.
+    roomy = {"max_uses": 10}
+    first = (await env.req("POST", "/internal/admin/passes", body=roomy)).json()["token"]
+    second = (await env.req("POST", "/internal/admin/passes", body=roomy)).json()["token"]
     for n in range(5):
         who = f"both{n}@example.org"
         codes = await asyncio.gather(
