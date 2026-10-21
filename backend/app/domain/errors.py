@@ -215,6 +215,13 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "The invitation does not exist, was used, revoked or expired, or was sent to another "
         "email. Every reason returns the same body.",
     ),
+    ErrorSpec(
+        "PASS_INVALID",
+        404,
+        "Pass invalid",
+        "The reviewer pass does not exist, was revoked, expired or used up, or cannot be used by "
+        "this account. Every reason returns the same body.",
+    ),
     ErrorSpec("ACCESS_NOT_FOUND", 404, "Access not found", "No active access for this email."),
     ErrorSpec("DOCTOR_NOT_FOUND", 404, "Doctor not found", "No such doctor (including inactive)."),
     ErrorSpec("PATIENT_NOT_FOUND", 404, "Patient not found", "No such patient."),
@@ -388,6 +395,14 @@ class InviteInvalid(DomainError):
     # One fixed sentence for every failure: the response must not say which check failed.
     def __init__(self) -> None:
         super().__init__("This invitation is not valid.")
+
+
+class PassInvalid(DomainError):
+    code = "PASS_INVALID"
+
+    # One fixed sentence for every failure: the response must not say which check failed.
+    def __init__(self) -> None:
+        super().__init__("This pass is not valid.")
 
 
 class NotFoundRoute(DomainError):

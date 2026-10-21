@@ -112,7 +112,7 @@ class Env:
 async def env(owner_conn: asyncpg.Connection) -> AsyncIterator[Env]:
     await owner_conn.execute(
         "TRUNCATE appointment_events, appointments, staff_access, staff_access_audit, "
-        "staff_invites RESTART IDENTITY CASCADE"
+        "staff_invites, staff_passes, invite_accept_cap RESTART IDENTITY CASCADE"
     )
     await owner_conn.execute(
         "DELETE FROM patients WHERE id = $1 OR phone = '+254700000001'", PATIENT
@@ -139,7 +139,7 @@ async def env(owner_conn: asyncpg.Connection) -> AsyncIterator[Env]:
         yield Env(c, clock)
     await owner_conn.execute(
         "TRUNCATE appointment_events, appointments, staff_access, staff_access_audit, "
-        "staff_invites RESTART IDENTITY CASCADE"
+        "staff_invites, staff_passes, invite_accept_cap RESTART IDENTITY CASCADE"
     )
     await owner_conn.execute(
         "DELETE FROM patients WHERE id = $1 OR phone = '+254700000001'", PATIENT
