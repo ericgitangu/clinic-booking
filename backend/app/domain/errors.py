@@ -70,7 +70,8 @@ CATALOGUE: tuple[ErrorSpec, ...] = (
         "TIMEZONE_REQUIRED",
         422,
         "Timezone required",
-        "The datetime is naive (and nothing else is wrong).",
+        "A datetime has no UTC offset; send RFC 3339 with an offset, "
+        "for example 2026-10-26T09:00:00+03:00.",
     ),
     ErrorSpec(
         "UNKNOWN_DOCTOR",

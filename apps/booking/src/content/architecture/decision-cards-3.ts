@@ -67,7 +67,7 @@ export const DECISION_CARDS_3: readonly DecisionCard[] = [
     status: "Accepted, shipped",
     decision:
       "Pages read through server components and every change goes through a server action, so the browser never holds a credential for the API. A patient must be signed in with a verified Google account, and booking, cancelling and rescheduling each carry their own reCAPTCHA token, rejected if it is missing, for another action, or scores under 0.5. Every call is checked against the generated contract on the way out and on the way back.",
-    cost: "The public REST API stays open, as the brief asks, so the sign-in and the human check protect the screens and not a direct API call. Sessions are stateless cookies that last seven days and cannot be revoked early. There is no guest booking, so a patient needs a Google account. The bot check cannot be rehearsed on a preview deployment.",
+    cost: "The public REST API stays open (the brief is silent on authentication; I kept it open so Swagger's Try it out works), so the sign-in and the human check protect the screens and not a direct API call. Sessions are stateless cookies that last seven days and cannot be revoked early. There is no guest booking, so a patient needs a Google account. The bot check cannot be rehearsed on a preview deployment.",
     revisit:
       "A need to revoke one session at once, guest booking, or any real patient data.",
     decisionsPage: ["thin-web-layer", "rest-and-errors"],

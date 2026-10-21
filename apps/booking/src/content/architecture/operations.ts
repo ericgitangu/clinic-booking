@@ -712,11 +712,11 @@ FROM staff_access_audit ORDER BY occurred_at DESC LIMIT 20;`,
       id: "demo-seed",
       title: "Demo seed",
       summary:
-        "A hand-run script that fills the clinic with invented patients and four weeks of bookings for the dashboard.",
+        "A hand-run script that fills a local or staging database with invented patients and four weeks of bookings for the dashboard.",
       blocks: [
         {
           t: "p",
-          text: "`python -m app.scripts.seed_demo` adds invented patients and four weeks of bookings so the admin dashboard has believable activity to review. I run it by hand, once, after the core seed. It is not part of the release migrate job and never runs on a deploy.",
+          text: "`python -m app.scripts.seed_demo` adds invented patients and four weeks of bookings so the admin dashboard has believable activity to review. It is run by hand against a local or staging database, after the core seed. It has not been run against production, which holds only the release-check rows that the admin views exclude. It is not part of the release migrate job and never runs on a deploy.",
         },
         {
           t: "ol",

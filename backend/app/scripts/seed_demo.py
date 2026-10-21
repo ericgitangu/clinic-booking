@@ -2,7 +2,7 @@
 
     python -m app.scripts.seed_demo [--today YYYY-MM-DD]
 
-Everything here is fictional and AI-generated (see ``demo_data``): about 40 patients, @example.com
+Everything here is fictional and AI-generated (see ``demo_data``): 100 patients, @example.com
 emails that can never receive mail, clearly fake phone numbers (+254700000xxx), and appointments
 across the five seeded doctors from 14 days before ``today`` to 14 days after. It exists so the
 admin dashboard can be reviewed with believable activity. It is NOT part of the release migrate
