@@ -2283,7 +2283,7 @@ export type SlotEvent = {
     /**
      * Seq
      *
-     * "<txid>.<id>.<part>": apply a message only if it sorts after the last one applied and its (txid, id) is after the cursor of the availability response in use.
+     * "<txid>.<id>.<part>": apply a message only if it sorts after the last one applied. Ignore it if the grid already reflects it; if the grid contradicts it, the grid is stale, so a slot_taken for a time still on offer wins and a slot_freed asks for one refetch.
      */
     seq: string;
     /**

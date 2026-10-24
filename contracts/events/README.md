@@ -36,12 +36,14 @@ Every outbox event has a cursor `"<txid>.<id>"`: the transaction that wrote it a
 integers (compare them as `BigInt` pairs, txid first). A patient message's `seq` is the cursor plus
 `.0` (the freed half) or `.1` (the taken half), so the two messages of one event still order.
 
-- The availability response carries `cursor`: every event whose `(txid, id)` sorts at or before it is
-  already reflected in `slots`. Accept a polled response only if its cursor is not older than the one
-  you hold.
-- Apply a pushed message only if its `seq` sorts after the last one you applied **and** its
-  `(txid, id)` sorts after the cursor of the availability response you are showing. Delivery is at
-  least once and not guaranteed to be in order after a reconnect, so a repeat is dropped by `seq`.
+- The availability response carries `cursor`, which is `<xmin>.0`: a horizon, not proof that the
+  response saw every event at or before it. Accept a polled response only if its cursor is not older
+  than the one you hold.
+- Apply a pushed message only if its `seq` sorts after the last one you applied. If the grid already
+  reflects the event, ignore it. If the grid contradicts it, the grid is stale: a `slot_taken` for a
+  time still on offer is applied, and a `slot_freed` for a time still absent asks for one refetch.
+  Delivery is at least once and not guaranteed to be in order after a reconnect, so a repeat is
+  dropped by `seq`.
 - After every (re)connect do one refetch of the availability: the push service documents no
   signal for a failed resume on SSE.
 
