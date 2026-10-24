@@ -451,7 +451,18 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 ## 9. Deployment & CI/CD
 
-**CI runs on CircleCI, not GitHub Actions.** GitHub Actions was not available on my account because of a billing issue, so the pipeline runs on CircleCI; the repository stays on GitHub. GitHub Actions still runs dependency-graph updates and Dependabot PRs, but those are automation, not the gate: the required checks and every deploy are CircleCI's. The CircleCI badge and pipeline page are public, and I verified both without a token on 2026-10-24 (HTTP 200), so a reviewer can inspect every run without an account.
+**Why CircleCI, not GitHub Actions.** GitHub Actions cannot run on this account until an outstanding GitHub bill is paid: workflow runs are blocked by the billing problem. I moved CI/CD to CircleCI so the repository stays on GitHub while every pull request is still tested and every merge to `main` is still deployed. The GitHub Actions entries a reviewer may see are dependency-graph updates and Dependabot jobs, not the product pipeline; they are automation, not required checks, and they do not deploy. When the GitHub bill is cleared, GitHub Actions can run again, but today the gate and the deploy are CircleCI's.
+
+**Public CI access.** This is an open-source CircleCI project, not a private one. I checked every surface a reviewer needs without a CircleCI account or token on 2026-10-24:
+
+| Surface | URL | Observed without a token |
+| --- | --- | --- |
+| Status badge | <https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield> | `200 image/svg+xml`, the word `passing` |
+| Pipeline list | <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> | `200 text/html`, no login wall |
+| A specific workflow | <https://app.circleci.com/pipelines/gh/ericgitangu/clinic-booking/569/workflows/023164c5-cabe-45c0-9087-f48d13b12269> | `200` after the canonical redirect |
+| Workflow API | <https://circleci.com/api/v2/workflow/023164c5-cabe-45c0-9087-f48d13b12269> | `200 application/json`, `status: success` |
+
+The badge is the quickest check; the pipeline list is the full history; the workflow API is the proof that the run data itself is public, not just the page shell. If the project's visibility is ever changed, the page and the API would start asking for a login, and the badge would be the first signal.
 
 **Which branch deploys.** Only `main`. Pull requests run the verify jobs: lint, backend quality, tests and contract tests, the real-Ably test (`ably-real`), gitleaks, semgrep, pip-audit, an image build with a trivy scan, the ZAP API scan (`dast`), web quality, `e2e-real`, `admin-e2e` and the static cost check, plus `go-quality` for the Go service and `api-check`, which runs the Postman collection with newman. A push to `main` runs the same jobs except `dast`: the ZAP API scan is a pull-request job, and the release runs a ZAP baseline against the public URL (`zap-prod`) after the deploy instead. Then it ships: build and push the image by digest, run migrations (expand-only, as `clinic_owner`), deploy a no-traffic revision, run `scripts/verify_claims.py` against its tagged URL, and promote it only if the commit is still the head of `main`. The booking and admin apps deploy to Vercel after the API. The deploy contexts are restricted to `main` and so is the workload identity federation condition, so a branch pipeline cannot deploy even if someone edits the config file.
 
@@ -467,7 +478,19 @@ Everything else finishes in under 5 minutes. If you rerun the checks yourself an
 
 **Rollback.** Going back is a traffic move, not a rebuild. What has and has not run is in section 4.3. After the web deploy, `verify-release` checks the public URL with no credentials (including `/ready`, which runs `SELECT 1` against Neon); if that fails, one job puts the API back on the revision that was live before and a second job, run only if the first succeeded, points the Vercel alias at the previous deployment, then the release stays red. It refuses to roll back to the placeholder image or when something else has already moved traffic. Deploys are also recorded as CircleCI deploy markers, and `.circleci/rollback.yml` is the one-click version for the CircleCI UI. The runbook is [the rollback runbook](https://clinic.ericgitangu.com/decisions#rollback).
 
-**Release status.** A release on `main` runs 51 jobs: the ships, `verify-release`, `smoke-public`, `zap-prod`, the rollback guards and the live `cost-check`. The badge at the top shows the latest one. One kind of failure is worth knowing about: `cost-check` allows each image repository only the live image and one rollback, and when one release was replaced by another seconds later, the replaced release's image used to be kept as if it were still on its way, so the count went one over. The prune step now keeps a newer image only when it belongs to the current head of `main`. The live check also reports C11 (budgets), C13 and C14 as UNVERIFIED, because CI has no billing role for them, so a run ends "PARTIAL, not OK" even when everything it can check passes.
+**Release status and live deployment.** A release on `main` runs 51 jobs: the ships, `verify-release`, `smoke-public`, `zap-prod`, the rollback guards and the live `cost-check`. The badge at the top shows the latest one. A green run is a full deploy, not a partial one: `ship-api`, `ship-realtime`, `ship-booking` and `ship-admin` each deploy, then `verify-release` checks the public URL, `smoke-public` exercises it without credentials, and `zap-prod` scans it. The last release, `cb0edec1` (workflow `023164c5-cabe-45c0-9087-f48d13b12269`), finished in 30m47s with all 51 jobs green and these public endpoints answering 200 on 2026-10-24:
+
+| Public endpoint | Observed |
+| --- | --- |
+| `/` | `200 text/html` |
+| `/book` | `200 text/html` |
+| `/api/health` | `200 application/json` |
+| `/api/ready` | `200 application/json` (`SELECT 1` against Neon) |
+| `/openapi.json` | `200 application/json` |
+| `/api/doctors` | `200 application/json` |
+| `https://clinic-admin.ericgitangu.com` | `200 text/html` (signed-out page) |
+
+One kind of failure is worth knowing about: `cost-check` allows each image repository only the live image and one rollback, and when one release was replaced by another seconds later, the replaced release's image used to be kept as if it were still on its way, so the count went one over. The prune step now keeps a newer image only when it belongs to the current head of `main`. The live check also reports C11 (budgets), C13 and C14 as UNVERIFIED, because CI has no billing role for them, so a run ends "PARTIAL, not OK" even when everything it can check passes.
 
 ## 10. Operations, cost & security posture
 
