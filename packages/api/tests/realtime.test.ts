@@ -23,7 +23,7 @@ type Ev = z.infer<typeof Event>;
 
 let server: Server;
 let base = "";
-let script: (auth: string | undefined) => string[] | "hold";
+let script: (auth: string | undefined) => string[] | "hold" | "hold-silent";
 let held: Array<() => void> = [];
 
 beforeEach(async () => {
@@ -31,8 +31,10 @@ beforeEach(async () => {
   server = createServer((req, res) => {
     const plan = script(req.headers.authorization);
     res.writeHead(200, { "content-type": "text/event-stream" });
-    if (plan === "hold") {
-      res.write(": open\n\n"); // send the headers now
+    if (plan === "hold" || plan === "hold-silent") {
+      if (plan === "hold")
+        res.write(": open\n\n"); // send the headers now
+      else res.flushHeaders(); // headers only: the client must run its attach grace
       held.push(() => res.end());
       return;
     }
@@ -110,6 +112,16 @@ describe("createSseParser", () => {
 });
 
 describe("StreamController against the SSE format", () => {
+  it("waits for a first frame or the attach grace before saying live", async () => {
+    script = () => "hold-silent";
+    const { c, statuses } = make({ attachGraceMs: 80 });
+    c.start();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(statuses).not.toContain("live");
+    await until(() => statuses.includes("live"));
+    c.stop();
+  });
+
   it("goes live, sends the token as a Bearer header and delivers valid events only", async () => {
     let auth: string | undefined;
     script = (a) => {
