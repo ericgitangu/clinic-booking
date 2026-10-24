@@ -7,10 +7,9 @@ import { DECISIONS, DIAGRAM_LABEL, GO_NOTE } from "@/lib/architecture";
 const root = (p: string) =>
   fileURLToPath(new URL(`../../../../${p}`, import.meta.url));
 const readme = readFileSync(root("README.md"), "utf8");
-const section = readme.slice(
-  readme.indexOf("\n## Architecture\n"),
-  readme.indexOf("\n## 1. Live URLs"),
-);
+const start = readme.indexOf("\n## Architecture\n");
+const end = readme.indexOf("\n## ", start + 1);
+const section = readme.slice(start, end === -1 ? undefined : end);
 const mmd = readFileSync(
   root("apps/booking/src/content/architecture.mmd"),
   "utf8",

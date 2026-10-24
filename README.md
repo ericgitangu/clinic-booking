@@ -2,7 +2,7 @@
 
 A clinic appointment API in which the database, not application code, is what makes double booking impossible, with a Next.js booking app and an admin dashboard on top.
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/workflow/4281cff2-d684-4bed-905c-d68bd7f6863a)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking)
 
 ## Start here
 
@@ -16,6 +16,7 @@ A clinic appointment API in which the database, not application code, is what ma
 - **Depth.** Every decision has a one-line summary in [section 4](#4-key-decisions--trade-offs) and, for the headline choices, an entry on the [decisions page](https://clinic.ericgitangu.com/decisions) that names what it costs. [The Architecture tab](https://clinic.ericgitangu.com/decisions#architecture) has the diagrams (context, containers, booking, push, release, data handling), [the engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions) the long decisions index, and [the verification card](https://clinic.ericgitangu.com/decisions#verification) how each pull request was checked, quoted from its review comments. [Section 4.2](#42-what-i-deliberately-did-not-build-and-the-known-limits) lists what I left out and the limits I know about.
 - **Demo data.** A demo seed (`python -m app.scripts.seed_demo`, run after the core seed; on the local stack `docker compose exec -T api python -m app.scripts.seed_demo`) fills a database with about 100 invented patients and four weeks of bookings so the admin dashboard can be reviewed ([the demo data runbook](https://clinic.ericgitangu.com/decisions#demo-seed)). They are AI-generated, fictional and Nairobi-local, created to make the clinic reviewable; no real people. Production does not hold them: it holds only the rows from the release checks, which the admin views exclude (they are not deleted). The demo is for a local or staging stack.
 - **The admin app** (<https://clinic-admin.ericgitangu.com>) only admits the allowlisted owner and the people the owner grants access to ([runbook](https://clinic.ericgitangu.com/decisions#admin-access)), so a reviewer needs an invitation or the reviewer pass link I send with the submission (see Reviewer access below).
+- **Reports.** The [Technical Design](reports/technical-design/technical-design.pdf) and the [Interview Walkthrough](reports/interview-walkthrough/interview-walkthrough.pdf) are generated from one branded print system: a shared base stylesheet, a document-control cover, a running header and a footer on every page. `make reports` rebuilds both; [the report system](reports/README.md) explains the branches.
 - **Reviewer access.** Staff invitations are live (#63 and #68 are merged). The owner invites the reviewer as admin through `/access`; the invitation expires in 72 hours and must be accepted with the same Google email it was sent to. The owner can also make a reviewer pass on the same page: one link that any verified Google account can accept to become admin (or viewer), for up to 5 people and 14 days by default, and at most 10 and 30. Accepting needs a Google sign-in and a press of Accept, every use is audited and emailed to the owner, and revoking the pass stops new sign-ins but does not remove people who already joined. The trade-off is in [Decision 35](https://clinic.ericgitangu.com/decisions#decision-35).
 - **AI use** is described by me in [section 11](#11-ai-reflection). The records it draws on (what I decided, what agents did, the stop rules) are in [the usage facts](https://clinic.ericgitangu.com/decisions#ai-usage).
 - **Live versus declared.** What runs in production and what is only designed is stated in [the architecture overview](https://clinic.ericgitangu.com/decisions#containers) and in the status column of [the engineering decisions card](https://clinic.ericgitangu.com/decisions#engineering-decisions).
@@ -101,6 +102,25 @@ Four runtimes is a cost for an app this size, so each one has to earn its place:
 
 **Ably** ([polling first, then push](https://clinic.ericgitangu.com/decisions#polling-then-push)). Patient slot events, which carry no personal data. It fans out to up to 200 patients at once on the free package, at $0, with no socket infrastructure of mine. Events reach it from the outbox relay in the API after each commit, and the booking page also polls every 60 seconds while push is healthy, so a missed message costs at most a minute of staleness and never a wrong booking.
 
+## Technology stack
+
+One pnpm workspace, two Next.js apps, one FastAPI service and one Go service, with Terraform for the cloud and CircleCI for delivery. The versions below are the ones pinned in the lockfiles and CI images at the time of writing.
+
+| Layer | Technology (pinned) | Where |
+| --- | --- | --- |
+| Languages | Python 3.12, TypeScript 5.9.3, Go 1.26.10, SQL, Bash | `backend/`, `apps/`, `services/realtime/`, `scripts/` |
+| API framework | FastAPI 0.143.2, Pydantic 2.14.1, SQLAlchemy 2.1.4 (async), asyncpg 0.32.0, Alembic 1.20.0, Uvicorn 0.54.0 | `backend/` |
+| Web framework | Next.js 16.4.2 (App Router, server actions, route handlers), React 19.3.1, TypeScript 5.9.3, Tailwind CSS 4.3.3, Better Auth 1.7.10, TanStack Query 5.104.2, zod 4.6.7 | `apps/booking/`, `apps/admin/`, `packages/ui/`, `packages/api/` |
+| Live feed | Go 1.26.10, pgx v5.11.0, jsonschema v6.0.3, server-sent events | `services/realtime/` |
+| Data | Neon PostgreSQL 17, a partial unique index, the `clinic_owner` / `clinic_app` / `clinic_realtime` roles, Alembic expand-only migrations | `backend/migrations/`, `infra/terraform/` |
+| Cloud | Google Cloud `us-east4` (Cloud Run, Cloud Run Jobs, Artifact Registry, Secret Manager, IAM, Workload Identity Federation, Cloud Logging, Cloud Monitoring), Vercel, Neon, Ably, Resend, reCAPTCHA Enterprise | `infra/`, `.circleci/` |
+| IaC and local runtime | Terraform 1.5.7 with the Google provider `~> 6.0` (GCP and billing budgets), Docker, Compose, `infra/bootstrap.sh` | `infra/terraform/`, `infra/billing/`, `docker-compose.yml` |
+| API contract | OpenAPI 3.1, RFC 9457 `application/problem+json`, `@hey-api/openapi-ts` 0.99.0, generated TypeScript types, zod schemas and SDK | `contracts/`, `packages/api/src/generated/` |
+| Tests | pytest 9, Schemathesis 4.31.1, Playwright 1.64, Vitest 5.0.5, axe-core 4.14.0, Lighthouse CI 0.15.1, the Go race detector | `backend/tests/`, `apps/*/e2e/`, `services/realtime/` |
+| Security gates | gitleaks 8.30.1, Semgrep 1.181.0, pip-audit, Trivy 0.76.0, OWASP ZAP API and baseline scans, `pnpm audit` | `.circleci/config.yml`, `.gitleaks.toml`, `.trivyignore`, `.zap/` |
+| Delivery | CircleCI 2.1, keyless OIDC to Workload Identity Federation, Vercel CLI 59.5.0, Cloud Run tagged revisions, smoke test, promotion and automatic rollback | `.circleci/config.yml`, `scripts/ci/` |
+| Reports | Markdown, Mermaid 11.4.2, pandoc 3.10, WeasyPrint 69, one shared `base.css` and per-report branches | `reports/` |
+
 ## 1. Live URLs
 
 | What | Where |
@@ -112,7 +132,7 @@ Four runtimes is a cost for an app this size, so each one has to earn its place:
 | ReDoc | <https://clinic.ericgitangu.com/redoc> |
 | OpenAPI spec | <https://clinic.ericgitangu.com/openapi.json> |
 | Admin app (allowlisted) | <https://clinic-admin.ericgitangu.com> |
-| Pipelines | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
+| Pipelines (public: the badge and the pipeline page answer without a CircleCI login) | [![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking) <https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking> |
 
 The earlier address, <https://sil-clinic-booking.vercel.app>, answers its pages (`/`, `/book`, `/docs`) with a 308 redirect to the host above. Its `/api/...` paths are not redirected: they are answered directly (`/api/doctors` returns 200 there too). I checked both with plain GET requests on 2026-10-20. The public REST API is still the product, and the booking pages sit on top of it. Cloud Run itself is IAM-only and only the Vercel proxy can call it.
 
@@ -431,7 +451,7 @@ The brief leaves these open. I picked an answer, and each is a one-line change i
 
 ## 9. Deployment & CI/CD
 
-**CI runs on CircleCI, not GitHub Actions.** GitHub Actions was not available on my account because of a billing issue, so the pipeline runs on CircleCI; the repository stays on GitHub.
+**CI runs on CircleCI, not GitHub Actions.** GitHub Actions was not available on my account because of a billing issue, so the pipeline runs on CircleCI; the repository stays on GitHub. GitHub Actions still runs dependency-graph updates and Dependabot PRs, but those are automation, not the gate: the required checks and every deploy are CircleCI's. The CircleCI badge and pipeline page are public, and I verified both without a token on 2026-10-24 (HTTP 200), so a reviewer can inspect every run without an account.
 
 **Which branch deploys.** Only `main`. Pull requests run the verify jobs: lint, backend quality, tests and contract tests, the real-Ably test (`ably-real`), gitleaks, semgrep, pip-audit, an image build with a trivy scan, the ZAP API scan (`dast`), web quality, `e2e-real`, `admin-e2e` and the static cost check, plus `go-quality` for the Go service and `api-check`, which runs the Postman collection with newman. A push to `main` runs the same jobs except `dast`: the ZAP API scan is a pull-request job, and the release runs a ZAP baseline against the public URL (`zap-prod`) after the deploy instead. Then it ships: build and push the image by digest, run migrations (expand-only, as `clinic_owner`), deploy a no-traffic revision, run `scripts/verify_claims.py` against its tagged URL, and promote it only if the commit is still the head of `main`. The booking and admin apps deploy to Vercel after the API. The deploy contexts are restricted to `main` and so is the workload identity federation condition, so a branch pipeline cannot deploy even if someone edits the config file.
 
