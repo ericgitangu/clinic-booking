@@ -2,7 +2,7 @@
 
 A clinic appointment API in which the database, not application code, is what makes double booking impossible, with a Next.js booking app and an admin dashboard on top.
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=flat-square)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ericgitangu/clinic-booking/tree/main.svg?style=shield)](https://app.circleci.com/pipelines/github/ericgitangu/clinic-booking)
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%C2%B7%20Next.js%20%C2%B7%20Go-243a8c?style=flat-square)](#technology-stack)
 [![Languages](https://img.shields.io/badge/languages-Python%20%C2%B7%20TypeScript%20%C2%B7%20Go%20%C2%B7%20SQL-1c75bc?style=flat-square)](#technology-stack)
 [![Architecture](https://img.shields.io/badge/architecture-C4%20%C2%B7%20event--driven%20%C2%B7%20serverless-14204f?style=flat-square)](#architecture)
