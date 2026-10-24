@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LotusMark } from "@clinic/ui/components/brand/lotus-mark";
 import { ZoneNote } from "@clinic/ui/components/zone-note";
 import { PrintButton } from "@/components/print-button";
 import { formatTime, humanDate, localDate } from "@/lib/clinic-time";
@@ -21,6 +22,25 @@ export default async function PrintPage() {
   }
   return (
     <div className="space-y-6 py-6">
+      <div className="print-only" data-testid="print-brand">
+        <div className="flex items-end justify-between gap-6 border-b-2 border-foreground pb-4">
+          <div className="flex items-center gap-3">
+            <LotusMark size={96} priority />
+            <div>
+              <p className="font-heading text-2xl font-semibold tracking-tight">
+                Idyllic Clinic
+              </p>
+              <p className="text-sm text-muted-foreground">Staff schedule</p>
+            </div>
+          </div>
+          <div className="text-right text-sm">
+            <p className="font-medium">Idyllic Clinic Admin</p>
+            <p className="text-muted-foreground">
+              clinic-admin.ericgitangu.com
+            </p>
+          </div>
+        </div>
+      </div>
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/dashboard"
@@ -79,6 +99,16 @@ export default async function PrintPage() {
           </section>
         ))
       )}
+      <div
+        className="print-only print-brand-footer"
+        data-testid="print-brand-footer"
+      >
+        <p className="font-medium">
+          Powered by Idyllic Clinic Technologies - Made with{" "}
+          <span className="heart">&#10084;</span> with Deveric
+        </p>
+        <p>https://developer.ericgitangu.com</p>
+      </div>
     </div>
   );
 }

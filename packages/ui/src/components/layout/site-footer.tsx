@@ -89,7 +89,7 @@ export function SiteFooter({
   notice: string;
 }) {
   return (
-    <footer className="mt-auto">
+    <footer className="mt-auto" data-shell="footer">
       <Separator />
       <div className="pad-safe-x mx-auto w-full max-w-5xl pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 text-muted-foreground">
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">

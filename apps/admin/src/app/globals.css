@@ -77,13 +77,27 @@ body::before {
   }
 }
 
-/* The print page: the sheet only, no chrome, no wash, black on white. */
+/* The print page: the sheet only, no shell chrome, black on white. */
+.print-only {
+  display: none;
+}
+
 @media print {
-  header,
-  footer,
+  @page {
+    size: A4;
+    margin: 16mm 14mm 24mm;
+  }
+
+  [data-shell="header"],
+  [data-shell="trail"],
+  [data-shell="footer"],
   .no-print,
   [data-sonner-toaster] {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   body::before {
@@ -93,6 +107,67 @@ body::before {
   body {
     background: #fff;
     color: #000;
+  }
+
+  main {
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  h1 {
+    font-size: 20pt;
+    margin: 4mm 0 2mm;
+  }
+
+  h2 {
+    font-size: 13pt;
+    margin: 5mm 0 2mm;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  th,
+  td {
+    border-bottom: 0.2mm solid #bbb;
+    padding: 1.5mm 2mm;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  .print-brand-footer {
+    position: fixed;
+    left: 14mm;
+    right: 14mm;
+    bottom: 8mm;
+    border-top: 0.3mm solid #999;
+    padding-top: 3mm;
+    font-size: 8.5pt;
+    line-height: 1.35;
+  }
+
+  .print-brand-footer p {
+    margin: 0;
+  }
+
+  .print-brand-footer p + p {
+    margin-top: 1mm;
+  }
+
+  .print-brand-footer .heart {
+    color: #b3261e;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
 

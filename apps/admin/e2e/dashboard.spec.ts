@@ -419,6 +419,23 @@ test.describe("owner dashboard", () => {
       }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
+
+    const brand = page.getByTestId("print-brand");
+    const brandFooter = page.getByTestId("print-brand-footer");
+    await expect(brand).toContainText("Idyllic Clinic");
+    await expect(brand).toContainText("Staff schedule");
+    await expect(brandFooter).toContainText(
+      "Powered by Idyllic Clinic Technologies",
+    );
+    await expect(brandFooter).toContainText("Made with");
+    await expect(brandFooter).toContainText("developer.ericgitangu.com");
+
+    // What a PDF gets: the brand block and footer, not the shell trail or print button.
+    await page.emulateMedia({ media: "print" });
+    await expect(brand).toBeVisible();
+    await expect(brandFooter).toBeVisible();
+    await expect(page.locator('[data-shell="trail"]')).toBeHidden();
+    await expect(page.getByRole("button", { name: "Print" })).toBeHidden();
   });
 
   test("a viewer gets no actions, no export, and a 403 from the export routes", async ({
