@@ -16,6 +16,9 @@ const NOT_IN_REPO = /(?<![\w./:@-])docs\/[\w-]+(\/|\.md)/;
 const FIXTURES = new Set([
   "scripts/repo_hygiene.sh",
   "scripts/repo_hygiene_selftest.sh",
+  // The interview walkthrough is a dated report source: it quotes paths from the old docs/ tree
+  // on purpose. The generated PDF is the reviewer artifact; the README points only at tracked files.
+  "reports/interview-walkthrough/WALKTHROUGH.md",
 ]);
 
 const tracked = execFileSync("git", ["ls-files", "-z"], {

@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  actor S as Staff browser (admin app)
+  participant AD as Admin app (server action vetoAppointment)
+  participant API as clinic-api
+  participant DB as Postgres
+  participant RT as clinic-realtime (Go)
+  participant LT as Admin /live/stream route
+  S->>AD: "Veto and lock", reason of 3 to 500 characters
+  AD->>API: POST /internal/admin/appointments/{id}/veto, ID token, assertion (role, email, method, path, body hash)
+  API->>API: require_role: verify HMAC, email_verified, role allowed, then re-read staff_access
+  API->>DB: read latest event, is it a patient change that is still vetoable?
+  alt latest change was a reschedule
+    API->>DB: reschedule back to from_starts_at, set staff_locked_at, expect_event_id guards a race
+  else latest change was a cancel
+    API->>DB: book the same slot again as a NEW appointment, predecessor_id set, starts locked
+  end
+  API->>DB: INSERT appointment_events (actor staff), INSERT staff_action_audit (who, why, before, after), COMMIT
+  API->>DB: relay (patient grids update through Ably)
+  API-->>AD: the change
+  AD-->>S: result, and an email to the patient after the response
+  loop every second per open stream
+    RT->>DB: events and audit rows below snapshot xmin, after my cursor
+    RT-->>LT: SSE frame (owner and admin shape includes who and why)
+    LT-->>S: "Vetoed by ..." in the live feed
+  end

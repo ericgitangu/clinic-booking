@@ -1,0 +1,62 @@
+/* Walkthrough branch on top of ../reports/base.css (print, A4). */
+html { font-size: 9.2pt; }
+main.walk h1 { display: none; }
+main.walk h2 { break-before: page; margin-top: 0; font-size: 16pt; padding-bottom: 2mm; border-bottom: 0.6mm solid var(--primary); color: var(--foreground); }
+main.walk > h2:first-child, main.walk > section:first-child > h2 { break-before: auto; }
+main.walk h3 { font-size: 11pt; color: var(--primary); margin: 5mm 0 1.8mm 0; break-after: avoid; }
+main.walk h4 { font-size: 9.8pt; margin: 4mm 0 1.5mm 0; break-after: avoid; }
+main.walk h5, main.walk h6 { break-after: avoid; }
+main.walk p { orphans: 3; widows: 3; }
+main.walk section { margin: 0; }
+a { overflow-wrap: anywhere; }
+
+/* Contents */
+nav.toc { break-after: page; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { margin: 0; }
+nav.toc > ul > li > a { font-weight: 600; padding: 1.1mm 0; margin-top: 1mm; }
+nav.toc ul ul { padding-left: 6mm; }
+nav.toc ul ul a { font-size: 7.8pt; color: var(--muted-foreground); padding: 0.2mm 0; border-bottom: none; }
+nav.toc a { display: flex; color: var(--foreground); text-decoration: none; border-bottom: 0.2mm dotted var(--border); }
+nav.toc a::after { content: target-counter(attr(href), page); margin-left: auto; padding-left: 3mm; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+nav.toc ul ul a::after { font-size: 7.8pt; }
+
+/* Code: light surface for print, wrapped, never below 8 pt */
+div.sourceCode, pre { margin: 0 0 3.5mm 0; }
+pre {
+  background: #f6f8fb; color: #14204f; border: 0.25mm solid var(--border); border-left: 1mm solid var(--primary);
+  border-radius: 1mm; padding: 2.6mm 3mm; font-size: 8pt; line-height: 1.38;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; hyphens: none; break-inside: auto; orphans: 3; widows: 3;
+}
+pre code { background: none; color: inherit; padding: 0; font-size: 8pt; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; }
+pre.sourceCode { overflow: visible; }
+code.sourceCode > span { display: inline; }
+code { font-size: 0.88em; overflow-wrap: anywhere; word-break: normal; }
+p code, li code, td code { overflow-wrap: anywhere; }
+
+/* Tables */
+table { table-layout: fixed; width: 100%; font-size: 8pt; }
+th { font-size: 7.6pt; }
+td, th { overflow-wrap: anywhere; word-break: normal; }
+td code, th code { font-size: 0.9em; }
+tr { break-inside: avoid; }
+
+/* Diagrams */
+figure.diagram { margin: 2mm 0 5mm 0; text-align: center; break-inside: avoid; }
+figure.diagram img { width: 100%; height: auto; max-height: 215mm; }
+figure.diagram.wide-fig { page: wide; break-before: page; break-after: page; }
+figure.diagram.wide-fig img { width: auto; max-width: 100%; max-height: 168mm; }
+
+/* Question cards (section 9) */
+.qcard { border: 0.25mm solid var(--border); border-left: 1.2mm solid var(--ring); border-radius: 1.2mm; background: #fff; padding: 2.4mm 3.4mm; margin: 0 0 3mm 0; break-inside: avoid; }
+.qcard .q { font-weight: 700; color: var(--primary); margin: 0 0 1.2mm 0; display: block; }
+.qcard .a { margin: 0; }
+.qcard .a + .a { margin-top: 1.5mm; }
+
+blockquote { font-style: normal; font-size: 9pt; }
+hr { border: none; border-top: 0.25mm solid var(--border); margin: 4mm 0; }
+img { max-width: 100%; }
+#read-this-first-what-is-on-main-and-what-is-not > h2 { break-before: auto; margin-top: 6mm; }
+figure.diagram.wide-fig > h3 { margin: 0 0 3mm 0; text-align: left; }
+figure.diagram.wide-fig > h2 { break-before: auto; margin: 0 0 3mm 0; text-align: left; }
+figure.diagram.wide-fig img { max-height: 148mm; }

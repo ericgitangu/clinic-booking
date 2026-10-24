@@ -10,7 +10,7 @@ export TEST_DB_PORT ?= $(DB_HOST_PORT)
 
 .PHONY: help up down logs migrate seed test test-unit test-int test-race test-control \
         contract lint lint-go fmt typecheck audit sec openapi gen-client verify migration-lint hygiene cost-static cost-check cost-selftest ci-test shared-headroom env-pull e2e e2e-admin avatars \
-        api-collection api-check api-check-prod
+        api-collection api-check api-check-prod reports
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -108,6 +108,9 @@ avatars: ## Regenerate the AI doctor portraits (needs a cached Hugging Face logi
 
 ci-test: ## Test the CI helper scripts against fakes (no cloud)
 	bash scripts/ci/test_ci_scripts.sh
+
+reports: ## Rebuild every branded PDF report from the shared print template
+	python3 reports/build_all.py
 
 env-pull: ## Fill apps/booking/.env.local (gitignored) from Vercel's Development environment; sensitive values are not returned
 	cd apps/booking && vercel env pull .env.local --environment=development

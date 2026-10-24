@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Idyllic Clinic: Technical Design</title>
+<meta name="author" content="Eric Gitangu">
+<meta name="description" content="Technical design for the Idyllic Clinic booking system, written against the Savannah Informatics backend assessment.">
+<meta name="dcterms.created" content="2026-10-19">
+<meta name="dcterms.modified" content="2026-10-24">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="tdd.css">
+</head>
+<body>
+
+<div class="runhead">
+  <img class="mark" src="assets/idyllic-mark-trimmed.png" alt="Idyllic Clinic">
+  <span class="wordmark">Idyllic Clinic</span>
+  <span class="sep"></span>
+</div>
+
+<!-- ============================== COVER ============================== -->
+<section class="cover">
+  <div class="band">
+    <img class="logo" src="assets/idyllic-logo-dark.png" alt="Idyllic Clinic logo">
+    <div class="brand">Clinic booking system</div>
+    <div class="rule"></div>
+  </div>
+  <div class="body">
+    <p class="kicker">Technical design &middot; Savannah Informatics assessment</p>
+    <h1>Idyllic Clinic: Technical Design</h1>
+    <p class="subtitle">A production-grade booking system, and the decisions behind it</p>
+    <table class="meta">
+      <tr><th>Author</th><td>Eric Gitangu</td></tr>
+      <tr><th>Date</th><td>24 October 2026</td></tr>
+      <tr><th>Version</th><td>2.0</td></tr>
+      <tr><th>Status</th><td>Ready</td></tr>
+      <tr><th>Repository</th><td><code>github.com/ericgitangu/clinic-booking</code>, branch <code>main</code> at <code>c59263e3</code>; production serves <code>v1.1.1</code> (<code>68449dd</code>) until the next release</td></tr>
+      <tr><th>Live system</th><td><code>https://clinic.ericgitangu.com</code></td></tr>
+    </table>
+  </div>
+  <div class="prepared">
+    <div>
+      <div class="label">Prepared against the brief from</div>
+      <img src="assets/savannah-logo-on-white.png" alt="Savannah Informatics logo">
+    </div>
+    <div class="note">The assessment brief is treated here as the business need. This document sets out the system that meets it, the decisions behind it and its known limits.</div>
+  </div>
+  <div class="brand-stamp">
+    <img src="assets/idyllic-mark-trimmed.png" alt="Idyllic Clinic Technologies">
+    <span class="powered">Powered by Idyllic Clinic Technologies</span>
+    <span>Made with <span class="heart">&#10084;</span> with Deveric</span>
+    <span class="spacer"></span>
+    <a href="https://developer.ericgitangu.com">developer.ericgitangu.com</a>
+  </div>
+</section>
+
+<!-- ============================== TOC ============================== -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#s1"><span class="num">1</span> Scope and conventions</a></li>
+    <li class="sub"><a href="#s1-1">1.1 Naming</a></li>
+    <li><a href="#s2"><span class="num">2</span> Business context</a></li>
+    <li class="sub"><a href="#s2-1">2.1 The scenario, as the brief states it</a></li>
+    <li class="sub"><a href="#s2-2">2.2 Stakeholders</a></li>
+    <li class="sub"><a href="#s2-3">2.3 Success criteria</a></li>
+    <li><a href="#s3"><span class="num">3</span> Requirements</a></li>
+    <li class="sub"><a href="#s3-1">3.1 Functional</a></li>
+    <li class="sub"><a href="#s3-2">3.2 Non-functional and delivery</a></li>
+    <li class="sub"><a href="#s3-3">3.3 Constraints</a></li>
+    <li><a href="#s4"><span class="num">4</span> Assumptions and ambiguity decisions</a></li>
+    <li class="sub"><a href="#s4-hour">4.1 The one-hour rule</a></li>
+    <li><a href="#s5"><span class="num">5</span> Architecture</a></li>
+    <li class="sub"><a href="#s5-1">5.1 What each part does</a></li>
+    <li class="sub"><a href="#s5-2">5.2 The admin side</a></li>
+    <li><a href="#s6"><span class="num">6</span> Data model and booking core</a></li>
+    <li class="sub"><a href="#s6-er">6.1 Entities</a></li>
+    <li class="sub"><a href="#s6-slots">6.2 Slot computation</a></li>
+    <li class="sub"><a href="#s6-race">6.3 The concurrency guarantee</a></li>
+    <li class="sub"><a href="#s6-state">6.4 Appointment state machine and attendance</a></li>
+    <li class="sub"><a href="#s6-time">6.5 Time model</a></li>
+    <li><a href="#s7"><span class="num">7</span> API design</a></li>
+    <li class="sub"><a href="#s7-1">7.1 Endpoints</a></li>
+    <li class="sub"><a href="#s7-2">7.2 Idempotency keys</a></li>
+    <li class="sub"><a href="#s7-3">7.3 Error model: RFC 9457</a></li>
+    <li><a href="#s8"><span class="num">8</span> Decisions and trade-offs</a></li>
+    <li><a href="#s9"><span class="num">9</span> Testing strategy</a></li>
+    <li class="sub"><a href="#s9-1">9.1 Measured results</a></li>
+    <li><a href="#s10"><span class="num">10</span> Deployment and CI/CD</a></li>
+    <li class="sub"><a href="#s10-1">10.1 Pipeline stages</a></li>
+    <li class="sub"><a href="#s10-2">10.2 Smoke check and rollback</a></li>
+    <li><a href="#s11"><span class="num">11</span> Operations, cost and security</a></li>
+    <li class="sub"><a href="#s11-1">11.1 Cost: the $0 posture and its one exception</a></li>
+    <li class="sub"><a href="#s11-2">11.2 Threat model</a></li>
+    <li class="sub"><a href="#s11-3">11.3 Abuse controls</a></li>
+    <li class="sub"><a href="#s11-4">11.4 Observability</a></li>
+    <li><a href="#s12"><span class="num">12</span> Risks, and what breaks at 10x and 100x</a></li>
+    <li class="sub"><a href="#s12-1">12.1 Risk register</a></li>
+    <li><a href="#s13"><span class="num">13</span> Traceability matrix</a></li>
+    <li class="sub"><a href="#s13-1">13.1 Requirements and constraints</a></li>
+    <li class="sub"><a href="#s13-2">13.2 Ambiguity decisions with tests</a></li>
+    <li><a href="#s14"><span class="num">14</span> Known limits</a></li>
+  </ol>
+</nav>
+
+<!-- ============================== 1 ============================== -->
+<section class="chapter" id="s1">
+  <h2><span class="num">1</span> Scope and conventions</h2>
+  <p>This document describes the Idyllic Clinic booking system as built on <code>main</code> at <code>c59263e3</code>, with production serving the <code>v1.1.1</code> release (<code>68449dd</code>) until the next successful release. The assessment brief is the business need. Each requirement and constraint in it gets an identifier in section 3, and each identifier is traced to design, code, test and production behaviour in section 13.</p>
+  <p>Two numbered lists are used. D1 to D13 (section 4) are the answers to the brief's open questions, traced to their tests in 13.2. Decision 1 to Decision 35 are the design decision records on <code>https://clinic.ericgitangu.com/decisions</code>, each at its own anchor (<code>#decision-3</code> for Decision 3); "Decision N" in this document means that record. Where a figure is an estimate rather than a measurement, it says so.</p>
+  <h3 id="s1-1">1.1 Naming</h3>
+  <p>The product name is Idyllic Clinic, and the seeded clinic is named "Idyllic Clinic" (migration 0011). The repository and the Cloud Run services keep the neutral <code>clinic-*</code> names.</p>
+</section>
+
+<!-- ============================== 2 ============================== -->
+<section class="chapter" id="s2">
+  <h2><span class="num">2</span> Business context</h2>
+  <h3 id="s2-1">2.1 The scenario, as the brief states it</h3>
+  <blockquote>"We run a small clinic with 5 doctors. Patients need to book appointments online. Each doctor has set working hours and works in 30-minute slots. A patient should see which slots are free for a given doctor on a given day, pick one, and book it. Once booked, that slot must not be available to others. Patients should also be able to cancel. We're starting small but want to grow."<span class="src">Savannah Informatics, Backend Developer Take-Home Assessment, Section 1</span></blockquote>
+  <p>The brief joins four sections into one scenario: design (1), build a REST API in FastAPI, Django REST Framework or Go (2), deploy with CI/CD that auto-deploys on merge (3), and a written reflection on the tools used (4). The time limit is three to five days. Its rules say "Clear reasoning matters as much as working code."</p>
+
+  <h3 id="s2-2">2.2 Stakeholders</h3>
+  <table>
+    <colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
+    <thead><tr><th>Who</th><th>What they need</th><th>What would hurt them</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Patients</strong></td><td>See free 30-minute slots for a doctor on a day, book one, cancel, move it. A clear message when something is refused.</td><td>Two people holding the same slot. A slot list that lies. A booking lost because a retry looked like a conflict.</td></tr>
+      <tr><td><strong>Clinic staff</strong> (owner, admin, viewer)</td><td>One place to see the day's bookings as they happen, act on a booking, record who arrived, and tell the doctor. Access limited by role.</td><td>Patient data reaching people or services that do not need it. A dashboard that silently shows stale data.</td></tr>
+      <tr><td><strong>Reviewers</strong> at Savannah Informatics</td><td>A public URL that works, a README that explains the design, a pipeline they can inspect, and behaviour they can check in minutes.</td><td>Behaviour that cannot be checked, an unreachable URL, design reasoning that only lives in code.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s2-3">2.3 Success criteria</h3>
+  <ol>
+    <li><strong>No double booking, ever,</strong> including under concurrent requests. This is the one property everything else depends on.</li>
+    <li><strong>The four required endpoints behave as the brief specifies,</strong> with meaningful errors and correct status codes, and the two bonus items work.</li>
+    <li><strong>A reviewer can verify the system independently:</strong> public URL, Swagger UI, a public CI project, copy-paste checks in the README.</li>
+    <li><strong>Merging to <code>main</code> deploys,</strong> and a pull request runs the tests.</li>
+    <li><strong>The design can grow</strong> from one clinic with 5 doctors without a rewrite of the booking core.</li>
+    <li><strong>Ambiguities are decided and written down,</strong> not left to the code to imply.</li>
+    <li><strong>Every deliverable the brief lists is present,</strong> including the Section 4 reflection (R16), which is README section 11.</li>
+  </ol>
+  <p>I added one constraint of my own that the brief does not ask for: the running system should cost nothing. Section 11 states the one exception I accepted.</p>
+</section>
+
+<!-- ============================== 3 ============================== -->
+<section class="chapter" id="s3">
+  <h2><span class="num">3</span> Requirements</h2>
+  <p>Every functional and delivery requirement in the brief is here, with an identifier. "Source" is the brief section. Text in quotation marks is the brief's own wording, verbatim; the rest is my paraphrase.</p>
+
+  <h3 id="s3-1">3.1 Functional</h3>
+  <table class="compact">
+    <colgroup><col style="width:7%"><col style="width:12%"><col style="width:81%"></colgroup>
+    <thead><tr><th>ID</th><th>Source</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td><strong>R1</strong></td><td>S1</td><td>Five doctors, each with set working hours, working in 30-minute slots.</td></tr>
+      <tr><td><strong>R2</strong></td><td>S2</td><td><code>POST /appointments</code>: book a slot. Validate that it "falls within the doctor's working hours, is not in the past, and is not already taken".</td></tr>
+      <tr><td><strong>R3</strong></td><td>S2</td><td><code>GET /doctors/{id}/availability</code>: "Return all available 30-minute slots for a doctor on a given date". I read "available" as bookable now, so slots inside the 60-minute lead are left out (R8, 6.2).</td></tr>
+      <tr><td><strong>R4</strong></td><td>S2</td><td><code>PATCH /appointments/{id}/cancel</code>: cancel "with a reason". "The slot must become bookable again." "Return an error if already cancelled."</td></tr>
+      <tr><td><strong>R5</strong></td><td>S2</td><td><code>PATCH /appointments/{id}/reschedule</code>: move to a new slot. "The original slot must become available again, and the new slot must be validated as you would for a fresh booking." "Return an error if the appointment is cancelled."</td></tr>
+      <tr><td><strong>R6</strong></td><td>S1</td><td>"Once booked, that slot must not be available to others." My reading: this has to hold under concurrent requests, not only sequentially.</td></tr>
+      <tr><td><strong>R7</strong></td><td>S2 bonus</td><td><code>GET /patients/{id}/appointments</code>: "upcoming appointments sorted by date".</td></tr>
+      <tr><td><strong>R8</strong></td><td>S2 bonus</td><td>"Prevention of bookings within 1 hour of now."</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s3-2">3.2 Non-functional and delivery</h3>
+  <table class="compact">
+    <colgroup><col style="width:7%"><col style="width:12%"><col style="width:81%"></colgroup>
+    <thead><tr><th>ID</th><th>Source</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td><strong>R9</strong></td><td>S2</td><td>Validation failures return "meaningful error messages with correct HTTP status codes".</td></tr>
+      <tr><td><strong>R10</strong></td><td>S2</td><td>Code is structured sensibly, not all in one file.</td></tr>
+      <tr><td><strong>R11</strong></td><td>S2</td><td>"Include at least basic test coverage for the booking logic."</td></tr>
+      <tr><td><strong>R12</strong></td><td>S3</td><td>Deployed to a cloud provider; "reachable via a public URL at the time of submission".</td></tr>
+      <tr><td><strong>R13</strong></td><td>S3</td><td>A CI/CD pipeline that "runs your test suite on every pull request".</td></tr>
+      <tr><td><strong>R14</strong></td><td>S3</td><td>It "automatically deploys when a PR is merged into a designated branch".</td></tr>
+      <tr><td><strong>R15</strong></td><td>S1, S3, Instructions</td><td>A README with the system design (models, components, key decisions, trade-offs), how to run locally, the public URL, which branch deploys and how, and what the pipeline does.</td></tr>
+      <tr><td><strong>R16</strong></td><td>S4</td><td>A reflection answering the four Section 4 questions, in the README or a separate file. The brief adds: "Honesty here matters more than the answer itself."</td></tr>
+      <tr><td><strong>R17</strong></td><td>Instructions</td><td>Links to the repository ("public or shared with us") and to the deployed, running application.</td></tr>
+      <tr><td><strong>R18</strong></td><td>S1</td><td>"Before writing any code, document your system design in your README."</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s3-3">3.3 Constraints</h3>
+  <table class="compact">
+    <colgroup><col style="width:7%"><col style="width:12%"><col style="width:81%"></colgroup>
+    <thead><tr><th>ID</th><th>Source</th><th>Constraint</th></tr></thead>
+    <tbody>
+      <tr><td><strong>C1</strong></td><td>Cover, Rules</td><td>Assistive tools are permitted and expected, and their use is to be reflected on (R16).</td></tr>
+      <tr><td><strong>C2</strong></td><td>Rules, S2</td><td>"Use any database you prefer."</td></tr>
+      <tr><td><strong>C3</strong></td><td>Rules</td><td>"When requirements are ambiguous, make a decision and note it in your README."</td></tr>
+      <tr><td><strong>C4</strong></td><td>S1</td><td>"We're starting small but want to grow."</td></tr>
+      <tr><td><strong>C5</strong></td><td>S2</td><td>Framework: FastAPI, Django REST Framework or Go.</td></tr>
+      <tr><td><strong>C6</strong></td><td>Cover</td><td>Three to five days.</td></tr>
+      <tr><td><strong>C7</strong></td><td>My own</td><td>The running system costs $0, proven against published free tiers. Not in the brief.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================== 4 ============================== -->
+<section class="chapter" id="s4">
+  <h2><span class="num">4</span> Assumptions and ambiguity decisions</h2>
+  <p>C3 asks for a decision wherever the brief is open. Each row is the decision and its reasoning. Their tests are in 13.2.</p>
+  <table class="compact">
+    <colgroup><col style="width:5%"><col style="width:19%"><col style="width:38%"><col style="width:38%"></colgroup>
+    <thead><tr><th>#</th><th>Open question</th><th>Decision</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>D1</td><td>What counts as "already taken"</td><td>Slots are a fixed, aligned 30-minute grid, so two bookings conflict exactly when they share a doctor and <code>starts_at</code>.</td><td>The brief fixes the slot length. Equality is enforceable with a unique index; overlap would need an exclusion constraint (Decision 3).</td></tr>
+      <tr><td>D2</td><td>Whose "day" is "a given date"</td><td>The clinic's local day. The zone is data, <code>clinics.timezone</code>, seeded as <code>Africa/Nairobi</code>.</td><td>A patient means the clinic's calendar day. A second clinic in another zone needs no code change (Decision 5).</td></tr>
+      <tr><td>D3</td><td>A datetime with no offset</td><td>Rejected as <code>422 TIMEZONE_REQUIRED</code>.</td><td>Guessing a zone can book the wrong hour silently.</td></tr>
+      <tr><td>D4</td><td>How far ahead a patient may book</td><td>At most 90 days (<code>BOOKING_HORIZON_DAYS</code>); beyond is <code>422 DATE_OUT_OF_RANGE</code>.</td><td>Bounds the availability query and stops nonsense dates.</td></tr>
+      <tr><td>D5</td><td>Cancelling or moving a visit that has started</td><td><code>409 APPOINTMENT_ALREADY_STARTED</code>.</td><td>The state is real but may not be changed; 409 is the status for "conflicts with current state" (Decision 8).</td></tr>
+      <tr><td>D6</td><td>What the cancel reason must be</td><td>Required, 3 to 500 characters after trimming. Enforced in the schema and by a CHECK.</td><td>The brief says "with a reason". An empty reason is no reason.</td></tr>
+      <tr><td>D7</td><td>What a reschedule is</td><td>An in-place update of the same row under a row lock, keeping the id. Rescheduling to the time it already has returns it unchanged.</td><td>The client keeps a stable id; the old slot is freed and the new one claimed in one transaction (Decision 8).</td></tr>
+      <tr><td>D8</td><td>Which states exist</td><td>Appointment status is <code>booked</code> or <code>cancelled</code> only. Attendance (<code>arrived</code>, <code>no_show</code>) is a separate, append-only staff record and never changes the status. There is no <code>completed</code> state.</td><td>The brief does not track attendance. Keeping it out of the status leaves the booking index and the state machine untouched while staff still record who came (6.4).</td></tr>
+      <tr><td>D9</td><td>What "upcoming" means</td><td>Booked, starting after now, ascending by start (ties by id). Limit 50 by default, at most 100, no pagination.</td><td>Cancelled visits are history, not upcoming.</td></tr>
+      <tr><td>D10</td><td>Patients</td><td>The brief implies patients (the bonus takes a patient id) but defines no way to create one. I added <code>POST /patients</code> and a <code>patients</code> table; a patient may not hold two bookings at the same instant (<code>409 PATIENT_DOUBLE_BOOKED</code>).</td><td>A booking needs someone to belong to. One person in two rooms at once is a data error.</td></tr>
+      <tr><td>D11</td><td>Who may cancel</td><td>Through the public API, anyone holding the appointment id. In the web apps, only the signed-in owning patient, or staff.</td><td>The brief is silent on authentication. I kept the public API open so Swagger's Try it out works for reviewers; that is my decision, not brief text. The cost is an IDOR, disclosed in section 11 (Decision 12).</td></tr>
+      <tr><td>D12</td><td>Retries after a lost response</td><td>An optional <code>Idempotency-Key</code> on booking replays the original booking.</td><td>Otherwise the real booker's retry reads as "slot taken" (Decision 13).</td></tr>
+      <tr><td>D13</td><td>Does the one-hour rule apply to changes</td><td>For a patient, cancelling, or moving away from, a visit that starts within the hour is <code>409 CHANGE_TOO_LATE</code>. Staff are exempt from this rule only.</td><td>My extension of the bonus, not brief text. A late change is a property of the appointment's current state, so 409 (4.1).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s4-hour">4.1 The one-hour rule</h3>
+  <p>The brief's bonus says only "prevention of bookings within 1 hour of now". It says nothing about changes to an existing booking. Applying the rule to changes (D13) is my extension of the bonus, not brief text.</p>
+  <div class="callout decision">
+    <span class="title">Decision</span>
+    <ul style="margin-bottom:0">
+      <li>A <strong>new booking</strong> whose slot starts less than 60 minutes from now is <code>422 BOOKING_TOO_SOON</code>.</li>
+      <li>A <strong>reschedule TARGET</strong> less than 60 minutes away is also <code>422 BOOKING_TOO_SOON</code>: the new slot is validated as a fresh booking would be, which is exactly what R5 asks.</li>
+      <li><code>409 CHANGE_TOO_LATE</code> applies <strong>only when the CURRENT visit starts within the hour</strong>: cancelling it, or moving it away.</li>
+      <li>Exactly 60 minutes away is allowed. Availability never offers a slot starting within 60 minutes.</li>
+      <li><strong>Staff</strong> (owner or admin) are exempt from the lead-time rule, both codes, and from nothing else. They still need a reason, which is audited, and stay bound by every other check (a start in the past, a visit that has begun, a taken slot, working hours, the 90-day horizon).</li>
+    </ul>
+  </div>
+  <p><strong>Why the split.</strong> The status rule in 7.3 decides it. A too-soon target is a property of the request: resending it unchanged can never succeed, so it is 422, and it keeps the reschedule validation identical to booking. A too-late change is a property of the appointment's current state, so it is 409.</p>
+  <div class="callout decision">
+    <span class="title">Tests</span>
+    <p><code>backend/tests/integration/test_one_hour_rule.py</code> drives each case: <code>test_book_boundary</code>, <code>test_cancel_boundary</code>, <code>test_reschedule_boundary_on_the_current_start</code>, <code>test_reschedule_boundary_on_the_new_start</code>, <code>test_both_starts_under_an_hour_answers_409_the_current_start_is_checked_first</code>, <code>test_availability_never_offers_a_slot_inside_the_window</code>, and for staff <code>test_staff_are_exempt_from_the_rule_the_patient_is_held_to</code> and <code>test_staff_reschedule_is_exempt_from_both_codes</code>. The availability filter keeps <code>test_slots.py::test_lead_filter_excludes_near_slots</code>.</p>
+    <p><strong>In production:</strong> <code>/openapi.json</code> lists <code>CHANGE_TOO_LATE</code>, and its problem type document is served at <code>/api/problems/change-too-late</code>.</p>
+  </div>
+</section>
+
+<!-- ============================== 5 ============================== -->
+<section class="wide" id="s5">
+  <h2><span class="num">5</span> Architecture</h2>
+  <figure>
+    <img src="diagrams/architecture.svg" style="max-height:132mm" alt="System diagram: Vercel booking and admin apps, the FastAPI and Go services on Google Cloud, Neon, and third parties">
+    <figcaption><b>Figure 1.</b> Components and trust boundaries, as deployed at <code>68449dd</code>. Every component shown is running in production. Rendered with mermaid-cli 11.4.2.
+      <div class="legend"><span><i></i>call</span><span><i class="thick"></i>an authenticated call to a Cloud Run service (ID token, plus a signed assertion where shown)</span><span><i class="dot"></i>secret mount</span></div>
+    </figcaption>
+  </figure>
+</section>
+
+<section class="chapter flow">
+  <h3 id="s5-1">5.1 What each part does</h3>
+  <p class="small">The last column names the decision records on <code>clinic.ericgitangu.com/decisions</code>, by number (Decision N is at <code>#decision-N</code>).</p>
+  <table class="compact">
+    <colgroup><col style="width:20%"><col style="width:67%"><col style="width:13%"></colgroup>
+    <thead><tr><th>Component</th><th>Role</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td><strong>clinic-web</strong> (Vercel)</td><td>Landing page, booking pages, server actions, the public <code>/api</code> proxy, the self-hosted <code>/docs</code> and the <code>/decisions</code> page. The only public entry point for patients and reviewers.</td><td>10, 23, 27</td></tr>
+      <tr><td><strong>clinic-admin</strong> (Vercel)</td><td>Staff dashboard and access page. Allowlisted owner plus people the owner or an admin invites. Staff booking, veto and lock, attendance, the audit trail, live notifications and the doctor's arrival email (5.2). The live feed streams from <code>clinic-realtime</code>.</td><td>27, 30, 33</td></tr>
+      <tr><td><strong>BFF and HMAC assertion</strong></td><td>Every server-side call to the API carries a Google ID token (to pass Cloud Run IAM). Calls to <code>/internal/*</code> also carry an <code>X-Internal-Assertion</code>: HMAC-SHA256 over the caller, role, method, path, query and body hash, valid for at most 60 seconds; the API re-reads the role from the database. The public <code>/api</code> proxy forwards with the ID token only.</td><td>30</td></tr>
+      <tr><td><strong>OIDC to WIF</strong></td><td>Vercel's OIDC token is exchanged at Google STS, then IAM issues an ID token for the Cloud Run audience. The invoker role on <code>clinic-api</code> is held by three service accounts (web, admin, smoke) and on <code>clinic-realtime</code> by two (admin, smoke), with no <code>allUsers</code> binding. No service-account key is used.</td><td>23</td></tr>
+      <tr><td><strong>clinic-api</strong> (Cloud Run)</td><td>FastAPI. Every business rule and every write. IAM-only (a direct request to its <code>run.app</code> address returns 403), min 0, max 3 instances, concurrency 80, 1 vCPU with CPU boost, 60 s timeout, us-east4.</td><td>2, 14</td></tr>
+      <tr><td><strong>clinic-realtime</strong> (Cloud Run, Go)</td><td>The staff live feed over SSE. Reads <code>appointment_events</code> through the <code>clinic_realtime</code> role, which has column-level SELECT and nothing else (migration 0014), so staff events with names never leave Google Cloud. 0.25 vCPU, concurrency 1, 0 to 2 instances, at most 2 database connections per instance. A viewer gets the same events without name, reason or appointment id.</td><td>9, 21</td></tr>
+      <tr><td><strong>Neon Postgres</strong></td><td>The single store: Postgres 17 at 0.25 CU, in aws-us-east-1 next to us-east4. Runtime role <code>clinic_app</code> has no DDL.</td><td>14, 15</td></tr>
+      <tr><td><strong>Outbox relay to Ably</strong></td><td><code>appointment_events</code> is written in the booking transaction; after each commit the API publishes "taken" or "freed" to <code>slots:{doctor_id}:{local_date}</code>, and the event type and times to <code>admin:events</code>. Neither carries a patient or appointment identifier. Patients subscribe with a 5-minute, subscribe-only token. Nothing subscribes to <code>admin:events</code>, because staff use <code>clinic-realtime</code>. Polling is the safety net.</td><td>9, 31</td></tr>
+      <tr><td><strong>clinic-migrate</strong></td><td>Cloud Run Job, run by digest on each release before the new revision: <code>alembic upgrade head</code> as <code>clinic_owner</code>, then the seed.</td><td>15</td></tr>
+      <tr><td><strong>Secret Manager</strong></td><td>Three database URLs (app, migrate, realtime), the internal and smoke signing keys, the Ably key: six secrets with one enabled version each. Mounted with <code>--set-secrets</code>.</td><td>16</td></tr>
+      <tr><td><strong>Resend</strong></td><td>Booking, move and cancel emails and a daily reminder from the booking app, only to verified linked Google accounts; staff emails and the doctor's arrival email from the admin app. Sent after the response with a 5 s abort. The day (100) and month (3,000) allowances are shared and reserved in the database before a send; every email but a booking acknowledgement stops 20 short of the day's limit (<code>EMAIL_ACK_RESERVE</code>).</td><td>25</td></tr>
+      <tr><td><strong>reCAPTCHA Enterprise</strong></td><td>One assessment per book, cancel and reschedule in the web app, called with the Vercel federated identity, so no key is stored.</td><td>22, 29</td></tr>
+      <tr><td><strong>CircleCI: test and promote</strong></td><td>Tests on every PR. On <code>main</code>, a keyless deploy (CircleCI OIDC to WIF, pinned to <code>main</code> in Terraform), and promotion of the tagged API revision only after <code>verify_claims.py</code> passes against it in <code>ship-api</code>. <code>ship-realtime</code> deploys the Go service the same way.</td><td>16</td></tr>
+      <tr><td><strong>CircleCI: public verify and rollback</strong></td><td><code>verify-release</code> checks the public URL after both web deploys; four rollback jobs (API, realtime, booking, admin) act only if it failed and stand down otherwise. The traffic move is exercised by <code>scripts/ci/test_ci_scripts.sh</code>; no production rollback has been needed.</td><td>16</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s5-2">5.2 The admin side</h3>
+  <ul>
+    <li><strong>Staff writes</strong> (Decision 33). Owner and admin book, move, cancel and veto for a patient through the same service functions the patient path uses. Each write needs a reason and writes an append-only <code>staff_action_audit</code> row in the same transaction. A veto undoes the patient's last change and locks the visit against further patient changes. Writes are throttled to 60 per person per 10 minutes.</li>
+    <li><strong>Live feed</strong> (Decisions 9 and 21). The dashboard and appointment page stream from <code>clinic-realtime</code> through the admin app's <code>/live/stream</code> route, which signs the staff assertion. All tabs in one browser share one stream. Two streams can be open at once; a third viewer sees "Live feed busy" and the page refreshes every 30 seconds.</li>
+    <li><strong>Live notifications.</strong> Each live event (a booking, a change, an arrival, a no-show, a veto) shows a toast to the staff who did not make it, an unread count on the live feed and a two-second highlight on the doctor's card. A burst becomes one "N updates" toast. It rides the existing stream and opens no new connection, and a viewer's toasts never carry a patient name.</li>
+    <li><strong>Attendance</strong> (migration 0010). Staff mark a patient arrived, or a no-show once the visit has begun, in <code>appointment_attendance</code>. The runtime role may insert and select only, so a correction is a new row with an audited reason. The appointment's status does not change (6.4).</li>
+    <li><strong>Doctor arrival email</strong> (migration 0017). Owner and admin may set an optional <code>doctors.email</code> on the doctor's card, an audited action (<code>doctor_email</code>). Marking a patient arrived writes one <code>doctor_notification</code> row in the same transaction; the admin app then claims it with a lease, takes one email from the shared allowance and records it sent, failed or skipped with a reason (<code>no_email</code>, <code>allowance_day</code>, <code>allowance_month</code>, <code>demo_address</code>, <code>not_configured</code>). Seeded doctors have no address, so nothing is emailed from seed data. The email names the patient by first name and last initial only. The address is shown to owner and admin, never to a viewer, and is in no public response.</li>
+    <li><strong>Audit trail.</strong> The audit page reads every stored staff action back through <code>/internal/admin/audit</code>, <code>doctor_email</code> included; <code>tests/integration/test_doctor_notice.py</code> covers that read-back.</li>
+  </ul>
+</section>
+
+<!-- ============================== 6 ============================== -->
+<section class="chapter" id="s6">
+  <h2><span class="num">6</span> Data model and booking core</h2>
+  <h3 id="s6-er">6.1 Entities</h3>
+  <figure>
+    <img src="diagrams/er.svg" alt="Entity relationship diagram" style="max-height:170mm">
+    <figcaption><b>Figure 2.</b> Tables from migrations 0001 to 0017, key columns only. Staff access and invites, email counters and realtime budget tables are left out for size.</figcaption>
+  </figure>
+  <ul>
+    <li><code>working_hours</code> is a clinic-local window per doctor and ISO weekday; a CHECK pins both ends to :00 or :30. The seed gives each doctor their own weekly windows: Otieno 08:00 to 12:00 and 13:00 to 17:00 on weekdays; Kamau 09:00 to 17:00 on weekdays; Rotich 08:00 to 14:00 on Monday, Wednesday and Friday; Mwangi 10:00 to 18:00 on Tuesday and Thursday and 09:00 to 13:00 on Saturday; Njeri 07:00 to 11:00 Monday to Saturday.</li>
+    <li><code>appointments</code> carries CHECKs for the status set, <code>ends_at = starts_at + 30 min</code>, the half-hour grid, and cancel consistency (a cancelled row has a reason and a time; a booked row has neither).</li>
+    <li><code>appointment_events</code> is written in the same transaction as every change. It is the event history, the admin lineage view, the outbox and the source the Go service streams. Its <code>txid xid8</code> column gives a commit-safe cursor.</li>
+    <li><code>appointment_attendance</code> (0010) holds staff marks, <code>arrived</code> or <code>no_show</code>; the latest row is the current mark. <code>staff_action_audit</code> (0009) holds every staff write with its actor, action and reason, and leaves patient name, phone and email out on purpose. <code>doctor_notification</code> (0017) records each arrival email, one per appointment and kind. <code>doctors.email</code> (0017) is nullable and normalised by a CHECK.</li>
+    <li>Migrations are hand-written and expand-only, linted in CI. <code>clinic_app</code> has SELECT, INSERT and UPDATE, no DELETE, and cannot rewrite <code>alembic_version</code>; on the attendance table it has INSERT and SELECT only.</li>
+  </ul>
+
+  <h3 id="s6-slots">6.2 Slot computation</h3>
+  <p>Slots are computed, never stored (Decision 4). Each availability request makes two indexed queries: the doctor's working hours, and the booked starts over the UTC range <code>[D 00:00, D+1 00:00)</code> of the clinic-local day. <code>domain/slots.py</code> then cuts each working window into 30-minute steps <em>in UTC</em>, de-duplicates by local wall time, subtracts the booked starts, and drops anything before <code>now + 60 min</code> (R3, R8). The slot function itself does no I/O; the pure domain package, which includes it, is held to 95% coverage by unit tests alone. Availability answers with an ETag and honours <code>If-None-Match</code> with a 304.</p>
+  <p><strong>What I gave up:</strong> there is no slot row to lock, so uniqueness cannot live on the slot. It lives on the appointment, which is the next section.</p>
+
+  <h3 id="s6-race">6.3 The concurrency guarantee</h3>
+  <p>Check-then-insert fails under concurrency, and <code>SELECT ... FOR UPDATE</code> cannot lock a row that does not exist yet. So the database decides:</p>
+  <pre><code>CREATE UNIQUE INDEX uq_appt_doctor_slot_booked
+  ON appointments (doctor_id, starts_at) WHERE status = 'booked';
+CREATE UNIQUE INDEX uq_appt_patient_slot_booked
+  ON appointments (patient_id, starts_at) WHERE status = 'booked';</code></pre>
+  <p>The service validates the request, inserts, and maps the unique violation (SQLSTATE 23505, by constraint name) to <code>409 SLOT_TAKEN</code> or <code>409 PATIENT_DOUBLE_BOOKED</code>. There is deliberately no "is it free?" pre-check: it would be a window for a race and adds nothing the index does not enforce. A cancelled row leaves the partial index, so the slot is bookable again (R4) while the history stays.</p>
+  <figure>
+    <img src="diagrams/booking-race.svg" alt="Sequence of two concurrent bookings for one slot" style="max-height:84mm">
+    <figcaption><b>Figure 3.</b> Two requests for one slot. The second insert waits on the first's uncommitted index entry, then fails with 23505.</figcaption>
+  </figure>
+  <div class="callout">
+    <span class="title">How the test proves it, and why it cannot pass vacuously</span>
+    <p><code>tests/concurrency/test_race_same_slot.py</code> releases <strong>25 concurrent POSTs</strong> for one slot at an <code>asyncio.Barrier</code>, holds each transaction open with a test-only <code>pg_sleep(0.2)</code>, and samples <code>pg_locks</code> every 20 ms. It repeats over <strong>10 slots</strong> (pool size 30, so all 25 are in flight). Per slot it asserts exactly one 201, 24 409s with <code>SLOT_TAKEN</code> and one booked row. Across the run it asserts a peak of at least 5 transactions waiting on another transaction's lock at once, so the test fails if it ever stops being concurrent.</p>
+    <p><strong>The naive control</strong> (<code>test_naive_control.py</code>) is a raw check-then-insert (asyncpg, with <code>pg_sleep(0.1)</code> between the check and the insert), released at its own barrier against a separate database migrated the same way, with the doctor-slot index dropped. It asserts more than one booked row. That is what shows the index, not luck, is what holds.</p>
+  </div>
+  <p>A reschedule takes the row with <code>SELECT ... FOR UPDATE</code> and updates <code>starts_at</code> in place. If the new slot is taken the transaction rolls back and the original booking is untouched. A deadlock or serialization failure is retried once with jitter, then reported as <code>409 CONCURRENT_UPDATE</code>.</p>
+
+  <h3 id="s6-state">6.4 Appointment state machine and attendance</h3>
+  <figure>
+    <img src="diagrams/state.svg" alt="Appointment state machine" style="max-height:78mm">
+    <figcaption><b>Figure 4.</b> Two states. <code>cancelled</code> is terminal; the loop on it is a refused request (<code>409 APPOINTMENT_ALREADY_CANCELLED</code>), not a third state. Attendance is not a state (below).</figcaption>
+  </figure>
+  <p>Guards on every change, in order: the appointment exists (else 404), is not cancelled (409 <code>APPOINTMENT_ALREADY_CANCELLED</code>), has not started (409 <code>APPOINTMENT_ALREADY_STARTED</code>). For a reschedule, a request for the start it already has then returns the appointment unchanged (D7); otherwise the doctor must still be active (else 422 <code>UNKNOWN_DOCTOR</code>) and the new slot passes the same validator as a booking. The one-hour guard on the current visit (409 <code>CHANGE_TOO_LATE</code>) runs before the new slot is checked, for patients (4.1). A visit locked by a staff veto refuses further patient changes (<code>APPOINTMENT_LOCKED</code>).</p>
+  <p><strong>Attendance is a staff record, not a state.</strong> <code>arrived</code> and <code>no_show</code> live in <code>appointment_attendance</code>, written only by staff, inside the window the API allows (else <code>ATTENDANCE_WINDOW_CLOSED</code>), and never on a cancelled appointment. The status stays <code>booked</code>, so the partial unique index, the availability query and the patient's view are unaffected by attendance.</p>
+
+  <h3 id="s6-time">6.5 Time model</h3>
+  <ul>
+    <li>Storage is UTC <code>timestamptz</code>. The clinic zone is data; production returns <code>"timezone": "Africa/Nairobi"</code> on the clinic.</li>
+    <li>Input must be RFC 3339 with an offset (D3). Output is in the clinic offset plus a <code>timezone</code> field.</li>
+    <li>The clock is injected through a FastAPI dependency. Business SQL never calls <code>now()</code>. Ruff bans <code>datetime.now</code>, <code>utcnow</code> and <code>today</code> outside <code>core/clock.py</code>, so tests pin time and pass on any weekday.</li>
+    <li>Nairobi has no daylight saving, so the DST tests run in <code>Europe/Berlin</code>. Slot stepping in UTC skips the spring-forward gap and de-duplicates the fall-back hour.</li>
+  </ul>
+</section>
+
+<!-- ============================== 7 ============================== -->
+<section class="chapter" id="s7">
+  <h2><span class="num">7</span> API design</h2>
+  <p>REST with OpenAPI 3.1. The contract is committed at <code>contracts/openapi.json</code>, and CI fails if the code drifts from it. The public base is <code>https://clinic.ericgitangu.com/api</code>: the served spec declares <code>servers: [{"url": "/api"}]</code>, and the Vercel proxy forwards it to Cloud Run. There is no <code>/v1</code> prefix; a breaking change would add one (Decision 7).</p>
+  <h3 id="s7-1">7.1 Endpoints</h3>
+  <p>The 14 public paths in the OpenAPI contract:</p>
+  <table class="compact">
+    <colgroup><col style="width:37%"><col style="width:38%"><col style="width:12%"><col style="width:13%"></colgroup>
+    <thead><tr><th>Method and path</th><th>Purpose</th><th>Success</th><th>Brief</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /appointments</code></td><td>Book. Optional <code>Idempotency-Key</code>.</td><td>201, <code>Location</code></td><td>R2, R6, R8</td></tr>
+      <tr><td><code>GET /doctors/{id}/availability?date=</code></td><td>Free slots on a clinic-local day. ETag, 304.</td><td>200</td><td>R3</td></tr>
+      <tr><td><code>PATCH /appointments/{id}/cancel</code></td><td>Cancel with <code>{"reason"}</code>.</td><td>200</td><td>R4</td></tr>
+      <tr><td><code>PATCH /appointments/{id}/reschedule</code></td><td>Move with <code>{"starts_at"}</code>, same id.</td><td>200</td><td>R5</td></tr>
+      <tr><td><code>GET /patients/{id}/appointments</code></td><td>Upcoming, ascending.</td><td>200</td><td>R7</td></tr>
+      <tr><td><code>GET /doctors</code>, <code>GET /doctors/{id}</code></td><td>Doctors with clinic and working hours.</td><td>200</td><td>R1</td></tr>
+      <tr><td><code>POST /patients</code>, <code>GET /appointments/{id}</code></td><td>Create a patient; read one appointment.</td><td>201, 200</td><td>D10</td></tr>
+      <tr><td><code>GET /health</code>, <code>/ready</code></td><td>Liveness; readiness (<code>SELECT 1</code>).</td><td>200</td><td>R12</td></tr>
+      <tr><td><code>GET /problems</code>, <code>/problems/{slug}</code></td><td>The error catalogue, and one error type document.</td><td>200</td><td>R9</td></tr>
+      <tr><td><code>POST /realtime/token/patient</code></td><td>A 5-minute subscribe-only push token for one channel.</td><td>200</td><td>Beyond</td></tr>
+    </tbody>
+  </table>
+  <p>The <code>/internal/*</code> routes serve the two apps' server side (staff writes, attendance, the doctor's email, the audit trail) and need the signed assertion. The proxy refuses <code>/internal</code> in every spelling, so they are not callable from Swagger. A contract test checks that no public response carries a doctor's email.</p>
+
+  <h3 id="s7-2">7.2 Idempotency keys</h3>
+  <p><code>Idempotency-Key</code> (1 to 255 visible ASCII characters) is read on <code>POST /appointments</code> and scoped to the patient. The key and a fingerprint of doctor and time are stored on the appointment under a partial unique index. The same key with the same doctor and time replays the original 201 with <code>Idempotent-Replayed: true</code>, answered before validation, so a retry after the slot has passed still gets its booking. The same key with a different doctor or time is <code>422 IDEMPOTENCY_KEY_REUSED</code>; a key whose appointment has left <code>booked</code> is <code>409 IDEMPOTENCY_KEY_CONSUMED</code>. On any unique violation the key is re-checked before answering, because a lost response must never read as "your slot was taken" (Decision 13).</p>
+
+  <h3 id="s7-3">7.3 Error model: RFC 9457</h3>
+  <p>Every non-2xx is <code>application/problem+json</code> with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, a stable machine <code>code</code> and a <code>request_id</code> that also appears in the logs. The catalogue is closed: 40 codes in the <code>ProblemCode</code> enum, and a unit test checks the domain errors, the handlers, the enum and <code>contracts/api-errors.md</code> against one list (Decision 6).</p>
+  <div class="callout decision">
+    <span class="title">The status rule</span>
+    <p><strong>404</strong>: the resource in the path does not exist. <strong>422</strong>: the request is well-formed but resending it unchanged can never succeed. <strong>409</strong>: it conflicts with current state and might succeed later or in another state.</p>
+  </div>
+  <p class="small">Main booking codes. The full list of 40, including validation, auth, staff, rate-limit and push codes, is in <code>contracts/api-errors.md</code>.</p>
+  <table class="compact">
+    <colgroup><col style="width:36%"><col style="width:8%"><col style="width:56%"></colgroup>
+    <thead><tr><th>Code</th><th>Status</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td><code>SLOT_IN_PAST</code></td><td>422</td><td>Starts at or before now (R2).</td></tr>
+      <tr><td><code>BOOKING_TOO_SOON</code></td><td>422</td><td>New booking or reschedule target under 60 minutes away (R8, 4.1).</td></tr>
+      <tr><td><code>OUTSIDE_WORKING_HOURS</code></td><td>422</td><td>The 30 minutes are not inside a working window (R2).</td></tr>
+      <tr><td><code>SLOT_MISALIGNED</code>, <code>DATE_OUT_OF_RANGE</code>, <code>TIMEZONE_REQUIRED</code></td><td>422</td><td>Off the grid; beyond 90 days; no offset.</td></tr>
+      <tr><td><code>UNKNOWN_DOCTOR</code>, <code>UNKNOWN_PATIENT</code></td><td>422</td><td>A missing or inactive doctor (including on a reschedule whose doctor was deactivated), or a missing patient.</td></tr>
+      <tr><td><code>SLOT_TAKEN</code>, <code>PATIENT_DOUBLE_BOOKED</code></td><td>409</td><td>The unique index refused the write (R2, R6).</td></tr>
+      <tr><td><code>APPOINTMENT_ALREADY_CANCELLED</code>, <code>APPOINTMENT_ALREADY_STARTED</code></td><td>409</td><td>Change to a cancelled appointment (R4, R5), or to a visit that has started (D5).</td></tr>
+      <tr><td><code>CHANGE_TOO_LATE</code></td><td>409</td><td>Current visit starts within the hour, on a patient's cancel or reschedule (4.1).</td></tr>
+      <tr><td><code>CONCURRENT_UPDATE</code></td><td>409</td><td>A deadlock survived one retry.</td></tr>
+      <tr><td><code>APPOINTMENT_NOT_FOUND</code>, <code>DOCTOR_NOT_FOUND</code>, <code>PATIENT_NOT_FOUND</code></td><td>404</td><td>The path id does not exist.</td></tr>
+      <tr><td><code>DB_UNAVAILABLE</code></td><td>503</td><td>Connection failure or pool timeout; retry shortly.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================== 8 ============================== -->
+<section class="chapter" id="s8">
+  <h2><span class="num">8</span> Decisions and trade-offs</h2>
+  <p>Each row is a decision and what it costs. The decision records on <code>https://clinic.ericgitangu.com/decisions</code> weigh the alternatives in full; the number in each row is the record, at <code>#decision-N</code>.</p>
+  <table class="compact">
+    <colgroup><col style="width:22%"><col style="width:27%"><col style="width:28%"><col style="width:23%"></colgroup>
+    <thead><tr><th>Decision</th><th>What I gave up</th><th>Why</th><th>Revisit when</th></tr></thead>
+    <tbody>
+      <tr><td>A partial unique index decides double booking; no application lock (Decision 3)</td><td>Only correct for fixed, aligned slots. Variable lengths need <code>EXCLUDE USING gist</code>.</td><td>The database is the only place that sees every concurrent writer. The race test proves it.</td><td>Slot lengths vary, or overlapping services appear.</td></tr>
+      <tr><td>Slots computed, never stored (Decision 4)</td><td>No slot row to lock; two indexed queries per availability request.</td><td>Working hours change without a backfill; nothing to keep in sync.</td><td>Availability p95 rises, or slot-level metadata is needed.</td></tr>
+      <tr><td>A Go service serves the staff live feed; FastAPI keeps every write (Decisions 2 and 21)</td><td>A second language, image, CI job (<code>go-quality</code>) and deploy job (<code>ship-realtime</code>). Python cold starts are slower than Go's; I mitigate with CPU boost and have not measured it.</td><td>Staff events carry patient names and reasons, so they stay inside Google Cloud instead of a third-party pub/sub. Streams on their own service cannot take booking concurrency. A small image and a fast start fit a service that scales to zero. The Go service never writes and never decides availability.</td><td>More than two staff need the live view at once, or a second clinic. Then fan-out moves to Pub/Sub or Redis inside Google Cloud.</td></tr>
+      <tr><td>Cost shape of the Go service: concurrency 1 at 0.25 vCPU, max 2 instances, scale to zero, a "busy" answer for a third viewer (Decisions 14 and 21)</td><td>At most 2 staff streams at once. A third viewer sees "Live feed busy" and the page refreshes every 30 seconds.</td><td>An open stream bills its instance for as long as it is open. One connected hour at 0.25 vCPU is about 900 vCPU-seconds against roughly 21,619 of shared free headroom (an estimate, not yet measured). Cloud Run requires concurrency 1 below 1 vCPU.</td><td>Free CPU stops being the binding limit, or a clinic needs more than two live viewers.</td></tr>
+      <tr><td>Ably for patient slot events, because those events carry no personal data (Decision 31)</td><td>A third-party account and a data processor in the path; a 25,000-publish monthly budget I enforce myself (at most about 5 million delivered messages, under the free 6 million).</td><td>A slot event is "doctor, local date, start, taken or freed" and nothing that names anyone. <code>admin:events</code> also goes to Ably with the event type and times only, and nothing reads it. Events with names or reasons are served by <code>clinic-realtime</code> from Google Cloud and are never pushed to a third party.</td><td>Publishes near the budget, or a need to push anything personal to a patient.</td></tr>
+      <tr><td>Staff can book, move, cancel and veto, each with a reason and an audit row (Decision 33)</td><td>A locked visit can only be changed by staff. The audit table only grows, and it leaves patient identity out, so it shows what changed and not who the patient was.</td><td>A clinic needs to stop a patient bumping a visit it has planned around, and to know who did what and why.</td><td>Per-clinic roles, a second owner, or email volume near the limits.</td></tr>
+      <tr><td>Attendance and the doctor's arrival email sit beside the appointment, not in it (D8, 6.4)</td><td>A separate table and a notification record to read; one shared email allowance, so a busy day can use it up and the row then says so. No per-doctor preference, digest or bounce handling.</td><td>The booking lifecycle and its index stay untouched. A spent allowance or a missing address never undoes an arrival, and booking acknowledgements keep 20 a day in reserve.</td><td>A doctor who wants a digest, or real email volume.</td></tr>
+      <tr><td>UTC storage, clinic zone as data, naive datetimes rejected, injected clock (Decision 5)</td><td>One join to read the zone; clients must send offsets.</td><td>No guessed zones; deterministic tests.</td><td>Multi-zone clinics or per-doctor zones.</td></tr>
+      <tr><td>RFC 9457 errors with a closed code catalogue (Decision 6)</td><td>Every new error needs a catalogue entry, a test update and a docs row.</td><td>Clients branch on <code>code</code>, not on prose; reviewers see a stable contract.</td><td>A public client needs localised titles.</td></tr>
+      <tr><td>Reschedule in place under a row lock, one deadlock retry (Decision 8)</td><td>A two-way slot swap can end with both requests refused.</td><td>Stable id; atomic free-and-claim.</td><td>Swaps become a real workflow.</td></tr>
+      <tr><td>Cloud Run IAM-only behind a Vercel proxy, us-east4 beside Neon (Decisions 14 and 23)</td><td>An estimated 100 to 150 ms more per warm request for Kenyan users than Frankfurt (not measured), and three possible cold starts.</td><td>The one layout I could prove close to $0, with the database round trips kept short.</td><td>Real Kenyan users; then an African region for both compute and data.</td></tr>
+      <tr><td>The public API stays unauthenticated; the brief does not ask for auth (Decision 12)</td><td>An IDOR: anyone with an appointment or patient UUID can read or change it through <code>/api</code>.</td><td>I want Swagger's "Try it out" to work for reviewers. The web apps add Google sign-in and ownership checks.</td><td>Any real patient data.</td></tr>
+      <tr><td>CircleCI with keyless OIDC, promote by tag after a claims check (Decision 16)</td><td>Not GitHub Actions; a long-lived Vercel token per project.</td><td>GitHub Actions was unavailable on my account for a billing reason; CircleCI's OIDC gives keyless GCP access.</td><td>Vercel supports OIDC for deploys.</td></tr>
+      <tr><td>Real Postgres in every backend test, no mocked repositories (Decision 18)</td><td>Slower suites; a database in CI.</td><td>The guarantee lives in Postgres; a mock cannot test it.</td><td>Suite time blocks feedback.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================== 9 ============================== -->
+<section class="chapter" id="s9">
+  <h2><span class="num">9</span> Testing strategy</h2>
+  <p>The rule I worked to: test the contract against the real thing, and do not trust a test I have not seen fail. Backend tests run against real Postgres 17 in CI; the browser tests run against the real API and database brought up with Docker Compose.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">1,089 passed</div><div class="l">backend unit, integration and migration tests, 5 skipped, at release (<code>e82c278</code>)</div></div>
+    <div class="kpi"><div class="v">96.36%</div><div class="l">backend coverage; the gate is 85%</div></div>
+    <div class="kpi"><div class="v">98.07%</div><div class="l">pure domain coverage from unit tests alone; the gate is 95%</div></div>
+    <div class="kpi"><div class="v">54 + 3</div><div class="l">concurrency tests passed, and the control run passed</div></div>
+  </div>
+  <table class="compact">
+    <colgroup><col style="width:17%"><col style="width:47%"><col style="width:36%"></colgroup>
+    <thead><tr><th>Layer</th><th>What it checks</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Unit (pure domain)</td><td>Slot grid, DST, validation order, idempotency fingerprints, error catalogue parity.</td><td><code>backend/tests/unit</code>; <code>pytest tests/unit</code> with a 95% gate on <code>app/domain</code></td></tr>
+      <tr><td>Integration</td><td>Every endpoint and error code on a real database: booking, availability, cancel, reschedule, clinic time zone, idempotency, problem shape, roles, staff writes, attendance, the doctor notification record and the audit read-back.</td><td><code>backend/tests/integration</code></td></tr>
+      <tr><td>Concurrency</td><td>Same slot (25 by 10), same patient, reschedule races, swap, cancel against reschedule, idempotency races, deadlock retry, racing vetoes. Plus the naive control.</td><td><code>backend/tests/concurrency</code>; <code>make test-race</code>, <code>make test-control</code></td></tr>
+      <tr><td>Contract</td><td>Schemathesis against the OpenAPI contract; no public response carries a doctor's email. Separately, the committed spec must equal a fresh export.</td><td><code>backend/tests/contract</code>, job <code>backend-contract</code>; spec freshness in job <code>backend-quality</code></td></tr>
+      <tr><td>Migrations</td><td>Upgrade on a clean database; roles and grants, including the read-only realtime role; expand-only lint.</td><td><code>backend/tests/migrations</code>, <code>scripts/migration_lint.sh</code></td></tr>
+      <tr><td>Go service</td><td>gosec, govulncheck and race-enabled tests against a real database: auth, limits, ordering, lifecycle.</td><td><code>services/realtime</code>, job <code>go-quality</code></td></tr>
+      <tr><td>API collection</td><td>The reviewer journey in Postman, run with newman: every status, content type and body against the contract.</td><td><code>collections/</code>, job <code>api-check</code></td></tr>
+      <tr><td>Browser, end to end</td><td>Booking: book, double book, cancel, cancel twice, reschedule, a past time, a time under an hour away, each typed error. Admin: roles, the live feed, live notifications, attendance and the doctor notification.</td><td><code>apps/booking/e2e</code>, job <code>e2e-real</code>; <code>apps/admin/e2e</code>, job <code>admin-e2e</code></td></tr>
+      <tr><td>Live, production</td><td>The claims check runs against each new API revision before it gets traffic; <code>verify-release</code> and <code>smoke-public</code> check the public URL after the web deploys.</td><td><code>scripts/verify_claims.py</code> in <code>ship-api</code></td></tr>
+    </tbody>
+  </table>
+  <h3 id="s9-1">9.1 Measured results</h3>
+  <ul>
+    <li><strong>Backend suites at release (<code>e82c278</code>):</strong> the main run is <code>1089 passed, 5 skipped</code> at 96.36% coverage; the pure domain run is <code>402 passed</code> at 98.07%; the concurrency run is <code>54 passed</code>, including <code>test_single_winner_per_slot</code>; the control run is <code>3 passed</code>, including <code>test_naive_service_double_books_without_index</code>.</li>
+    <li><strong>Concurrency in production</strong> (2026-10-18): 20 parallel bookings of one slot produced one 201 and nineteen 409 <code>SLOT_TAKEN</code>.</li>
+    <li><strong>Mutation check:</strong> removing <code>test_slots.py</code> fails the 95% domain coverage gate.</li>
+    <li><strong>Pull requests</strong> run the 16 jobs of the <code>pr</code> workflow (10.1).</li>
+  </ul>
+</section>
+
+<!-- ============================== 10 ============================== -->
+<section class="chapter" id="s10">
+  <h2><span class="num">10</span> Deployment and CI/CD</h2>
+  <p><strong>The main branch deploys.</strong> Pull requests run the verify jobs only. A push to <code>main</code> runs the same jobs (without the PR-only <code>dast</code>) and then ships. The workload identity federation condition in Terraform admits only <code>refs/heads/main</code> in this repository and a job that uses the deploy context, so editing the config on a branch cannot deploy. The deploy contexts are also restricted to <code>main</code> in CircleCI's project settings.</p>
+  <p><strong>The CircleCI project is public,</strong> so every run can be inspected: <code>app.circleci.com/pipelines/github/ericgitangu/clinic-booking</code>. The API is readable without a login too: <code>GET circleci.com/api/v2/project/gh/ericgitangu/clinic-booking/pipeline?branch=main</code> returns the pipelines and their job logs.</p>
+  <p><strong>How long it takes.</strong> A pull request pipeline takes about 18 minutes and a release 28 to 29, set by the slowest jobs (<code>e2e-real</code> about 18 minutes, <code>admin-e2e</code> 11 to 13, <code>backend-test</code> 8 to 10). Every suite runs to the end and the job still fails if anything failed, so one red test does not hide the others. <code>go-quality</code> retries module downloads with a bounded backoff and caches them, with checksum verification left on.</p>
+  <h3 id="s10-1">10.1 Pipeline stages</h3>
+  <table class="compact">
+    <colgroup><col style="width:17%"><col style="width:55%"><col style="width:28%"></colgroup>
+    <thead><tr><th>Stage</th><th>Jobs</th><th>Runs on</th></tr></thead>
+    <tbody>
+      <tr><td>Verify</td><td><code>lint</code> (markdown, TypeScript, ruff, <code>mypy --strict</code>), <code>backend-quality</code> (expand-only migration lint, single Alembic head, contract freshness), <code>backend-test</code>, <code>backend-contract</code>, <code>ably-real</code>, <code>secrets</code> (gitleaks), <code>sast</code> (semgrep), <code>sca</code> (pip-audit), <code>build-scan</code> (trivy), <code>web-quality</code>, <code>e2e-real</code>, <code>admin-e2e</code>, <code>go-quality</code>, <code>api-check</code> (newman), <code>cost-static</code></td><td>Every PR (plus <code>dast</code>, ZAP) and every push to <code>main</code></td></tr>
+      <tr><td>Build</td><td><code>build-scan-push</code> and <code>build-scan-push-realtime</code>: images to Artifact Registry by digest</td><td><code>main</code></td></tr>
+      <tr><td>Ship services</td><td><code>ship-api</code>: run <code>clinic-migrate</code> by digest; deploy <code>clinic-api</code> with <code>--no-traffic --tag sha-&lt;7&gt;</code>; run <code>verify_claims.py</code> against the tagged URL; promote only if the commit is still the head of <code>main</code>. <code>ship-realtime</code> does the same for <code>clinic-realtime</code> with its own smoke test.</td><td><code>main</code></td></tr>
+      <tr><td>Live cost guards</td><td><code>cost-check</code></td><td><code>main</code>, after <code>ship-api</code> and <code>ship-realtime</code></td></tr>
+      <tr><td>Ship web</td><td><code>build-booking</code>, <code>build-admin</code>, then <code>ship-booking</code>, <code>ship-admin</code> (prebuilt Vercel deploys)</td><td><code>main</code></td></tr>
+      <tr><td>Verify release</td><td><code>verify-release</code>: the public URL with no credentials, including <code>/ready</code></td><td><code>main</code>, after both web ships</td></tr>
+      <tr><td>Roll back</td><td><code>rollback-api</code>, <code>rollback-realtime</code> (traffic to the previous revision), then <code>rollback-booking</code>, <code>rollback-admin</code> (Vercel alias to the previous deployment)</td><td>Every release; they act only when <code>verify-release</code> failed</td></tr>
+      <tr><td>After release</td><td><code>smoke-public</code> (read-only), then <code>zap-prod</code></td><td><code>main</code></td></tr>
+    </tbody>
+  </table>
+  <p class="small">A release pipeline shows 51 jobs: the 31 configured jobs plus 20 <code>serial-start</code> and <code>serial-end</code> markers that keep the deploy jobs in one serial group, so two releases cannot interleave.</p>
+  <h3 id="s10-2">10.2 Smoke check and rollback</h3>
+  <p>A release is a tagged, no-traffic Cloud Run revision that has to pass the claims check before it gets traffic. Going back is a traffic move, not a rebuild. Rollback refuses to move to the placeholder image, and refuses when something else has already moved traffic. <code>.circleci/rollback.yml</code> is the one-click version, and the rollback runbook is on the decisions page (<code>#rollback</code>). The image prune keeps the serving image and the rollback image and deletes everything else; a newer image is kept as in flight only when its tag is the current head of <code>main</code>.</p>
+  <div class="callout decision">
+    <span class="title">Current release</span>
+    <p>Production runs <code>v1.1.1</code>, which is <code>main</code> at <code>68449dd</code>. <code>clinic-api</code> and <code>clinic-realtime</code> both send 100% of traffic to the revision tagged <code>sha-68449dd</code> and keep the <code>sha-e82c278</code> revision as the rollback target. Artifact Registry holds two images per service: the serving one and the rollback one.</p>
+  </div>
+</section>
+
+<!-- ============================== 11 ============================== -->
+<section class="chapter" id="s11">
+  <h2><span class="num">11</span> Operations, cost and security</h2>
+  <h3 id="s11-1">11.1 Cost: the $0 posture and its one exception</h3>
+  <p>Every running part sits inside a published free tier: Cloud Run compute and egress in a Tier 1 region, Neon Free, Vercel Hobby, Ably's free package (no payment method on the account), Resend's free limits enforced in the database, and CircleCI's free credits. <code>cost_check.sh</code> runs statically on every PR and live after each API deploy, and has a self-test that mutates the config to prove it fails.</p>
+  <div class="callout pending">
+    <span class="title">The one exception: shared billing</span>
+    <p>The GCP project shares a billing account with other projects whose use has already exhausted the shared Artifact Registry and Secret Manager free tiers. This project's share is estimated at <strong>about $0.41 a month</strong> against a ceiling of <strong>$0.50 a month</strong>: six enabled secret versions at $0.06 are $0.36, plus about $0.05 of registry storage. Check C5 in <code>cost_check.sh</code> computes the share from the live secret count and fails if the ceiling is exceeded or the count cannot be read. Cloud Run compute and egress stay inside the free tier. A $1 alert budget (<code>infra/billing/budget.tf</code>) and a $3 Cloud Run spend cap (console-managed) stand behind it.</p>
+  </div>
+  <h3 id="s11-2">11.2 Threat model</h3>
+  <table class="compact">
+    <colgroup><col style="width:24%"><col style="width:46%"><col style="width:30%"></colgroup>
+    <thead><tr><th>Threat</th><th>Control</th><th>Residual</th></tr></thead>
+    <tbody>
+      <tr><td>Direct calls to the services, bypassing the proxy</td><td>Both Cloud Run services are IAM-only, with no <code>allUsers</code> invoker; a direct request to the API gets 403.</td><td>None known.</td></tr>
+      <tr><td>Forged staff calls on <code>/internal</code> or the live feed</td><td>Proxy denies <code>/internal</code>; the ID token passes IAM; the HMAC assertion binds caller, role, method, path, query and body for at most 60 s; the role is re-read from <code>staff_access</code>. The Go service checks the same staff assertion.</td><td>No replay store: a byte-identical request can be replayed inside 60 s.</td></tr>
+      <tr><td>Stolen deploy credentials</td><td>No GCP service-account key is used. CircleCI and Vercel exchange OIDC tokens through WIF conditions pinned to <code>main</code> and to the production projects.</td><td>The Vercel deploy token is long-lived.</td></tr>
+      <tr><td>Patient IDOR on the public API</td><td>UUIDs are unguessable; the web path checks ownership and answers 404 for others' appointments.</td><td><span class="badge acc">Accepted</span> Anyone holding a UUID can act on it through <code>/api</code>; a duplicate phone reveals that a number is registered.</td></tr>
+      <tr><td>PII leaking to third parties or logs</td><td>Ably events (<code>slots:*</code> and <code>admin:events</code>) carry no identifiers. Staff events with names are served by <code>clinic-realtime</code> inside Google Cloud, and a viewer gets them without name, reason or id. Logs carry a <code>request_id</code> and no PII. Patient email goes only to verified linked accounts; the doctor's email gives first name and last initial only. A doctor's address is shown to owner and admin and is in no public response.</td><td>Resend keeps sent-mail records under its own retention.</td></tr>
+      <tr><td>Privilege escalation in the database</td><td>Runtime role has no DDL and no DELETE; migrations use a separate role and secret; the Go reader has column-level SELECT only; attendance and audit rows cannot be edited by the runtime role.</td><td>None known.</td></tr>
+      <tr><td>Supply chain and secrets in code</td><td>gitleaks, semgrep, pip-audit, gosec, govulncheck, trivy image and config scans, ZAP; base images pinned by digest.</td><td>Findings below the gate thresholds pass.</td></tr>
+    </tbody>
+  </table>
+  <h3 id="s11-3">11.3 Abuse controls</h3>
+  <ul>
+    <li>Per-client rate limit in the Vercel proxy: 120 requests a minute by default, per instance. There is no general request rate limit inside the API, where no trustworthy client IP exists behind the proxy; the push-token endpoint has its own per-address limits (below).</li>
+    <li>reCAPTCHA Enterprise assessment on each book, cancel and reschedule in the web app.</li>
+    <li>Push tokens are rate-limited per address per minute (in memory) and per day (in the database), answering <code>429 RATE_LIMITED</code>; a monthly publish budget turns push off (<code>503 REALTIME_UNAVAILABLE</code>) and the page polls.</li>
+    <li>Email day and month limits are reserved atomically before a send, so a burst cannot run past Resend's free tier, and 20 a day stay reserved for booking acknowledgements.</li>
+    <li>Staff writes are throttled to 60 per person per 10 minutes; one live stream per person and two in all.</li>
+    <li>A kill switch (<code>scripts/ops/kill_switch.sh</code>) and a production ZAP baseline.</li>
+  </ul>
+  <h3 id="s11-4">11.4 Observability</h3>
+  <p>Structured logs with a request id on every line and in every problem body, no PII. A Cloud Monitoring egress alert policy exists and is one of the live cost guards. Deploys are recorded as CircleCI deploy markers.</p>
+</section>
+
+<!-- ============================== 12 ============================== -->
+<section class="chapter" id="s12">
+  <h2><span class="num">12</span> Risks, and what breaks at 10x and 100x</h2>
+  <p>These are estimates from the configuration, not load-test results; latency and throughput have not been measured.</p>
+  <table class="compact">
+    <colgroup><col style="width:12%"><col style="width:44%"><col style="width:44%"></colgroup>
+    <thead><tr><th>Scale</th><th>What breaks first</th><th>What I would do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Today</strong> (1 clinic, 5 doctors)</td><td>Cold starts: up to three in a row (Vercel function, Cloud Run, Neon) on the first request after idle. Two staff can watch the live feed at once.</td><td>Accept for a demo. <code>min-instances 1</code> is the knob when latency matters more than $0.</td></tr>
+      <tr><td><strong>10x</strong> (about 50 doctors, a few clinics)</td><td>Database connections. Each API instance holds a pool of 5 against Neon's direct endpoint; at max 3 instances that is 15. The Go service adds up to 4 (2 per instance, 2 instances), 19 in total, and because it polls every second, Neon would not suspend while anyone watches. Two live viewers will not be enough.</td><td>Neon's pooler (needs asyncpg's statement cache off; unverified here). Add <code>clinic_id</code> scoping to every query and test tenant isolation. Move staff fan-out to Pub/Sub or Redis inside Google Cloud. Paid tiers end the $0 rule.</td></tr>
+      <tr><td><strong>100x</strong> (hundreds of clinics)</td><td>One Postgres primary is the ceiling. The proxy's per-instance rate limit stops meaning anything. Per-instance stream polling scales linearly with viewers.</td><td>A read replica for availability before any sharding (the unique index contends only per doctor and slot, so it does not serialise unrelated bookings). A shared rate-limit store. Authentication on the public API. One relay publishing to a pub/sub for the live feed.</td></tr>
+    </tbody>
+  </table>
+  <h3 id="s12-1">12.1 Risk register</h3>
+  <table class="compact">
+    <colgroup><col style="width:30%"><col style="width:12%"><col style="width:58%"></colgroup>
+    <thead><tr><th>Risk</th><th>Likelihood</th><th>Mitigation, or what I accept</th></tr></thead>
+    <tbody>
+      <tr><td>Public URL unavailable after a release</td><td>Low</td><td>The API only gets traffic after the claims check passes on its tagged revision; the public verify and the automatic rollback after it run on every release. The traffic move is tested in CI but has not been needed in production; the runbook covers the manual path.</td></tr>
+      <tr><td>IDOR on the public API</td><td>Certain</td><td>Accepted and disclosed; demo data only; review trigger is any real patient data.</td></tr>
+      <tr><td>Shared billing exhausts more free tiers</td><td>Medium</td><td>Alert budget, spend cap, live cost guards; the estimate stays under the $0.50 ceiling (11.1).</td></tr>
+      <tr><td>A rare double refetch in the live path</td><td>Low</td><td>The test "(b) a cancellation frees the time after one refetch" in <code>apps/booking/e2e/realtime.spec.ts</code> is intermittent: it sometimes sees two refetches. The cause is not yet established. Booking correctness does not depend on it, because the database decides.</td></tr>
+      <tr><td>Documentation drifts from the code</td><td>Medium</td><td>Catalogue and contract tests fail on drift between the code, the OpenAPI contract and <code>contracts/api-errors.md</code>.</td></tr>
+      <tr><td>Variable slot lengths requested</td><td>Low</td><td>Migrate the unique index to an exclusion constraint on a time range.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================== 13 ============================== -->
+<section class="chapter" id="s13">
+  <h2><span class="num">13</span> Traceability matrix</h2>
+  <p>Backend paths are relative to <code>backend/</code> unless they start with a top-level folder. "Live" URLs are under <code>https://clinic.ericgitangu.com</code> unless given in full.</p>
+  <h3 id="s13-1">13.1 Requirements and constraints</h3>
+  <table class="compact matrix">
+    <colgroup><col style="width:5%"><col style="width:7%"><col style="width:27%"><col style="width:29%"><col style="width:17%"><col style="width:15%"></colgroup>
+    <thead><tr><th>ID</th><th>Design</th><th>Implementation</th><th>Test</th><th>In production</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>R1</td><td>6.1</td><td><code>app/scripts/seed.py</code>; <code>migrations/versions/0001_initial.py</code> (<code>working_hours</code>)</td><td><code>tests/integration/test_doctors.py::test_list_doctors_active_sorted</code>, <code>::test_get_doctor_ok</code></td><td><code>/api/doctors</code> (5 doctors)</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R2</td><td>6.2, 6.3, 7</td><td><code>app/services/booking.py::book</code>; <code>app/domain/booking_rules.py::validate_slot</code></td><td><code>tests/integration/test_post_appointments.py</code></td><td><code>/docs</code>, POST /appointments</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R3</td><td>6.2</td><td><code>app/domain/slots.py</code>; <code>app/api/routers/doctors.py</code></td><td><code>tests/unit/test_slots.py</code>; <code>tests/integration/test_availability.py</code></td><td><code>/api/doctors/{id}/availability?date=</code></td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R4</td><td>6.3, 6.4</td><td><code>app/services/booking.py::cancel</code></td><td><code>tests/integration/test_cancel.py</code></td><td><code>/docs</code>, PATCH cancel</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R5</td><td>6.3, 6.4, 4.1</td><td><code>app/services/booking.py::reschedule</code></td><td><code>tests/integration/test_reschedule.py</code> (cancelled 409, outside hours 422, taken slot 409); <code>test_availability.py::test_book_cancel_and_reschedule_move_a_time_between_slots_and_taken</code>; <code>tests/concurrency/test_race_reschedule.py</code>, <code>test_race_swap.py</code></td><td><code>/docs</code>, PATCH reschedule</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R6</td><td>6.3</td><td><code>0001_initial.py</code> (<code>uq_appt_doctor_slot_booked</code>); <code>app/repositories/errors.py</code></td><td><code>tests/concurrency/test_race_same_slot.py</code>; <code>test_naive_control.py</code></td><td>20 parallel bookings of one slot on 2026-10-18: 1 x 201, 19 x 409</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R7</td><td>4 (D9), 7</td><td><code>app/api/routers/patients.py</code>; <code>app/repositories/appointments.py::upcoming_for_patient</code></td><td><code>tests/integration/test_patient_appointments.py</code></td><td><code>/docs</code>, GET patient appointments</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R8</td><td>4.1</td><td><code>app/domain/booking_rules.py</code> (<code>BookingTooSoon</code>); <code>app/domain/slots.py</code> lead filter</td><td><code>tests/integration/test_post_appointments.py::test_booking_too_soon</code>; <code>tests/unit/test_booking_rules.py</code>; <code>tests/unit/test_slots.py::test_lead_filter_excludes_near_slots</code>; <code>apps/booking/e2e/booking.spec.ts</code></td><td><code>/openapi.json</code> lists <code>BOOKING_TOO_SOON</code></td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R9</td><td>7</td><td><code>app/domain/errors.py</code>; <code>app/core/problems.py</code>; <code>contracts/api-errors.md</code></td><td><code>tests/unit/test_error_catalogue.py</code>; <code>tests/integration/test_problem_shape.py</code></td><td><code>/openapi.json</code> <code>ProblemCode</code> (40)</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R10</td><td>5</td><td><code>app/{api,services,domain,repositories,models,schemas,core}</code>; <code>services/realtime/internal</code></td><td>ruff, mypy in <code>lint</code>; <code>go-quality</code></td><td>Repository tree</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R11</td><td>9</td><td><code>backend/tests/</code></td><td>Coverage gates 85% and 95% in <code>.circleci/config.yml</code></td><td>1,089 passed, 96.36% coverage (9.1)</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R12</td><td>5, 10</td><td><code>.circleci/config.yml</code> (<code>ship-api</code>, <code>ship-realtime</code>, <code>ship-booking</code>, <code>ship-admin</code>)</td><td><code>scripts/verify_claims.py</code>; <code>verify-release</code></td><td><code>/</code>, <code>/docs</code>, <code>/api/health</code> all 200</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R13</td><td>10</td><td><code>.circleci/config.yml</code> workflow <code>pr</code></td><td>The workflow itself</td><td>16 jobs on every pull request</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R14</td><td>10</td><td>Workflow <code>release</code>; <code>infra/terraform/wif.tf</code></td><td><code>scripts/ci/test_ci_scripts.sh</code></td><td>Each merge to <code>main</code> ships four services</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R15</td><td>All</td><td><code>README.md</code> sections 1 to 12; the decisions page (35 records)</td><td><code>make lint</code> (markdownlint)</td><td>GitHub README; <code>/decisions</code> 200</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R16</td><td>n/a</td><td><code>README.md</code> section 11, "AI reflection"</td><td>n/a</td><td>GitHub README</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R17</td><td>1</td><td><code>README.md</code> Start here and section 1</td><td>n/a</td><td>Public repository; <code>/</code> 200</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>R18</td><td>1</td><td>The decision records on the decisions page; <code>README.md</code> system design sections. The decision records preceded the code; the README design section followed the first code commit.</td><td>n/a</td><td><code>/decisions</code></td><td><span class="badge gap">Partial</span></td></tr>
+      <tr><td>C1</td><td>n/a</td><td>As R16</td><td>n/a</td><td>n/a</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>C2</td><td>6, 8</td><td>Postgres (Decisions 2 and 15); <code>migrations/versions/</code></td><td><code>tests/migrations</code></td><td><code>/api/doctors</code> reads it</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>C3</td><td>4</td><td><code>README.md</code> section 8; the decisions page</td><td>n/a</td><td>n/a</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>C4</td><td>12</td><td><code>clinics.timezone</code> as data; <code>doctors.clinic_id</code></td><td><code>tests/integration/test_clinic_timezone.py</code></td><td>n/a</td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>C5</td><td>5</td><td>FastAPI, <code>app/main.py</code>; Go for the read-only live feed</td><td>Every backend test; <code>go-quality</code></td><td><code>/openapi.json</code></td><td><span class="badge ok">Met</span></td></tr>
+      <tr><td>C6</td><td>n/a</td><td>A schedule constraint, not a property of the code</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>
+      <tr><td>C7</td><td>11</td><td><code>scripts/cost_check.sh</code>; <code>infra/billing/budget.tf</code></td><td><code>scripts/cost_check_selftest.sh</code></td><td><code>cost-check</code> after each API and realtime deploy</td><td><span class="badge acc">Accepted</span> shared billing (11.1)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s13-2">13.2 Ambiguity decisions with tests</h3>
+  <table class="compact matrix">
+    <colgroup><col style="width:7%"><col style="width:93%"></colgroup>
+    <thead><tr><th>D</th><th>Test</th></tr></thead>
+    <tbody>
+      <tr><td>D1</td><td><code>tests/concurrency/test_race_same_slot.py</code>; <code>tests/integration/test_post_appointments.py::test_slot_misaligned_seconds</code></td></tr>
+      <tr><td>D2</td><td><code>tests/integration/test_clinic_timezone.py</code></td></tr>
+      <tr><td>D3</td><td><code>tests/integration/test_post_appointments.py::test_timezone_required</code></td></tr>
+      <tr><td>D4</td><td><code>tests/integration/test_post_appointments.py::test_date_out_of_range</code></td></tr>
+      <tr><td>D5</td><td><code>tests/integration/test_cancel.py::test_cancel_already_started_409</code></td></tr>
+      <tr><td>D6</td><td><code>tests/integration/test_cancel.py::test_cancel_reason_too_short_422</code></td></tr>
+      <tr><td>D7</td><td><code>tests/integration/test_reschedule.py::test_reschedule_ok</code>, <code>::test_reschedule_same_start_noop</code></td></tr>
+      <tr><td>D9</td><td><code>tests/integration/test_patient_appointments.py</code></td></tr>
+      <tr><td>D10</td><td><code>tests/integration/test_post_appointments.py::test_patient_double_booked</code></td></tr>
+      <tr><td>D12</td><td><code>tests/unit/test_idempotency.py</code>; <code>tests/integration/test_idempotency.py</code>; <code>tests/concurrency/test_race_idempotency.py</code></td></tr>
+      <tr><td>D13</td><td><code>tests/integration/test_one_hour_rule.py</code>, including the two staff exemption tests</td></tr>
+    </tbody>
+  </table>
+  <p class="small">D8 is held by the schema: <code>ck_appt_status</code> (<code>0001_initial.py</code>) admits only <code>booked</code> and <code>cancelled</code>, and attendance is a row in <code>appointment_attendance</code> (<code>0010_attendance.py</code>), which the app role may only insert and read (<code>tests/integration/test_attendance.py::test_attendance_rows_cannot_be_edited_by_the_app_role</code>). D11 is the absence of auth on <code>/api</code> and has no test of its own.</p>
+</section>
+
+<!-- ============================== 14 ============================== -->
+<section class="chapter" id="s14">
+  <h2><span class="num">14</span> Known limits</h2>
+  <table class="compact">
+    <colgroup><col style="width:19%"><col style="width:50%"><col style="width:31%"></colgroup>
+    <thead><tr><th>Kind</th><th>Limit</th><th>What removes it</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge acc">Accepted</span></td><td>The public API is unauthenticated, so the IDOR in 11.2 stands.</td><td>Authentication on the API before any real patient data.</td></tr>
+      <tr><td><span class="badge acc">Accepted</span></td><td>At most two staff can watch the live feed at once; a third sees "Live feed busy" and the page refreshes every 30 seconds.</td><td>Pub/Sub or Redis fan-out inside Google Cloud.</td></tr>
+      <tr><td><span class="badge acc">Accepted</span></td><td>Shared billing cost on the GCP project (11.1).</td><td>A billing account of its own, or fewer secret versions.</td></tr>
+      <tr><td><span class="badge unc">Not observed</span></td><td>The doctor's arrival email is covered by tests but has not been delivered to a real inbox; seeded doctors have no address.</td><td>Set a test doctor's address, mark an arrival, check the inbox.</td></tr>
+      <tr><td><span class="badge unc">Not observed</span></td><td>The daily reminder runs, but a production send has not been seen in the Resend log. Booking and cancellation emails are delivered in production.</td><td>Check the Resend log after a 15:00 UTC run.</td></tr>
+      <tr><td><span class="badge unc">Not measured</span></td><td>The cost of one connected hour on the Go service (the estimate is in section 8).</td><td><code>scripts/ops/measure_realtime_cost.sh</code></td></tr>
+      <tr><td><span class="badge gap">Defect</span></td><td>An intermittent test: "(b) a cancellation frees the time after one refetch" in <code>apps/booking/e2e/realtime.spec.ts</code> sometimes sees two refetches. The cause is not yet established.</td><td>Root cause, then a fix with a test that fails first.</td></tr>
+      <tr><td><span class="badge gap">Defect</span></td><td>Largest contentful paint on <code>/book</code> is 2.80 s on mobile Lighthouse locally, over the 2.5 s budget.</td><td>Load the header menus on demand.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</body>
+</html>

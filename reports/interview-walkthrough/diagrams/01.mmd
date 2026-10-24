@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph Browser["Browsers"]
+    PB["Patient browser<br/>PWA shell, polling fallback"]
+    SB["Staff browser<br/>one stream per browser"]
+  end
+  subgraph Vercel["Vercel (public, iad1)"]
+    BK["Booking app<br/>server actions, /api proxy, /docs"]
+    AD["Admin app<br/>server actions, /live/stream route"]
+  end
+  subgraph GCP["Google Cloud us-east4 (no public invoker)"]
+    API["clinic-api<br/>FastAPI, every rule, outbox relay"]
+    RT["clinic-realtime<br/>Go, SELECT-only role"]
+    MIG["clinic-migrate<br/>Cloud Run job, alembic as clinic_owner"]
+  end
+  DB[("Neon Postgres 17<br/>partial unique index")]
+  AB["Ably<br/>non-PII slot events"]
+  PB -->|HTTPS| BK
+  SB -->|HTTPS| AD
+  BK ==>|"ID token via OIDC to WIF, plus signed assertion"| API
+  AD ==>|"ID token plus signed assertion"| API
+  AD ==>|"ID token plus signed assertion, SSE"| RT
+  API -->|"asyncpg, role clinic_app"| DB
+  RT -->|"SELECT only, role clinic_realtime"| DB
+  MIG -->|"role clinic_owner"| DB
+  API -->|"relay after each commit"| AB
+  AB -.->|"SSE, 5 minute subscribe-only token"| PB

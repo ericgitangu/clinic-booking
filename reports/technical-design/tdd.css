@@ -1,0 +1,29 @@
+/* Idyllic Clinic: Technical Design. Branch stylesheet for WeasyPrint (A4).
+ *
+ * The brand, cover, typography, tables, callouts, footer and page furniture live in
+ * ../reports/base.css. Only the Technical Design's own pacing and matrix rules belong here.
+ */
+
+section.chapter { break-before: page; }
+section.chapter.flow { break-before: auto; margin-top: 10mm; }
+
+/* Sections 2, 3, 4, 8, 10, 11 and 12 follow the short tails of the section before on the same
+   page instead of leaving them mostly blank. */
+#s2, #s3, #s4, #s8, #s10, #s11, #s12 { break-before: auto; margin-top: 9mm; }
+#s4-hour { break-before: page; margin-top: 0; }
+
+#s4 table.compact { font-size: 7.2pt; }
+#s4 table.compact td { padding: 0.7mm 1.4mm; }
+
+/* Bookmarks: the number span has only a margin, so give the outline an explicit label. */
+h2[data-bm] { bookmark-label: attr(data-bm); }
+h3[data-bm] { bookmark-label: attr(data-bm); }
+
+.legend { font-size: 7.6pt; color: var(--muted-foreground); margin-top: 1mm; text-align: left; }
+.legend span { display: inline-block; margin-right: 5mm; }
+.legend i { display: inline-block; width: 9mm; height: 0; vertical-align: middle; margin-right: 1.5mm; border-top: 0.35mm solid #4a5b80; }
+.legend i.thick { border-top-width: 1mm; }
+.legend i.dot { border-top-style: dotted; border-top-width: 0.5mm; }
+.legend i.amber { border-top: 0.5mm dashed var(--pending); }
+table.matrix td { font-size: 7.1pt; }
+table.matrix .badge { white-space: normal; }

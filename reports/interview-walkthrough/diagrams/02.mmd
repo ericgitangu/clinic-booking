@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  actor P as Patient browser
+  participant BK as Booking app (server action)
+  participant RC as reCAPTCHA Enterprise
+  participant API as clinic-api (Cloud Run, IAM only)
+  participant DB as Postgres (Neon)
+  participant AB as Ably
+  actor O as Another patient's browser
+  P->>BK: confirm (doctor, time, attempt key)
+  BK->>RC: assessment for action "book"
+  BK->>API: POST /internal/me/appointments, ID token, signed assertion, Idempotency-Key
+  API->>API: verify assertion, email_verified, find the patient for this Google account
+  API->>DB: BEGIN, look up the key, validate_slot, INSERT appointment
+  Note over DB: uq_appt_doctor_slot_booked decides. A loser gets 23505, mapped to 409 SLOT_TAKEN
+  API->>DB: INSERT appointment_events (txid defaults to pg_current_xact_id), COMMIT
+  API->>DB: relay: cursor row FOR UPDATE SKIP LOCKED, events below snapshot xmin
+  API->>AB: publish slot_taken on slots:{doctor}:{date}, message id txid.id.part
+  API->>DB: advance cursor and budget debit in the same transaction
+  API-->>BK: 201 (or 409, or the replayed 201)
+  BK-->>P: "You are booked"
+  AB-->>O: slot_taken over SSE
+  O->>O: take the time off the grid, no poll needed
