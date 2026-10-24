@@ -50,3 +50,10 @@ overrides:
   js-yaml@^4: '>=4.3.2 <5'
   markdown-it@^14: '>=14.3.1 <15'
   katex@^0.16: '>=0.18.2 <0.19'
+  # GHSA-mrhx-c7xc-m3w5 (zod < 4.6.6 can exhaust memory on oversized constrained
+  # collections). These two parents are still on vulnerable zod lines; redirect only
+  # their child, not every zod peer in the tree (the MCP/shadcn tooling keeps zod 3).
+  # Drop these once the parents declare >= 4.6.6 themselves.
+  '@vercel/cli-config>zod': '4.6.7'
+  '@serwist/build>zod': '4.6.7'
+  '@serwist/turbopack>zod': '4.6.7'

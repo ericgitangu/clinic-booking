@@ -89,7 +89,7 @@ executors:
 
   go_db:
     docker:
-      - image: mirror.gcr.io/cimg/go:1.26
+      - image: mirror.gcr.io/cimg/go:1.26.10
       - image: mirror.gcr.io/cimg/postgres:17.11
         environment:
           POSTGRES_USER: clinic

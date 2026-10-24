@@ -1,6 +1,6 @@
 module github.com/ericgitangu/clinic-booking/services/realtime
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/jackc/pgx/v5 v5.11.0
