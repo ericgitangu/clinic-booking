@@ -26,15 +26,18 @@ export type EventResult =
   | { effect: "taken" | "freed"; data: Availability; lastSeq: string };
 
 /**
- * RULE 2: a pushed event is applied only if its sequence is after the last one applied and its
- * (txid, id) is after the cursor of the response on screen (anything at or before that cursor is
- * already in the slots). A taken slot is removed here, at once; a freed slot is not added here:
- * whether a time is offerable is the server's call, so the caller refetches once.
+ * RULE 2: a pushed event is applied only if its sequence is after the last one applied. If the
+ * response on screen already reflects the event (the time is gone for a `slot_taken`, or already
+ * free for a `slot_freed`), it is ignored and its sequence is remembered. A taken slot is removed
+ * here, at once; a freed slot is not added here: whether a time is offerable is the server's call,
+ * so the caller refetches once.
  *
- * The cursor on screen stays the response's own. The server's cursor is "<xmin>.0", which can sit
- * behind the (txid, id) of an event already pushed; moving it to the event made the refetch after
- * a freed event look older and be dropped. Event order is tracked by `lastSeq` instead, and a taken
- * time is held back from older responses by `reapplyTaken`.
+ * The cursor on screen stays the response's own, but it is a horizon (`<xmin>.0`), not a promise
+ * that the response saw every event at or before it. A gap between the cursor and the grid is
+ * resolved in favour of the grid: a `slot_taken` for a time still on offer is applied, because a
+ * bookable taken time is the worse error. A `slot_freed` for a time still absent asks the server
+ * once. Event order is tracked by `lastSeq`, and a taken time is held back from older responses
+ * by `reapplyTaken`.
  */
 export function applyEvent(
   data: Availability,
@@ -48,8 +51,16 @@ export function applyEvent(
     return ignored;
   const last = lastSeq ? parseSeq(lastSeq) : null;
   if (last && compareSeq(seq, last) <= 0) return ignored;
-  const cursor = parseSeq(data.cursor);
-  if (cursor && compareSeq(seq, cursor, 2) <= 0)
+
+  // The grid is the evidence that decides whether the event is already reflected. The cursor can
+  // sit at or beyond the event while a response still shows the old state; the event wins when
+  // the two disagree, because a taken time left on offer is worse than one extra render.
+  const stillFree = data.slots.some((s) =>
+    sameInstant(s.starts_at, ev.starts_at),
+  );
+  if (ev.kind === "slot_taken" && !stillFree)
+    return { ...ignored, lastSeq: ev.seq };
+  if (ev.kind === "slot_freed" && stillFree)
     return { ...ignored, lastSeq: ev.seq };
 
   if (ev.kind === "slot_freed")
