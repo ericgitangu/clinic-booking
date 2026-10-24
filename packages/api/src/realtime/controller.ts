@@ -38,6 +38,13 @@ export interface ControllerOptions<T> {
   /** Visible, not idle, and the person has done something since the last token was minted. */
   shouldReconnect(): boolean;
   fetchImpl?: typeof fetch;
+  /**
+   * How long to wait for the first SSE frame before calling the stream live. The service sends no
+   * frame on connect (see the backend's real-Ably test), so a page that books immediately after
+   * the headers can publish before the subscription is attached and lose the event. A first frame
+   * is positive proof; after this grace the stream is treated as live anyway. Default 1.5 s.
+   */
+  attachGraceMs?: number;
   /** Reconnect backoff in ms: doubles from `baseMs` up to `maxMs`. */
   backoff?: { baseMs: number; maxMs: number };
   /** How long to leave a refused (429, no access) channel alone. */
@@ -171,11 +178,17 @@ export class StreamController<T> {
       });
       if (!res.ok || !res.body) return "failed";
       outcome = "opened-then-closed";
-      this.set("live");
-      this.o.onConnected?.();
+      let failed = false;
+      let marked = false;
+      const markLive = () => {
+        if (marked || failed || signal.aborted) return;
+        marked = true;
+        this.set("live");
+        this.o.onConnected?.();
+      };
       const parser = createSseParser((f) => {
-        if (f.kind !== "event") return;
-        if (f.event === "error") {
+        if (f.kind === "event" && f.event === "error") {
+          failed = true;
           let code = 0;
           try {
             code = Number((JSON.parse(f.data) as { code?: number }).code);
@@ -192,13 +205,20 @@ export class StreamController<T> {
           void reader.cancel();
           return;
         }
-        this.deliver(f.data);
+        // A comment, heartbeat or real event is positive proof the subscription is attached.
+        markLive();
+        if (f.kind === "event") this.deliver(f.data);
       });
       const reader = res.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        parser.push(value);
+      const timer = setTimeout(markLive, this.o.attachGraceMs ?? 1_500);
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parser.push(value);
+        }
+      } finally {
+        clearTimeout(timer);
       }
     } catch {
       if (signal.aborted) return outcome;
