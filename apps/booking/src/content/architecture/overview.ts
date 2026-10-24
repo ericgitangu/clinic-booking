@@ -118,7 +118,7 @@ export const OVERVIEW: TabContent = {
         },
         {
           t: "p",
-          text: "A page that opens the booking screen asks the API for a 5 minute, subscribe-only token for that one channel, then listens over SSE. A message is applied only if it is newer than the last one seen and newer than the page's availability cursor.",
+          text: "A page that opens the booking screen asks the API for a 5 minute, subscribe-only token for that one channel, then listens over SSE. A message is applied only if it is newer than the last one seen. The response cursor is a horizon, not proof that the response saw every event before it, so if the grid still offers a time a `slot_taken` removes, the event wins; a `slot_freed` for a time still absent asks the server once.",
         },
         {
           t: "p",

@@ -101,6 +101,26 @@ describe("RULE 2: pushed events", () => {
     );
     expect(r.effect).toBe("ignored");
   });
+  it("applies a taken event when the cursor is at its txid but the grid still offers the time", () => {
+    // The cursor is <xmin>.0, a horizon, not proof that this response saw the event. The grid is
+    // the evidence: a taken time still on offer must be removed, not left bookable.
+    const r = applyEvent(
+      avail("7.6", ["08:00", "08:30"]),
+      null,
+      ev("7.6.1", "slot_taken", "08:00"),
+    );
+    expect(r.effect).toBe("taken");
+    expect(r.data.slots.map((s) => s.starts_at)).toEqual([at("08:30")]);
+    expect(r.data.taken).toEqual([new Date(at("08:00")).toISOString()]);
+  });
+  it("asks for a refetch when a freed event is at the cursor but the grid still calls the time taken", () => {
+    const r = applyEvent(
+      avail("7.6", ["08:30"], ["08:00"]),
+      null,
+      ev("7.6.0", "slot_freed", "08:00"),
+    );
+    expect(r.effect).toBe("freed");
+  });
   it("asks for one refetch on a freed slot and does not add the time itself", () => {
     const data = avail("7.5", ["08:30"], ["08:00"]);
     const r = applyEvent(data, null, ev("7.7.0", "slot_freed", "08:00"));
