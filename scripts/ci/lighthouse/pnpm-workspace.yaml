@@ -9,12 +9,15 @@ minimumReleaseAge: 1440 # nosemgrep: package_managers.pnpm.pnpm-missing-minimum-
 trustPolicyExclude:
   - semver@5.7.2
   - semver@6.3.1
-# Patched versions exist for these three transitive advisories, so they are forced (checked with
-# `pnpm audit` on 2026-10-18).
+# Patched versions exist for these transitive advisories, so they are forced (checked with
+# `pnpm audit` on 2026-10-24).
 overrides:
   tmp: '>=0.2.6'
   basic-ftp: '>=6.2.1'
   uuid: '>=11.1.1'
+  # GHSA-27r3-jxmh-p828: express 4.22.3 still resolves body-parser 1.20.8. 1.20.9 is
+  # semver-compatible with the express range and fixes the trailing-bytes DoS.
+  body-parser: '>=1.20.9 <2'
 # TECH DEBT, dated 2026-10-18: extract-zip (<=2.0.1, no patched release) has two high advisories,
 # GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3, both about malicious zip archives. It is reached only
 # through puppeteer-core's browser downloader, which Lighthouse CI never calls here: it is given a
@@ -24,8 +27,14 @@ overrides:
 # through unbounded precision specifiers) arrives as @lhci/utils > js-yaml 3 > argparse 1 > sprintf-js
 # and only ever formats our own lighthouserc, so no untrusted format string reaches it. Review
 # trigger: an @lhci/cli release after 0.15.1 (0.15.1 is the latest on 2026-10-20), then delete the ignore.
+# TECH DEBT, dated 2026-10-24: zod 3.25.76 arrives through lighthouse > puppeteer-core >
+# chromium-bidi 14, which declares a zod 3 range; forcing zod 4 would be an untested major
+# upgrade in the browser driver. The advisory is memory exhaustion while validating oversized
+# constrained collections, and Lighthouse CI validates its own lighthouserc, not untrusted input.
+# Review trigger: a chromium-bidi release on zod >= 4.6.6, then delete this ignore.
 auditConfig:
   ignoreGhsas:
     - GHSA-jmr9-qjv8-65gv
     - GHSA-7pqw-9j4j-h8q3
     - GHSA-hp3w-g68c-fv3c
+    - GHSA-mrhx-c7xc-m3w5
